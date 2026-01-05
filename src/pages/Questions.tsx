@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Filter } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +8,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
 import { NYS_SUBJECTS, searchTopics, type JMAPTopic, type TopicCategory } from '@/data/nysTopics';
 import { WorksheetBuilder, type WorksheetQuestion } from '@/components/questions/WorksheetBuilder';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +19,7 @@ export default function Questions() {
   const [selectedSubject, setSelectedSubject] = useState('geometry');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [worksheetQuestions, setWorksheetQuestions] = useState<WorksheetQuestion[]>([]);
+  const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set());
 
   // Get current subject data
   const currentSubject = NYS_SUBJECTS.find(s => s.id === selectedSubject);
@@ -40,8 +42,75 @@ export default function Questions() {
     });
   };
 
+  const getTopicId = (topic: JMAPTopic, subject: string, category: string) => {
+    return `${subject}-${category}-${topic.name}`.replace(/\s+/g, '-').toLowerCase();
+  };
+
+  const toggleTopicSelection = (topic: JMAPTopic, subject: string, category: string) => {
+    const id = getTopicId(topic, subject, category);
+    setSelectedTopics(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const addSelectedToWorksheet = () => {
+    if (selectedTopics.size === 0) {
+      toast({
+        title: 'No topics selected',
+        description: 'Please select topics by checking the boxes.',
+      });
+      return;
+    }
+
+    let addedCount = 0;
+    const allTopics = NYS_SUBJECTS.flatMap(subject =>
+      subject.categories.flatMap(category =>
+        category.topics.map(topic => ({
+          topic,
+          subject: subject.name,
+          category: category.category,
+          id: getTopicId(topic, subject.name, category.category),
+        }))
+      )
+    );
+
+    selectedTopics.forEach(topicId => {
+      const found = allTopics.find(t => t.id === topicId);
+      if (found && !worksheetQuestions.some(q => q.id === topicId)) {
+        setWorksheetQuestions(prev => [...prev, {
+          id: topicId,
+          topicName: found.topic.name,
+          standard: found.topic.standard,
+          jmapUrl: found.topic.url,
+          subject: found.subject,
+          category: found.category,
+        }]);
+        addedCount++;
+      }
+    });
+
+    if (addedCount > 0) {
+      toast({
+        title: 'Topics added',
+        description: `Added ${addedCount} topic(s) to your worksheet.`,
+      });
+      setSelectedTopics(new Set());
+    } else {
+      toast({
+        title: 'Already added',
+        description: 'All selected topics are already in your worksheet.',
+      });
+    }
+  };
+
   const addToWorksheet = (topic: JMAPTopic, subject: string, category: string) => {
-    const id = `${subject}-${category}-${topic.name}`.replace(/\s+/g, '-').toLowerCase();
+    const id = getTopicId(topic, subject, category);
     
     // Check if already added
     if (worksheetQuestions.some(q => q.id === id)) {
@@ -75,18 +144,56 @@ export default function Questions() {
     setWorksheetQuestions([]);
   };
 
+  const selectAllInCategory = (category: TopicCategory, subject: string) => {
+    const categoryTopicIds = category.topics.map(topic => 
+      getTopicId(topic, subject, category.category)
+    );
+    
+    const allSelected = categoryTopicIds.every(id => selectedTopics.has(id));
+    
+    setSelectedTopics(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        categoryTopicIds.forEach(id => next.delete(id));
+      } else {
+        categoryTopicIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
   const TopicItem = ({ topic, subject, category }: { topic: JMAPTopic; subject: string; category: string }) => {
-    const id = `${subject}-${category}-${topic.name}`.replace(/\s+/g, '-').toLowerCase();
+    const id = getTopicId(topic, subject, category);
     const isAdded = worksheetQuestions.some(q => q.id === id);
+    const isSelected = selectedTopics.has(id);
 
     return (
-      <div className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50 group transition-colors">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-sm">{topic.name}</span>
-            <Badge variant="outline" className="text-xs font-mono">
-              {topic.standard}
-            </Badge>
+      <div 
+        className={`flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50 group transition-colors cursor-pointer ${
+          isSelected ? 'bg-primary/10 hover:bg-primary/15' : ''
+        }`}
+        onClick={() => toggleTopicSelection(topic, subject, category)}
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <Checkbox 
+            checked={isSelected}
+            onCheckedChange={() => toggleTopicSelection(topic, subject, category)}
+            onClick={(e) => e.stopPropagation()}
+            className="data-[state=checked]:bg-primary"
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm">{topic.name}</span>
+              <Badge variant="outline" className="text-xs font-mono">
+                {topic.standard}
+              </Badge>
+              {isAdded && (
+                <Badge variant="secondary" className="text-xs">
+                  <Check className="h-3 w-3 mr-1" />
+                  Added
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -95,6 +202,7 @@ export default function Questions() {
             target="_blank"
             rel="noopener noreferrer"
             className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+            onClick={(e) => e.stopPropagation()}
           >
             <ExternalLink className="h-4 w-4" />
           </a>
@@ -102,7 +210,10 @@ export default function Questions() {
             variant={isAdded ? "secondary" : "ghost"}
             size="icon"
             className="h-7 w-7"
-            onClick={() => addToWorksheet(topic, subject, category)}
+            onClick={(e) => {
+              e.stopPropagation();
+              addToWorksheet(topic, subject, category);
+            }}
             disabled={isAdded}
           >
             <Plus className="h-4 w-4" />
@@ -114,11 +225,23 @@ export default function Questions() {
 
   const CategorySection = ({ category, subject }: { category: TopicCategory; subject: string }) => {
     const isExpanded = expandedCategories.has(category.category);
+    const categoryTopicIds = category.topics.map(topic => 
+      getTopicId(topic, subject, category.category)
+    );
+    const selectedCount = categoryTopicIds.filter(id => selectedTopics.has(id)).length;
+    const allSelected = selectedCount === category.topics.length && category.topics.length > 0;
+    const someSelected = selectedCount > 0 && selectedCount < category.topics.length;
 
     return (
       <Collapsible open={isExpanded} onOpenChange={() => toggleCategory(category.category)}>
         <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
           <div className="flex items-center gap-2">
+            <Checkbox 
+              checked={allSelected}
+              className={`${someSelected ? 'data-[state=unchecked]:bg-primary/30' : ''}`}
+              onCheckedChange={() => selectAllInCategory(category, subject)}
+              onClick={(e) => e.stopPropagation()}
+            />
             {isExpanded ? (
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             ) : (
@@ -126,9 +249,16 @@ export default function Questions() {
             )}
             <span className="font-semibold text-sm">{category.category}</span>
           </div>
-          <Badge variant="secondary" className="text-xs">
-            {category.topics.length} topics
-          </Badge>
+          <div className="flex items-center gap-2">
+            {selectedCount > 0 && (
+              <Badge variant="default" className="text-xs">
+                {selectedCount} selected
+              </Badge>
+            )}
+            <Badge variant="secondary" className="text-xs">
+              {category.topics.length} topics
+            </Badge>
+          </div>
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-1 ml-4 border-l-2 border-muted pl-2">
           {category.topics.map((topic) => (
@@ -151,7 +281,7 @@ export default function Questions() {
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Question Bank</h1>
           <p className="text-muted-foreground">
-            Browse NYS Regents aligned topics and create downloadable worksheets
+            Browse NYS Regents aligned topics and create AI-generated worksheets
           </p>
         </div>
 
@@ -168,6 +298,31 @@ export default function Questions() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+
+            {/* Add Selected Button */}
+            {selectedTopics.size > 0 && (
+              <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/20">
+                <span className="text-sm font-medium">
+                  {selectedTopics.size} topic(s) selected
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedTopics(new Set())}
+                  >
+                    Clear Selection
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={addSelectedToWorksheet}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add to Worksheet
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Search Results or Topic Browser */}
             {searchQuery.trim() ? (
@@ -187,39 +342,69 @@ export default function Questions() {
                   ) : (
                     <ScrollArea className="h-[400px]">
                       <div className="space-y-1">
-                        {searchResults.map((result, index) => (
-                          <div key={index} className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50 group">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-medium text-sm">{result.topic.name}</span>
-                                <Badge variant="outline" className="text-xs font-mono">
-                                  {result.topic.standard}
-                                </Badge>
+                        {searchResults.map((result, index) => {
+                          const id = getTopicId(result.topic, result.subject, result.category);
+                          const isSelected = selectedTopics.has(id);
+                          const isAdded = worksheetQuestions.some(q => q.id === id);
+
+                          return (
+                            <div 
+                              key={index} 
+                              className={`flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50 group cursor-pointer ${
+                                isSelected ? 'bg-primary/10 hover:bg-primary/15' : ''
+                              }`}
+                              onClick={() => toggleTopicSelection(result.topic, result.subject, result.category)}
+                            >
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <Checkbox 
+                                  checked={isSelected}
+                                  onCheckedChange={() => toggleTopicSelection(result.topic, result.subject, result.category)}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium text-sm">{result.topic.name}</span>
+                                    <Badge variant="outline" className="text-xs font-mono">
+                                      {result.topic.standard}
+                                    </Badge>
+                                    {isAdded && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        <Check className="h-3 w-3 mr-1" />
+                                        Added
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {result.subject} › {result.category}
+                                  </p>
+                                </div>
                               </div>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {result.subject} › {result.category}
-                              </p>
+                              <div className="flex items-center gap-1">
+                                <a
+                                  href={result.topic.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    addToWorksheet(result.topic, result.subject, result.category);
+                                  }}
+                                  disabled={isAdded}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <a
-                                href={result.topic.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </a>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => addToWorksheet(result.topic, result.subject, result.category)}
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </ScrollArea>
                   )}
@@ -230,7 +415,7 @@ export default function Questions() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg">Browse by Subject</CardTitle>
                   <CardDescription>
-                    Select a subject to explore NYS Regents aligned topics
+                    Select topics to build your worksheet. Use checkboxes to select multiple topics.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -269,10 +454,10 @@ export default function Questions() {
                 <div className="flex gap-3">
                   <BookOpen className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                   <div className="space-y-1">
-                    <p className="font-medium text-sm">JMAP Resources</p>
+                    <p className="font-medium text-sm">AI-Powered Worksheets</p>
                     <p className="text-sm text-muted-foreground">
-                      Click the external link icon on any topic to access free practice problems, 
-                      answer keys, and instructional resources from JMAP.org aligned to NYS Regents exams.
+                      Select topics, choose the number of questions, and click "Compile Worksheet" to generate 
+                      higher-order thinking questions aligned to NYS Regents standards.
                     </p>
                   </div>
                 </div>
