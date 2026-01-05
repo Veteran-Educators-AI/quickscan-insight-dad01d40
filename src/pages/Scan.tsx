@@ -12,14 +12,22 @@ import { BatchReport } from '@/components/scan/BatchReport';
 import { ClassStudentSelector, useClassStudents } from '@/components/scan/ClassStudentSelector';
 import { useAnalyzeStudentWork } from '@/hooks/useAnalyzeStudentWork';
 import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
+import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
-type ScanState = 'idle' | 'camera' | 'preview' | 'analyzed';
+type ScanState = 'idle' | 'camera' | 'preview' | 'analyzed' | 'manual-scoring';
 type ScanMode = 'single' | 'batch';
 type GradingMethod = 'ai' | 'teacher';
+
+interface ManualResult {
+  rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
+  totalScore: { earned: number; possible: number; percentage: number };
+  feedback: string;
+  misconceptions: string[];
+}
 
 export default function Scan() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -32,6 +40,7 @@ export default function Scan() {
   const [finalImage, setFinalImage] = useState<string | null>(null);
   const [showBatchReport, setShowBatchReport] = useState(false);
   const [gradingMethod, setGradingMethod] = useState<GradingMethod>('ai');
+  const [manualResult, setManualResult] = useState<ManualResult | null>(null);
 
   // Class & student selection for batch mode
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -119,6 +128,11 @@ export default function Scan() {
   const analyzeImage = async () => {
     if (!finalImage) return;
 
+    if (gradingMethod === 'teacher') {
+      setScanState('manual-scoring');
+      return;
+    }
+
     const analysisResult = await analyze(finalImage, undefined, mockRubricSteps);
     
     if (analysisResult) {
@@ -129,6 +143,14 @@ export default function Scan() {
     } else if (error) {
       toast.error('Analysis failed', { description: error });
     }
+  };
+
+  const handleManualScoreSubmit = (manualScoreResult: ManualResult) => {
+    setManualResult(manualScoreResult);
+    setScanState('analyzed');
+    toast.success('Score saved!', {
+      description: `Score: ${manualScoreResult.totalScore.earned}/${manualScoreResult.totalScore.possible} (${manualScoreResult.totalScore.percentage}%)`,
+    });
   };
 
   const startBatchAnalysis = async () => {
@@ -201,6 +223,7 @@ export default function Scan() {
     setCapturedImage(null);
     setScanState('idle');
     setShowBatchReport(false);
+    setManualResult(null);
   };
 
   // Detect if running in Capacitor/native context
@@ -276,11 +299,28 @@ export default function Scan() {
 
             {/* Single Scan Mode */}
             <TabsContent value="single" className="space-y-4 mt-4">
-              {/* Analysis Results */}
-              {scanState === 'analyzed' && result && (
+              {/* Manual Scoring Form */}
+              {scanState === 'manual-scoring' && finalImage && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">Grading Results</h2>
+                    <h2 className="text-lg font-semibold">Manual Scoring</h2>
+                  </div>
+                  <ManualScoringForm
+                    rubricSteps={mockRubricSteps}
+                    imageUrl={finalImage}
+                    onSubmit={handleManualScoreSubmit}
+                    onCancel={() => setScanState('idle')}
+                  />
+                </div>
+              )}
+
+              {/* Analysis Results - AI or Manual */}
+              {scanState === 'analyzed' && (result || manualResult) && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold">
+                      {manualResult ? 'Teacher Scoring Results' : 'AI Grading Results'}
+                    </h2>
                     <Button variant="outline" size="sm" onClick={startNewScan}>
                       <RotateCcw className="h-4 w-4 mr-2" />
                       New Scan
@@ -297,12 +337,28 @@ export default function Scan() {
                     </CardContent>
                   </Card>
                   
-                  <AnalysisResults result={result} rawAnalysis={rawAnalysis} />
+                  {result && !manualResult && (
+                    <AnalysisResults result={result} rawAnalysis={rawAnalysis} />
+                  )}
+                  
+                  {manualResult && (
+                    <AnalysisResults 
+                      result={{
+                        ocrText: '',
+                        problemIdentified: '',
+                        approachAnalysis: '',
+                        rubricScores: manualResult.rubricScores,
+                        misconceptions: manualResult.misconceptions,
+                        totalScore: manualResult.totalScore,
+                        feedback: manualResult.feedback,
+                      }} 
+                    />
+                  )}
                 </div>
               )}
 
               {/* Main scan card */}
-              {scanState !== 'analyzed' && (
+              {scanState !== 'analyzed' && scanState !== 'manual-scoring' && (
                 <Card className="overflow-hidden">
                   <CardContent className="p-0">
                     {finalImage ? (
@@ -350,7 +406,7 @@ export default function Scan() {
                             onClick={analyzeImage}
                             disabled={isAnalyzing}
                           >
-                            {isAnalyzing ? 'Analyzing...' : 'Analyze'}
+                            {isAnalyzing ? 'Analyzing...' : gradingMethod === 'ai' ? 'Analyze with AI' : 'Score Manually'}
                           </Button>
                         </div>
                       </div>
