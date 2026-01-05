@@ -235,9 +235,9 @@ export default function Questions() {
                 </CardHeader>
                 <CardContent>
                   <Tabs value={selectedSubject} onValueChange={setSelectedSubject}>
-                    <TabsList className="grid w-full grid-cols-4 mb-4">
+                    <TabsList className="flex flex-wrap h-auto gap-1 mb-4">
                       {NYS_SUBJECTS.map((subject) => (
-                        <TabsTrigger key={subject.id} value={subject.id} className="text-xs sm:text-sm">
+                        <TabsTrigger key={subject.id} value={subject.id} className="text-xs px-2 py-1">
                           {subject.shortName}
                         </TabsTrigger>
                       ))}
