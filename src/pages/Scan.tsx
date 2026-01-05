@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, Users, FileText, RotateCcw, Layers, Play, Plus, Sparkles } from 'lucide-react';
+import { Camera, Upload, Users, FileText, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,9 +14,12 @@ import { useAnalyzeStudentWork } from '@/hooks/useAnalyzeStudentWork';
 import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 type ScanState = 'idle' | 'camera' | 'preview' | 'analyzed';
 type ScanMode = 'single' | 'batch';
+type GradingMethod = 'ai' | 'teacher';
 
 export default function Scan() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -28,6 +31,7 @@ export default function Scan() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [finalImage, setFinalImage] = useState<string | null>(null);
   const [showBatchReport, setShowBatchReport] = useState(false);
+  const [gradingMethod, setGradingMethod] = useState<GradingMethod>('ai');
 
   // Class & student selection for batch mode
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -216,6 +220,40 @@ export default function Scan() {
             <h1 className="font-display text-2xl font-bold">Scan Student Work</h1>
             <p className="text-muted-foreground">Capture or upload photos of student responses</p>
           </div>
+
+          {/* Grading Method Selection */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Grading Method</Label>
+                <RadioGroup
+                  value={gradingMethod}
+                  onValueChange={(v) => setGradingMethod(v as GradingMethod)}
+                  className="grid grid-cols-2 gap-3"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="ai" id="ai" />
+                    <Label htmlFor="ai" className="flex items-center gap-2 cursor-pointer">
+                      <Bot className="h-4 w-4 text-primary" />
+                      <span>AI Analysis</span>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="teacher" id="teacher" />
+                    <Label htmlFor="teacher" className="flex items-center gap-2 cursor-pointer">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span>Teacher Input</span>
+                    </Label>
+                  </div>
+                </RadioGroup>
+                <p className="text-xs text-muted-foreground">
+                  {gradingMethod === 'ai' 
+                    ? 'AI will automatically analyze and grade student work based on the rubric.'
+                    : 'You will manually input scores and feedback for each student.'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Mode Toggle */}
           <Tabs value={scanMode} onValueChange={(v) => {

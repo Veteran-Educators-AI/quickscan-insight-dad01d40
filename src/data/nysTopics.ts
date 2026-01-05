@@ -305,6 +305,168 @@ export const PRECALCULUS_TOPICS: TopicCategory[] = [
   },
 ];
 
+export const ENGLISH_TOPICS: TopicCategory[] = [
+  {
+    category: 'READING COMPREHENSION',
+    topics: [
+      { name: 'Central Idea and Theme', standard: 'RL.11-12.2', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Text Structure and Organization', standard: 'RI.11-12.5', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Author\'s Purpose and Point of View', standard: 'RI.11-12.6', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Inference and Evidence', standard: 'RL.11-12.1', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Vocabulary in Context', standard: 'L.11-12.4', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+    ],
+  },
+  {
+    category: 'LITERARY ANALYSIS',
+    topics: [
+      { name: 'Characterization', standard: 'RL.11-12.3', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Literary Devices', standard: 'RL.11-12.4', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Symbolism and Allegory', standard: 'RL.11-12.4', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Tone and Mood', standard: 'RL.11-12.4', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Narrative Perspective', standard: 'RL.11-12.6', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+    ],
+  },
+  {
+    category: 'WRITING',
+    topics: [
+      { name: 'Argumentative Writing', standard: 'W.11-12.1', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Informative/Explanatory Writing', standard: 'W.11-12.2', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Narrative Writing', standard: 'W.11-12.3', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Research Skills', standard: 'W.11-12.7', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Evidence Integration', standard: 'W.11-12.9', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+    ],
+  },
+  {
+    category: 'LANGUAGE AND GRAMMAR',
+    topics: [
+      { name: 'Sentence Structure', standard: 'L.11-12.3', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Usage and Conventions', standard: 'L.11-12.1', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Punctuation', standard: 'L.11-12.2', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+      { name: 'Word Choice and Style', standard: 'L.11-12.3', url: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards' },
+    ],
+  },
+];
+
+export const HISTORY_TOPICS: TopicCategory[] = [
+  {
+    category: 'US HISTORY',
+    topics: [
+      { name: 'Colonial Period', standard: 'USH.1', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'American Revolution', standard: 'USH.2', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Constitution and New Nation', standard: 'USH.3', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Civil War and Reconstruction', standard: 'USH.4', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Industrialization and Progressivism', standard: 'USH.5', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'World War I and the 1920s', standard: 'USH.6', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Great Depression and New Deal', standard: 'USH.7', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'World War II', standard: 'USH.8', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Cold War Era', standard: 'USH.9', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Civil Rights Movement', standard: 'USH.10', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+    ],
+  },
+  {
+    category: 'GLOBAL HISTORY',
+    topics: [
+      { name: 'Ancient Civilizations', standard: 'GH.1', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Classical Civilizations', standard: 'GH.2', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Post-Classical Era', standard: 'GH.3', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Renaissance and Reformation', standard: 'GH.4', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Age of Exploration', standard: 'GH.5', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Age of Revolutions', standard: 'GH.6', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Imperialism', standard: 'GH.7', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'World Wars', standard: 'GH.8', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Cold War and Decolonization', standard: 'GH.9', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+    ],
+  },
+  {
+    category: 'CIVIC LITERACY',
+    topics: [
+      { name: 'Constitutional Foundations', standard: 'CIV.1', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Rights and Responsibilities', standard: 'CIV.2', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Government Structure', standard: 'CIV.3', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Political Processes', standard: 'CIV.4', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+    ],
+  },
+  {
+    category: 'GEOGRAPHY AND ECONOMICS',
+    topics: [
+      { name: 'Physical Geography', standard: 'GEO.1', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Human Geography', standard: 'GEO.2', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Economic Systems', standard: 'ECON.1', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+      { name: 'Trade and Globalization', standard: 'ECON.2', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-framework' },
+    ],
+  },
+];
+
+export const BIOLOGY_TOPICS: TopicCategory[] = [
+  {
+    category: 'CELLS AND CELL PROCESSES',
+    topics: [
+      { name: 'Cell Structure and Function', standard: 'LE.1.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Cell Organelles', standard: 'LE.1.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Cell Membrane and Transport', standard: 'LE.1.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Cellular Respiration', standard: 'LE.1.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Photosynthesis', standard: 'LE.1.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Cell Division - Mitosis', standard: 'LE.2.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Cell Division - Meiosis', standard: 'LE.2.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'GENETICS AND HEREDITY',
+    topics: [
+      { name: 'DNA Structure and Replication', standard: 'LE.2.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Protein Synthesis', standard: 'LE.2.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Mendelian Genetics', standard: 'LE.2.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Punnett Squares', standard: 'LE.2.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Genetic Variations', standard: 'LE.2.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Mutations', standard: 'LE.2.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Genetic Engineering', standard: 'LE.2.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'EVOLUTION',
+    topics: [
+      { name: 'Natural Selection', standard: 'LE.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Evidence of Evolution', standard: 'LE.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Adaptation', standard: 'LE.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Speciation', standard: 'LE.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Evolutionary Relationships', standard: 'LE.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'ECOLOGY',
+    topics: [
+      { name: 'Ecosystems and Biomes', standard: 'LE.6.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Food Chains and Webs', standard: 'LE.6.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Energy Flow', standard: 'LE.6.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Biogeochemical Cycles', standard: 'LE.6.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Population Dynamics', standard: 'LE.6.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Symbiotic Relationships', standard: 'LE.6.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Human Impact on Environment', standard: 'LE.7.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'HUMAN BODY SYSTEMS',
+    topics: [
+      { name: 'Digestive System', standard: 'LE.1.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Circulatory System', standard: 'LE.1.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Respiratory System', standard: 'LE.1.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Nervous System', standard: 'LE.1.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Immune System', standard: 'LE.1.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Reproductive System', standard: 'LE.4.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Homeostasis', standard: 'LE.5.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'LABORATORY SKILLS',
+    topics: [
+      { name: 'Microscope Use', standard: 'LE.1.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Scientific Method', standard: 'LE.1.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Data Analysis', standard: 'LE.1.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Laboratory Safety', standard: 'LE.1.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+];
+
 export const NYS_SUBJECTS: Subject[] = [
   {
     id: 'geometry',
@@ -329,6 +491,24 @@ export const NYS_SUBJECTS: Subject[] = [
     name: 'Precalculus',
     shortName: 'PRE',
     categories: PRECALCULUS_TOPICS,
+  },
+  {
+    id: 'english',
+    name: 'English',
+    shortName: 'ENG',
+    categories: ENGLISH_TOPICS,
+  },
+  {
+    id: 'history',
+    name: 'History',
+    shortName: 'HIST',
+    categories: HISTORY_TOPICS,
+  },
+  {
+    id: 'biology',
+    name: 'Biology',
+    shortName: 'BIO',
+    categories: BIOLOGY_TOPICS,
   },
 ];
 
