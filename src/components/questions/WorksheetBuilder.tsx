@@ -40,6 +40,8 @@ interface SavedWorksheet {
     questionCount: string;
     difficultyFilter: string[];
     showAnswerLines: boolean;
+    includeGeometry?: boolean;
+    includeFormulas?: boolean;
   };
   created_at: string;
   share_code: string | null;
@@ -60,6 +62,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [showAnswerLines, setShowAnswerLines] = useState(true);
   const [questionCount, setQuestionCount] = useState('5');
   const [difficultyFilter, setDifficultyFilter] = useState<string[]>(['medium', 'hard', 'challenging']);
+  const [includeGeometry, setIncludeGeometry] = useState(false);
+  const [includeFormulas, setIncludeFormulas] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledQuestions, setCompiledQuestions] = useState<GeneratedQuestion[]>([]);
   const [isCompiled, setIsCompiled] = useState(false);
@@ -119,6 +123,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           questionCount,
           difficultyFilter,
           showAnswerLines,
+          includeGeometry,
+          includeFormulas,
         })),
       };
       const { error } = await supabase.from('worksheets').insert([worksheetData]);
@@ -149,6 +155,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setQuestionCount(worksheet.settings.questionCount);
     setDifficultyFilter(worksheet.settings.difficultyFilter);
     setShowAnswerLines(worksheet.settings.showAnswerLines);
+    setIncludeGeometry(worksheet.settings.includeGeometry ?? false);
+    setIncludeFormulas(worksheet.settings.includeFormulas ?? false);
     setIsCompiled(true);
     setShowSavedWorksheets(false);
     toast({
@@ -265,6 +273,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           })),
           questionCount: parseInt(questionCount),
           difficultyLevels: difficultyFilter,
+          includeGeometry,
+          includeFormulas,
         },
       });
 
@@ -653,6 +663,30 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   />
                   <Label htmlFor="answerLines" className="text-sm cursor-pointer">
                     Include answer lines
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="includeGeometry"
+                    checked={includeGeometry}
+                    onChange={(e) => setIncludeGeometry(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  <Label htmlFor="includeGeometry" className="text-sm cursor-pointer">
+                    Include geometric shapes/diagrams
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="includeFormulas"
+                    checked={includeFormulas}
+                    onChange={(e) => setIncludeFormulas(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  <Label htmlFor="includeFormulas" className="text-sm cursor-pointer">
+                    Include mathematical formulas
                   </Label>
                 </div>
               </div>

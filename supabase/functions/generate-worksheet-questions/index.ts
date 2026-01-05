@@ -27,10 +27,12 @@ serve(async (req) => {
   }
 
   try {
-    const { topics, questionCount, difficultyLevels } = await req.json() as {
+    const { topics, questionCount, difficultyLevels, includeGeometry, includeFormulas } = await req.json() as {
       topics: TopicInput[];
       questionCount: number;
       difficultyLevels?: string[];
+      includeGeometry?: boolean;
+      includeFormulas?: boolean;
     };
 
     if (!topics || topics.length === 0) {
@@ -56,6 +58,27 @@ serve(async (req) => {
       : ['medium', 'hard', 'challenging'];
     const difficultyInstruction = `Only generate questions with these difficulty levels: ${allowedDifficulties.join(', ')}.`;
 
+    // Build optional instructions for geometry and formulas
+    let geometryInstruction = '';
+    if (includeGeometry) {
+      geometryInstruction = `
+8. Include geometric shapes and diagrams in your questions. Describe shapes clearly using text notation such as:
+   - Use ASCII art or text descriptions for simple shapes (e.g., "Triangle ABC with vertices A(0,0), B(4,0), C(2,3)")
+   - Reference geometric figures like circles, triangles, quadrilaterals, etc.
+   - Include coordinate geometry problems with clearly defined points
+   - Describe transformations, angles, and spatial relationships`;
+    }
+
+    let formulasInstruction = '';
+    if (includeFormulas) {
+      formulasInstruction = `
+${includeGeometry ? '9' : '8'}. Include mathematical formulas and expressions in your questions:
+   - Use standard mathematical notation (e.g., "x² + 2x + 1 = 0", "sin(θ) = opposite/hypotenuse")
+   - Reference formulas like quadratic formula, Pythagorean theorem, area/volume formulas
+   - Include problems that require students to apply or derive formulas
+   - Use proper mathematical symbols where appropriate (√, π, ², ³, etc.)`;
+    }
+
     const prompt = `You are an expert math educator creating a worksheet for NYS Regents preparation.
 
 Based on the following standards and topics, generate exactly ${questionCount} higher-order thinking questions that require students to apply, analyze, or evaluate concepts. The questions should be challenging but appropriate for high school students.
@@ -70,7 +93,7 @@ REQUIREMENTS:
 4. Include multi-step problems that require showing work
 5. ${difficultyInstruction}
 6. Use real-world contexts where appropriate
-7. Questions should be clear and unambiguous
+7. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}
 
 Respond with a JSON array of questions in this exact format:
 [
