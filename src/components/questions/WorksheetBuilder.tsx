@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/lib/auth';
 import jsPDF from 'jspdf';
 
 export interface WorksheetQuestion {
@@ -29,6 +30,20 @@ interface GeneratedQuestion {
   difficulty: 'medium' | 'hard' | 'challenging';
 }
 
+interface SavedWorksheet {
+  id: string;
+  title: string;
+  teacher_name: string | null;
+  questions: GeneratedQuestion[];
+  topics: WorksheetQuestion[];
+  settings: {
+    questionCount: string;
+    difficultyFilter: string[];
+    showAnswerLines: boolean;
+  };
+  created_at: string;
+}
+
 interface WorksheetBuilderProps {
   selectedQuestions: WorksheetQuestion[];
   onRemoveQuestion: (id: string) => void;
@@ -37,6 +52,7 @@ interface WorksheetBuilderProps {
 
 export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearAll }: WorksheetBuilderProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [worksheetTitle, setWorksheetTitle] = useState('Math Practice Worksheet');
   const [teacherName, setTeacherName] = useState('');
   const [showAnswerLines, setShowAnswerLines] = useState(true);
@@ -47,6 +63,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [isCompiled, setIsCompiled] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedWorksheets, setSavedWorksheets] = useState<SavedWorksheet[]>([]);
+  const [showSavedWorksheets, setShowSavedWorksheets] = useState(false);
+  const [isLoadingWorksheets, setIsLoadingWorksheets] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   const toggleDifficulty = (difficulty: string) => {
@@ -56,6 +76,104 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         : [...prev, difficulty]
     );
   };
+
+  const fetchSavedWorksheets = async () => {
+    if (!user) return;
+    setIsLoadingWorksheets(true);
+    try {
+      const { data, error } = await supabase
+        .from('worksheets')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSavedWorksheets((data || []).map(w => ({
+        ...w,
+        questions: w.questions as unknown as GeneratedQuestion[],
+        topics: w.topics as unknown as WorksheetQuestion[],
+        settings: w.settings as unknown as SavedWorksheet['settings'],
+      })));
+    } catch (error) {
+      console.error('Error fetching worksheets:', error);
+    } finally {
+      setIsLoadingWorksheets(false);
+    }
+  };
+
+  const saveWorksheet = async () => {
+    if (!user || compiledQuestions.length === 0) return;
+
+    setIsSaving(true);
+    try {
+      const worksheetData = {
+        teacher_id: user.id,
+        title: worksheetTitle,
+        teacher_name: teacherName || null,
+        questions: JSON.parse(JSON.stringify(compiledQuestions)),
+        topics: JSON.parse(JSON.stringify(selectedQuestions)),
+        settings: JSON.parse(JSON.stringify({
+          questionCount,
+          difficultyFilter,
+          showAnswerLines,
+        })),
+      };
+      const { error } = await supabase.from('worksheets').insert([worksheetData]);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Worksheet saved!',
+        description: 'You can access it from your saved worksheets.',
+      });
+      fetchSavedWorksheets();
+    } catch (error) {
+      console.error('Error saving worksheet:', error);
+      toast({
+        title: 'Failed to save',
+        description: 'Could not save worksheet. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadWorksheet = (worksheet: SavedWorksheet) => {
+    setWorksheetTitle(worksheet.title);
+    setTeacherName(worksheet.teacher_name || '');
+    setCompiledQuestions(worksheet.questions);
+    setQuestionCount(worksheet.settings.questionCount);
+    setDifficultyFilter(worksheet.settings.difficultyFilter);
+    setShowAnswerLines(worksheet.settings.showAnswerLines);
+    setIsCompiled(true);
+    setShowSavedWorksheets(false);
+    toast({
+      title: 'Worksheet loaded',
+      description: `"${worksheet.title}" has been loaded.`,
+    });
+  };
+
+  const deleteWorksheet = async (id: string) => {
+    try {
+      const { error } = await supabase.from('worksheets').delete().eq('id', id);
+      if (error) throw error;
+      setSavedWorksheets(prev => prev.filter(w => w.id !== id));
+      toast({ title: 'Worksheet deleted' });
+    } catch (error) {
+      console.error('Error deleting worksheet:', error);
+      toast({
+        title: 'Failed to delete',
+        description: 'Could not delete worksheet.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchSavedWorksheets();
+    }
+  }, [user]);
 
   const compileWorksheet = async () => {
     if (selectedQuestions.length === 0) {
@@ -257,15 +375,82 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     }
   };
 
-  if (selectedQuestions.length === 0 && !isCompiled) {
+  if (selectedQuestions.length === 0 && !isCompiled && !showSavedWorksheets) {
     return (
       <Card className="border-dashed">
         <CardContent className="flex flex-col items-center justify-center py-10 text-center">
           <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
           <h3 className="font-medium text-lg mb-2">Worksheet Builder</h3>
-          <p className="text-sm text-muted-foreground max-w-xs">
+          <p className="text-sm text-muted-foreground max-w-xs mb-4">
             Select topics from the list to add them to your worksheet. Click the + button next to any topic.
           </p>
+          {savedWorksheets.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setShowSavedWorksheets(true)}>
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Load Saved ({savedWorksheets.length})
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (showSavedWorksheets) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Saved Worksheets</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setShowSavedWorksheets(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingWorksheets ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : savedWorksheets.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No saved worksheets yet.
+            </p>
+          ) : (
+            <ScrollArea className="h-64">
+              <div className="space-y-2">
+                {savedWorksheets.map((worksheet) => (
+                  <div
+                    key={worksheet.id}
+                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">{worksheet.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {worksheet.questions.length} questions • {new Date(worksheet.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 ml-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => loadWorksheet(worksheet)}
+                      >
+                        Load
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => deleteWorksheet(worksheet.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
         </CardContent>
       </Card>
     );
@@ -446,7 +631,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 </ScrollArea>
               </div>
 
-              {/* Download/Print Actions */}
+              {/* Download/Print/Save Actions */}
               <div className="flex gap-2">
                 <Button
                   className="flex-1"
@@ -462,6 +647,30 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 >
                   <Printer className="h-4 w-4" />
                 </Button>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={saveWorksheet}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save Worksheet
+                </Button>
+                {savedWorksheets.length > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowSavedWorksheets(true)}
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
 
               <Button

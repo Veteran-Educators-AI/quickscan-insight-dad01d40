@@ -645,6 +645,50 @@ export type Database = {
           },
         ]
       }
+      worksheets: {
+        Row: {
+          created_at: string
+          id: string
+          questions: Json
+          settings: Json
+          teacher_id: string
+          teacher_name: string | null
+          title: string
+          topics: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          questions?: Json
+          settings?: Json
+          teacher_id: string
+          teacher_name?: string | null
+          title: string
+          topics?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          questions?: Json
+          settings?: Json
+          teacher_id?: string
+          teacher_name?: string | null
+          title?: string
+          topics?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worksheets_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
