@@ -27,9 +27,10 @@ serve(async (req) => {
   }
 
   try {
-    const { topics, questionCount } = await req.json() as {
+    const { topics, questionCount, difficultyLevels } = await req.json() as {
       topics: TopicInput[];
       questionCount: number;
+      difficultyLevels?: string[];
     };
 
     if (!topics || topics.length === 0) {
@@ -50,6 +51,10 @@ serve(async (req) => {
     ).join('\n');
 
     const questionsPerTopic = Math.ceil(questionCount / topics.length);
+    const allowedDifficulties = difficultyLevels && difficultyLevels.length > 0 
+      ? difficultyLevels 
+      : ['medium', 'hard', 'challenging'];
+    const difficultyInstruction = `Only generate questions with these difficulty levels: ${allowedDifficulties.join(', ')}.`;
 
     const prompt = `You are an expert math educator creating a worksheet for NYS Regents preparation.
 
@@ -63,7 +68,7 @@ REQUIREMENTS:
 2. Distribute questions across the topics (approximately ${questionsPerTopic} per topic)
 3. Focus on higher-order thinking skills (Bloom's Taxonomy levels: Apply, Analyze, Evaluate, Create)
 4. Include multi-step problems that require showing work
-5. Make questions progressively harder
+5. ${difficultyInstruction}
 6. Use real-world contexts where appropriate
 7. Questions should be clear and unambiguous
 
@@ -74,11 +79,11 @@ Respond with a JSON array of questions in this exact format:
     "topic": "Topic Name",
     "standard": "G.CO.A.1",
     "question": "The full question text here",
-    "difficulty": "medium"
+    "difficulty": "${allowedDifficulties[0]}"
   }
 ]
 
-Difficulty levels should be: "medium", "hard", or "challenging"
+Difficulty levels allowed: ${allowedDifficulties.join(', ')}
 
 IMPORTANT: Return ONLY the JSON array, no other text.`;
 
