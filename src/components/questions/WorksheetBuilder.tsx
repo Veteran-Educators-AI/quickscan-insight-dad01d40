@@ -41,12 +41,21 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [teacherName, setTeacherName] = useState('');
   const [showAnswerLines, setShowAnswerLines] = useState(true);
   const [questionCount, setQuestionCount] = useState('5');
+  const [difficultyFilter, setDifficultyFilter] = useState<string[]>(['medium', 'hard', 'challenging']);
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledQuestions, setCompiledQuestions] = useState<GeneratedQuestion[]>([]);
   const [isCompiled, setIsCompiled] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+
+  const toggleDifficulty = (difficulty: string) => {
+    setDifficultyFilter(prev => 
+      prev.includes(difficulty)
+        ? prev.filter(d => d !== difficulty)
+        : [...prev, difficulty]
+    );
+  };
 
   const compileWorksheet = async () => {
     if (selectedQuestions.length === 0) {
@@ -70,6 +79,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             category: q.category,
           })),
           questionCount: parseInt(questionCount),
+          difficultyLevels: difficultyFilter,
         },
       });
 
@@ -311,6 +321,32 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Difficulty Levels</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {['medium', 'hard', 'challenging'].map((level) => (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => toggleDifficulty(level)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                          difficultyFilter.includes(level)
+                            ? level === 'medium'
+                              ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                              : level === 'hard'
+                              ? 'bg-orange-100 text-orange-800 border-orange-300'
+                              : 'bg-red-100 text-red-800 border-red-300'
+                            : 'bg-muted text-muted-foreground border-border'
+                        }`}
+                      >
+                        {level.charAt(0).toUpperCase() + level.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                  {difficultyFilter.length === 0 && (
+                    <p className="text-xs text-destructive">Select at least one difficulty level</p>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -360,7 +396,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               <Button
                 className="w-full"
                 onClick={compileWorksheet}
-                disabled={isCompiling}
+                disabled={isCompiling || difficultyFilter.length === 0}
               >
                 {isCompiling ? (
                   <>
