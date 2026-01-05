@@ -14,6 +14,7 @@ interface GeneratedQuestion {
   standard: string;
   question: string;
   difficulty: 'medium' | 'hard' | 'challenging';
+  svg?: string;
 }
 
 interface SharedWorksheetData {
@@ -113,8 +114,8 @@ export default function SharedWorksheet() {
       pdf.setLineWidth(0.5);
       pdf.line(margin, yPosition - 5, pageWidth - margin, yPosition - 5);
 
-      worksheet.questions.forEach((question) => {
-        if (yPosition > pageHeight - 60) {
+      for (const question of worksheet.questions) {
+        if (yPosition > pageHeight - 80) {
           pdf.addPage();
           yPosition = margin;
         }
@@ -146,6 +147,47 @@ export default function SharedWorksheet() {
 
         yPosition += 4;
 
+        // Render SVG as image if present
+        if (question.svg) {
+          try {
+            const svgBlob = new Blob([question.svg], { type: 'image/svg+xml;charset=utf-8' });
+            const svgUrl = URL.createObjectURL(svgBlob);
+            
+            const img = new Image();
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => resolve();
+              img.onerror = reject;
+              img.src = svgUrl;
+            });
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 200;
+            canvas.height = 200;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = 'white';
+              ctx.fillRect(0, 0, 200, 200);
+              ctx.drawImage(img, 0, 0, 200, 200);
+              const pngDataUrl = canvas.toDataURL('image/png');
+              
+              if (yPosition > pageHeight - 70) {
+                pdf.addPage();
+                yPosition = margin;
+              }
+              
+              const imgWidth = 50;
+              const imgHeight = 50;
+              const imgX = (pageWidth - imgWidth) / 2;
+              pdf.addImage(pngDataUrl, 'PNG', imgX, yPosition, imgWidth, imgHeight);
+              yPosition += imgHeight + 5;
+            }
+            
+            URL.revokeObjectURL(svgUrl);
+          } catch (svgError) {
+            console.error('Error rendering SVG to PDF:', svgError);
+          }
+        }
+
         if (worksheet.settings?.showAnswerLines !== false) {
           pdf.setDrawColor(200);
           pdf.setLineWidth(0.2);
@@ -160,7 +202,7 @@ export default function SharedWorksheet() {
         } else {
           yPosition += 15;
         }
-      });
+      }
 
       pdf.setFontSize(8);
       pdf.setTextColor(150);
@@ -248,6 +290,12 @@ export default function SharedWorksheet() {
                     {question.topic} ({question.standard})
                   </p>
                   <p className="text-sm">{question.question}</p>
+                  {question.svg && (
+                    <div 
+                      className="mt-2 flex justify-center"
+                      dangerouslySetInnerHTML={{ __html: question.svg }}
+                    />
+                  )}
                 </div>
               ))}
             </ScrollArea>
