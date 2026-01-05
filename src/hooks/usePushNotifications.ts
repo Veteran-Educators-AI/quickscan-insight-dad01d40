@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 
 // VAPID public key - this should match the one in your secrets
-const VAPID_PUBLIC_KEY = 'BNSZN5gS1ZeAq3BvX3SfuE2DTvWiutjbBq5Dg4cqQmbn4crN5nv-VXRBlKh0NnXP9PnGmlkqMagcqS10ehJdCZk';
+const VAPID_PUBLIC_KEY = 'BJEc-X8O2snWC-oWFJjjp6kj4yulGXMoWqqOpngbHbWw4yPCnhlZpMbC3ZlpiP2PUSMevQxh_WP9cG48vq5gRgk';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
