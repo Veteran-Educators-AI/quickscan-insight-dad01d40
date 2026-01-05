@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2 } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +42,8 @@ interface SavedWorksheet {
     showAnswerLines: boolean;
   };
   created_at: string;
+  share_code: string | null;
+  is_shared: boolean;
 }
 
 interface WorksheetBuilderProps {
@@ -67,6 +69,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [savedWorksheets, setSavedWorksheets] = useState<SavedWorksheet[]>([]);
   const [showSavedWorksheets, setShowSavedWorksheets] = useState(false);
   const [isLoadingWorksheets, setIsLoadingWorksheets] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
   const toggleDifficulty = (difficulty: string) => {
@@ -164,6 +168,69 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       toast({
         title: 'Failed to delete',
         description: 'Could not delete worksheet.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const generateShareCode = () => {
+    return Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+  };
+
+  const toggleShareWorksheet = async (worksheet: SavedWorksheet) => {
+    setIsSharing(true);
+    try {
+      if (worksheet.is_shared) {
+        // Unshare
+        const { error } = await supabase
+          .from('worksheets')
+          .update({ is_shared: false, share_code: null })
+          .eq('id', worksheet.id);
+
+        if (error) throw error;
+
+        setSavedWorksheets(prev => prev.map(w => 
+          w.id === worksheet.id ? { ...w, is_shared: false, share_code: null } : w
+        ));
+        toast({ title: 'Worksheet unshared' });
+      } else {
+        // Share
+        const shareCode = generateShareCode();
+        const { error } = await supabase
+          .from('worksheets')
+          .update({ is_shared: true, share_code: shareCode })
+          .eq('id', worksheet.id);
+
+        if (error) throw error;
+
+        setSavedWorksheets(prev => prev.map(w => 
+          w.id === worksheet.id ? { ...w, is_shared: true, share_code: shareCode } : w
+        ));
+        toast({ title: 'Worksheet shared!' });
+      }
+    } catch (error) {
+      console.error('Error toggling share:', error);
+      toast({
+        title: 'Failed to update sharing',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const copyShareLink = async (shareCode: string, worksheetId: string) => {
+    const shareUrl = `${window.location.origin}/worksheet/${shareCode}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedId(worksheetId);
+      setTimeout(() => setCopiedId(null), 2000);
+      toast({ title: 'Link copied to clipboard!' });
+    } catch (error) {
+      toast({
+        title: 'Failed to copy',
+        description: shareUrl,
         variant: 'destructive',
       });
     }
@@ -421,30 +488,74 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 {savedWorksheets.map((worksheet) => (
                   <div
                     key={worksheet.id}
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    className="p-3 rounded-lg border hover:bg-muted/50 transition-colors space-y-2"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">{worksheet.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {worksheet.questions.length} questions • {new Date(worksheet.created_at).toLocaleDateString()}
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm truncate">{worksheet.title}</p>
+                          {worksheet.is_shared && (
+                            <Badge variant="outline" className="text-xs">
+                              <Link className="h-3 w-3 mr-1" />
+                              Shared
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {worksheet.questions.length} questions • {new Date(worksheet.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => loadWorksheet(worksheet)}
+                        >
+                          Load
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => deleteWorksheet(worksheet.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 ml-2">
+                    
+                    {/* Share controls */}
+                    <div className="flex items-center gap-2 pt-1 border-t">
                       <Button
-                        variant="ghost"
+                        variant={worksheet.is_shared ? "secondary" : "outline"}
                         size="sm"
-                        onClick={() => loadWorksheet(worksheet)}
+                        className="text-xs h-7"
+                        onClick={() => toggleShareWorksheet(worksheet)}
+                        disabled={isSharing}
                       >
-                        Load
+                        <Share2 className="h-3 w-3 mr-1" />
+                        {worksheet.is_shared ? 'Unshare' : 'Share'}
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => deleteWorksheet(worksheet.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {worksheet.is_shared && worksheet.share_code && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs h-7"
+                          onClick={() => copyShareLink(worksheet.share_code!, worksheet.id)}
+                        >
+                          {copiedId === worksheet.id ? (
+                            <>
+                              <Check className="h-3 w-3 mr-1" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3 w-3 mr-1" />
+                              Copy Link
+                            </>
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -649,8 +649,10 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_shared: boolean
           questions: Json
           settings: Json
+          share_code: string | null
           teacher_id: string
           teacher_name: string | null
           title: string
@@ -660,8 +662,10 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_shared?: boolean
           questions?: Json
           settings?: Json
+          share_code?: string | null
           teacher_id: string
           teacher_name?: string | null
           title: string
@@ -671,8 +675,10 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_shared?: boolean
           questions?: Json
           settings?: Json
+          share_code?: string | null
           teacher_id?: string
           teacher_name?: string | null
           title?: string

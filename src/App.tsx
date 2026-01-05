@@ -20,6 +20,7 @@ import Scan from "./pages/Scan";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
+import SharedWorksheet from "./pages/SharedWorksheet";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -73,6 +74,7 @@ function AppRoutes() {
       <Route path="/scan" element={<ProtectedRoute><Scan /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      <Route path="/worksheet/:shareCode" element={<SharedWorksheet />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
