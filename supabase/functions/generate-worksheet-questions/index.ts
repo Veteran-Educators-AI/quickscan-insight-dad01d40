@@ -19,6 +19,7 @@ interface GeneratedQuestion {
   standard: string;
   question: string;
   difficulty: 'medium' | 'hard' | 'challenging';
+  svg?: string;
 }
 
 serve(async (req) => {
@@ -62,11 +63,19 @@ serve(async (req) => {
     let geometryInstruction = '';
     if (includeGeometry) {
       geometryInstruction = `
-8. Include geometric shapes and diagrams in your questions. Describe shapes clearly using text notation such as:
-   - Use ASCII art or text descriptions for simple shapes (e.g., "Triangle ABC with vertices A(0,0), B(4,0), C(2,3)")
-   - Reference geometric figures like circles, triangles, quadrilaterals, etc.
-   - Include coordinate geometry problems with clearly defined points
-   - Describe transformations, angles, and spatial relationships`;
+8. For geometry-related questions, you MUST include an "svg" field with a complete, valid SVG string that visually represents the geometric figure described in the question.
+   - The SVG should be self-contained with width="200" height="200" viewBox="0 0 200 200"
+   - Use clear colors: stroke="#1f2937" (dark gray) for lines, fill="none" or fill="#e5e7eb" for shapes
+   - Include labels for vertices, angles, or measurements using <text> elements
+   - Examples of shapes to draw:
+     * Triangles with labeled vertices (A, B, C)
+     * Circles with radius lines and center points
+     * Quadrilaterals (rectangles, squares, parallelograms, trapezoids)
+     * Coordinate grids with plotted points
+     * Angle diagrams with arc indicators
+     * 3D shapes like cubes, prisms, pyramids (using isometric projections)
+   - Make sure the SVG is clean, properly formatted, and renders correctly
+   - For coordinate geometry, include axis lines and grid marks`;
     }
 
     let formulasInstruction = '';
@@ -78,6 +87,11 @@ ${includeGeometry ? '9' : '8'}. Include mathematical formulas and expressions in
    - Include problems that require students to apply or derive formulas
    - Use proper mathematical symbols where appropriate (√, π, ², ³, etc.)`;
     }
+
+    const svgFieldNote = includeGeometry 
+      ? `
+If the question involves geometry and a diagram would help, include an "svg" field with a complete SVG string. The svg field should ONLY be included when a visual diagram is genuinely helpful for the question.`
+      : '';
 
     const prompt = `You are an expert math educator creating a worksheet for NYS Regents preparation.
 
@@ -102,9 +116,10 @@ Respond with a JSON array of questions in this exact format:
     "topic": "Topic Name",
     "standard": "G.CO.A.1",
     "question": "The full question text here",
-    "difficulty": "${allowedDifficulties[0]}"
+    "difficulty": "${allowedDifficulties[0]}"${includeGeometry ? ',\n    "svg": "<svg width=\\"200\\" height=\\"200\\" viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>"' : ''}
   }
 ]
+${svgFieldNote}
 
 Difficulty levels allowed: ${allowedDifficulties.join(', ')}
 
@@ -122,7 +137,7 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
-        max_tokens: 4000,
+        max_tokens: 8000,
       }),
     });
 

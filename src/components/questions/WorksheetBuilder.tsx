@@ -28,6 +28,7 @@ interface GeneratedQuestion {
   standard: string;
   question: string;
   difficulty: 'medium' | 'hard' | 'challenging';
+  svg?: string;
 }
 
 interface SavedWorksheet {
@@ -350,9 +351,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       pdf.line(margin, yPosition - 5, pageWidth - margin, yPosition - 5);
 
       // Questions
-      compiledQuestions.forEach((question, index) => {
+      for (const question of compiledQuestions) {
         // Check if we need a new page
-        if (yPosition > pageHeight - 60) {
+        if (yPosition > pageHeight - 80) {
           pdf.addPage();
           yPosition = margin;
         }
@@ -387,6 +388,52 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
         yPosition += 4;
 
+        // Render SVG as image if present
+        if (question.svg) {
+          try {
+            // Convert SVG to data URL
+            const svgBlob = new Blob([question.svg], { type: 'image/svg+xml;charset=utf-8' });
+            const svgUrl = URL.createObjectURL(svgBlob);
+            
+            // Create an image from SVG
+            const img = new Image();
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => resolve();
+              img.onerror = reject;
+              img.src = svgUrl;
+            });
+            
+            // Draw to canvas and get as PNG data URL
+            const canvas = document.createElement('canvas');
+            canvas.width = 200;
+            canvas.height = 200;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = 'white';
+              ctx.fillRect(0, 0, 200, 200);
+              ctx.drawImage(img, 0, 0, 200, 200);
+              const pngDataUrl = canvas.toDataURL('image/png');
+              
+              // Check if we need a new page for the image
+              if (yPosition > pageHeight - 70) {
+                pdf.addPage();
+                yPosition = margin;
+              }
+              
+              // Add image to PDF (centered)
+              const imgWidth = 50; // mm
+              const imgHeight = 50; // mm
+              const imgX = (pageWidth - imgWidth) / 2;
+              pdf.addImage(pngDataUrl, 'PNG', imgX, yPosition, imgWidth, imgHeight);
+              yPosition += imgHeight + 5;
+            }
+            
+            URL.revokeObjectURL(svgUrl);
+          } catch (svgError) {
+            console.error('Error rendering SVG to PDF:', svgError);
+          }
+        }
+
         // Work area
         if (showAnswerLines) {
           pdf.setDrawColor(200);
@@ -402,7 +449,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         } else {
           yPosition += 15;
         }
-      });
+      }
 
       // Footer
       pdf.setFontSize(8);
@@ -771,6 +818,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         {question.topic} ({question.standard})
                       </p>
                       <p className="text-sm">{question.question}</p>
+                      {question.svg && (
+                        <div 
+                          className="mt-2 flex justify-center"
+                          dangerouslySetInnerHTML={{ __html: question.svg }}
+                        />
+                      )}
                     </div>
                   ))}
                 </ScrollArea>
@@ -863,6 +916,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     {question.topic} ({question.standard})
                   </p>
                   <p className="ml-5">{question.question}</p>
+                  {question.svg && (
+                    <div 
+                      className="ml-5 mt-2 flex justify-center"
+                      dangerouslySetInnerHTML={{ __html: question.svg }}
+                    />
+                  )}
                   {showAnswerLines && (
                     <div className="ml-5 mt-4 space-y-3">
                       {[1, 2, 3, 4, 5].map((line) => (
