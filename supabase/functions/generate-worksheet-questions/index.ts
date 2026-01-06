@@ -28,12 +28,14 @@ serve(async (req) => {
   }
 
   try {
-    const { topics, questionCount, difficultyLevels, includeGeometry, includeFormulas } = await req.json() as {
+    const { topics, questionCount, difficultyLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry } = await req.json() as {
       topics: TopicInput[];
       questionCount: number;
       difficultyLevels?: string[];
       includeGeometry?: boolean;
       includeFormulas?: boolean;
+      includeGraphPaper?: boolean;
+      includeCoordinateGeometry?: boolean;
     };
 
     if (!topics || topics.length === 0) {
@@ -88,6 +90,31 @@ ${includeGeometry ? '9' : '8'}. Include mathematical formulas and expressions in
    - Use proper mathematical symbols where appropriate (√, π, ², ³, etc.)`;
     }
 
+    let graphPaperInstruction = '';
+    if (includeGraphPaper) {
+      const nextNum = (includeGeometry ? 9 : 8) + (includeFormulas ? 1 : 0);
+      graphPaperInstruction = `
+${nextNum}. Include questions that require graph paper solutions:
+   - Problems involving plotting points, lines, and curves on a coordinate plane
+   - Graphing linear equations, quadratics, or other functions
+   - Questions that ask students to "graph and show your work"
+   - Include SVG with a grid pattern (graph paper style) when appropriate
+   - For graph paper SVGs, use: light gray grid lines, bold axis lines with labels, and marked intervals`;
+    }
+
+    let coordinateGeometryInstruction = '';
+    if (includeCoordinateGeometry) {
+      const nextNum = (includeGeometry ? 9 : 8) + (includeFormulas ? 1 : 0) + (includeGraphPaper ? 1 : 0);
+      coordinateGeometryInstruction = `
+${nextNum}. Include coordinate geometry problems:
+   - Finding distance between points, midpoints, and slopes
+   - Equations of lines (point-slope, slope-intercept forms)
+   - Parallel and perpendicular lines in coordinate plane
+   - Proving geometric properties using coordinates (e.g., proving a quadrilateral is a parallelogram)
+   - Transformations on the coordinate plane
+   - Include SVG diagrams showing coordinate planes with plotted points and shapes when helpful`;
+    }
+
     const svgFieldNote = includeGeometry 
       ? `
 If the question involves geometry and a diagram would help, include an "svg" field with a complete SVG string. The svg field should ONLY be included when a visual diagram is genuinely helpful for the question.`
@@ -107,7 +134,7 @@ REQUIREMENTS:
 4. Include multi-step problems that require showing work
 5. ${difficultyInstruction}
 6. Use real-world contexts where appropriate
-7. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}
+7. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}${graphPaperInstruction}${coordinateGeometryInstruction}
 
 Respond with a JSON array of questions in this exact format:
 [
