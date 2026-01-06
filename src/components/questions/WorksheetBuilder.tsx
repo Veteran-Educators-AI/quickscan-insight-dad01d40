@@ -82,7 +82,6 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [showAnswerLines, setShowAnswerLines] = useState(true);
   const [questionCount, setQuestionCount] = useState('5');
   const [difficultyFilter, setDifficultyFilter] = useState<string[]>(['medium', 'hard', 'challenging']);
-  const [includeGeometry, setIncludeGeometry] = useState(false);
   const [includeFormulas, setIncludeFormulas] = useState(false);
   const [includeFormulaSheet, setIncludeFormulaSheet] = useState(false);
   const [includeGraphPaper, setIncludeGraphPaper] = useState(false);
@@ -147,7 +146,6 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           questionCount,
           difficultyFilter,
           showAnswerLines,
-          includeGeometry,
           includeFormulas,
           includeFormulaSheet,
           includeGraphPaper,
@@ -184,12 +182,11 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setQuestionCount(worksheet.settings.questionCount);
     setDifficultyFilter(worksheet.settings.difficultyFilter);
     setShowAnswerLines(worksheet.settings.showAnswerLines);
-    setIncludeGeometry(worksheet.settings.includeGeometry ?? false);
     setIncludeFormulas(worksheet.settings.includeFormulas ?? false);
     setIncludeFormulaSheet(worksheet.settings.includeFormulaSheet ?? false);
     setIncludeGraphPaper(worksheet.settings.includeGraphPaper ?? false);
     setIncludeCoordinateGeometry(worksheet.settings.includeCoordinateGeometry ?? false);
-    setUseAIImages(worksheet.settings.useAIImages ?? false);
+    setUseAIImages(worksheet.settings.useAIImages ?? (worksheet.settings.includeGeometry ?? false));
     setIsCompiled(true);
     setShowSavedWorksheets(false);
     toast({
@@ -306,7 +303,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           })),
           questionCount: parseInt(questionCount),
           difficultyLevels: difficultyFilter,
-          includeGeometry,
+          includeGeometry: useAIImages,
           includeFormulas,
           includeGraphPaper,
           includeCoordinateGeometry,
@@ -919,18 +916,6 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    id="includeGeometry"
-                    checked={includeGeometry}
-                    onChange={(e) => setIncludeGeometry(e.target.checked)}
-                    className="rounded border-input"
-                  />
-                  <Label htmlFor="includeGeometry" className="text-sm cursor-pointer">
-                    Include geometric shapes/diagrams
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
                     id="includeFormulas"
                     checked={includeFormulas}
                     onChange={(e) => setIncludeFormulas(e.target.checked)}
@@ -988,9 +973,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     className="rounded border-input"
                   />
                   <Label htmlFor="useAIImages" className="text-sm cursor-pointer">
-                    <span className="flex items-center gap-1">
-                      <Sparkles className="h-3.5 w-3.5 text-purple-500" />
-                      Use AI-generated images for diagrams
+                    <span className="flex flex-col">
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+                        Include AI-generated geometric/scientific diagrams
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-5">Generates images for shapes, graphs, and coordinate geometry</span>
                     </span>
                   </Label>
                 </div>
