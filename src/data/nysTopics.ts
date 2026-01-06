@@ -467,6 +467,271 @@ export const BIOLOGY_TOPICS: TopicCategory[] = [
   },
 ];
 
+export const CHEMISTRY_TOPICS: TopicCategory[] = [
+  {
+    category: 'MATTER AND ENERGY',
+    topics: [
+      { name: 'Classification of Matter', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Physical and Chemical Properties', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'States of Matter', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Phase Changes', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Heat and Temperature', standard: 'PS.4.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Calorimetry', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'ATOMIC STRUCTURE',
+    topics: [
+      { name: 'Atomic Models', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Subatomic Particles', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Electron Configuration', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Isotopes and Atomic Mass', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Nuclear Chemistry', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Radioactive Decay', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Half-Life', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'PERIODIC TABLE',
+    topics: [
+      { name: 'Periodic Trends', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Groups and Periods', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Metals, Nonmetals, and Metalloids', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Electronegativity', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Ionization Energy', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Atomic Radius', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'CHEMICAL BONDING',
+    topics: [
+      { name: 'Ionic Bonding', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Covalent Bonding', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Metallic Bonding', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Lewis Dot Structures', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Molecular Geometry', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Polarity', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Intermolecular Forces', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'CHEMICAL FORMULAS AND EQUATIONS',
+    topics: [
+      { name: 'Naming Compounds', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Writing Chemical Formulas', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Balancing Chemical Equations', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Types of Chemical Reactions', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Synthesis Reactions', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Decomposition Reactions', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Single and Double Replacement', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'STOICHIOMETRY',
+    topics: [
+      { name: 'Mole Concept', standard: 'PS.3.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Molar Mass', standard: 'PS.3.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Percent Composition', standard: 'PS.3.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Empirical and Molecular Formulas', standard: 'PS.3.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Mole-to-Mole Calculations', standard: 'PS.3.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Mass-to-Mass Calculations', standard: 'PS.3.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Limiting Reagent', standard: 'PS.3.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'SOLUTIONS AND SOLUBILITY',
+    topics: [
+      { name: 'Types of Solutions', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Concentration and Molarity', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Solubility Rules', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Dilution', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Colligative Properties', standard: 'PS.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'ACIDS AND BASES',
+    topics: [
+      { name: 'Properties of Acids and Bases', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'pH Scale', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Neutralization Reactions', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Titration', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Buffers', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'KINETICS AND EQUILIBRIUM',
+    topics: [
+      { name: 'Reaction Rate', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Factors Affecting Rate', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Activation Energy', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Chemical Equilibrium', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Le Chatelier\'s Principle', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Equilibrium Constants', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'OXIDATION-REDUCTION',
+    topics: [
+      { name: 'Oxidation States', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Redox Reactions', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Balancing Redox Equations', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Electrochemical Cells', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Electrolysis', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'ORGANIC CHEMISTRY',
+    topics: [
+      { name: 'Hydrocarbons', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Functional Groups', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Isomers', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Organic Reactions', standard: 'PS.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Polymers', standard: 'PS.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+];
+
+export const PHYSICS_TOPICS: TopicCategory[] = [
+  {
+    category: 'MECHANICS - KINEMATICS',
+    topics: [
+      { name: 'Distance and Displacement', standard: 'PS.4.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Speed and Velocity', standard: 'PS.4.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Acceleration', standard: 'PS.4.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Motion Graphs', standard: 'PS.4.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Free Fall', standard: 'PS.4.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Projectile Motion', standard: 'PS.4.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Kinematic Equations', standard: 'PS.4.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'MECHANICS - DYNAMICS',
+    topics: [
+      { name: 'Newton\'s First Law', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Newton\'s Second Law', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Newton\'s Third Law', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Force Diagrams', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Friction', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Weight and Normal Force', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Inclined Planes', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'CIRCULAR MOTION AND GRAVITY',
+    topics: [
+      { name: 'Uniform Circular Motion', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Centripetal Force', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Universal Gravitation', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Gravitational Fields', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Satellite Motion', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'MOMENTUM AND IMPULSE',
+    topics: [
+      { name: 'Momentum', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Impulse', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Impulse-Momentum Theorem', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Conservation of Momentum', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Elastic Collisions', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Inelastic Collisions', standard: 'PS.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'WORK, ENERGY, AND POWER',
+    topics: [
+      { name: 'Work', standard: 'PS.4.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Kinetic Energy', standard: 'PS.4.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Potential Energy', standard: 'PS.4.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Conservation of Energy', standard: 'PS.4.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Work-Energy Theorem', standard: 'PS.4.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Power', standard: 'PS.4.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Simple Machines', standard: 'PS.4.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'ELECTROSTATICS',
+    topics: [
+      { name: 'Electric Charge', standard: 'PS.4.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Coulomb\'s Law', standard: 'PS.4.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Electric Fields', standard: 'PS.4.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Electric Potential', standard: 'PS.4.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Conductors and Insulators', standard: 'PS.4.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Charging Methods', standard: 'PS.4.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'CIRCUITS',
+    topics: [
+      { name: 'Current and Voltage', standard: 'PS.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Resistance and Ohm\'s Law', standard: 'PS.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Series Circuits', standard: 'PS.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Parallel Circuits', standard: 'PS.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Combination Circuits', standard: 'PS.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Power in Circuits', standard: 'PS.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Circuit Analysis', standard: 'PS.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'MAGNETISM',
+    topics: [
+      { name: 'Magnetic Fields', standard: 'PS.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Magnetic Force on Charges', standard: 'PS.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Magnetic Force on Current', standard: 'PS.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Electromagnetic Induction', standard: 'PS.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Motors and Generators', standard: 'PS.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'WAVES',
+    topics: [
+      { name: 'Wave Properties', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Wave Types', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Wave Equation', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Reflection', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Refraction', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Diffraction', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Interference', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Standing Waves', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Doppler Effect', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'SOUND',
+    topics: [
+      { name: 'Sound Waves', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Sound Speed', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Sound Intensity', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Resonance', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Beats', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'LIGHT AND OPTICS',
+    topics: [
+      { name: 'Electromagnetic Spectrum', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Ray Diagrams', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Plane Mirrors', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Curved Mirrors', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Snell\'s Law', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Lenses', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Total Internal Reflection', standard: 'PS.4.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'MODERN PHYSICS',
+    topics: [
+      { name: 'Photoelectric Effect', standard: 'PS.4.7', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Wave-Particle Duality', standard: 'PS.4.7', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Energy Levels', standard: 'PS.4.7', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Photon Energy', standard: 'PS.4.7', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'De Broglie Wavelength', standard: 'PS.4.7', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Special Relativity', standard: 'PS.4.7', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Mass-Energy Equivalence', standard: 'PS.4.7', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+];
+
 export const NYS_SUBJECTS: Subject[] = [
   {
     id: 'geometry',
@@ -509,6 +774,18 @@ export const NYS_SUBJECTS: Subject[] = [
     name: 'Biology',
     shortName: 'BIO',
     categories: BIOLOGY_TOPICS,
+  },
+  {
+    id: 'chemistry',
+    name: 'Chemistry',
+    shortName: 'CHEM',
+    categories: CHEMISTRY_TOPICS,
+  },
+  {
+    id: 'physics',
+    name: 'Physics',
+    shortName: 'PHYS',
+    categories: PHYSICS_TOPICS,
   },
 ];
 
