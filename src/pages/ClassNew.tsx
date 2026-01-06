@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { RosterImageConverter } from '@/components/classes/RosterImageConverter';
+import { CSVStudentUploader, ParsedStudent } from '@/components/classes/CSVStudentUploader';
 
 function generateJoinCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -26,6 +27,7 @@ export default function ClassNew() {
   const [schoolYear, setSchoolYear] = useState('');
   const [classPeriod, setClassPeriod] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingStudents, setPendingStudents] = useState<ParsedStudent[]>([]);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -53,10 +55,39 @@ export default function ClassNew() {
 
       if (error) throw error;
 
-      toast({
-        title: 'Class created!',
-        description: `Join code: ${joinCode}`,
-      });
+      // Import pending students if any
+      if (pendingStudents.length > 0) {
+        const studentsToInsert = pendingStudents.map(s => ({
+          class_id: data.id,
+          first_name: s.firstName,
+          last_name: s.lastName,
+          student_id: s.studentId || null,
+          email: s.email || null,
+        }));
+
+        const { error: studentsError } = await supabase
+          .from('students')
+          .insert(studentsToInsert);
+
+        if (studentsError) {
+          console.error('Failed to import students:', studentsError);
+          toast({
+            title: 'Class created, but student import failed',
+            description: studentsError.message,
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Class created!',
+            description: `Join code: ${joinCode}. Imported ${pendingStudents.length} students.`,
+          });
+        }
+      } else {
+        toast({
+          title: 'Class created!',
+          description: `Join code: ${joinCode}`,
+        });
+      }
 
       navigate(`/classes/${data.id}`);
     } catch (error: any) {
@@ -138,14 +169,21 @@ export default function ClassNew() {
                 </Select>
               </div>
 
-              <div className="pt-2 border-t">
-                <Label className="text-sm text-muted-foreground">Roster Tools</Label>
-                <div className="mt-2">
+              <div className="pt-2 border-t space-y-3">
+                <Label className="text-sm text-muted-foreground">Import Students (Optional)</Label>
+                
+                <CSVStudentUploader
+                  onStudentsParsed={setPendingStudents}
+                  parsedStudents={pendingStudents}
+                  onClear={() => setPendingStudents([])}
+                />
+                
+                <div className="flex items-center gap-2">
                   <RosterImageConverter />
+                  <span className="text-xs text-muted-foreground">
+                    or convert a roster photo to CSV
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Convert a photo of your roster into a CSV file for easy student import
-                </p>
               </div>
 
               <div className="flex gap-3 pt-4">
