@@ -1,4 +1,4 @@
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode } from 'lucide-react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +34,31 @@ interface BatchQueueProps {
   isProcessing: boolean;
   isIdentifying: boolean;
 }
+
+const getConfidenceBadge = (confidence: 'high' | 'medium' | 'low' | 'none') => {
+  switch (confidence) {
+    case 'high':
+      return (
+        <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-xs">
+          High
+        </Badge>
+      );
+    case 'medium':
+      return (
+        <Badge variant="secondary" className="bg-amber-500 hover:bg-amber-600 text-white text-xs">
+          Medium
+        </Badge>
+      );
+    case 'low':
+      return (
+        <Badge variant="destructive" className="text-xs">
+          Low
+        </Badge>
+      );
+    default:
+      return null;
+  }
+};
 
 export function BatchQueue({ 
   items, 
@@ -131,106 +156,149 @@ export function BatchQueue({
                 {/* Student Selector with auto-assign indicator */}
                 <div className="flex-1 min-w-0">
                   {!isBusy && (item.status === 'pending' || !item.result) ? (
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={item.studentId || ''}
-                        onValueChange={(value) => {
-                          const student = students.find(s => s.id === value);
-                          if (student) {
-                            onAssignStudent(
-                              item.id, 
-                              student.id, 
-                              `${student.first_name} ${student.last_name}`
-                            );
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="h-9 flex-1">
-                          <SelectValue placeholder="Assign student...">
-                            {item.studentName && (
-                              <span className="flex items-center gap-2">
-                                <UserCircle className="h-4 w-4" />
-                                {item.studentName}
-                              </span>
-                            )}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {/* Current student if assigned */}
-                          {item.studentId && (
-                            <SelectItem value={item.studentId}>
-                              {item.studentName} (current)
-                            </SelectItem>
-                          )}
-                          {/* Available students */}
-                          {availableStudents.length > 0 ? (
-                            availableStudents.map((student) => (
-                              <SelectItem key={student.id} value={student.id}>
-                                {student.last_name}, {student.first_name}
-                                {student.student_id && ` (${student.student_id})`}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                              All students assigned
-                            </div>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      
-                      {/* Auto-assign indicator */}
-                      {item.autoAssigned && item.identification && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="shrink-0">
-                                {item.identification.qrCodeDetected ? (
-                                  <QrCode className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <Sparkles className="h-4 w-4 text-amber-500" />
-                                )}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="left" className="max-w-[250px]">
-                              <p className="text-xs">
-                                {item.identification.qrCodeDetected 
-                                  ? `Matched via QR code` 
-                                  : `Matched via name: "${item.identification.handwrittenName}"`}
-                                {item.identification.parsedQRCode && (
-                                  <>
-                                    <br />
-                                    <span className="text-muted-foreground">
-                                      Question ID detected
-                                    </span>
-                                  </>
-                                )}
-                                <br />
-                                <span className="text-muted-foreground">
-                                  Confidence: {item.identification.confidence}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={item.studentId || ''}
+                          onValueChange={(value) => {
+                            const student = students.find(s => s.id === value);
+                            if (student) {
+                              onAssignStudent(
+                                item.id, 
+                                student.id, 
+                                `${student.first_name} ${student.last_name}`
+                              );
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-9 flex-1">
+                            <SelectValue placeholder="Assign student...">
+                              {item.studentName && (
+                                <span className="flex items-center gap-2">
+                                  <UserCircle className="h-4 w-4" />
+                                  {item.studentName}
                                 </span>
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* Current student if assigned */}
+                            {item.studentId && (
+                              <SelectItem value={item.studentId}>
+                                {item.studentName} (current)
+                              </SelectItem>
+                            )}
+                            {/* Available students */}
+                            {availableStudents.length > 0 ? (
+                              availableStudents.map((student) => (
+                                <SelectItem key={student.id} value={student.id}>
+                                  {student.last_name}, {student.first_name}
+                                  {student.student_id && ` (${student.student_id})`}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                                All students assigned
+                              </div>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        
+                        {/* Auto-assign indicator with confidence badge */}
+                        {item.autoAssigned && item.identification && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="shrink-0 flex items-center gap-1">
+                                  {item.identification.qrCodeDetected ? (
+                                    <QrCode className="h-4 w-4 text-green-600" />
+                                  ) : (
+                                    <Sparkles className="h-4 w-4 text-amber-500" />
+                                  )}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="max-w-[250px]">
+                                <p className="text-xs">
+                                  {item.identification.qrCodeDetected 
+                                    ? `Matched via QR code` 
+                                    : `Matched via name: "${item.identification.handwrittenName}"`}
+                                  {item.identification.parsedQRCode && (
+                                    <>
+                                      <br />
+                                      <span className="text-muted-foreground">
+                                        Question ID detected
+                                      </span>
+                                    </>
+                                  )}
+                                  <br />
+                                  <span className="text-muted-foreground">
+                                    Click dropdown to correct if wrong
+                                  </span>
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                      
+                      {/* Confidence badge row for auto-assigned items */}
+                      {item.autoAssigned && item.identification && item.identification.confidence !== 'none' && (
+                        <div className="flex items-center gap-2 ml-1">
+                          {getConfidenceBadge(item.identification.confidence)}
+                          <span className="text-xs text-muted-foreground">
+                            {item.identification.qrCodeDetected ? 'QR match' : 'Name match'}
+                          </span>
+                          {item.identification.confidence !== 'high' && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-5 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                                    onClick={() => {
+                                      // Clear the current assignment to allow correction
+                                      onAssignStudent(item.id, '', '');
+                                    }}
+                                  >
+                                    <RefreshCw className="h-3 w-3 mr-1" />
+                                    Fix
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-xs">Clear auto-match to manually select student</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <UserCircle className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium truncate">
-                        {item.studentName || 'Unassigned'}
-                      </span>
-                      {item.autoAssigned && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Sparkles className="h-3 w-3 text-amber-500" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs">Auto-assigned</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <UserCircle className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium truncate">
+                          {item.studentName || 'Unassigned'}
+                        </span>
+                        {item.autoAssigned && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Sparkles className="h-3 w-3 text-amber-500" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Auto-assigned</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                      {/* Show confidence badge even after processing */}
+                      {item.autoAssigned && item.identification && item.identification.confidence !== 'none' && (
+                        <div className="flex items-center gap-2 ml-6">
+                          {getConfidenceBadge(item.identification.confidence)}
+                        </div>
                       )}
                     </div>
                   )}
