@@ -732,6 +732,167 @@ export const PHYSICS_TOPICS: TopicCategory[] = [
   },
 ];
 
+// Financial Math Topics - Aligned with NYS Standards and NGPF (Next Gen Personal Finance)
+export const FINANCIAL_MATH_TOPICS: TopicCategory[] = [
+  {
+    category: 'FIRST JOB & INCOME',
+    topics: [
+      { name: 'Calculating Gross Pay', standard: 'NGPF.1.1', url: 'https://www.ngpf.org/curriculum/earning-income/' },
+      { name: 'Understanding Pay Stubs', standard: 'NGPF.1.2', url: 'https://www.ngpf.org/curriculum/earning-income/' },
+      { name: 'Net Pay vs Gross Pay', standard: 'NGPF.1.3', url: 'https://www.ngpf.org/curriculum/earning-income/' },
+      { name: 'Overtime Pay Calculations', standard: 'NGPF.1.4', url: 'https://www.ngpf.org/curriculum/earning-income/' },
+      { name: 'Tips and Commission', standard: 'NGPF.1.5', url: 'https://www.ngpf.org/curriculum/earning-income/' },
+      { name: 'Part-Time Job Budgeting', standard: 'NGPF.1.6', url: 'https://www.ngpf.org/curriculum/earning-income/' },
+      { name: 'W-4 Form and Withholdings', standard: 'NGPF.1.7', url: 'https://www.ngpf.org/curriculum/earning-income/' },
+    ],
+  },
+  {
+    category: 'FEDERAL INCOME TAXES',
+    topics: [
+      { name: 'Tax Brackets and Marginal Rates', standard: 'NGPF.2.1', url: 'https://www.ngpf.org/curriculum/taxes/' },
+      { name: 'Filing Status (Single, MFJ, HOH)', standard: 'NGPF.2.2', url: 'https://www.ngpf.org/curriculum/taxes/' },
+      { name: 'Standard vs Itemized Deductions', standard: 'NGPF.2.3', url: 'https://www.ngpf.org/curriculum/taxes/' },
+      { name: 'Calculating Taxable Income', standard: 'NGPF.2.4', url: 'https://www.ngpf.org/curriculum/taxes/' },
+      { name: 'Federal Tax Calculations', standard: 'NGPF.2.5', url: 'https://www.ngpf.org/curriculum/taxes/' },
+      { name: 'Effective vs Marginal Tax Rate', standard: 'NGPF.2.6', url: 'https://www.ngpf.org/curriculum/taxes/' },
+      { name: 'W-2 Forms and Tax Returns', standard: 'NGPF.2.7', url: 'https://www.ngpf.org/curriculum/taxes/' },
+      { name: 'Tax Credits vs Deductions', standard: 'NGPF.2.8', url: 'https://www.ngpf.org/curriculum/taxes/' },
+    ],
+  },
+  {
+    category: 'STATE & PAYROLL TAXES',
+    topics: [
+      { name: 'NYS Income Tax Brackets', standard: 'NYS.FIN.1', url: 'https://www.tax.ny.gov/pit/file/tax_tables.htm' },
+      { name: 'FICA Taxes (Social Security & Medicare)', standard: 'NGPF.2.9', url: 'https://www.ngpf.org/curriculum/taxes/' },
+      { name: 'Self-Employment Tax', standard: 'NGPF.2.10', url: 'https://www.ngpf.org/curriculum/taxes/' },
+      { name: 'NYS and NYC Local Taxes', standard: 'NYS.FIN.2', url: 'https://www.tax.ny.gov/pit/file/tax_tables.htm' },
+    ],
+  },
+  {
+    category: 'CREDIT FUNDAMENTALS',
+    topics: [
+      { name: 'What is Credit?', standard: 'NGPF.3.1', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Credit Reports and Bureaus', standard: 'NGPF.3.2', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Credit Score Components', standard: 'NGPF.3.3', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Payment History Impact (35%)', standard: 'NGPF.3.4', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Credit Utilization (30%)', standard: 'NGPF.3.5', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Credit History Length (15%)', standard: 'NGPF.3.6', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Credit Mix (10%)', standard: 'NGPF.3.7', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'New Credit Inquiries (10%)', standard: 'NGPF.3.8', url: 'https://www.ngpf.org/curriculum/credit/' },
+    ],
+  },
+  {
+    category: 'CREDIT SCORE CALCULATIONS',
+    topics: [
+      { name: 'Calculating Credit Utilization Ratio', standard: 'NGPF.3.9', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Late Payment Score Impact', standard: 'NGPF.3.10', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Ideal Utilization (Under 30%)', standard: 'NGPF.3.11', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Score Recovery Strategies', standard: 'NGPF.3.12', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Credit Score Ranges (300-850)', standard: 'NGPF.3.13', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Debt-to-Credit Ratio Analysis', standard: 'NGPF.3.14', url: 'https://www.ngpf.org/curriculum/credit/' },
+    ],
+  },
+  {
+    category: 'CREDIT CARDS & INTEREST',
+    topics: [
+      { name: 'Annual Percentage Rate (APR)', standard: 'NGPF.3.15', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Minimum Payment Traps', standard: 'NGPF.3.16', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Interest Charge Calculations', standard: 'NGPF.3.17', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Credit Card Fees', standard: 'NGPF.3.18', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Secured vs Unsecured Cards', standard: 'NGPF.3.19', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Building Credit Responsibly', standard: 'NGPF.3.20', url: 'https://www.ngpf.org/curriculum/credit/' },
+    ],
+  },
+  {
+    category: 'FIRST APARTMENT & HOUSING',
+    topics: [
+      { name: 'Rent Affordability (30% Rule)', standard: 'NGPF.4.1', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Security Deposits and First/Last Month', standard: 'NGPF.4.2', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Renter\'s Insurance', standard: 'NGPF.4.3', url: 'https://www.ngpf.org/curriculum/insurance/' },
+      { name: 'Utility Budgeting', standard: 'NGPF.4.4', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Lease Agreement Terms', standard: 'NGPF.4.5', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Credit Score Requirements for Renting', standard: 'NGPF.4.6', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Move-In Cost Calculations', standard: 'NGPF.4.7', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+    ],
+  },
+  {
+    category: 'BUDGETING & MONEY MANAGEMENT',
+    topics: [
+      { name: 'Creating a Monthly Budget', standard: 'NGPF.5.1', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: '50/30/20 Budget Rule', standard: 'NGPF.5.2', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Fixed vs Variable Expenses', standard: 'NGPF.5.3', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Emergency Fund Calculations', standard: 'NGPF.5.4', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Opportunity Cost', standard: 'NGPF.5.5', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Tracking Spending', standard: 'NGPF.5.6', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+    ],
+  },
+  {
+    category: 'CAR FINANCING & LOANS',
+    topics: [
+      { name: 'Calculating Monthly Car Payments', standard: 'NGPF.6.1', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Loan vs Lease Comparison', standard: 'NGPF.6.2', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Down Payment and Trade-In', standard: 'NGPF.6.3', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'APR and Total Interest Paid', standard: 'NGPF.6.4', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Depreciation Calculations', standard: 'NGPF.6.5', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Car Insurance Requirements', standard: 'NGPF.6.6', url: 'https://www.ngpf.org/curriculum/insurance/' },
+      { name: 'Total Cost of Car Ownership', standard: 'NGPF.6.7', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+    ],
+  },
+  {
+    category: 'LEASING CALCULATIONS',
+    topics: [
+      { name: 'MSRP and Residual Value', standard: 'NGPF.6.8', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Money Factor to APR Conversion', standard: 'NGPF.6.9', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Monthly Lease Payment Formula', standard: 'NGPF.6.10', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Capitalized Cost and Fees', standard: 'NGPF.6.11', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Mileage Limits and Penalties', standard: 'NGPF.6.12', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+    ],
+  },
+  {
+    category: 'RELATIONSHIPS & SHARED FINANCES',
+    topics: [
+      { name: 'Splitting Expenses with Roommates', standard: 'NGPF.7.1', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Joint vs Separate Accounts', standard: 'NGPF.7.2', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Financial Communication in Relationships', standard: 'NGPF.7.3', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Co-signing Loans: Risks and Responsibilities', standard: 'NGPF.7.4', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Authorized User on Credit Cards', standard: 'NGPF.7.5', url: 'https://www.ngpf.org/curriculum/credit/' },
+      { name: 'Wedding and Event Budgeting', standard: 'NGPF.7.6', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+    ],
+  },
+  {
+    category: 'SAVING & INVESTING BASICS',
+    topics: [
+      { name: 'Simple vs Compound Interest', standard: 'NGPF.8.1', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Rule of 72', standard: 'NGPF.8.2', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'High-Yield Savings Accounts', standard: 'NGPF.8.3', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: '401(k) and Employer Match', standard: 'NGPF.8.4', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Roth IRA Contributions', standard: 'NGPF.8.5', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Time Value of Money', standard: 'NGPF.8.6', url: 'https://www.ngpf.org/curriculum/investing/' },
+    ],
+  },
+  {
+    category: 'ECONOMIC INDICATORS',
+    topics: [
+      { name: 'GDP Calculation', standard: 'NYS.ECON.1', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-learning-standards' },
+      { name: 'GDP Growth Rate', standard: 'NYS.ECON.2', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-learning-standards' },
+      { name: 'Nominal vs Real GDP', standard: 'NYS.ECON.3', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-learning-standards' },
+      { name: 'Inflation and CPI', standard: 'NYS.ECON.4', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-learning-standards' },
+      { name: 'Unemployment Rate', standard: 'NYS.ECON.5', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-learning-standards' },
+    ],
+  },
+  {
+    category: 'STUDENT LOANS & EDUCATION',
+    topics: [
+      { name: 'FAFSA and Financial Aid', standard: 'NGPF.9.1', url: 'https://www.ngpf.org/curriculum/paying-for-college/' },
+      { name: 'Federal vs Private Loans', standard: 'NGPF.9.2', url: 'https://www.ngpf.org/curriculum/paying-for-college/' },
+      { name: 'Loan Repayment Plans', standard: 'NGPF.9.3', url: 'https://www.ngpf.org/curriculum/paying-for-college/' },
+      { name: 'Interest Accrual While in School', standard: 'NGPF.9.4', url: 'https://www.ngpf.org/curriculum/paying-for-college/' },
+      { name: 'Total Cost of College', standard: 'NGPF.9.5', url: 'https://www.ngpf.org/curriculum/paying-for-college/' },
+      { name: 'Scholarships and Grants', standard: 'NGPF.9.6', url: 'https://www.ngpf.org/curriculum/paying-for-college/' },
+    ],
+  },
+];
+
 export const NYS_SUBJECTS: Subject[] = [
   {
     id: 'geometry',
@@ -786,6 +947,12 @@ export const NYS_SUBJECTS: Subject[] = [
     name: 'Physics',
     shortName: 'PHYS',
     categories: PHYSICS_TOPICS,
+  },
+  {
+    id: 'financialmath',
+    name: 'Financial Math',
+    shortName: 'FIN',
+    categories: FINANCIAL_MATH_TOPICS,
   },
 ];
 
