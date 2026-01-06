@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
+import { RosterImageConverter } from '@/components/classes/RosterImageConverter';
 
 function generateJoinCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -22,6 +24,7 @@ function generateJoinCode(): string {
 export default function ClassNew() {
   const [name, setName] = useState('');
   const [schoolYear, setSchoolYear] = useState('');
+  const [classPeriod, setClassPeriod] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -43,6 +46,7 @@ export default function ClassNew() {
           name,
           join_code: joinCode,
           school_year: schoolYear || null,
+          class_period: classPeriod || null,
         })
         .select()
         .single();
@@ -113,6 +117,37 @@ export default function ClassNew() {
                   onChange={(e) => setSchoolYear(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="classPeriod">Class Period</Label>
+                <Select value={classPeriod} onValueChange={setClassPeriod}>
+                  <SelectTrigger id="classPeriod">
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Period 1</SelectItem>
+                    <SelectItem value="2">Period 2</SelectItem>
+                    <SelectItem value="3">Period 3</SelectItem>
+                    <SelectItem value="4">Period 4</SelectItem>
+                    <SelectItem value="5">Period 5</SelectItem>
+                    <SelectItem value="6">Period 6</SelectItem>
+                    <SelectItem value="7">Period 7</SelectItem>
+                    <SelectItem value="8">Period 8</SelectItem>
+                    <SelectItem value="homeroom">Homeroom</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="pt-2 border-t">
+                <Label className="text-sm text-muted-foreground">Roster Tools</Label>
+                <div className="mt-2">
+                  <RosterImageConverter />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Convert a photo of your roster into a CSV file for easy student import
+                </p>
+              </div>
+
               <div className="flex gap-3 pt-4">
                 <Button
                   type="button"
