@@ -180,41 +180,66 @@ export function CSVStudentUploader({ onStudentsParsed, parsedStudents, onClear }
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <div className="mt-2 max-h-48 overflow-y-auto">
+          <div className="mt-2 max-h-64 overflow-y-auto">
             <div className="text-xs space-y-1">
               {parsedStudents.map((s, i) => (
-                <div key={i} className="flex items-center gap-2 py-1 px-2 rounded bg-background/50">
+                <div key={i} className="py-1.5 px-2 rounded bg-background/50">
                   {editingIndex === i && editValues ? (
-                    <>
-                      <Input
-                        value={editValues.firstName}
-                        onChange={(e) => setEditValues({ ...editValues, firstName: e.target.value })}
-                        className="h-6 text-xs flex-1"
-                        placeholder="First name"
-                      />
-                      <Input
-                        value={editValues.lastName}
-                        onChange={(e) => setEditValues({ ...editValues, lastName: e.target.value })}
-                        className="h-6 text-xs flex-1"
-                        placeholder="Last name"
-                      />
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleEditSave}>
-                        <Check className="h-3 w-3 text-green-600" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleEditCancel}>
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={editValues.firstName}
+                          onChange={(e) => setEditValues({ ...editValues, firstName: e.target.value })}
+                          className="h-6 text-xs flex-1"
+                          placeholder="First name"
+                        />
+                        <Input
+                          value={editValues.lastName}
+                          onChange={(e) => setEditValues({ ...editValues, lastName: e.target.value })}
+                          className="h-6 text-xs flex-1"
+                          placeholder="Last name"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={editValues.studentId || ''}
+                          onChange={(e) => setEditValues({ ...editValues, studentId: e.target.value || undefined })}
+                          className="h-6 text-xs flex-1"
+                          placeholder="Student ID (optional)"
+                        />
+                        <Input
+                          value={editValues.email || ''}
+                          onChange={(e) => setEditValues({ ...editValues, email: e.target.value || undefined })}
+                          className="h-6 text-xs flex-1"
+                          placeholder="Email (optional)"
+                        />
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleEditSave}>
+                          <Check className="h-3 w-3 text-green-600" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleEditCancel}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
                   ) : (
-                    <>
-                      <span className="flex-1 text-muted-foreground">{s.firstName} {s.lastName}</span>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditStart(i)}>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-foreground">{s.firstName} {s.lastName}</span>
+                        {(s.studentId || s.email) && (
+                          <span className="text-muted-foreground ml-2">
+                            {s.studentId && `ID: ${s.studentId}`}
+                            {s.studentId && s.email && ' • '}
+                            {s.email}
+                          </span>
+                        )}
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => handleEditStart(i)}>
                         <Pencil className="h-3 w-3" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveStudent(i)}>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => handleRemoveStudent(i)}>
                         <X className="h-3 w-3 text-destructive" />
                       </Button>
-                    </>
+                    </div>
                   )}
                 </div>
               ))}

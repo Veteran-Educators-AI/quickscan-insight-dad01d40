@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { Plus, Users, Copy, Check, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { EditClassDialog } from '@/components/classes/EditClassDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -12,6 +14,7 @@ interface ClassWithStudentCount {
   name: string;
   join_code: string;
   school_year: string | null;
+  class_period: string | null;
   created_at: string;
   student_count: number;
 }
@@ -120,42 +123,58 @@ export default function Classes() {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {classes.map((cls) => (
-              <Link key={cls.id} to={`/classes/${cls.id}`}>
-                <Card className="hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer h-full">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center justify-between">
+              <Card key={cls.id} className="hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center justify-between">
+                    <Link to={`/classes/${cls.id}`} className="hover:underline flex-1">
                       {cls.name}
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </CardTitle>
-                    <CardDescription>
-                      {cls.school_year || 'No year set'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Users className="h-4 w-4" />
-                        {cls.student_count} student{cls.student_count !== 1 ? 's' : ''}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          copyJoinCode(cls.join_code);
-                        }}
-                      >
-                        {copiedCode === cls.join_code ? (
-                          <Check className="h-3 w-3" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                        {cls.join_code}
-                      </Button>
+                    </Link>
+                    <div className="flex items-center gap-1">
+                      <EditClassDialog
+                        classId={cls.id}
+                        currentName={cls.name}
+                        currentPeriod={cls.class_period}
+                        currentYear={cls.school_year}
+                        onUpdate={fetchClasses}
+                      />
+                      <Link to={`/classes/${cls.id}`}>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </Link>
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-2">
+                    {cls.school_year || 'No year set'}
+                    {cls.class_period && (
+                      <Badge variant="secondary" className="text-xs">
+                        {cls.class_period}
+                      </Badge>
+                    )}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="h-4 w-4" />
+                      {cls.student_count} student{cls.student_count !== 1 ? 's' : ''}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        copyJoinCode(cls.join_code);
+                      }}
+                    >
+                      {copiedCode === cls.join_code ? (
+                        <Check className="h-3 w-3" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                      {cls.join_code}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}
