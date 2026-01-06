@@ -1,1 +1,22 @@
 project_id = "wihddyjdfihvnxvvynek"
+
+[functions.analyze-student-work]
+verify_jwt = false
+
+[functions.extract-answer-key]
+verify_jwt = false
+
+[functions.generate-vapid-keys]
+verify_jwt = false
+
+[functions.send-push-notification]
+verify_jwt = false
+
+[functions.send-student-questions]
+verify_jwt = false
+
+[functions.generate-worksheet-questions]
+verify_jwt = false
+
+[functions.generate-diagram-images]
+verify_jwt = false
