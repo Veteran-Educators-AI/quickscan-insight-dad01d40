@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, CheckCircle, Chrome } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -227,7 +228,42 @@ export default function Login() {
                   <Button type="submit" className="w-full" variant="hero" disabled={isLoading}>
                     {isLoading ? "Signing in..." : "Sign In"}
                   </Button>
-                  
+
+                  <div className="relative my-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={isLoading}
+                    onClick={async () => {
+                      setIsLoading(true);
+                      const { error } = await supabase.auth.signInWithOAuth({
+                        provider: 'google',
+                        options: {
+                          redirectTo: `${window.location.origin}/dashboard`,
+                        },
+                      });
+                      if (error) {
+                        toast({
+                          title: "Google sign-in failed",
+                          description: error.message,
+                          variant: "destructive",
+                        });
+                        setIsLoading(false);
+                      }
+                    }}
+                  >
+                    <Chrome className="mr-2 h-4 w-4" />
+                    Sign in with Google
+                  </Button>
                 </form>
               </TabsContent>
 
@@ -316,6 +352,42 @@ export default function Login() {
                     </div>
                     <Button type="submit" className="w-full" variant="hero" disabled={isLoading}>
                       {isLoading ? "Creating account..." : "Create Account"}
+                    </Button>
+
+                    <div className="relative my-4">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-border" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={isLoading}
+                      onClick={async () => {
+                        setIsLoading(true);
+                        const { error } = await supabase.auth.signInWithOAuth({
+                          provider: 'google',
+                          options: {
+                            redirectTo: `${window.location.origin}/dashboard`,
+                          },
+                        });
+                        if (error) {
+                          toast({
+                            title: "Google sign-up failed",
+                            description: error.message,
+                            variant: "destructive",
+                          });
+                          setIsLoading(false);
+                        }
+                      }}
+                    >
+                      <Chrome className="mr-2 h-4 w-4" />
+                      Sign up with Google
                     </Button>
                   </form>
                 )}
