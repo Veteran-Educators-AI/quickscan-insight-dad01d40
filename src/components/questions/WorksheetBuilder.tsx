@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -105,6 +107,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [imageGenerationProgress, setImageGenerationProgress] = useState(0);
   const [imageGenerationStatus, setImageGenerationStatus] = useState('');
   const [imagesGenerated, setImagesGenerated] = useState(false);
+  
+  // Prompt editing modal state
+  const [showPromptEditor, setShowPromptEditor] = useState(false);
+  const [editablePrompts, setEditablePrompts] = useState<{ questionNumber: number; prompt: string }[]>([]);
   
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -355,11 +361,32 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const questionsNeedingImages = compiledQuestions.filter(q => q.imagePrompt && !q.imageUrl);
   const hasQuestionsWithImagePrompts = compiledQuestions.some(q => q.imagePrompt);
 
-  // Generate images for questions with image prompts
-  const generateImages = async () => {
-    const questionsToGenerate = compiledQuestions.filter(q => q.imagePrompt && !q.imageUrl);
-    
-    if (questionsToGenerate.length === 0) {
+  // Open prompt editor modal
+  const openPromptEditor = () => {
+    const promptsToEdit = compiledQuestions
+      .filter(q => q.imagePrompt && !q.imageUrl)
+      .map(q => ({
+        questionNumber: q.questionNumber,
+        prompt: q.imagePrompt!,
+      }));
+    setEditablePrompts(promptsToEdit);
+    setShowPromptEditor(true);
+  };
+
+  // Update a single prompt in the editable prompts array
+  const updateEditablePrompt = (questionNumber: number, newPrompt: string) => {
+    setEditablePrompts(prev =>
+      prev.map(p =>
+        p.questionNumber === questionNumber
+          ? { ...p, prompt: newPrompt }
+          : p
+      )
+    );
+  };
+
+  // Generate images with edited prompts
+  const generateImagesWithEditedPrompts = async () => {
+    if (editablePrompts.length === 0) {
       toast({
         title: 'No diagrams to generate',
         description: 'All questions already have images or no diagrams are needed.',
@@ -367,16 +394,27 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       return;
     }
 
+    // Update the compiled questions with edited prompts before generating
+    const updatedQuestions = compiledQuestions.map(q => {
+      const editedPrompt = editablePrompts.find(p => p.questionNumber === q.questionNumber);
+      if (editedPrompt) {
+        return { ...q, imagePrompt: editedPrompt.prompt };
+      }
+      return q;
+    });
+    setCompiledQuestions(updatedQuestions);
+
+    setShowPromptEditor(false);
     setIsGeneratingImages(true);
     setImageGenerationProgress(0);
-    setImageGenerationStatus(`Generating images for ${questionsToGenerate.length} questions...`);
+    setImageGenerationStatus(`Generating images for ${editablePrompts.length} questions...`);
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
         body: {
-          questions: questionsToGenerate.map(q => ({
-            questionNumber: q.questionNumber,
-            imagePrompt: q.imagePrompt,
+          questions: editablePrompts.map(p => ({
+            questionNumber: p.questionNumber,
+            imagePrompt: p.prompt,
           })),
         },
       });
@@ -385,14 +423,14 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
       if (data.results) {
         // Update questions with generated images
-        const updatedQuestions = [...compiledQuestions];
+        const finalQuestions = [...updatedQuestions];
         let successCount = 0;
         
         for (const result of data.results) {
-          const questionIndex = updatedQuestions.findIndex(q => q.questionNumber === result.questionNumber);
+          const questionIndex = finalQuestions.findIndex(q => q.questionNumber === result.questionNumber);
           if (questionIndex !== -1 && result.imageUrl) {
-            updatedQuestions[questionIndex] = {
-              ...updatedQuestions[questionIndex],
+            finalQuestions[questionIndex] = {
+              ...finalQuestions[questionIndex],
               imageUrl: result.imageUrl,
             };
             successCount++;
@@ -400,15 +438,15 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           // Update progress
           const progress = ((data.results.indexOf(result) + 1) / data.results.length) * 100;
           setImageGenerationProgress(progress);
-          setImageGenerationStatus(`Generated ${successCount} of ${questionsToGenerate.length} diagrams`);
+          setImageGenerationStatus(`Generated ${successCount} of ${editablePrompts.length} diagrams`);
         }
 
-        setCompiledQuestions(updatedQuestions);
+        setCompiledQuestions(finalQuestions);
         setImagesGenerated(true);
         
         toast({
           title: 'Diagrams generated!',
-          description: `Successfully created ${successCount} of ${questionsToGenerate.length} diagram images.`,
+          description: `Successfully created ${successCount} of ${editablePrompts.length} diagram images.`,
         });
       }
     } catch (error) {
@@ -1204,7 +1242,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   <Button
                     className="w-full"
                     variant="secondary"
-                    onClick={generateImages}
+                    onClick={openPromptEditor}
                     disabled={isGeneratingImages}
                   >
                     {isGeneratingImages ? (
@@ -1214,8 +1252,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       </>
                     ) : (
                       <>
-                        <ImageIcon className="h-4 w-4 mr-2" />
-                        Generate {questionsNeedingImages.length} Diagram{questionsNeedingImages.length > 1 ? 's' : ''}
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Review & Generate {questionsNeedingImages.length} Diagram{questionsNeedingImages.length > 1 ? 's' : ''}
                       </>
                     )}
                   </Button>
@@ -1384,6 +1422,70 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           }
         }
       `}</style>
+
+      {/* Prompt Editor Dialog */}
+      <Dialog open={showPromptEditor} onOpenChange={setShowPromptEditor}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Review & Edit Diagram Prompts
+            </DialogTitle>
+            <DialogDescription>
+              Review and edit the AI prompts for each diagram before generating. Better prompts lead to more accurate diagrams.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-4 py-4">
+              {editablePrompts.map((item, index) => {
+                const question = compiledQuestions.find(q => q.questionNumber === item.questionNumber);
+                return (
+                  <div key={item.questionNumber} className="space-y-2 p-3 border rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        Question {item.questionNumber}
+                      </Badge>
+                      {question && (
+                        <span className="text-xs text-muted-foreground">
+                          {question.topic}
+                        </span>
+                      )}
+                    </div>
+                    {question && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {question.question}
+                      </p>
+                    )}
+                    <div className="space-y-1">
+                      <Label htmlFor={`prompt-${item.questionNumber}`} className="text-xs font-medium">
+                        Diagram Description
+                      </Label>
+                      <Textarea
+                        id={`prompt-${item.questionNumber}`}
+                        value={item.prompt}
+                        onChange={(e) => updateEditablePrompt(item.questionNumber, e.target.value)}
+                        className="min-h-[80px] text-sm"
+                        placeholder="Describe what the diagram should show..."
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="pt-4 border-t">
+            <Button variant="outline" onClick={() => setShowPromptEditor(false)}>
+              Cancel
+            </Button>
+            <Button onClick={generateImagesWithEditedPrompts} disabled={editablePrompts.length === 0}>
+              <ImageIcon className="h-4 w-4 mr-2" />
+              Generate {editablePrompts.length} Diagram{editablePrompts.length > 1 ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
