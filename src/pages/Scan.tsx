@@ -1,5 +1,5 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, Users, FileText, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot } from 'lucide-react';
+import { useRef, useState, useCallback } from 'react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,10 +15,8 @@ import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
 import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
 
-type ScanState = 'idle' | 'camera' | 'preview' | 'analyzed' | 'manual-scoring';
+type ScanState = 'idle' | 'camera' | 'preview' | 'choose-method' | 'upload-solution' | 'analyzed' | 'manual-scoring';
 type ScanMode = 'single' | 'batch';
 type GradingMethod = 'ai' | 'teacher';
 
@@ -38,9 +36,12 @@ export default function Scan() {
   const [scanState, setScanState] = useState<ScanState>('idle');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [finalImage, setFinalImage] = useState<string | null>(null);
+  const [solutionImage, setSolutionImage] = useState<string | null>(null);
   const [showBatchReport, setShowBatchReport] = useState(false);
   const [gradingMethod, setGradingMethod] = useState<GradingMethod>('ai');
   const [manualResult, setManualResult] = useState<ManualResult | null>(null);
+  
+  const solutionInputRef = useRef<HTMLInputElement>(null);
 
   // Class & student selection for batch mode
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -67,13 +68,43 @@ export default function Scan() {
     if (scanMode === 'batch') {
       batch.addImage(finalImageDataUrl);
       toast.success('Image added to batch');
+      setCapturedImage(null);
+      setScanState('idle');
     } else {
       setFinalImage(finalImageDataUrl);
-      toast.success('Photo captured successfully!');
+      setCapturedImage(null);
+      setScanState('choose-method');
+      toast.success('Image uploaded! Choose analysis method.');
     }
-    setCapturedImage(null);
-    setScanState('idle');
   }, [scanMode, batch]);
+
+  const handleSolutionUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        setSolutionImage(dataUrl);
+        toast.success('Solution uploaded!');
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = '';
+  };
+
+  const handleChooseAI = () => {
+    setGradingMethod('ai');
+    analyzeImage();
+  };
+
+  const handleChooseTeacher = () => {
+    setGradingMethod('teacher');
+    setScanState('upload-solution');
+  };
+
+  const handleProceedWithComparison = () => {
+    setScanState('manual-scoring');
+  };
 
   const handlePreviewRetake = useCallback(() => {
     setCapturedImage(null);
@@ -127,11 +158,6 @@ export default function Scan() {
 
   const analyzeImage = async () => {
     if (!finalImage) return;
-
-    if (gradingMethod === 'teacher') {
-      setScanState('manual-scoring');
-      return;
-    }
 
     const analysisResult = await analyze(finalImage, undefined, mockRubricSteps);
     
@@ -215,12 +241,14 @@ export default function Scan() {
   const clearImage = () => {
     setFinalImage(null);
     setCapturedImage(null);
+    setSolutionImage(null);
     setScanState('idle');
   };
 
   const startNewScan = () => {
     setFinalImage(null);
     setCapturedImage(null);
+    setSolutionImage(null);
     setScanState('idle');
     setShowBatchReport(false);
     setManualResult(null);
@@ -243,40 +271,6 @@ export default function Scan() {
             <h1 className="font-display text-2xl font-bold">Scan Student Work</h1>
             <p className="text-muted-foreground">Capture or upload photos of student responses</p>
           </div>
-
-          {/* Grading Method Selection */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Grading Method</Label>
-                <RadioGroup
-                  value={gradingMethod}
-                  onValueChange={(v) => setGradingMethod(v as GradingMethod)}
-                  className="grid grid-cols-2 gap-3"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="ai" id="ai" />
-                    <Label htmlFor="ai" className="flex items-center gap-2 cursor-pointer">
-                      <Bot className="h-4 w-4 text-primary" />
-                      <span>AI Analysis</span>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="teacher" id="teacher" />
-                    <Label htmlFor="teacher" className="flex items-center gap-2 cursor-pointer">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span>Teacher Input</span>
-                    </Label>
-                  </div>
-                </RadioGroup>
-                <p className="text-xs text-muted-foreground">
-                  {gradingMethod === 'ai' 
-                    ? 'AI will automatically analyze and grade student work based on the rubric.'
-                    : 'You will manually input scores and feedback for each student.'}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Mode Toggle */}
           <Tabs value={scanMode} onValueChange={(v) => {
@@ -303,14 +297,195 @@ export default function Scan() {
               {scanState === 'manual-scoring' && finalImage && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">Manual Scoring</h2>
+                    <h2 className="text-lg font-semibold">Teacher Scoring</h2>
+                    <Button variant="outline" size="sm" onClick={startNewScan}>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Start Over
+                    </Button>
                   </div>
+                  
+                  {/* Side by side comparison if solution uploaded */}
+                  {solutionImage && (
+                    <Card>
+                      <CardContent className="p-4">
+                        <h3 className="text-sm font-medium mb-3">Compare: Student Work vs Solution</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <p className="text-xs text-muted-foreground text-center">Student Work</p>
+                            <img 
+                              src={finalImage} 
+                              alt="Student work" 
+                              className="w-full object-contain max-h-64 rounded-md border" 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-xs text-muted-foreground text-center">Solution</p>
+                            <img 
+                              src={solutionImage} 
+                              alt="Solution" 
+                              className="w-full object-contain max-h-64 rounded-md border" 
+                            />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
                   <ManualScoringForm
                     rubricSteps={mockRubricSteps}
                     imageUrl={finalImage}
                     onSubmit={handleManualScoreSubmit}
-                    onCancel={() => setScanState('idle')}
+                    onCancel={startNewScan}
                   />
+                </div>
+              )}
+
+              {/* Upload Solution Screen for Teacher Analysis */}
+              {scanState === 'upload-solution' && finalImage && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold">Upload Solution for Comparison</h2>
+                    <Button variant="outline" size="sm" onClick={() => setScanState('choose-method')}>
+                      ← Back
+                    </Button>
+                  </div>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-center">Student Work</p>
+                          <img 
+                            src={finalImage} 
+                            alt="Student work" 
+                            className="w-full object-contain max-h-48 rounded-md border" 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-center">Solution</p>
+                          {solutionImage ? (
+                            <div className="relative">
+                              <img 
+                                src={solutionImage} 
+                                alt="Solution" 
+                                className="w-full object-contain max-h-48 rounded-md border" 
+                              />
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="absolute top-2 right-2"
+                                onClick={() => setSolutionImage(null)}
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div 
+                              className="w-full h-48 border-2 border-dashed rounded-md flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                              onClick={() => solutionInputRef.current?.click()}
+                            >
+                              <Upload className="h-8 w-8 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">Upload Solution</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <input
+                    ref={solutionInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleSolutionUpload}
+                    className="hidden"
+                  />
+
+                  <div className="flex gap-3">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => solutionInputRef.current?.click()}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {solutionImage ? 'Change Solution' : 'Upload Solution'}
+                    </Button>
+                    <Button 
+                      variant="hero" 
+                      className="flex-1"
+                      onClick={handleProceedWithComparison}
+                    >
+                      {solutionImage ? 'Compare & Score' : 'Skip & Score'}
+                    </Button>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground text-center">
+                    Upload the correct solution to compare side-by-side while grading, or skip to score directly.
+                  </p>
+                </div>
+              )}
+
+              {/* Choose Analysis Method */}
+              {scanState === 'choose-method' && finalImage && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold">Choose Analysis Method</h2>
+                    <Button variant="outline" size="sm" onClick={startNewScan}>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Start Over
+                    </Button>
+                  </div>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <img 
+                        src={finalImage} 
+                        alt="Student work" 
+                        className="w-full object-contain max-h-48 rounded-md" 
+                      />
+                    </CardContent>
+                  </Card>
+
+                  {isAnalyzing ? (
+                    <Card>
+                      <CardContent className="p-8">
+                        <div className="text-center">
+                          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
+                          <p className="font-medium">Analyzing with AI...</p>
+                          <p className="text-sm text-muted-foreground">Running OCR and auto-grading</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button 
+                        variant="outline" 
+                        className="h-auto py-6 flex-col gap-3 border-2 hover:border-primary hover:bg-primary/5"
+                        onClick={handleChooseAI}
+                      >
+                        <Bot className="h-10 w-10 text-primary" />
+                        <div className="space-y-1">
+                          <span className="font-semibold text-base">AI Analysis</span>
+                          <p className="text-xs text-muted-foreground font-normal">
+                            Automatic grading using AI
+                          </p>
+                        </div>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="h-auto py-6 flex-col gap-3 border-2 hover:border-primary hover:bg-primary/5"
+                        onClick={handleChooseTeacher}
+                      >
+                        <User className="h-10 w-10 text-muted-foreground" />
+                        <div className="space-y-1">
+                          <span className="font-semibold text-base">Teacher Analysis</span>
+                          <p className="text-xs text-muted-foreground font-normal">
+                            Upload solution to compare
+                          </p>
+                        </div>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -357,140 +532,89 @@ export default function Scan() {
                 </div>
               )}
 
-              {/* Main scan card */}
-              {scanState !== 'analyzed' && scanState !== 'manual-scoring' && (
+              {/* Main scan card - only show in idle state */}
+              {scanState === 'idle' && (
                 <Card className="overflow-hidden">
                   <CardContent className="p-0">
-                    {finalImage ? (
-                      <div className="p-6 space-y-4">
-                        <div className="relative rounded-lg overflow-hidden border bg-muted">
-                          <img 
-                            src={finalImage} 
-                            alt="Captured student work" 
-                            className="w-full object-contain max-h-[50vh]" 
+                    <div className="p-8 sm:p-12">
+                      <div className="text-center space-y-6">
+                        <div className="w-24 h-24 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                          <Camera className="h-12 w-12 text-primary" />
+                        </div>
+
+                        <div>
+                          <h2 className="text-lg font-semibold mb-1">Ready to Scan</h2>
+                          <p className="text-sm text-muted-foreground">
+                            Take a photo of student work or upload an existing image
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                          <input
+                            ref={nativeInputRef}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleNativeCapture}
+                            className="hidden"
                           />
-                          {isAnalyzing && (
-                            <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                              <div className="text-center">
-                                <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
-                                <p className="font-medium">Analyzing with AI...</p>
-                                <p className="text-sm text-muted-foreground">Running OCR and auto-grading</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <Button variant="outline" className="h-auto py-3 flex-col gap-1">
-                            <Users className="h-5 w-5" />
-                            <span className="text-xs">Select Student</span>
-                          </Button>
-                          <Button variant="outline" className="h-auto py-3 flex-col gap-1">
-                            <FileText className="h-5 w-5" />
-                            <span className="text-xs">Select Question</span>
-                          </Button>
-                        </div>
-
-                        <div className="flex gap-3">
-                          <Button 
-                            variant="outline" 
-                            className="flex-1"
-                            onClick={clearImage}
-                            disabled={isAnalyzing}
-                          >
-                            Retake
-                          </Button>
-                          <Button 
-                            variant="hero" 
-                            className="flex-1"
-                            onClick={analyzeImage}
-                            disabled={isAnalyzing}
-                          >
-                            {isAnalyzing ? 'Analyzing...' : gradingMethod === 'ai' ? 'Analyze with AI' : 'Score Manually'}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-8 sm:p-12">
-                        <div className="text-center space-y-6">
-                          <div className="w-24 h-24 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                            <Camera className="h-12 w-12 text-primary" />
-                          </div>
-
-                          <div>
-                            <h2 className="text-lg font-semibold mb-1">Ready to Scan</h2>
-                            <p className="text-sm text-muted-foreground">
-                              Take a photo of student work or upload an existing image
-                            </p>
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                            <input
-                              ref={nativeInputRef}
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              onChange={handleNativeCapture}
-                              className="hidden"
-                            />
-                            
-                            {isNativeContext ? (
+                          
+                          {isNativeContext ? (
+                            <Button 
+                              variant="scan" 
+                              size="lg" 
+                              className="min-w-[180px]"
+                              onClick={() => nativeInputRef.current?.click()}
+                            >
+                              <Camera className="h-5 w-5 mr-2" />
+                              Open Camera
+                            </Button>
+                          ) : (
+                            <>
                               <Button 
                                 variant="scan" 
                                 size="lg" 
                                 className="min-w-[180px]"
-                                onClick={() => nativeInputRef.current?.click()}
+                                onClick={() => setScanState('camera')}
                               >
                                 <Camera className="h-5 w-5 mr-2" />
                                 Open Camera
                               </Button>
-                            ) : (
-                              <>
-                                <Button 
-                                  variant="scan" 
-                                  size="lg" 
-                                  className="min-w-[180px]"
-                                  onClick={() => setScanState('camera')}
-                                >
-                                  <Camera className="h-5 w-5 mr-2" />
-                                  Open Camera
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="lg"
-                                  className="sm:hidden"
-                                  onClick={() => nativeInputRef.current?.click()}
-                                >
-                                  <Camera className="h-5 w-5 mr-2" />
-                                  Use Device Camera
-                                </Button>
-                              </>
-                            )}
-                            
-                            <input
-                              ref={fileInputRef}
-                              type="file"
-                              accept="image/*"
-                              onChange={handleFileUpload}
-                              className="hidden"
-                            />
-                            <Button 
-                              variant="outline" 
-                              size="lg"
-                              onClick={() => fileInputRef.current?.click()}
-                            >
-                              <Upload className="h-5 w-5 mr-2" />
-                              Upload Image
-                            </Button>
-                          </div>
+                              <Button 
+                                variant="outline" 
+                                size="lg"
+                                className="sm:hidden"
+                                onClick={() => nativeInputRef.current?.click()}
+                              >
+                                <Camera className="h-5 w-5 mr-2" />
+                                Use Device Camera
+                              </Button>
+                            </>
+                          )}
+                          
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                          />
+                          <Button 
+                            variant="outline" 
+                            size="lg"
+                            onClick={() => fileInputRef.current?.click()}
+                          >
+                            <Upload className="h-5 w-5 mr-2" />
+                            Upload Image
+                          </Button>
+                        </div>
 
-                          <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
-                            <p>💡 <strong>Tip:</strong> For best results, ensure good lighting and capture the full response</p>
-                            <p>📱 QR codes on printed assessments will auto-detect student & question</p>
-                          </div>
+                        <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
+                          <p>💡 <strong>Tip:</strong> For best results, ensure good lighting and capture the full response</p>
+                          <p>📱 QR codes on printed assessments will auto-detect student & question</p>
                         </div>
                       </div>
-                    )}
+                    </div>
                   </CardContent>
                 </Card>
               )}
