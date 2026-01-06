@@ -18,7 +18,7 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const { imageBase64, questionId, rubricSteps, identifyOnly, studentRoster, studentName, teacherId, assessmentMode, promptText } = await req.json();
+    const { imageBase64, solutionBase64, questionId, rubricSteps, identifyOnly, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode } = await req.json();
     
     if (!imageBase64) {
       throw new Error('Image data is required');
@@ -38,6 +38,18 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         identification,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // If compareMode is true, compare student work against provided solution
+    if (compareMode && solutionBase64) {
+      console.log('Comparing student work against solution...');
+      const comparison = await compareWithSolution(imageBase64, solutionBase64, rubricSteps, LOVABLE_API_KEY);
+      return new Response(JSON.stringify({
+        success: true,
+        comparison,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -218,6 +230,139 @@ Identify the problem being solved and evaluate the student's approach.`;
     });
   }
 });
+
+interface ComparisonResult {
+  suggestedScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
+  totalScore: { earned: number; possible: number; percentage: number };
+  misconceptions: string[];
+  feedback: string;
+  correctnessAnalysis: string;
+  rawComparison: string;
+}
+
+interface RubricStep {
+  step_number: number;
+  description: string;
+  points: number;
+}
+
+async function compareWithSolution(
+  studentImageBase64: string,
+  solutionImageBase64: string,
+  rubricSteps: RubricStep[] | null,
+  apiKey: string
+): Promise<ComparisonResult> {
+  let rubricPrompt = '';
+  if (rubricSteps && rubricSteps.length > 0) {
+    rubricPrompt = `\n\nScore against these rubric criteria:\n`;
+    rubricSteps.forEach((step, i) => {
+      rubricPrompt += `${i + 1}. ${step.description} (${step.points} points max)\n`;
+    });
+  }
+
+  const systemPrompt = `You are an expert math teacher helping grade student work by comparing it to a provided solution.
+
+Your task is to:
+1. Perform OCR on both images to extract all text, equations, and mathematical expressions
+2. Compare the student's work step-by-step against the correct solution
+3. Identify where the student's approach matches or differs from the solution
+4. Score each rubric criterion based on how well the student's work aligns with the solution
+5. Identify specific misconceptions or errors
+6. Provide constructive feedback for improvement
+
+Be fair, accurate, and educational in your assessment.`;
+
+  const userPrompt = `Compare the student's work (first image) against the correct solution (second image).
+${rubricPrompt}
+
+Provide your analysis in this exact JSON format:
+{
+  "suggested_scores": [
+    {"criterion": "criterion text", "score": 0, "max_score": 0, "feedback": "specific feedback"}
+  ],
+  "total_earned": 0,
+  "total_possible": 0,
+  "misconceptions": ["list of identified errors or misconceptions"],
+  "feedback": "overall constructive feedback for the student",
+  "correctness_analysis": "detailed comparison of student work vs solution"
+}`;
+
+  const formatImageUrl = (img: string) => 
+    img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`;
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { 
+          role: "user", 
+          content: [
+            { type: "text", text: userPrompt },
+            { type: "image_url", image_url: { url: formatImageUrl(studentImageBase64) } },
+            { type: "image_url", image_url: { url: formatImageUrl(solutionImageBase64) } }
+          ]
+        }
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Comparison API error:', response.status, errorText);
+    throw new Error(`AI gateway error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  
+  console.log('Comparison raw response:', content);
+
+  try {
+    // Extract JSON from response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      
+      const suggestedScores = (parsed.suggested_scores || []).map((s: any) => ({
+        criterion: s.criterion || '',
+        score: Number(s.score) || 0,
+        maxScore: Number(s.max_score) || 0,
+        feedback: s.feedback || '',
+      }));
+
+      const earned = Number(parsed.total_earned) || suggestedScores.reduce((sum: number, s: any) => sum + s.score, 0);
+      const possible = Number(parsed.total_possible) || suggestedScores.reduce((sum: number, s: any) => sum + s.maxScore, 0);
+      const percentage = possible > 0 ? Math.round((earned / possible) * 100) : 0;
+
+      return {
+        suggestedScores,
+        totalScore: { earned, possible, percentage },
+        misconceptions: parsed.misconceptions || [],
+        feedback: parsed.feedback || '',
+        correctnessAnalysis: parsed.correctness_analysis || '',
+        rawComparison: content,
+      };
+    }
+  } catch (e) {
+    console.error('Failed to parse comparison response:', e);
+  }
+
+  // Return empty result if parsing fails
+  return {
+    suggestedScores: [],
+    totalScore: { earned: 0, possible: 0, percentage: 0 },
+    misconceptions: [],
+    feedback: 'Unable to parse AI comparison. Please score manually.',
+    correctnessAnalysis: content,
+    rawComparison: content,
+  };
+}
 
 interface StudentRosterItem {
   id: string;

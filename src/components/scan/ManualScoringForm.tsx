@@ -24,6 +24,12 @@ interface ManualScore {
 interface ManualScoringFormProps {
   rubricSteps: RubricStep[];
   imageUrl: string;
+  solutionUrl?: string;
+  initialSuggestions?: {
+    scores: ManualScore[];
+    misconceptions: string[];
+    feedback: string;
+  };
   onSubmit: (result: {
     rubricScores: ManualScore[];
     totalScore: { earned: number; possible: number; percentage: number };
@@ -35,20 +41,25 @@ interface ManualScoringFormProps {
 
 export function ManualScoringForm({ 
   rubricSteps, 
-  imageUrl, 
+  imageUrl,
+  solutionUrl,
+  initialSuggestions,
   onSubmit, 
   onCancel 
 }: ManualScoringFormProps) {
-  const [scores, setScores] = useState<ManualScore[]>(
-    rubricSteps.map(step => ({
+  const [scores, setScores] = useState<ManualScore[]>(() => {
+    if (initialSuggestions?.scores && initialSuggestions.scores.length > 0) {
+      return initialSuggestions.scores;
+    }
+    return rubricSteps.map(step => ({
       criterion: step.description,
       score: 0,
       maxScore: step.points,
       feedback: '',
-    }))
-  );
-  const [overallFeedback, setOverallFeedback] = useState('');
-  const [misconceptions, setMisconceptions] = useState<string[]>([]);
+    }));
+  });
+  const [overallFeedback, setOverallFeedback] = useState(initialSuggestions?.feedback || '');
+  const [misconceptions, setMisconceptions] = useState<string[]>(initialSuggestions?.misconceptions || []);
   const [newMisconception, setNewMisconception] = useState('');
 
   const updateScore = (index: number, value: number) => {
@@ -93,16 +104,47 @@ export function ManualScoringForm({
 
   return (
     <div className="space-y-4">
-      {/* Image Preview */}
+      {/* Image Preview - Side by side if solution available */}
       <Card>
         <CardContent className="p-4">
-          <img 
-            src={imageUrl} 
-            alt="Student work" 
-            className="w-full object-contain max-h-48 rounded-md" 
-          />
+          {solutionUrl ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground text-center font-medium">Student Work</p>
+                <img 
+                  src={imageUrl} 
+                  alt="Student work" 
+                  className="w-full object-contain max-h-48 rounded-md border" 
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground text-center font-medium">Solution</p>
+                <img 
+                  src={solutionUrl} 
+                  alt="Solution" 
+                  className="w-full object-contain max-h-48 rounded-md border" 
+                />
+              </div>
+            </div>
+          ) : (
+            <img 
+              src={imageUrl} 
+              alt="Student work" 
+              className="w-full object-contain max-h-48 rounded-md" 
+            />
+          )}
         </CardContent>
       </Card>
+
+      {/* AI Suggestions Banner */}
+      {initialSuggestions && (
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+          <p className="text-sm text-primary font-medium flex items-center gap-2">
+            <span className="text-lg">✨</span>
+            AI-suggested scores applied. Review and adjust as needed.
+          </p>
+        </div>
+      )}
 
       {/* Score Summary */}
       <Card>

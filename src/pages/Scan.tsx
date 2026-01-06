@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -48,8 +48,15 @@ export default function Scan() {
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const { students } = useClassStudents(selectedClassId);
 
-  const { analyze, isAnalyzing, error, result, rawAnalysis } = useAnalyzeStudentWork();
+  const { analyze, compareWithSolution, isAnalyzing, isComparing, error, result, rawAnalysis, comparisonResult } = useAnalyzeStudentWork();
   const batch = useBatchAnalysis();
+  
+  // AI suggestions for manual scoring
+  const [aiSuggestions, setAiSuggestions] = useState<{
+    scores: { criterion: string; score: number; maxScore: number; feedback: string }[];
+    misconceptions: string[];
+    feedback: string;
+  } | null>(null);
 
   // Mock rubric steps
   const mockRubricSteps = [
@@ -102,7 +109,38 @@ export default function Scan() {
     setScanState('upload-solution');
   };
 
-  const handleProceedWithComparison = () => {
+  const handleProceedWithComparison = async () => {
+    // If solution is uploaded, get AI suggestions
+    if (solutionImage && finalImage) {
+      toast.info('Getting AI suggestions...');
+      const comparison = await compareWithSolution(finalImage, solutionImage, mockRubricSteps);
+      
+      if (comparison) {
+        // Map AI suggestions to the form format
+        const mappedScores = mockRubricSteps.map((step, index) => {
+          const suggested = comparison.suggestedScores[index];
+          return {
+            criterion: step.description,
+            score: suggested?.score || 0,
+            maxScore: step.points,
+            feedback: suggested?.feedback || '',
+          };
+        });
+        
+        setAiSuggestions({
+          scores: mappedScores,
+          misconceptions: comparison.misconceptions,
+          feedback: comparison.feedback,
+        });
+        toast.success('AI suggestions ready!');
+      }
+    }
+    
+    setScanState('manual-scoring');
+  };
+
+  const handleSkipToScoring = () => {
+    setAiSuggestions(null);
     setScanState('manual-scoring');
   };
 
@@ -252,6 +290,7 @@ export default function Scan() {
     setScanState('idle');
     setShowBatchReport(false);
     setManualResult(null);
+    setAiSuggestions(null);
   };
 
   // Detect if running in Capacitor/native context
@@ -297,43 +336,20 @@ export default function Scan() {
               {scanState === 'manual-scoring' && finalImage && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">Teacher Scoring</h2>
+                    <h2 className="text-lg font-semibold">
+                      {aiSuggestions ? 'AI-Assisted Scoring' : 'Teacher Scoring'}
+                    </h2>
                     <Button variant="outline" size="sm" onClick={startNewScan}>
                       <RotateCcw className="h-4 w-4 mr-2" />
                       Start Over
                     </Button>
                   </div>
                   
-                  {/* Side by side comparison if solution uploaded */}
-                  {solutionImage && (
-                    <Card>
-                      <CardContent className="p-4">
-                        <h3 className="text-sm font-medium mb-3">Compare: Student Work vs Solution</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <p className="text-xs text-muted-foreground text-center">Student Work</p>
-                            <img 
-                              src={finalImage} 
-                              alt="Student work" 
-                              className="w-full object-contain max-h-64 rounded-md border" 
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-xs text-muted-foreground text-center">Solution</p>
-                            <img 
-                              src={solutionImage} 
-                              alt="Solution" 
-                              className="w-full object-contain max-h-64 rounded-md border" 
-                            />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                  
                   <ManualScoringForm
                     rubricSteps={mockRubricSteps}
                     imageUrl={finalImage}
+                    solutionUrl={solutionImage || undefined}
+                    initialSuggestions={aiSuggestions || undefined}
                     onSubmit={handleManualScoreSubmit}
                     onCancel={startNewScan}
                   />
@@ -401,26 +417,72 @@ export default function Scan() {
                     className="hidden"
                   />
 
-                  <div className="flex gap-3">
-                    <Button 
-                      variant="outline" 
-                      className="flex-1"
-                      onClick={() => solutionInputRef.current?.click()}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      {solutionImage ? 'Change Solution' : 'Upload Solution'}
-                    </Button>
-                    <Button 
-                      variant="hero" 
-                      className="flex-1"
-                      onClick={handleProceedWithComparison}
-                    >
-                      {solutionImage ? 'Compare & Score' : 'Skip & Score'}
-                    </Button>
+                  <div className="flex flex-col gap-3">
+                    {solutionImage ? (
+                      <>
+                        <Button 
+                          variant="hero" 
+                          className="w-full"
+                          onClick={handleProceedWithComparison}
+                          disabled={isComparing}
+                        >
+                          {isComparing ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                              Comparing with AI...
+                            </>
+                          ) : (
+                            <>
+                              <Wand2 className="h-4 w-4 mr-2" />
+                              Get AI Suggestions & Score
+                            </>
+                          )}
+                        </Button>
+                        <div className="flex gap-3">
+                          <Button 
+                            variant="outline" 
+                            className="flex-1"
+                            onClick={() => solutionInputRef.current?.click()}
+                            disabled={isComparing}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Change Solution
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            className="flex-1"
+                            onClick={handleSkipToScoring}
+                            disabled={isComparing}
+                          >
+                            Skip AI, Score Manually
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex gap-3">
+                        <Button 
+                          variant="outline" 
+                          className="flex-1"
+                          onClick={() => solutionInputRef.current?.click()}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload Solution
+                        </Button>
+                        <Button 
+                          variant="hero" 
+                          className="flex-1"
+                          onClick={handleSkipToScoring}
+                        >
+                          Skip & Score Manually
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <p className="text-xs text-muted-foreground text-center">
-                    Upload the correct solution to compare side-by-side while grading, or skip to score directly.
+                    {solutionImage 
+                      ? 'AI will compare student work with the solution and suggest scores for you to review.'
+                      : 'Upload a solution for AI-assisted comparison, or skip to score manually.'}
                   </p>
                 </div>
               )}
