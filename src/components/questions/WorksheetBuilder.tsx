@@ -63,7 +63,17 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const { toast } = useToast();
   const { user } = useAuth();
   const [worksheetTitle, setWorksheetTitle] = useState('Math Practice Worksheet');
+  const [hasUserEditedTitle, setHasUserEditedTitle] = useState(false);
   const [teacherName, setTeacherName] = useState('');
+
+  // Auto-update title to first topic name when questions are added
+  useEffect(() => {
+    if (selectedQuestions.length > 0 && !hasUserEditedTitle) {
+      setWorksheetTitle(selectedQuestions[0].topicName);
+    } else if (selectedQuestions.length === 0 && !hasUserEditedTitle) {
+      setWorksheetTitle('Math Practice Worksheet');
+    }
+  }, [selectedQuestions, hasUserEditedTitle]);
   const [showAnswerLines, setShowAnswerLines] = useState(true);
   const [questionCount, setQuestionCount] = useState('5');
   const [difficultyFilter, setDifficultyFilter] = useState<string[]>(['medium', 'hard', 'challenging']);
@@ -161,6 +171,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
   const loadWorksheet = (worksheet: SavedWorksheet) => {
     setWorksheetTitle(worksheet.title);
+    setHasUserEditedTitle(true);
     setTeacherName(worksheet.teacher_name || '');
     setCompiledQuestions(worksheet.questions);
     setQuestionCount(worksheet.settings.questionCount);
@@ -739,7 +750,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   <Input
                     id="title"
                     value={worksheetTitle}
-                    onChange={(e) => setWorksheetTitle(e.target.value)}
+                    onChange={(e) => {
+                      setWorksheetTitle(e.target.value);
+                      setHasUserEditedTitle(true);
+                    }}
                     placeholder="Enter worksheet title"
                   />
                 </div>
