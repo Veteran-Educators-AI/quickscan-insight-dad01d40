@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import jsPDF from 'jspdf';
+import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
 
 export interface WorksheetQuestion {
   id: string;
@@ -43,6 +44,7 @@ interface SavedWorksheet {
     showAnswerLines: boolean;
     includeGeometry?: boolean;
     includeFormulas?: boolean;
+    includeFormulaSheet?: boolean;
   };
   created_at: string;
   share_code: string | null;
@@ -65,6 +67,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [difficultyFilter, setDifficultyFilter] = useState<string[]>(['medium', 'hard', 'challenging']);
   const [includeGeometry, setIncludeGeometry] = useState(false);
   const [includeFormulas, setIncludeFormulas] = useState(false);
+  const [includeFormulaSheet, setIncludeFormulaSheet] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledQuestions, setCompiledQuestions] = useState<GeneratedQuestion[]>([]);
   const [isCompiled, setIsCompiled] = useState(false);
@@ -126,6 +129,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           showAnswerLines,
           includeGeometry,
           includeFormulas,
+          includeFormulaSheet,
         })),
       };
       const { error } = await supabase.from('worksheets').insert([worksheetData]);
@@ -158,6 +162,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setShowAnswerLines(worksheet.settings.showAnswerLines);
     setIncludeGeometry(worksheet.settings.includeGeometry ?? false);
     setIncludeFormulas(worksheet.settings.includeFormulas ?? false);
+    setIncludeFormulaSheet(worksheet.settings.includeFormulaSheet ?? false);
     setIsCompiled(true);
     setShowSavedWorksheets(false);
     toast({
@@ -451,6 +456,85 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         }
       }
 
+      // Formula Reference Sheet
+      if (includeFormulaSheet) {
+        const relevantFormulas = getFormulasForTopics(
+          selectedQuestions.map(q => ({ category: q.category, topicName: q.topicName }))
+        );
+
+        if (relevantFormulas.length > 0) {
+          pdf.addPage();
+          yPosition = margin;
+
+          // Formula sheet header
+          pdf.setFontSize(16);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(0);
+          pdf.text('Formula Reference Sheet', pageWidth / 2, yPosition, { align: 'center' });
+          yPosition += 12;
+
+          pdf.setFontSize(10);
+          pdf.setFont('helvetica', 'italic');
+          pdf.setTextColor(100);
+          pdf.text('Based on selected topics', pageWidth / 2, yPosition, { align: 'center' });
+          pdf.setTextColor(0);
+          yPosition += 10;
+
+          pdf.setLineWidth(0.5);
+          pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+          yPosition += 8;
+
+          // Render each formula category
+          for (const category of relevantFormulas) {
+            // Check if we need a new page
+            if (yPosition > pageHeight - 60) {
+              pdf.addPage();
+              yPosition = margin;
+            }
+
+            // Category header
+            pdf.setFontSize(11);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(category.category, margin, yPosition);
+            yPosition += 7;
+
+            // Formulas in this category
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+
+            for (const formula of category.formulas) {
+              if (yPosition > pageHeight - 30) {
+                pdf.addPage();
+                yPosition = margin;
+              }
+
+              // Formula name and formula
+              const formulaLine = `• ${formula.name}: ${formula.formula}`;
+              const lines = pdf.splitTextToSize(formulaLine, contentWidth - 10);
+              
+              lines.forEach((line: string) => {
+                pdf.text(line, margin + 5, yPosition);
+                yPosition += 5;
+              });
+
+              // Description if present
+              if (formula.description) {
+                pdf.setFontSize(9);
+                pdf.setTextColor(100);
+                pdf.text(`  (${formula.description})`, margin + 10, yPosition);
+                pdf.setTextColor(0);
+                pdf.setFontSize(10);
+                yPosition += 5;
+              }
+
+              yPosition += 2;
+            }
+
+            yPosition += 5;
+          }
+        }
+      }
+
       // Footer
       pdf.setFontSize(8);
       pdf.setTextColor(150);
@@ -736,6 +820,21 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     Include mathematical formulas
                   </Label>
                 </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="includeFormulaSheet"
+                    checked={includeFormulaSheet}
+                    onChange={(e) => setIncludeFormulaSheet(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  <Label htmlFor="includeFormulaSheet" className="text-sm cursor-pointer">
+                    <span className="flex items-center gap-1">
+                      <BookOpen className="h-3.5 w-3.5" />
+                      Append formula reference sheet
+                    </span>
+                  </Label>
+                </div>
               </div>
 
               <Separator />
@@ -932,6 +1031,44 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 </div>
               ))}
             </div>
+
+            {/* Formula Reference Sheet in Print Preview */}
+            {includeFormulaSheet && (() => {
+              const relevantFormulas = getFormulasForTopics(
+                selectedQuestions.map(q => ({ category: q.category, topicName: q.topicName }))
+              );
+              
+              if (relevantFormulas.length === 0) return null;
+              
+              return (
+                <div className="mt-12 pt-8 border-t-2 border-dashed page-break-before">
+                  <h2 className="text-xl font-bold text-center mb-2">Formula Reference Sheet</h2>
+                  <p className="text-center text-sm text-muted-foreground mb-6">Based on selected topics</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {relevantFormulas.map((category) => (
+                      <div key={category.category} className="space-y-2">
+                        <h3 className="font-semibold text-sm border-b pb-1">{category.category}</h3>
+                        <ul className="space-y-1 text-sm">
+                          {category.formulas.map((formula, idx) => (
+                            <li key={idx} className="flex flex-col">
+                              <span>
+                                <span className="font-medium">{formula.name}:</span>{' '}
+                                <span className="font-mono text-xs">{formula.formula}</span>
+                              </span>
+                              {formula.description && (
+                                <span className="text-xs text-muted-foreground ml-4">({formula.description})</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="mt-12 text-center text-xs text-muted-foreground">
               Generated with Scan Genius - NYS Regents Aligned
             </div>
