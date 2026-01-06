@@ -30,6 +30,8 @@ interface GeneratedQuestion {
   question: string;
   difficulty: 'medium' | 'hard' | 'challenging';
   svg?: string;
+  imageUrl?: string;
+  imagePrompt?: string;
 }
 
 interface SavedWorksheet {
@@ -47,6 +49,7 @@ interface SavedWorksheet {
     includeFormulaSheet?: boolean;
     includeGraphPaper?: boolean;
     includeCoordinateGeometry?: boolean;
+    useAIImages?: boolean;
   };
   created_at: string;
   share_code: string | null;
@@ -84,6 +87,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [includeFormulaSheet, setIncludeFormulaSheet] = useState(false);
   const [includeGraphPaper, setIncludeGraphPaper] = useState(false);
   const [includeCoordinateGeometry, setIncludeCoordinateGeometry] = useState(false);
+  const [useAIImages, setUseAIImages] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledQuestions, setCompiledQuestions] = useState<GeneratedQuestion[]>([]);
   const [isCompiled, setIsCompiled] = useState(false);
@@ -148,6 +152,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           includeFormulaSheet,
           includeGraphPaper,
           includeCoordinateGeometry,
+          useAIImages,
         })),
       };
       const { error } = await supabase.from('worksheets').insert([worksheetData]);
@@ -184,6 +189,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setIncludeFormulaSheet(worksheet.settings.includeFormulaSheet ?? false);
     setIncludeGraphPaper(worksheet.settings.includeGraphPaper ?? false);
     setIncludeCoordinateGeometry(worksheet.settings.includeCoordinateGeometry ?? false);
+    setUseAIImages(worksheet.settings.useAIImages ?? false);
     setIsCompiled(true);
     setShowSavedWorksheets(false);
     toast({
@@ -304,6 +310,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           includeFormulas,
           includeGraphPaper,
           includeCoordinateGeometry,
+          useAIImages,
         },
       });
 
@@ -416,8 +423,48 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
         yPosition += 4;
 
-        // Render SVG as image if present
-        if (question.svg) {
+        // Render AI-generated image if present
+        if (question.imageUrl) {
+          try {
+            // Create an image from the base64 data URL
+            const img = new Image();
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => resolve();
+              img.onerror = reject;
+              img.crossOrigin = 'anonymous';
+              img.src = question.imageUrl!;
+            });
+            
+            // Draw to canvas and get as PNG data URL
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width || 400;
+            canvas.height = img.height || 400;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = 'white';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(img, 0, 0);
+              const pngDataUrl = canvas.toDataURL('image/png');
+              
+              // Check if we need a new page for the image
+              if (yPosition > pageHeight - 80) {
+                pdf.addPage();
+                yPosition = margin;
+              }
+              
+              // Add image to PDF (centered)
+              const imgWidth = 60; // mm
+              const imgHeight = 60; // mm
+              const imgX = (pageWidth - imgWidth) / 2;
+              pdf.addImage(pngDataUrl, 'PNG', imgX, yPosition, imgWidth, imgHeight);
+              yPosition += imgHeight + 5;
+            }
+          } catch (imgError) {
+            console.error('Error rendering AI image to PDF:', imgError);
+          }
+        }
+        // Render SVG as image if present (fallback)
+        else if (question.svg) {
           try {
             // Convert SVG to data URL
             const svgBlob = new Blob([question.svg], { type: 'image/svg+xml;charset=utf-8' });
@@ -932,6 +979,21 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     Include coordinate geometry solutions
                   </Label>
                 </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="useAIImages"
+                    checked={useAIImages}
+                    onChange={(e) => setUseAIImages(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  <Label htmlFor="useAIImages" className="text-sm cursor-pointer">
+                    <span className="flex items-center gap-1">
+                      <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+                      Use AI-generated images for diagrams
+                    </span>
+                  </Label>
+                </div>
               </div>
 
               <Separator />
@@ -1014,7 +1076,16 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         {question.topic} ({question.standard})
                       </p>
                       <p className="text-sm">{question.question}</p>
-                      {question.svg && (
+                      {question.imageUrl && (
+                        <div className="mt-2 flex justify-center">
+                          <img 
+                            src={question.imageUrl} 
+                            alt={`Diagram for question ${question.questionNumber}`}
+                            className="max-w-[200px] max-h-[200px] border rounded"
+                          />
+                        </div>
+                      )}
+                      {!question.imageUrl && question.svg && (
                         <div 
                           className="mt-2 flex justify-center"
                           dangerouslySetInnerHTML={{ __html: question.svg }}

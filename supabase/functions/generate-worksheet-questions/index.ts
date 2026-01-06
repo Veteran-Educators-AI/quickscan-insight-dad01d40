@@ -20,6 +20,42 @@ interface GeneratedQuestion {
   question: string;
   difficulty: 'medium' | 'hard' | 'challenging';
   svg?: string;
+  imageUrl?: string;
+  imagePrompt?: string;
+}
+
+async function generateAIImage(prompt: string, lovableApiKey: string): Promise<string | null> {
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${lovableApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        modalities: ['image', 'text']
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('AI Image generation error:', await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    return imageUrl || null;
+  } catch (error) {
+    console.error('Error generating AI image:', error);
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -28,7 +64,7 @@ serve(async (req) => {
   }
 
   try {
-    const { topics, questionCount, difficultyLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry } = await req.json() as {
+    const { topics, questionCount, difficultyLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages } = await req.json() as {
       topics: TopicInput[];
       questionCount: number;
       difficultyLevels?: string[];
@@ -36,6 +72,7 @@ serve(async (req) => {
       includeFormulas?: boolean;
       includeGraphPaper?: boolean;
       includeCoordinateGeometry?: boolean;
+      useAIImages?: boolean;
     };
 
     if (!topics || topics.length === 0) {
@@ -64,7 +101,20 @@ serve(async (req) => {
     // Build optional instructions for geometry and formulas
     let geometryInstruction = '';
     if (includeGeometry) {
-      geometryInstruction = `
+      if (useAIImages) {
+        // When using AI images, ask for image prompts instead of SVGs
+        geometryInstruction = `
+8. For geometry-related questions, you MUST include an "imagePrompt" field with a detailed description of the diagram/image needed.
+   - The imagePrompt should describe what visual diagram would help students understand the question
+   - Be specific about shapes, labels, measurements, angles, and any text that should appear
+   - Examples of prompts:
+     * "A right triangle ABC with right angle at C, hypotenuse AB labeled 10cm, and angle A labeled 30 degrees"
+     * "A circle with center O, radius 5, and a chord AB with midpoint M, showing the perpendicular from O to AB"
+     * "A coordinate plane with x and y axes, showing points A(2,3) and B(-1,4) connected by a line segment"
+     * "A rectangular prism with dimensions 4x3x2, showing dashed hidden edges"
+   - Make the prompts clear and educational, suitable for a math worksheet`;
+      } else {
+        geometryInstruction = `
 8. For geometry-related questions, you MUST include an "svg" field with a complete, valid SVG string that visually represents the geometric figure described in the question.
    - The SVG should be self-contained with width="200" height="200" viewBox="0 0 200 200"
    - Use clear colors: stroke="#1f2937" (dark gray) for lines, fill="none" or fill="#e5e7eb" for shapes
@@ -78,6 +128,7 @@ serve(async (req) => {
      * 3D shapes like cubes, prisms, pyramids (using isometric projections)
    - Make sure the SVG is clean, properly formatted, and renders correctly
    - For coordinate geometry, include axis lines and grid marks`;
+      }
     }
 
     let formulasInstruction = '';
@@ -93,19 +144,38 @@ ${includeGeometry ? '9' : '8'}. Include mathematical formulas and expressions in
     let graphPaperInstruction = '';
     if (includeGraphPaper) {
       const nextNum = (includeGeometry ? 9 : 8) + (includeFormulas ? 1 : 0);
-      graphPaperInstruction = `
+      if (useAIImages) {
+        graphPaperInstruction = `
+${nextNum}. Include questions that require graph paper solutions:
+   - Problems involving plotting points, lines, and curves on a coordinate plane
+   - Graphing linear equations, quadratics, or other functions
+   - Questions that ask students to "graph and show your work"
+   - Include an "imagePrompt" field describing a coordinate plane with grid, axes labels, and any plotted elements`;
+      } else {
+        graphPaperInstruction = `
 ${nextNum}. Include questions that require graph paper solutions:
    - Problems involving plotting points, lines, and curves on a coordinate plane
    - Graphing linear equations, quadratics, or other functions
    - Questions that ask students to "graph and show your work"
    - Include SVG with a grid pattern (graph paper style) when appropriate
    - For graph paper SVGs, use: light gray grid lines, bold axis lines with labels, and marked intervals`;
+      }
     }
 
     let coordinateGeometryInstruction = '';
     if (includeCoordinateGeometry) {
       const nextNum = (includeGeometry ? 9 : 8) + (includeFormulas ? 1 : 0) + (includeGraphPaper ? 1 : 0);
-      coordinateGeometryInstruction = `
+      if (useAIImages) {
+        coordinateGeometryInstruction = `
+${nextNum}. Include coordinate geometry problems:
+   - Finding distance between points, midpoints, and slopes
+   - Equations of lines (point-slope, slope-intercept forms)
+   - Parallel and perpendicular lines in coordinate plane
+   - Proving geometric properties using coordinates (e.g., proving a quadrilateral is a parallelogram)
+   - Transformations on the coordinate plane
+   - Include an "imagePrompt" field describing coordinate planes with plotted points and shapes`;
+      } else {
+        coordinateGeometryInstruction = `
 ${nextNum}. Include coordinate geometry problems:
    - Finding distance between points, midpoints, and slopes
    - Equations of lines (point-slope, slope-intercept forms)
@@ -113,12 +183,37 @@ ${nextNum}. Include coordinate geometry problems:
    - Proving geometric properties using coordinates (e.g., proving a quadrilateral is a parallelogram)
    - Transformations on the coordinate plane
    - Include SVG diagrams showing coordinate planes with plotted points and shapes when helpful`;
+      }
     }
 
-    const svgFieldNote = includeGeometry 
-      ? `
+    const imageFieldNote = includeGeometry 
+      ? useAIImages
+        ? `
+If the question involves geometry and a diagram would help, include an "imagePrompt" field with a detailed description of the diagram. The imagePrompt field should ONLY be included when a visual diagram is genuinely helpful for the question.`
+        : `
 If the question involves geometry and a diagram would help, include an "svg" field with a complete SVG string. The svg field should ONLY be included when a visual diagram is genuinely helpful for the question.`
       : '';
+
+    const exampleOutput = useAIImages
+      ? `[
+  {
+    "questionNumber": 1,
+    "topic": "Topic Name",
+    "standard": "G.CO.A.1",
+    "question": "The full question text here",
+    "difficulty": "${allowedDifficulties[0]}",
+    "imagePrompt": "A detailed description of the geometric diagram needed"
+  }
+]`
+      : `[
+  {
+    "questionNumber": 1,
+    "topic": "Topic Name",
+    "standard": "G.CO.A.1",
+    "question": "The full question text here",
+    "difficulty": "${allowedDifficulties[0]}"${includeGeometry ? ',\n    "svg": "<svg width=\\"200\\" height=\\"200\\" viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>"' : ''}
+  }
+]`;
 
     const prompt = `You are an expert math educator creating a worksheet for NYS Regents preparation.
 
@@ -137,16 +232,8 @@ REQUIREMENTS:
 7. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}${graphPaperInstruction}${coordinateGeometryInstruction}
 
 Respond with a JSON array of questions in this exact format:
-[
-  {
-    "questionNumber": 1,
-    "topic": "Topic Name",
-    "standard": "G.CO.A.1",
-    "question": "The full question text here",
-    "difficulty": "${allowedDifficulties[0]}"${includeGeometry ? ',\n    "svg": "<svg width=\\"200\\" height=\\"200\\" viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>"' : ''}
-  }
-]
-${svgFieldNote}
+${exampleOutput}
+${imageFieldNote}
 
 Difficulty levels allowed: ${allowedDifficulties.join(', ')}
 
@@ -199,6 +286,27 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
     } catch (parseError) {
       console.error('Failed to parse AI response:', content);
       throw new Error('Failed to parse generated questions');
+    }
+
+    // If using AI images, generate images for questions with imagePrompt
+    if (useAIImages) {
+      console.log('Generating AI images for questions with imagePrompt...');
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        if (q.imagePrompt) {
+          console.log(`Generating image for question ${q.questionNumber}: ${q.imagePrompt.substring(0, 50)}...`);
+          const imageUrl = await generateAIImage(
+            `Create a clean, educational black and white diagram for a math worksheet. The diagram should be clear, precise, and suitable for printing. ${q.imagePrompt}. Style: minimalist, educational, with clear labels and measurements. No background color, just clean lines on white.`,
+            lovableApiKey
+          );
+          if (imageUrl) {
+            questions[i].imageUrl = imageUrl;
+            console.log(`Successfully generated image for question ${q.questionNumber}`);
+          } else {
+            console.log(`Failed to generate image for question ${q.questionNumber}`);
+          }
+        }
+      }
     }
 
     return new Response(
