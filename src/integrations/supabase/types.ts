@@ -220,6 +220,7 @@ export type Database = {
       }
       classes: {
         Row: {
+          class_period: string | null
           created_at: string
           id: string
           join_code: string
@@ -229,6 +230,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          class_period?: string | null
           created_at?: string
           id?: string
           join_code: string
@@ -238,6 +240,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          class_period?: string | null
           created_at?: string
           id?: string
           join_code?: string
