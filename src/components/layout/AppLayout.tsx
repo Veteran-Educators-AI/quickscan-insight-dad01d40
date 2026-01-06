@@ -13,6 +13,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import scanGeniusLogo from '@/assets/scan-genius-logo.png';
@@ -84,9 +85,18 @@ export function AppLayout({ children }: AppLayoutProps) {
           </nav>
 
           {/* User Menu */}
-          <div className="flex items-center gap-2">
-            <span className="hidden text-sm text-muted-foreground sm:inline">
-              {user?.email}
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8">
+              <AvatarImage 
+                src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture} 
+                alt={user?.user_metadata?.full_name || user?.email || 'User'} 
+              />
+              <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                {(user?.user_metadata?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <span className="hidden text-sm text-muted-foreground sm:inline max-w-[150px] truncate">
+              {user?.user_metadata?.full_name || user?.email}
             </span>
             <Button 
               variant="ghost" 
