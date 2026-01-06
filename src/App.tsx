@@ -70,6 +70,8 @@ function AppRoutes() {
       <Route path="/questions" element={<ProtectedRoute><Questions /></ProtectedRoute>} />
       <Route path="/questions/new" element={<ProtectedRoute><QuestionNew /></ProtectedRoute>} />
       <Route path="/assessments" element={<Navigate to="/questions" replace />} />
+      <Route path="/assessment" element={<Navigate to="/questions" replace />} />
+      <Route path="/assessment/*" element={<Navigate to="/questions" replace />} />
       <Route path="/scan" element={<ProtectedRoute><Scan /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
