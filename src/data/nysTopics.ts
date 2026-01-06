@@ -893,6 +893,148 @@ export const FINANCIAL_MATH_TOPICS: TopicCategory[] = [
   },
 ];
 
+// NYS LOTE (Languages Other Than English) - Checkpoint A, B, and C aligned
+export const LOTE_TOPICS: TopicCategory[] = [
+  {
+    category: 'INTERPRETIVE COMMUNICATION - LISTENING',
+    topics: [
+      { name: 'Understanding Greetings & Introductions', standard: 'NYS.LOTE.1a.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Following Classroom Instructions', standard: 'NYS.LOTE.1a.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Comprehending Weather Reports', standard: 'NYS.LOTE.1a.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Understanding Phone Conversations', standard: 'NYS.LOTE.1b.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Following News Broadcasts', standard: 'NYS.LOTE.1b.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Listening to Song Lyrics', standard: 'NYS.LOTE.1b.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+    ],
+  },
+  {
+    category: 'INTERPRETIVE COMMUNICATION - READING',
+    topics: [
+      { name: 'Reading Restaurant Menus', standard: 'NYS.LOTE.2a.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Understanding Store Signs & Advertisements', standard: 'NYS.LOTE.2a.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Reading Social Media Posts', standard: 'NYS.LOTE.2a.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Interpreting Job Listings', standard: 'NYS.LOTE.2b.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Reading Apartment Rental Ads', standard: 'NYS.LOTE.2b.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Understanding Product Labels', standard: 'NYS.LOTE.2b.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Reading News Articles', standard: 'NYS.LOTE.2c.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+    ],
+  },
+  {
+    category: 'INTERPERSONAL COMMUNICATION',
+    topics: [
+      { name: 'Introducing Yourself', standard: 'NYS.LOTE.3a.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Ordering Food at a Restaurant', standard: 'NYS.LOTE.3a.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Asking for Directions', standard: 'NYS.LOTE.3a.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Shopping Conversations', standard: 'NYS.LOTE.3b.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Job Interview Role Play', standard: 'NYS.LOTE.3b.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Making Plans with Friends', standard: 'NYS.LOTE.3b.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Discussing Current Events', standard: 'NYS.LOTE.3c.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Negotiating & Problem Solving', standard: 'NYS.LOTE.3c.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+    ],
+  },
+  {
+    category: 'PRESENTATIONAL COMMUNICATION - SPEAKING',
+    topics: [
+      { name: 'Describing Your Family', standard: 'NYS.LOTE.4a.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Presenting About Your School', standard: 'NYS.LOTE.4a.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Describing Daily Routines', standard: 'NYS.LOTE.4a.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Giving Oral Reports on Cultural Topics', standard: 'NYS.LOTE.4b.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Presenting Future Career Plans', standard: 'NYS.LOTE.4b.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Debating Social Issues', standard: 'NYS.LOTE.4c.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+    ],
+  },
+  {
+    category: 'PRESENTATIONAL COMMUNICATION - WRITING',
+    topics: [
+      { name: 'Writing Personal Introductions', standard: 'NYS.LOTE.5a.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Completing Job Applications', standard: 'NYS.LOTE.5a.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Writing Emails to Friends', standard: 'NYS.LOTE.5a.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Composing Cover Letters', standard: 'NYS.LOTE.5b.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Writing Formal Complaints', standard: 'NYS.LOTE.5b.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Creating Social Media Content', standard: 'NYS.LOTE.5b.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Writing Persuasive Essays', standard: 'NYS.LOTE.5c.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+    ],
+  },
+  {
+    category: 'FIRST JOB SCENARIOS',
+    topics: [
+      { name: 'Job Application Vocabulary', standard: 'NYS.LOTE.6.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Interview Questions & Responses', standard: 'NYS.LOTE.6.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Understanding Work Schedules', standard: 'NYS.LOTE.6.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Workplace Communication', standard: 'NYS.LOTE.6.4', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Calling in Sick / Requesting Time Off', standard: 'NYS.LOTE.6.5', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Understanding Paystubs', standard: 'NYS.LOTE.6.6', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+    ],
+  },
+  {
+    category: 'FIRST APARTMENT SCENARIOS',
+    topics: [
+      { name: 'Apartment Hunting Vocabulary', standard: 'NYS.LOTE.7.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Reading Lease Agreements', standard: 'NYS.LOTE.7.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Communicating with Landlords', standard: 'NYS.LOTE.7.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Reporting Maintenance Issues', standard: 'NYS.LOTE.7.4', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Setting Up Utilities', standard: 'NYS.LOTE.7.5', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Roommate Agreements', standard: 'NYS.LOTE.7.6', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+    ],
+  },
+  {
+    category: 'RELATIONSHIP SCENARIOS',
+    topics: [
+      { name: 'Making Friends & Small Talk', standard: 'NYS.LOTE.8.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Expressing Feelings & Emotions', standard: 'NYS.LOTE.8.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Planning Dates & Activities', standard: 'NYS.LOTE.8.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Meeting Family Members', standard: 'NYS.LOTE.8.4', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Resolving Conflicts', standard: 'NYS.LOTE.8.5', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Cultural Dating Customs', standard: 'NYS.LOTE.8.6', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+    ],
+  },
+  {
+    category: 'CULTURAL PRACTICES & PRODUCTS',
+    topics: [
+      { name: 'Traditional Holidays & Celebrations', standard: 'NYS.LOTE.9.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Food & Cuisine Traditions', standard: 'NYS.LOTE.9.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Music & Dance', standard: 'NYS.LOTE.9.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Art & Literature', standard: 'NYS.LOTE.9.4', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Famous Figures & Historical Events', standard: 'NYS.LOTE.9.5', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Sports & Recreation', standard: 'NYS.LOTE.9.6', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+    ],
+  },
+  {
+    category: 'CULTURAL PERSPECTIVES',
+    topics: [
+      { name: 'Family Structures & Values', standard: 'NYS.LOTE.10.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Education Systems', standard: 'NYS.LOTE.10.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Work-Life Balance', standard: 'NYS.LOTE.10.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Social Etiquette & Manners', standard: 'NYS.LOTE.10.4', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Attitudes Toward Time', standard: 'NYS.LOTE.10.5', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Comparing Cultural Perspectives', standard: 'NYS.LOTE.10.6', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+    ],
+  },
+  {
+    category: 'GRAMMAR & LANGUAGE STRUCTURES',
+    topics: [
+      { name: 'Present Tense Conjugations', standard: 'NYS.LOTE.11.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Past Tense Narration', standard: 'NYS.LOTE.11.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Future Tense Expressions', standard: 'NYS.LOTE.11.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Question Formation', standard: 'NYS.LOTE.11.4', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Subjunctive Mood', standard: 'NYS.LOTE.11.5', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Conditional Expressions', standard: 'NYS.LOTE.11.6', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Object Pronouns', standard: 'NYS.LOTE.11.7', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+    ],
+  },
+  {
+    category: 'VOCABULARY THEMES',
+    topics: [
+      { name: 'Numbers, Dates & Time', standard: 'NYS.LOTE.12.1', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Colors & Physical Descriptions', standard: 'NYS.LOTE.12.2', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Clothing & Fashion', standard: 'NYS.LOTE.12.3', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Food & Beverages', standard: 'NYS.LOTE.12.4', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Transportation', standard: 'NYS.LOTE.12.5', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Health & Body Parts', standard: 'NYS.LOTE.12.6', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+      { name: 'Technology & Social Media', standard: 'NYS.LOTE.12.7', url: 'https://www.nysed.gov/curriculum-instruction/languages-other-english-lote' },
+    ],
+  },
+];
+
 export const NYS_SUBJECTS: Subject[] = [
   {
     id: 'geometry',
@@ -953,6 +1095,12 @@ export const NYS_SUBJECTS: Subject[] = [
     name: 'Financial Math',
     shortName: 'FIN',
     categories: FINANCIAL_MATH_TOPICS,
+  },
+  {
+    id: 'lote',
+    name: 'Languages Other Than English (LOTE)',
+    shortName: 'LOTE',
+    categories: LOTE_TOPICS,
   },
 ];
 
