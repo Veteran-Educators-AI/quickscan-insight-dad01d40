@@ -449,9 +449,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 yPosition = margin;
               }
               
-              // Add image to PDF (centered)
-              const imgWidth = 60; // mm
-              const imgHeight = 60; // mm
+              // Add image to PDF (centered) - 30% larger than base size
+              const imgWidth = 78; // mm (60 * 1.3)
+              const imgHeight = 78; // mm (60 * 1.3)
               const imgX = (pageWidth - imgWidth) / 2;
               pdf.addImage(pngDataUrl, 'PNG', imgX, yPosition, imgWidth, imgHeight);
               yPosition += imgHeight + 5;
@@ -492,9 +492,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 yPosition = margin;
               }
               
-              // Add image to PDF (centered)
-              const imgWidth = 50; // mm
-              const imgHeight = 50; // mm
+              // Add image to PDF (centered) - 30% larger than base size
+              const imgWidth = 65; // mm (50 * 1.3)
+              const imgHeight = 65; // mm (50 * 1.3)
               const imgX = (pageWidth - imgWidth) / 2;
               pdf.addImage(pngDataUrl, 'PNG', imgX, yPosition, imgWidth, imgHeight);
               yPosition += imgHeight + 5;
@@ -1069,7 +1069,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                           <img 
                             src={question.imageUrl} 
                             alt={`Diagram for question ${question.questionNumber}`}
-                            className="max-w-[200px] max-h-[200px] border rounded"
+                            className="max-w-[260px] max-h-[260px] border rounded"
                           />
                         </div>
                       )}
