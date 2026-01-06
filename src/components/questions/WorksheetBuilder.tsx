@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,7 @@ interface GeneratedQuestion {
   svg?: string;
   imageUrl?: string;
   imagePrompt?: string;
+  clipartUrl?: string;
 }
 
 interface SavedWorksheet {
@@ -55,6 +56,7 @@ interface SavedWorksheet {
     includeCoordinateGeometry?: boolean;
     useAIImages?: boolean;
     imageSize?: number;
+    includeClipart?: boolean;
   };
   created_at: string;
   share_code: string | null;
@@ -118,6 +120,13 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   // Single image regeneration state
   const [regeneratingQuestionNumber, setRegeneratingQuestionNumber] = useState<number | null>(null);
   
+  // Clipart state
+  const [showClipartDialog, setShowClipartDialog] = useState(false);
+  const [isGeneratingClipart, setIsGeneratingClipart] = useState(false);
+  const [clipartProgress, setClipartProgress] = useState(0);
+  const [clipartStatus, setClipartStatus] = useState('');
+  const [clipartGenerated, setClipartGenerated] = useState(false);
+  
   const printRef = useRef<HTMLDivElement>(null);
 
   const toggleDifficulty = (difficulty: string) => {
@@ -172,6 +181,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           includeCoordinateGeometry,
           useAIImages,
           imageSize,
+          includeClipart: clipartGenerated,
         })),
       };
       const { error } = await supabase.from('worksheets').insert([worksheetData]);
@@ -338,9 +348,11 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       if (data.questions && data.questions.length > 0) {
         setCompiledQuestions(data.questions);
         setIsCompiled(true);
+        // Show clipart dialog after successful compilation
+        setShowClipartDialog(true);
         toast({
           title: 'Worksheet compiled!',
-          description: `Generated ${data.questions.length} higher-order questions.`,
+          description: `Generated ${data.questions.length} questions. Would you like to add clipart?`,
         });
       } else {
         throw new Error('No questions generated');
@@ -363,6 +375,115 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setImagesGenerated(false);
     setImageGenerationProgress(0);
     setImageGenerationStatus('');
+    setClipartGenerated(false);
+    setClipartProgress(0);
+    setClipartStatus('');
+  };
+
+  // Generate clipart for all questions
+  const generateClipart = async () => {
+    if (compiledQuestions.length === 0) return;
+
+    setShowClipartDialog(false);
+    setIsGeneratingClipart(true);
+    setClipartProgress(0);
+    setClipartStatus('Generating fun clipart for your worksheet...');
+
+    try {
+      const updatedQuestions = [...compiledQuestions];
+      let successCount = 0;
+
+      for (let i = 0; i < updatedQuestions.length; i++) {
+        const question = updatedQuestions[i];
+        setClipartStatus(`Generating clipart ${i + 1} of ${updatedQuestions.length}...`);
+
+        // Create a themed clipart prompt based on the question topic
+        const clipartPrompt = `Create a simple, fun, black and white line art clipart icon suitable for a math worksheet. The clipart should relate to: "${question.topic}" in the context of ${question.question.substring(0, 100)}. Make it educational, appropriate for students, simple enough to print clearly, cartoon-style with clean lines. No text, just the image. White background.`;
+
+        const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+          body: {
+            questions: [{
+              questionNumber: question.questionNumber,
+              imagePrompt: clipartPrompt,
+            }],
+          },
+        });
+
+        if (!error && data?.results?.[0]?.imageUrl) {
+          updatedQuestions[i] = {
+            ...updatedQuestions[i],
+            clipartUrl: data.results[0].imageUrl,
+          };
+          successCount++;
+        }
+
+        setClipartProgress(((i + 1) / updatedQuestions.length) * 100);
+      }
+
+      setCompiledQuestions(updatedQuestions);
+      setClipartGenerated(true);
+      
+      toast({
+        title: 'Clipart added!',
+        description: `Successfully generated ${successCount} clipart images for your worksheet.`,
+      });
+    } catch (error) {
+      console.error('Error generating clipart:', error);
+      toast({
+        title: 'Clipart generation failed',
+        description: 'Some clipart could not be generated. You can continue without them.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingClipart(false);
+      setClipartProgress(100);
+    }
+  };
+
+  // Regenerate clipart for a single question
+  const regenerateClipart = async (questionNumber: number) => {
+    const question = compiledQuestions.find(q => q.questionNumber === questionNumber);
+    if (!question) return;
+
+    setRegeneratingQuestionNumber(questionNumber);
+
+    try {
+      const clipartPrompt = `Create a simple, fun, black and white line art clipart icon suitable for a math worksheet. The clipart should relate to: "${question.topic}" in the context of ${question.question.substring(0, 100)}. Make it educational, appropriate for students, simple enough to print clearly, cartoon-style with clean lines. No text, just the image. White background.`;
+
+      const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+        body: {
+          questions: [{
+            questionNumber: questionNumber,
+            imagePrompt: clipartPrompt,
+          }],
+        },
+      });
+
+      if (!error && data?.results?.[0]?.imageUrl) {
+        const updatedQuestions = compiledQuestions.map(q =>
+          q.questionNumber === questionNumber
+            ? { ...q, clipartUrl: data.results[0].imageUrl }
+            : q
+        );
+        setCompiledQuestions(updatedQuestions);
+        
+        toast({
+          title: 'Clipart regenerated!',
+          description: `New clipart created for question ${questionNumber}.`,
+        });
+      } else {
+        throw new Error('No image returned');
+      }
+    } catch (error) {
+      console.error('Error regenerating clipart:', error);
+      toast({
+        title: 'Regeneration failed',
+        description: 'Could not regenerate the clipart. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRegeneratingQuestionNumber(null);
+    }
   };
 
   // Check if there are questions that need images
@@ -688,6 +809,35 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             URL.revokeObjectURL(svgUrl);
           } catch (svgError) {
             console.error('Error rendering SVG to PDF:', svgError);
+          }
+        }
+
+        // Render clipart if present (small icon next to question number)
+        if (question.clipartUrl) {
+          try {
+            const clipImg = new Image();
+            await new Promise<void>((resolve, reject) => {
+              clipImg.onload = () => resolve();
+              clipImg.onerror = reject;
+              clipImg.crossOrigin = 'anonymous';
+              clipImg.src = question.clipartUrl!;
+            });
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = clipImg.width || 100;
+            canvas.height = clipImg.height || 100;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = 'white';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(clipImg, 0, 0);
+              const pngDataUrl = canvas.toDataURL('image/png');
+              
+              // Add small clipart icon (15mm x 15mm) at right margin
+              pdf.addImage(pngDataUrl, 'PNG', pageWidth - margin - 15, yPosition - 20, 15, 15);
+            }
+          } catch (clipError) {
+            console.error('Error rendering clipart to PDF:', clipError);
           }
         }
 
@@ -1337,6 +1487,40 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                           dangerouslySetInnerHTML={{ __html: question.svg }}
                         />
                       )}
+                      {/* Clipart Display */}
+                      {question.clipartUrl && (
+                        <div className="mt-2 flex flex-col items-start gap-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              <Palette className="h-3 w-3 mr-1" />
+                              Clipart
+                            </Badge>
+                          </div>
+                          <div className="relative group">
+                            <img 
+                              src={question.clipartUrl} 
+                              alt={`Clipart for question ${question.questionNumber}`}
+                              className="border rounded bg-white"
+                              style={{ maxWidth: '60px', maxHeight: '60px' }}
+                            />
+                            {regeneratingQuestionNumber === question.questionNumber && (
+                              <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded">
+                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-muted-foreground hover:text-foreground h-6 px-2"
+                            onClick={() => regenerateClipart(question.questionNumber)}
+                            disabled={regeneratingQuestionNumber !== null}
+                          >
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            Regenerate
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </ScrollArea>
@@ -1371,6 +1555,34 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         Review & Generate {questionsNeedingImages.length} Diagram{questionsNeedingImages.length > 1 ? 's' : ''}
                       </>
                     )}
+                  </Button>
+                </div>
+              )}
+
+              {/* Add Clipart Button */}
+              {!clipartGenerated && (
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => setShowClipartDialog(true)}
+                  disabled={isGeneratingClipart}
+                >
+                  <Palette className="h-4 w-4 mr-2" />
+                  Add Fun Clipart to Questions
+                </Button>
+              )}
+
+              {clipartGenerated && (
+                <div className="flex items-center justify-between p-2 bg-primary/10 rounded-lg border border-primary/20">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Palette className="h-4 w-4 text-primary" />
+                    <span className="font-medium text-primary">
+                      {compiledQuestions.filter(q => q.clipartUrl).length} clipart added
+                    </span>
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={generateClipart}>
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Regenerate
                   </Button>
                 </div>
               )}
@@ -1601,6 +1813,67 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Clipart Generation Dialog */}
+      <Dialog open={showClipartDialog} onOpenChange={setShowClipartDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5 text-primary" />
+              Add Fun Clipart?
+            </DialogTitle>
+            <DialogDescription>
+              Would you like to add AI-generated clipart images to make your worksheet more engaging? Each question will get a themed clipart icon based on its topic.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-3">
+            <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+              <Palette className="h-5 w-5 text-primary mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">Themed Clipart Icons</p>
+                <p className="text-xs text-muted-foreground">
+                  Simple, fun line art images that match each question's topic to help students engage with the material.
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This will generate {compiledQuestions.length} clipart image{compiledQuestions.length > 1 ? 's' : ''} and may take a moment.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowClipartDialog(false)}>
+              Skip for Now
+            </Button>
+            <Button onClick={generateClipart}>
+              <Palette className="h-4 w-4 mr-2" />
+              Generate Clipart
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clipart Generation Progress */}
+      {isGeneratingClipart && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <Card className="w-full max-w-md mx-4">
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <div>
+                  <p className="font-medium">Generating Clipart</p>
+                  <p className="text-sm text-muted-foreground">{clipartStatus}</p>
+                </div>
+              </div>
+              <Progress value={clipartProgress} className="h-2" />
+              <p className="text-xs text-muted-foreground text-center">
+                {Math.round(clipartProgress)}% complete
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </>
   );
 }
