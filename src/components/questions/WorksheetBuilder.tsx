@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -111,6 +111,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   // Prompt editing modal state
   const [showPromptEditor, setShowPromptEditor] = useState(false);
   const [editablePrompts, setEditablePrompts] = useState<{ questionNumber: number; prompt: string }[]>([]);
+  
+  // Single image regeneration state
+  const [regeneratingQuestionNumber, setRegeneratingQuestionNumber] = useState<number | null>(null);
   
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -459,6 +462,59 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     } finally {
       setIsGeneratingImages(false);
       setImageGenerationProgress(100);
+    }
+  };
+
+  // Regenerate a single image
+  const regenerateSingleImage = async (questionNumber: number) => {
+    const question = compiledQuestions.find(q => q.questionNumber === questionNumber);
+    if (!question?.imagePrompt) {
+      toast({
+        title: 'Cannot regenerate',
+        description: 'No diagram prompt found for this question.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setRegeneratingQuestionNumber(questionNumber);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+        body: {
+          questions: [{
+            questionNumber: questionNumber,
+            imagePrompt: question.imagePrompt,
+          }],
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.results && data.results[0]?.imageUrl) {
+        const updatedQuestions = compiledQuestions.map(q =>
+          q.questionNumber === questionNumber
+            ? { ...q, imageUrl: data.results[0].imageUrl }
+            : q
+        );
+        setCompiledQuestions(updatedQuestions);
+        
+        toast({
+          title: 'Diagram regenerated!',
+          description: `New diagram created for question ${questionNumber}.`,
+        });
+      } else {
+        throw new Error('No image returned');
+      }
+    } catch (error) {
+      console.error('Error regenerating image:', error);
+      toast({
+        title: 'Regeneration failed',
+        description: 'Could not regenerate the diagram. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRegeneratingQuestionNumber(null);
     }
   };
 
@@ -1202,12 +1258,38 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       </p>
                       <p className="text-sm">{question.question}</p>
                       {question.imageUrl && (
-                        <div className="mt-2 flex justify-center">
-                          <img 
-                            src={question.imageUrl} 
-                            alt={`Diagram for question ${question.questionNumber}`}
-                            className="max-w-[260px] max-h-[260px] border rounded"
-                          />
+                        <div className="mt-2 flex flex-col items-center gap-2">
+                          <div className="relative group">
+                            <img 
+                              src={question.imageUrl} 
+                              alt={`Diagram for question ${question.questionNumber}`}
+                              className="max-w-[260px] max-h-[260px] border rounded"
+                            />
+                            {regeneratingQuestionNumber === question.questionNumber && (
+                              <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded">
+                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                            onClick={() => regenerateSingleImage(question.questionNumber)}
+                            disabled={regeneratingQuestionNumber !== null}
+                          >
+                            {regeneratingQuestionNumber === question.questionNumber ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Regenerating...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="h-3 w-3 mr-1" />
+                                Regenerate diagram
+                              </>
+                            )}
+                          </Button>
                         </div>
                       )}
                       {!question.imageUrl && question.imagePrompt && (
