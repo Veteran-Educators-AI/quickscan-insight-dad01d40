@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,6 +54,7 @@ interface SavedWorksheet {
     includeGraphPaper?: boolean;
     includeCoordinateGeometry?: boolean;
     useAIImages?: boolean;
+    imageSize?: number;
   };
   created_at: string;
   share_code: string | null;
@@ -90,6 +92,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [includeGraphPaper, setIncludeGraphPaper] = useState(false);
   const [includeCoordinateGeometry, setIncludeCoordinateGeometry] = useState(false);
   const [useAIImages, setUseAIImages] = useState(false);
+  const [imageSize, setImageSize] = useState(200); // Image size in pixels (100-400)
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledQuestions, setCompiledQuestions] = useState<GeneratedQuestion[]>([]);
   const [isCompiled, setIsCompiled] = useState(false);
@@ -168,6 +171,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           includeGraphPaper,
           includeCoordinateGeometry,
           useAIImages,
+          imageSize,
         })),
       };
       const { error } = await supabase.from('worksheets').insert([worksheetData]);
@@ -204,6 +208,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setIncludeGraphPaper(worksheet.settings.includeGraphPaper ?? false);
     setIncludeCoordinateGeometry(worksheet.settings.includeCoordinateGeometry ?? false);
     setUseAIImages(worksheet.settings.useAIImages ?? (worksheet.settings.includeGeometry ?? false));
+    setImageSize(worksheet.settings.imageSize ?? 200);
     setIsCompiled(true);
     setShowSavedWorksheets(false);
     toast({
@@ -627,9 +632,11 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 yPosition = margin;
               }
               
-              // Add image to PDF (centered) - 30% larger than base size
-              const imgWidth = 78; // mm (60 * 1.3)
-              const imgHeight = 78; // mm (60 * 1.3)
+              // Add image to PDF (centered) - use user-configured size
+              // Convert pixel size to mm (roughly 0.26mm per pixel at 96dpi)
+              const imgSizeMm = imageSize * 0.26;
+              const imgWidth = imgSizeMm;
+              const imgHeight = imgSizeMm;
               const imgX = (pageWidth - imgWidth) / 2;
               pdf.addImage(pngDataUrl, 'PNG', imgX, yPosition, imgWidth, imgHeight);
               yPosition += imgHeight + 5;
@@ -1160,6 +1167,31 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     </span>
                   </Label>
                 </div>
+                
+                {/* Image Size Slider - shown when AI images are enabled */}
+                {useAIImages && (
+                  <div className="space-y-2 ml-5 pl-2 border-l-2 border-muted">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm flex items-center gap-1">
+                        <ImageIcon className="h-3.5 w-3.5" />
+                        Diagram Size
+                      </Label>
+                      <span className="text-xs text-muted-foreground">{imageSize}px</span>
+                    </div>
+                    <Slider
+                      value={[imageSize]}
+                      onValueChange={(value) => setImageSize(value[0])}
+                      min={100}
+                      max={400}
+                      step={25}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Small</span>
+                      <span>Large</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <Separator />
@@ -1263,7 +1295,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                             <img 
                               src={question.imageUrl} 
                               alt={`Diagram for question ${question.questionNumber}`}
-                              className="max-w-[260px] max-h-[260px] border rounded"
+                              className="border rounded"
+                              style={{ maxWidth: `${imageSize}px`, maxHeight: `${imageSize}px` }}
                             />
                             {regeneratingQuestionNumber === question.questionNumber && (
                               <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded">
