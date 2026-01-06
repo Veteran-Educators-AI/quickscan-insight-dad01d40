@@ -25,7 +25,6 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/classes', label: 'Classes', icon: Users },
   { href: '/questions', label: 'Question Bank', icon: BookOpen },
-  { href: '/assessments', label: 'Assessments', icon: ClipboardList },
   { href: '/scan', label: 'Scan', icon: Camera },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/settings', label: 'Settings', icon: Settings },
