@@ -420,9 +420,44 @@ export default function Questions() {
                 </CardHeader>
                 <CardContent>
                   <Tabs value={selectedSubject} onValueChange={setSelectedSubject}>
-                    <TabsList className="flex flex-wrap h-auto gap-1 mb-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
+                      {NYS_SUBJECTS.map((subject) => {
+                        const isActive = selectedSubject === subject.id;
+                        const subjectColors: Record<string, { bg: string; border: string; text: string; activeBg: string }> = {
+                          geometry: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', activeBg: 'bg-blue-500' },
+                          algebra1: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', activeBg: 'bg-emerald-500' },
+                          algebra2: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', activeBg: 'bg-purple-500' },
+                          precalculus: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', activeBg: 'bg-orange-500' },
+                        };
+                        const colors = subjectColors[subject.id] || subjectColors.geometry;
+                        
+                        return (
+                          <button
+                            key={subject.id}
+                            onClick={() => setSelectedSubject(subject.id)}
+                            className={`
+                              relative p-4 rounded-xl border-2 transition-all duration-200
+                              flex flex-col items-center justify-center text-center gap-2 min-h-[80px]
+                              ${isActive 
+                                ? `${colors.activeBg} text-white border-transparent shadow-lg scale-[1.02]` 
+                                : `${colors.bg} ${colors.border} ${colors.text} hover:shadow-md hover:scale-[1.01]`
+                              }
+                            `}
+                          >
+                            <span className="font-bold text-sm md:text-base">{subject.shortName}</span>
+                            <span className={`text-xs ${isActive ? 'text-white/80' : 'opacity-70'}`}>
+                              {subject.categories.reduce((acc, cat) => acc + cat.topics.length, 0)} topics
+                            </span>
+                            {isActive && (
+                              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 bg-inherit" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <TabsList className="hidden">
                       {NYS_SUBJECTS.map((subject) => (
-                        <TabsTrigger key={subject.id} value={subject.id} className="text-xs px-2 py-1">
+                        <TabsTrigger key={subject.id} value={subject.id}>
                           {subject.shortName}
                         </TabsTrigger>
                       ))}

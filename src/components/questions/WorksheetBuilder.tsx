@@ -45,6 +45,8 @@ interface SavedWorksheet {
     includeGeometry?: boolean;
     includeFormulas?: boolean;
     includeFormulaSheet?: boolean;
+    includeGraphPaper?: boolean;
+    includeCoordinateGeometry?: boolean;
   };
   created_at: string;
   share_code: string | null;
@@ -68,6 +70,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [includeGeometry, setIncludeGeometry] = useState(false);
   const [includeFormulas, setIncludeFormulas] = useState(false);
   const [includeFormulaSheet, setIncludeFormulaSheet] = useState(false);
+  const [includeGraphPaper, setIncludeGraphPaper] = useState(false);
+  const [includeCoordinateGeometry, setIncludeCoordinateGeometry] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledQuestions, setCompiledQuestions] = useState<GeneratedQuestion[]>([]);
   const [isCompiled, setIsCompiled] = useState(false);
@@ -130,6 +134,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           includeGeometry,
           includeFormulas,
           includeFormulaSheet,
+          includeGraphPaper,
+          includeCoordinateGeometry,
         })),
       };
       const { error } = await supabase.from('worksheets').insert([worksheetData]);
@@ -163,6 +169,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setIncludeGeometry(worksheet.settings.includeGeometry ?? false);
     setIncludeFormulas(worksheet.settings.includeFormulas ?? false);
     setIncludeFormulaSheet(worksheet.settings.includeFormulaSheet ?? false);
+    setIncludeGraphPaper(worksheet.settings.includeGraphPaper ?? false);
+    setIncludeCoordinateGeometry(worksheet.settings.includeCoordinateGeometry ?? false);
     setIsCompiled(true);
     setShowSavedWorksheets(false);
     toast({
@@ -281,6 +289,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           difficultyLevels: difficultyFilter,
           includeGeometry,
           includeFormulas,
+          includeGraphPaper,
+          includeCoordinateGeometry,
         },
       });
 
@@ -833,6 +843,30 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       <BookOpen className="h-3.5 w-3.5" />
                       Append formula reference sheet
                     </span>
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="includeGraphPaper"
+                    checked={includeGraphPaper}
+                    onChange={(e) => setIncludeGraphPaper(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  <Label htmlFor="includeGraphPaper" className="text-sm cursor-pointer">
+                    Include graph paper solutions
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="includeCoordinateGeometry"
+                    checked={includeCoordinateGeometry}
+                    onChange={(e) => setIncludeCoordinateGeometry(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  <Label htmlFor="includeCoordinateGeometry" className="text-sm cursor-pointer">
+                    Include coordinate geometry solutions
                   </Label>
                 </div>
               </div>
