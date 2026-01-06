@@ -64,16 +64,18 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const { user } = useAuth();
   const [worksheetTitle, setWorksheetTitle] = useState('Math Practice Worksheet');
   const [hasUserEditedTitle, setHasUserEditedTitle] = useState(false);
+  const [worksheetType, setWorksheetType] = useState<'practice' | 'assessment'>('practice');
   const [teacherName, setTeacherName] = useState('');
 
   // Auto-update title to first topic name when questions are added
   useEffect(() => {
     if (selectedQuestions.length > 0 && !hasUserEditedTitle) {
-      setWorksheetTitle(selectedQuestions[0].topicName);
+      const prefix = worksheetType === 'assessment' ? 'Assessment: ' : '';
+      setWorksheetTitle(prefix + selectedQuestions[0].topicName);
     } else if (selectedQuestions.length === 0 && !hasUserEditedTitle) {
-      setWorksheetTitle('Math Practice Worksheet');
+      setWorksheetTitle(worksheetType === 'assessment' ? 'Math Assessment' : 'Math Practice Worksheet');
     }
-  }, [selectedQuestions, hasUserEditedTitle]);
+  }, [selectedQuestions, hasUserEditedTitle, worksheetType]);
   const [showAnswerLines, setShowAnswerLines] = useState(true);
   const [questionCount, setQuestionCount] = useState('5');
   const [difficultyFilter, setDifficultyFilter] = useState<string[]>(['medium', 'hard', 'challenging']);
@@ -743,6 +745,53 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         <CardContent className="space-y-4">
           {!isCompiled ? (
             <>
+              {/* Worksheet Type Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">What are you building?</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    type="button"
+                    variant={worksheetType === 'practice' ? 'default' : 'outline'}
+                    className={`h-auto py-4 flex flex-col items-center gap-2 ${
+                      worksheetType === 'practice' 
+                        ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2' 
+                        : 'hover:bg-muted'
+                    }`}
+                    onClick={() => {
+                      setWorksheetType('practice');
+                      if (!hasUserEditedTitle) {
+                        setWorksheetTitle(selectedQuestions.length > 0 ? selectedQuestions[0].topicName : 'Math Practice Worksheet');
+                      }
+                    }}
+                  >
+                    <BookOpen className="h-6 w-6" />
+                    <span className="font-semibold">Practice Worksheet</span>
+                    <span className="text-xs opacity-80 text-center">For practice and homework</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={worksheetType === 'assessment' ? 'default' : 'outline'}
+                    className={`h-auto py-4 flex flex-col items-center gap-2 ${
+                      worksheetType === 'assessment' 
+                        ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2' 
+                        : 'hover:bg-muted'
+                    }`}
+                    onClick={() => {
+                      setWorksheetType('assessment');
+                      if (!hasUserEditedTitle) {
+                        setWorksheetTitle(selectedQuestions.length > 0 ? 'Assessment: ' + selectedQuestions[0].topicName : 'Math Assessment');
+                      }
+                    }}
+                  >
+                    <FileText className="h-6 w-6" />
+                    <span className="font-semibold">Assessment</span>
+                    <span className="text-xs opacity-80 text-center">For quizzes and tests</span>
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
               {/* Configuration */}
               <div className="space-y-3">
                 <div className="space-y-1.5">
