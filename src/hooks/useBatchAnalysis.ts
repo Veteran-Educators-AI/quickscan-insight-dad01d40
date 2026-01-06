@@ -70,6 +70,7 @@ export interface BatchSummary {
 interface UseBatchAnalysisReturn {
   items: BatchItem[];
   addImage: (imageDataUrl: string, studentId?: string, studentName?: string) => string;
+  addImageWithAutoIdentify: (imageDataUrl: string, studentRoster?: Student[]) => Promise<string>;
   removeImage: (id: string) => void;
   updateItemStudent: (itemId: string, studentId: string, studentName: string) => void;
   clearAll: () => void;
@@ -90,15 +91,69 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [summary, setSummary] = useState<BatchSummary | null>(null);
 
-  const addImage = useCallback((imageDataUrl: string, studentId?: string, studentName?: string): string => {
+const addImage = useCallback((imageDataUrl: string, studentId?: string, studentName?: string): string => {
     const id = crypto.randomUUID();
-    setItems(prev => [...prev, {
+    const newItem: BatchItem = {
       id,
       imageDataUrl,
       studentId,
       studentName: studentName || undefined,
       status: 'pending',
-    }]);
+    };
+    setItems(prev => [...prev, newItem]);
+    return id;
+  }, []);
+
+  // Auto-identify a single newly added image
+  const autoIdentifySingle = useCallback(async (itemId: string, studentRoster: Student[]) => {
+    if (studentRoster.length === 0) return;
+
+    // Mark as identifying
+    setItems(prev => prev.map(item => 
+      item.id === itemId ? { ...item, status: 'identifying' } : item
+    ));
+
+    const item = items.find(i => i.id === itemId) || { id: itemId, imageDataUrl: '', status: 'pending' as const };
+    
+    // We need to get the item from current state, use a ref pattern or fetch from latest
+    setItems(prev => {
+      const currentItem = prev.find(i => i.id === itemId);
+      if (!currentItem) return prev;
+      
+      // Start async identification
+      (async () => {
+        const result = await identifyStudent(currentItem, studentRoster);
+        setItems(p => p.map(i => i.id === itemId ? result : i));
+      })();
+      
+      return prev;
+    });
+  }, []);
+
+  // Add image and auto-identify if roster provided
+  const addImageWithAutoIdentify = useCallback(async (imageDataUrl: string, studentRoster?: Student[]): Promise<string> => {
+    const id = crypto.randomUUID();
+    const newItem: BatchItem = {
+      id,
+      imageDataUrl,
+      status: studentRoster && studentRoster.length > 0 ? 'identifying' : 'pending',
+    };
+    
+    setItems(prev => [...prev, newItem]);
+
+    // Auto-identify if roster is provided
+    if (studentRoster && studentRoster.length > 0) {
+      try {
+        const result = await identifyStudent(newItem, studentRoster);
+        setItems(prev => prev.map(item => item.id === id ? result : item));
+      } catch (err) {
+        console.error('Auto-identify failed:', err);
+        setItems(prev => prev.map(item => 
+          item.id === id ? { ...item, status: 'pending' } : item
+        ));
+      }
+    }
+
     return id;
   }, []);
 
@@ -316,6 +371,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   return {
     items,
     addImage,
+    addImageWithAutoIdentify,
     removeImage,
     updateItemStudent,
     clearAll,

@@ -71,10 +71,17 @@ export default function Scan() {
     setScanState('preview');
   }, []);
 
-  const handlePreviewConfirm = useCallback((finalImageDataUrl: string) => {
+  const handlePreviewConfirm = useCallback(async (finalImageDataUrl: string) => {
     if (scanMode === 'batch') {
-      batch.addImage(finalImageDataUrl);
-      toast.success('Image added to batch');
+      // Auto-identify student if a class is selected
+      if (selectedClassId && students.length > 0) {
+        toast.info('Adding image & identifying student...');
+        await batch.addImageWithAutoIdentify(finalImageDataUrl, students);
+        toast.success('Image added with auto-identification');
+      } else {
+        batch.addImage(finalImageDataUrl);
+        toast.success('Image added to batch');
+      }
       setCapturedImage(null);
       setScanState('idle');
     } else {
@@ -83,7 +90,7 @@ export default function Scan() {
       setScanState('choose-method');
       toast.success('Image uploaded! Choose analysis method.');
     }
-  }, [scanMode, batch]);
+  }, [scanMode, batch, selectedClassId, students]);
 
   const handleSolutionUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -163,20 +170,34 @@ export default function Scan() {
     e.target.value = '';
   };
 
-  const handleBatchUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBatchUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
     
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string;
-        batch.addImage(dataUrl);
-      };
-      reader.readAsDataURL(file);
-    });
+    const fileCount = files.length;
+    toast.info(`Adding ${fileCount} image(s)...`);
     
-    toast.success(`Added ${files.length} image(s) to batch`);
+    // Process files with auto-identification if class is selected
+    const processFile = async (file: File) => {
+      return new Promise<void>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const dataUrl = ev.target?.result as string;
+          if (selectedClassId && students.length > 0) {
+            await batch.addImageWithAutoIdentify(dataUrl, students);
+          } else {
+            batch.addImage(dataUrl);
+          }
+          resolve();
+        };
+        reader.readAsDataURL(file);
+      });
+    };
+
+    // Process all files
+    await Promise.all(Array.from(files).map(processFile));
+    
+    toast.success(`Added ${fileCount} image(s)${selectedClassId ? ' with auto-identification' : ''}`);
     e.target.value = '';
   };
 
@@ -728,8 +749,8 @@ export default function Scan() {
                           <h2 className="text-lg font-semibold">Add Student Papers</h2>
                           <p className="text-sm text-muted-foreground">
                             {selectedClassId 
-                              ? `Upload papers and assign to students from your class`
-                              : 'Select a class above, then add papers'}
+                              ? `Papers will be auto-identified using QR codes or handwritten names`
+                              : 'Select a class above to enable automatic student identification'}
                           </p>
                         </div>
 
