@@ -279,9 +279,9 @@ export default function Questions() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">Question Bank</h1>
+          <h1 className="font-display text-2xl font-bold text-foreground">Question Bank & Assessments</h1>
           <p className="text-muted-foreground">
-            Browse NYS Regents aligned topics and create AI-generated worksheets
+            Browse NYS Regents aligned topics, create AI-generated worksheets, and download assessments
           </p>
         </div>
 

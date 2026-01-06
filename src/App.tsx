@@ -15,7 +15,6 @@ import ClassNew from "./pages/ClassNew";
 import ClassDetail from "./pages/ClassDetail";
 import Questions from "./pages/Questions";
 import QuestionNew from "./pages/QuestionNew";
-import Assessments from "./pages/Assessments";
 import Scan from "./pages/Scan";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
@@ -70,7 +69,7 @@ function AppRoutes() {
       <Route path="/classes/:id" element={<ProtectedRoute><ClassDetail /></ProtectedRoute>} />
       <Route path="/questions" element={<ProtectedRoute><Questions /></ProtectedRoute>} />
       <Route path="/questions/new" element={<ProtectedRoute><QuestionNew /></ProtectedRoute>} />
-      <Route path="/assessments" element={<ProtectedRoute><Assessments /></ProtectedRoute>} />
+      <Route path="/assessments" element={<Navigate to="/questions" replace />} />
       <Route path="/scan" element={<ProtectedRoute><Scan /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
