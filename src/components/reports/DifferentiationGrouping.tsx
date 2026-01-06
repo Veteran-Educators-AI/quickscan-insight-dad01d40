@@ -4,11 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Users, ChevronDown, ChevronRight, Target, BookOpen, Sparkles, AlertTriangle, ClipboardPlus, Loader2, Printer } from 'lucide-react';
+import { Users, ChevronDown, ChevronRight, Target, BookOpen, Sparkles, AlertTriangle, ClipboardPlus, Loader2, Printer, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 import { PrintRemediationDialog } from '@/components/print/PrintRemediationDialog';
+import { ExportGroupPDFDialog } from './ExportGroupPDFDialog';
 import type { StudentMastery } from './MasteryHeatMap';
 
 interface Topic {
@@ -89,6 +90,7 @@ export function DifferentiationGrouping({ students, topics }: DifferentiationGro
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['needs-support', 'developing']));
   const [creatingAssessment, setCreatingAssessment] = useState<string | null>(null);
   const [printDialogGroup, setPrintDialogGroup] = useState<StudentGroup | null>(null);
+  const [exportPDFGroup, setExportPDFGroup] = useState<StudentGroup | null>(null);
 
   const groups = useMemo(() => {
     const result: StudentGroup[] = GROUP_DEFINITIONS.map(def => ({
@@ -418,7 +420,7 @@ export function DifferentiationGrouping({ students, topics }: DifferentiationGro
                             <p className="text-xs text-muted-foreground">
                               💡 Assign lower-level versions of these standards as practice.
                             </p>
-                            <div className="flex gap-2 shrink-0">
+                            <div className="flex flex-wrap gap-2 shrink-0">
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -427,6 +429,15 @@ export function DifferentiationGrouping({ students, topics }: DifferentiationGro
                               >
                                 <Printer className="h-3 w-3 mr-1" />
                                 Print
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setExportPDFGroup(group)}
+                                className="shrink-0"
+                              >
+                                <Download className="h-3 w-3 mr-1" />
+                                Export PDFs
                               </Button>
                               <Button
                                 size="sm"
@@ -463,6 +474,18 @@ export function DifferentiationGrouping({ students, topics }: DifferentiationGro
           groupLabel={printDialogGroup.label}
           students={printDialogGroup.students}
           weakTopics={printDialogGroup.weakTopics}
+        />
+      )}
+
+      {/* Export PDF Dialog */}
+      {exportPDFGroup && (
+        <ExportGroupPDFDialog
+          open={!!exportPDFGroup}
+          onOpenChange={(open) => !open && setExportPDFGroup(null)}
+          groupLabel={exportPDFGroup.label}
+          groupLevel={exportPDFGroup.level}
+          students={exportPDFGroup.students}
+          weakTopics={exportPDFGroup.weakTopics}
         />
       )}
     </Card>
