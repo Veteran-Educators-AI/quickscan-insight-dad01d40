@@ -1,3 +1,4 @@
+import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -47,6 +48,15 @@ function AppRoutes() {
   
   // Handle deep links from Capacitor native wrapper
   useDeepLinks();
+
+  // Handle SPA redirect from 404.html fallback
+  React.useEffect(() => {
+    const redirectPath = sessionStorage.getItem('redirect_path');
+    if (redirectPath && redirectPath !== '/') {
+      sessionStorage.removeItem('redirect_path');
+      window.history.replaceState(null, '', redirectPath);
+    }
+  }, []);
 
   if (loading) {
     return (
