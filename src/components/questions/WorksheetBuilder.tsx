@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -98,6 +99,13 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [isLoadingWorksheets, setIsLoadingWorksheets] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  
+  // Image generation state
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+  const [imageGenerationProgress, setImageGenerationProgress] = useState(0);
+  const [imageGenerationStatus, setImageGenerationStatus] = useState('');
+  const [imagesGenerated, setImagesGenerated] = useState(false);
+  
   const printRef = useRef<HTMLDivElement>(null);
 
   const toggleDifficulty = (difficulty: string) => {
@@ -338,6 +346,82 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const resetCompilation = () => {
     setIsCompiled(false);
     setCompiledQuestions([]);
+    setImagesGenerated(false);
+    setImageGenerationProgress(0);
+    setImageGenerationStatus('');
+  };
+
+  // Check if there are questions that need images
+  const questionsNeedingImages = compiledQuestions.filter(q => q.imagePrompt && !q.imageUrl);
+  const hasQuestionsWithImagePrompts = compiledQuestions.some(q => q.imagePrompt);
+
+  // Generate images for questions with image prompts
+  const generateImages = async () => {
+    const questionsToGenerate = compiledQuestions.filter(q => q.imagePrompt && !q.imageUrl);
+    
+    if (questionsToGenerate.length === 0) {
+      toast({
+        title: 'No diagrams to generate',
+        description: 'All questions already have images or no diagrams are needed.',
+      });
+      return;
+    }
+
+    setIsGeneratingImages(true);
+    setImageGenerationProgress(0);
+    setImageGenerationStatus(`Generating images for ${questionsToGenerate.length} questions...`);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+        body: {
+          questions: questionsToGenerate.map(q => ({
+            questionNumber: q.questionNumber,
+            imagePrompt: q.imagePrompt,
+          })),
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.results) {
+        // Update questions with generated images
+        const updatedQuestions = [...compiledQuestions];
+        let successCount = 0;
+        
+        for (const result of data.results) {
+          const questionIndex = updatedQuestions.findIndex(q => q.questionNumber === result.questionNumber);
+          if (questionIndex !== -1 && result.imageUrl) {
+            updatedQuestions[questionIndex] = {
+              ...updatedQuestions[questionIndex],
+              imageUrl: result.imageUrl,
+            };
+            successCount++;
+          }
+          // Update progress
+          const progress = ((data.results.indexOf(result) + 1) / data.results.length) * 100;
+          setImageGenerationProgress(progress);
+          setImageGenerationStatus(`Generated ${successCount} of ${questionsToGenerate.length} diagrams`);
+        }
+
+        setCompiledQuestions(updatedQuestions);
+        setImagesGenerated(true);
+        
+        toast({
+          title: 'Diagrams generated!',
+          description: `Successfully created ${successCount} of ${questionsToGenerate.length} diagram images.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error generating images:', error);
+      toast({
+        title: 'Image generation failed',
+        description: 'Some diagrams could not be generated. You can try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingImages(false);
+      setImageGenerationProgress(100);
+    }
   };
 
   const generatePDF = async () => {
@@ -1047,7 +1131,16 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             <>
               {/* Compiled Questions Preview */}
               <div className="space-y-2">
-                <Label className="text-sm">Generated Questions</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Generated Questions</Label>
+                  {hasQuestionsWithImagePrompts && (
+                    <Badge variant={imagesGenerated ? "default" : "secondary"} className="text-xs">
+                      {imagesGenerated 
+                        ? `${compiledQuestions.filter(q => q.imageUrl).length} diagrams` 
+                        : `${questionsNeedingImages.length} diagrams pending`}
+                    </Badge>
+                  )}
+                </div>
                 <ScrollArea className="h-64 rounded-md border p-2">
                   {compiledQuestions.map((question) => (
                     <div
@@ -1059,6 +1152,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         <Badge variant="outline" className={`text-xs ${getDifficultyColor(question.difficulty)}`}>
                           {question.difficulty}
                         </Badge>
+                        {question.imagePrompt && !question.imageUrl && (
+                          <Badge variant="secondary" className="text-xs">
+                            <ImageIcon className="h-3 w-3 mr-1" />
+                            Diagram pending
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground mb-1">
                         {question.topic} ({question.standard})
@@ -1073,6 +1172,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                           />
                         </div>
                       )}
+                      {!question.imageUrl && question.imagePrompt && (
+                        <div className="mt-2 p-2 bg-muted rounded text-xs text-muted-foreground">
+                          <span className="font-medium">Diagram description: </span>
+                          {question.imagePrompt}
+                        </div>
+                      )}
                       {!question.imageUrl && question.svg && (
                         <div 
                           className="mt-2 flex justify-center"
@@ -1083,6 +1188,39 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   ))}
                 </ScrollArea>
               </div>
+
+              {/* Generate Images Button - shown when there are questions with imagePrompt but no imageUrl */}
+              {useAIImages && questionsNeedingImages.length > 0 && (
+                <div className="space-y-3">
+                  {isGeneratingImages && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{imageGenerationStatus}</span>
+                        <span className="font-medium">{Math.round(imageGenerationProgress)}%</span>
+                      </div>
+                      <Progress value={imageGenerationProgress} className="h-2" />
+                    </div>
+                  )}
+                  <Button
+                    className="w-full"
+                    variant="secondary"
+                    onClick={generateImages}
+                    disabled={isGeneratingImages}
+                  >
+                    {isGeneratingImages ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating Diagrams...
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon className="h-4 w-4 mr-2" />
+                        Generate {questionsNeedingImages.length} Diagram{questionsNeedingImages.length > 1 ? 's' : ''}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
 
               {/* Download/Print/Save Actions */}
               <div className="flex gap-2">

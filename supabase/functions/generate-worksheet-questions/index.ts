@@ -288,26 +288,8 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       throw new Error('Failed to parse generated questions');
     }
 
-    // If using AI images, generate images for questions with imagePrompt
-    if (useAIImages) {
-      console.log('Generating AI images for questions with imagePrompt...');
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
-        if (q.imagePrompt) {
-          console.log(`Generating image for question ${q.questionNumber}: ${q.imagePrompt.substring(0, 50)}...`);
-          const imageUrl = await generateAIImage(
-            `Create a clean, educational black and white diagram for a math worksheet. The diagram should be clear, precise, and suitable for printing. ${q.imagePrompt}. Style: minimalist, educational, with clear labels and measurements. No background color, just clean lines on white.`,
-            lovableApiKey
-          );
-          if (imageUrl) {
-            questions[i].imageUrl = imageUrl;
-            console.log(`Successfully generated image for question ${q.questionNumber}`);
-          } else {
-            console.log(`Failed to generate image for question ${q.questionNumber}`);
-          }
-        }
-      }
-    }
+    // No longer generating images here - they are generated separately via generate-diagram-images endpoint
+    // This allows for a two-step workflow: generate questions first, then generate images
 
     return new Response(
       JSON.stringify({ questions }),
