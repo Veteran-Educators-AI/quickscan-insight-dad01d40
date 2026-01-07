@@ -129,6 +129,31 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   
   const printRef = useRef<HTMLDivElement>(null);
 
+  // Determine if selected topics are geometry/trigonometry related (for shape generation vs clipart)
+  const isGeometryOrTrigSubject = selectedQuestions.some(q => {
+    const subject = q.subject?.toLowerCase() || '';
+    const category = q.category?.toLowerCase() || '';
+    const topicName = q.topicName?.toLowerCase() || '';
+    return (
+      subject.includes('geometry') ||
+      subject.includes('trigonometry') ||
+      category.includes('geometry') ||
+      category.includes('trigonometry') ||
+      topicName.includes('geometry') ||
+      topicName.includes('trigonometry') ||
+      topicName.includes('triangle') ||
+      topicName.includes('circle') ||
+      topicName.includes('polygon') ||
+      topicName.includes('angle') ||
+      topicName.includes('congruence') ||
+      topicName.includes('similarity') ||
+      topicName.includes('pythagorean') ||
+      topicName.includes('sine') ||
+      topicName.includes('cosine') ||
+      topicName.includes('tangent')
+    );
+  });
+
   const toggleDifficulty = (difficulty: string) => {
     setDifficultyFilter(prev => 
       prev.includes(difficulty)
@@ -348,12 +373,19 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       if (data.questions && data.questions.length > 0) {
         setCompiledQuestions(data.questions);
         setIsCompiled(true);
-        // Show clipart dialog after successful compilation
-        setShowClipartDialog(true);
-        toast({
-          title: 'Worksheet compiled!',
-          description: `Generated ${data.questions.length} questions. Would you like to add clipart?`,
-        });
+        // Show clipart dialog after successful compilation ONLY for non-geometry/trig subjects
+        if (!isGeometryOrTrigSubject) {
+          setShowClipartDialog(true);
+          toast({
+            title: 'Worksheet compiled!',
+            description: `Generated ${data.questions.length} questions. Would you like to add clipart?`,
+          });
+        } else {
+          toast({
+            title: 'Worksheet compiled!',
+            description: `Generated ${data.questions.length} questions. You can generate diagrams for geometry problems.`,
+          });
+        }
       } else {
         throw new Error('No questions generated');
       }
@@ -1559,8 +1591,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 </div>
               )}
 
-              {/* Add Clipart Button */}
-              {!clipartGenerated && (
+              {/* Add Clipart Button - Only show for non-geometry/trig subjects */}
+              {!isGeometryOrTrigSubject && !clipartGenerated && (
                 <Button
                   className="w-full"
                   variant="outline"
@@ -1572,7 +1604,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 </Button>
               )}
 
-              {clipartGenerated && (
+              {!isGeometryOrTrigSubject && clipartGenerated && (
                 <div className="flex items-center justify-between p-2 bg-primary/10 rounded-lg border border-primary/20">
                   <div className="flex items-center gap-2 text-sm">
                     <Palette className="h-4 w-4 text-primary" />
