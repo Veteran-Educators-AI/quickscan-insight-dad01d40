@@ -36,6 +36,7 @@ interface AnalysisResultsProps {
   onAssociateStudent?: () => void;
   isSaving?: boolean;
   studentName?: string | null;
+  studentId?: string | null;
 }
 
 export function AnalysisResults({ 
@@ -44,7 +45,8 @@ export function AnalysisResults({
   onSaveAnalytics, 
   onAssociateStudent,
   isSaving = false,
-  studentName = null
+  studentName = null,
+  studentId = null
 }: AnalysisResultsProps) {
   const getScoreColor = (percentage: number) => {
     if (percentage >= 80) return 'text-green-600';
@@ -200,6 +202,7 @@ export function AnalysisResults({
         <AIWorkDetector 
           text={result.ocrText} 
           studentName={studentName || undefined}
+          studentId={studentId || undefined}
           questionContext={result.problemIdentified}
         />
       )}

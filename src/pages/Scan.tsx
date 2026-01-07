@@ -791,6 +791,7 @@ export default function Scan() {
                         onAssociateStudent={() => setShowStudentPicker(true)}
                         isSaving={isSaving}
                         studentName={studentName}
+                        studentId={currentStudentId}
                       />
                       
                       <SaveAnalyticsConfirmDialog
