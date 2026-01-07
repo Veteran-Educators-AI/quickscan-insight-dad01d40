@@ -3,6 +3,7 @@ import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wan
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { SaveAnalyticsConfirmDialog } from '@/components/scan/SaveAnalyticsConfirmDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { CameraModal } from '@/components/scan/CameraModal';
@@ -73,6 +74,9 @@ export default function Scan() {
   // Get student name for display
   const currentStudentId = singleScanStudentId || analyzingScanStudentId;
   const studentName = useStudentName(currentStudentId);
+  
+  // Confirmation dialog state
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   
   // AI suggestions for manual scoring
   const [aiSuggestions, setAiSuggestions] = useState<{
@@ -779,14 +783,30 @@ export default function Scan() {
                   
                   {/* Single result (legacy) */}
                   {result && !manualResult && Object.keys(multiQuestionResults).length === 0 && (
-                    <AnalysisResults 
-                      result={result} 
-                      rawAnalysis={rawAnalysis}
-                      onSaveAnalytics={currentStudentId && !resultsSaved ? handleSaveSingleResult : undefined}
-                      onAssociateStudent={() => setShowStudentPicker(true)}
-                      isSaving={isSaving}
-                      studentName={studentName}
-                    />
+                    <>
+                      <AnalysisResults 
+                        result={result} 
+                        rawAnalysis={rawAnalysis}
+                        onSaveAnalytics={currentStudentId && !resultsSaved ? () => setShowSaveConfirm(true) : undefined}
+                        onAssociateStudent={() => setShowStudentPicker(true)}
+                        isSaving={isSaving}
+                        studentName={studentName}
+                      />
+                      
+                      <SaveAnalyticsConfirmDialog
+                        open={showSaveConfirm}
+                        onOpenChange={setShowSaveConfirm}
+                        onConfirm={async () => {
+                          await handleSaveSingleResult();
+                          setShowSaveConfirm(false);
+                        }}
+                        studentName={studentName}
+                        totalScore={result.totalScore}
+                        rubricScores={result.rubricScores}
+                        questionCount={1}
+                        isSaving={isSaving}
+                      />
+                    </>
                   )}
                   
                   {manualResult && (
