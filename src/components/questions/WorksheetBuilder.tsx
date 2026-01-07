@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
 import jsPDF from 'jspdf';
 import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
 
@@ -368,7 +369,14 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        handleApiError(error, 'Worksheet generation');
+        return;
+      }
+
+      if (checkResponseForApiError(data)) {
+        return;
+      }
 
       if (data.questions && data.questions.length > 0) {
         setCompiledQuestions(data.questions);
@@ -391,11 +399,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       }
     } catch (error) {
       console.error('Error compiling worksheet:', error);
-      toast({
-        title: 'Compilation failed',
-        description: 'Failed to generate questions. Please try again.',
-        variant: 'destructive',
-      });
+      handleApiError(error, 'Worksheet generation');
     } finally {
       setIsCompiling(false);
     }

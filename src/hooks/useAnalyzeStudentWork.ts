@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
 
 interface RubricStep {
   step_number: number;
@@ -92,11 +93,12 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
       });
 
       if (fnError) {
-        throw new Error(fnError.message || 'Failed to analyze image');
+        handleApiError(fnError, 'Analysis');
+        return null;
       }
 
-      if (data?.error) {
-        throw new Error(data.error);
+      if (checkResponseForApiError(data)) {
+        return null;
       }
 
       if (!data?.success || !data?.analysis) {
@@ -136,11 +138,12 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
       });
 
       if (fnError) {
-        throw new Error(fnError.message || 'Failed to compare images');
+        handleApiError(fnError, 'Comparison');
+        return null;
       }
 
-      if (data?.error) {
-        throw new Error(data.error);
+      if (checkResponseForApiError(data)) {
+        return null;
       }
 
       if (!data?.success || !data?.comparison) {
