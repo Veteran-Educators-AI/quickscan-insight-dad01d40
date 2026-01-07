@@ -2,6 +2,7 @@ import { useRef, useState, useCallback } from 'react';
 import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { CameraModal } from '@/components/scan/CameraModal';
@@ -10,6 +11,7 @@ import { AnalysisResults } from '@/components/scan/AnalysisResults';
 import { BatchQueue } from '@/components/scan/BatchQueue';
 import { BatchReport } from '@/components/scan/BatchReport';
 import { ClassStudentSelector, useClassStudents } from '@/components/scan/ClassStudentSelector';
+import { ScanClassStudentPicker, useStudentName } from '@/components/scan/ScanClassStudentPicker';
 import { SaveForLaterTab } from '@/components/scan/SaveForLaterTab';
 import { useAnalyzeStudentWork } from '@/hooks/useAnalyzeStudentWork';
 import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
@@ -50,11 +52,16 @@ export default function Scan() {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const { students } = useClassStudents(selectedClassId);
+  
+  // Single scan class/student selection
+  const [singleScanClassId, setSingleScanClassId] = useState<string | null>(null);
+  const [singleScanStudentId, setSingleScanStudentId] = useState<string | null>(null);
+  const [showStudentPicker, setShowStudentPicker] = useState(false);
 
   const { analyze, compareWithSolution, isAnalyzing, isComparing, error, result, rawAnalysis, comparisonResult } = useAnalyzeStudentWork();
   const batch = useBatchAnalysis();
   const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans();
-  const { saveMultiQuestionResults, isSaving } = useSaveAnalysisResults();
+  const { saveResults, saveMultiQuestionResults, isSaving } = useSaveAnalysisResults();
   const [analyzingScanId, setAnalyzingScanId] = useState<string | null>(null);
   const [analyzingScanStudentId, setAnalyzingScanStudentId] = useState<string | null>(null);
   // Track question IDs for multi-question analysis
@@ -62,6 +69,10 @@ export default function Scan() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [resultsSaved, setResultsSaved] = useState(false);
   const [multiQuestionResults, setMultiQuestionResults] = useState<Record<string, any>>({});
+  
+  // Get student name for display
+  const currentStudentId = singleScanStudentId || analyzingScanStudentId;
+  const studentName = useStudentName(currentStudentId);
   
   // AI suggestions for manual scoring
   const [aiSuggestions, setAiSuggestions] = useState<{
@@ -367,6 +378,7 @@ export default function Scan() {
     setCurrentQuestionIndex(0);
     setMultiQuestionResults({});
     setResultsSaved(false);
+    setShowStudentPicker(false);
   };
 
   // Handle analyzing a saved scan with multiple questions
@@ -386,13 +398,15 @@ export default function Scan() {
 
   // Save multi-question analysis results to database
   const handleSaveResults = async () => {
-    if (!analyzingScanStudentId || Object.keys(multiQuestionResults).length === 0 || !finalImage) {
+    const studentId = currentStudentId;
+    
+    if (!studentId || Object.keys(multiQuestionResults).length === 0 || !finalImage) {
       toast.error('Missing student or results to save');
       return;
     }
 
     const success = await saveMultiQuestionResults(
-      analyzingScanStudentId,
+      studentId,
       finalImage,
       multiQuestionResults,
       analyzingScanId || undefined
@@ -401,6 +415,28 @@ export default function Scan() {
     if (success) {
       setResultsSaved(true);
       refreshPendingScans();
+    }
+  };
+
+  // Save single result to database
+  const handleSaveSingleResult = async () => {
+    const studentId = currentStudentId;
+    
+    if (!studentId || !result || !finalImage) {
+      toast.error('Missing student or results to save');
+      return;
+    }
+
+    const attemptId = await saveResults({
+      studentId,
+      questionId: selectedQuestionIds[0] || 'unknown',
+      imageUrl: finalImage,
+      result,
+    });
+
+    if (attemptId) {
+      setResultsSaved(true);
+      toast.success('Analytics saved successfully');
     }
   };
 
@@ -743,7 +779,14 @@ export default function Scan() {
                   
                   {/* Single result (legacy) */}
                   {result && !manualResult && Object.keys(multiQuestionResults).length === 0 && (
-                    <AnalysisResults result={result} rawAnalysis={rawAnalysis} />
+                    <AnalysisResults 
+                      result={result} 
+                      rawAnalysis={rawAnalysis}
+                      onSaveAnalytics={currentStudentId && !resultsSaved ? handleSaveSingleResult : undefined}
+                      onAssociateStudent={() => setShowStudentPicker(true)}
+                      isSaving={isSaving}
+                      studentName={studentName}
+                    />
                   )}
                   
                   {manualResult && (
@@ -759,25 +802,67 @@ export default function Scan() {
                       }} 
                     />
                   )}
+
+                  {/* Student Picker Dialog */}
+                  <Dialog open={showStudentPicker} onOpenChange={setShowStudentPicker}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Associate with Student</DialogTitle>
+                      </DialogHeader>
+                      <div className="py-4">
+                        <ScanClassStudentPicker
+                          selectedClassId={singleScanClassId}
+                          selectedStudentId={singleScanStudentId || currentStudentId}
+                          onClassChange={setSingleScanClassId}
+                          onStudentChange={(id) => {
+                            setSingleScanStudentId(id);
+                            if (id) {
+                              setShowStudentPicker(false);
+                              toast.success('Student associated. You can now save analytics.');
+                            }
+                          }}
+                        />
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               )}
 
               {/* Main scan card - only show in idle state */}
               {scanState === 'idle' && (
-                <Card className="overflow-hidden">
-                  <CardContent className="p-0">
-                    <div className="p-8 sm:p-12">
-                      <div className="text-center space-y-6">
-                        <div className="w-24 h-24 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                          <Camera className="h-12 w-12 text-primary" />
-                        </div>
+                <div className="space-y-4">
+                  {/* Class/Student Picker */}
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Select Class & Student (Optional)</label>
+                        <ScanClassStudentPicker
+                          selectedClassId={singleScanClassId}
+                          selectedStudentId={singleScanStudentId}
+                          onClassChange={setSingleScanClassId}
+                          onStudentChange={setSingleScanStudentId}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Pre-selecting a student allows you to save analytics directly after scanning
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                        <div>
-                          <h2 className="text-lg font-semibold mb-1">Ready to Scan</h2>
-                          <p className="text-sm text-muted-foreground">
-                            Take a photo of student work or upload an existing image
-                          </p>
-                        </div>
+                  <Card className="overflow-hidden">
+                    <CardContent className="p-0">
+                      <div className="p-8 sm:p-12">
+                        <div className="text-center space-y-6">
+                          <div className="w-24 h-24 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                            <Camera className="h-12 w-12 text-primary" />
+                          </div>
+
+                          <div>
+                            <h2 className="text-lg font-semibold mb-1">Ready to Scan</h2>
+                            <p className="text-sm text-muted-foreground">
+                              Take a photo of student work or upload an existing image
+                            </p>
+                          </div>
 
                         <div className="flex flex-col sm:flex-row gap-3 justify-center">
                           <input
@@ -843,10 +928,11 @@ export default function Scan() {
                           <p>💡 <strong>Tip:</strong> For best results, ensure good lighting and capture the full response</p>
                           <p>📱 QR codes on printed assessments will auto-detect student & question</p>
                         </div>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </div>
               )}
             </TabsContent>
 

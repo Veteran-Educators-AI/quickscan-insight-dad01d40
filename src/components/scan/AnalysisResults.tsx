@@ -1,6 +1,7 @@
-import { CheckCircle2, XCircle, AlertTriangle, Lightbulb } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, Lightbulb, Save, UserPlus, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -30,9 +31,20 @@ interface AnalysisResult {
 interface AnalysisResultsProps {
   result: AnalysisResult;
   rawAnalysis?: string | null;
+  onSaveAnalytics?: () => void;
+  onAssociateStudent?: () => void;
+  isSaving?: boolean;
+  studentName?: string | null;
 }
 
-export function AnalysisResults({ result, rawAnalysis }: AnalysisResultsProps) {
+export function AnalysisResults({ 
+  result, 
+  rawAnalysis, 
+  onSaveAnalytics, 
+  onAssociateStudent,
+  isSaving = false,
+  studentName = null
+}: AnalysisResultsProps) {
   const getScoreColor = (percentage: number) => {
     if (percentage >= 80) return 'text-green-600';
     if (percentage >= 60) return 'text-yellow-600';
@@ -77,7 +89,42 @@ export function AnalysisResults({ result, rawAnalysis }: AnalysisResultsProps) {
         </CardContent>
       </Card>
 
-      {/* Rubric Breakdown */}
+      {/* Action Buttons */}
+      {(onSaveAnalytics || onAssociateStudent) && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              {onSaveAnalytics && (
+                <Button 
+                  onClick={onSaveAnalytics}
+                  disabled={isSaving}
+                  className="flex-1"
+                  variant="hero"
+                >
+                  {isSaving ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  Save Analytics
+                </Button>
+              )}
+              {onAssociateStudent && (
+                <Button 
+                  onClick={onAssociateStudent}
+                  disabled={isSaving}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  {studentName ? `Change Student (${studentName})` : 'Associate with Student'}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {result.rubricScores.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
