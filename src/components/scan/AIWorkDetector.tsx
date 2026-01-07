@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bot, AlertTriangle, CheckCircle, Loader2, ShieldAlert } from 'lucide-react';
+import { Bot, AlertTriangle, CheckCircle, Loader2, ShieldAlert, XCircle, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,12 +20,15 @@ interface AIWorkDetectorProps {
   studentName?: string;
   questionContext?: string;
   onResult?: (result: AIDetectionResult) => void;
+  onRejection?: (rejected: boolean) => void;
 }
 
-export function AIWorkDetector({ text, studentName, questionContext, onResult }: AIWorkDetectorProps) {
+export function AIWorkDetector({ text, studentName, questionContext, onResult, onRejection }: AIWorkDetectorProps) {
   const { toast } = useToast();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AIDetectionResult | null>(null);
+
+  const isRejected = result?.isLikelyAI && result.confidence > 80;
 
   const analyzeWork = async () => {
     if (!text || text.trim().length < 20) {
@@ -48,7 +51,16 @@ export function AIWorkDetector({ text, studentName, questionContext, onResult }:
       setResult(data);
       onResult?.(data);
 
-      if (data.isLikelyAI && data.confidence > 70) {
+      const rejected = data.isLikelyAI && data.confidence > 80;
+      onRejection?.(rejected);
+
+      if (rejected) {
+        toast({
+          title: '🚫 Work Rejected - AI Content Detected',
+          description: `${data.confidence}% confidence this is AI-generated. Student must redo this assignment.`,
+          variant: 'destructive',
+        });
+      } else if (data.isLikelyAI && data.confidence > 70) {
         toast({
           title: '⚠️ Potential AI-generated content detected',
           description: `${data.confidence}% confidence. Review the indicators below.`,
@@ -83,9 +95,11 @@ export function AIWorkDetector({ text, studentName, questionContext, onResult }:
 
   return (
     <Card className={cn(
-      result?.isLikelyAI && result.confidence > 70 
-        ? 'border-red-200 bg-red-50/50 dark:bg-red-950/20' 
-        : 'border-blue-200 bg-blue-50/50 dark:bg-blue-950/20'
+      isRejected
+        ? 'border-red-500 bg-red-100/80 dark:bg-red-950/40 ring-2 ring-red-500' 
+        : result?.isLikelyAI && result.confidence > 70 
+          ? 'border-red-200 bg-red-50/50 dark:bg-red-950/20' 
+          : 'border-blue-200 bg-blue-50/50 dark:bg-blue-950/20'
     )}>
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
@@ -118,16 +132,36 @@ export function AIWorkDetector({ text, studentName, questionContext, onResult }:
           </Button>
         ) : (
           <div className="space-y-4">
+            {/* Rejection Banner */}
+            {isRejected && (
+              <div className="bg-red-600 text-white p-4 rounded-lg space-y-2">
+                <div className="flex items-center gap-2 font-bold">
+                  <XCircle className="h-5 w-5" />
+                  WORK REJECTED
+                </div>
+                <p className="text-sm">
+                  This submission has been flagged as AI-generated with {result.confidence}% confidence. 
+                  The student must redo this assignment using their own work.
+                </p>
+                <div className="flex items-center gap-2 text-sm bg-red-700 p-2 rounded mt-2">
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Student needs to resubmit original work</span>
+                </div>
+              </div>
+            )}
+
             {/* Result Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {result.isLikelyAI ? (
+                {isRejected ? (
+                  <XCircle className="h-5 w-5 text-red-600" />
+                ) : result.isLikelyAI ? (
                   <AlertTriangle className={cn('h-5 w-5', getConfidenceColor(result.confidence, true))} />
                 ) : (
                   <CheckCircle className="h-5 w-5 text-emerald-600" />
                 )}
                 <span className="font-medium">
-                  {result.isLikelyAI ? 'Likely AI-Generated' : 'Appears Human-Written'}
+                  {isRejected ? 'AI Work - Rejected' : result.isLikelyAI ? 'Likely AI-Generated' : 'Appears Human-Written'}
                 </span>
               </div>
               <Badge variant={result.isLikelyAI ? 'destructive' : 'outline'}>
@@ -140,7 +174,7 @@ export function AIWorkDetector({ text, studentName, questionContext, onResult }:
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">AI Likelihood</span>
                 <span className={cn('font-medium', getConfidenceColor(result.confidence, result.isLikelyAI))}>
-                  {result.isLikelyAI ? 'High' : 'Low'}
+                  {isRejected ? 'Rejected' : result.isLikelyAI ? 'High' : 'Low'}
                 </span>
               </div>
               <Progress 
@@ -169,7 +203,10 @@ export function AIWorkDetector({ text, studentName, questionContext, onResult }:
 
             {/* Re-analyze button */}
             <Button
-              onClick={() => setResult(null)}
+              onClick={() => {
+                setResult(null);
+                onRejection?.(false);
+              }}
               variant="ghost"
               size="sm"
               className="w-full"
