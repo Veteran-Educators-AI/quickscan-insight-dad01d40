@@ -13,6 +13,7 @@ import { DifferentiationGrouping } from '@/components/reports/DifferentiationGro
 import { EmailResponsesReport } from '@/components/reports/EmailResponsesReport';
 import { ScanAnalysisHistory } from '@/components/reports/ScanAnalysisHistory';
 import { DiagnosticDashboard } from '@/components/reports/DiagnosticDashboard';
+import { StudentProgressTracker } from '@/components/reports/StudentProgressTracker';
 import { useMasteryData } from '@/hooks/useMasteryData';
 
 export default function Reports() {
@@ -155,6 +156,9 @@ export default function Reports() {
 
             {/* Diagnostic Dashboard */}
             <DiagnosticDashboard classId={selectedClassId === 'all' ? undefined : selectedClassId} />
+
+            {/* Student Progress Tracker */}
+            <StudentProgressTracker classId={selectedClassId === 'all' ? undefined : selectedClassId} />
 
             {/* Scan Analysis History */}
             <ScanAnalysisHistory classId={selectedClassId === 'all' ? undefined : selectedClassId} />
