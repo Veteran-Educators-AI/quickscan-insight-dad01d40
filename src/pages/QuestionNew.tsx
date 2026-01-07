@@ -53,7 +53,10 @@ const GEOMETRY_JMAP_TOPICS = [
     topics: [
       { name: 'Planes', standard: 'G.CO.A.1', url: 'https://www.jmap.org/htmlstandard/G.CO.A.1.htm' },
       { name: 'Solids', standard: 'G.MG.A.1', url: 'https://www.jmap.org/htmlstandard/G.MG.A.1.htm' },
+      { name: 'Density Problems', standard: 'G.MG.A.2', url: 'https://www.jmap.org/htmlstandard/G.MG.A.2.htm' },
       { name: 'Geometric Modeling in Design', standard: 'G.MG.A.3', url: 'https://www.jmap.org/htmlstandard/G.MG.A.3.htm' },
+      { name: 'Circumference and Area Formulas', standard: 'G.GMD.A.1', url: 'https://www.jmap.org/htmlstandard/G.GMD.A.1.htm' },
+      { name: 'Volume Formulas', standard: 'G.GMD.A.3', url: 'https://www.jmap.org/htmlstandard/G.GMD.A.3.htm' },
       { name: 'Cross-Sections of Three-Dimensional Objects', standard: 'G.GMD.B.4', url: 'https://www.jmap.org/htmlstandard/G.GMD.B.4.htm' },
       { name: 'Constructions', standard: 'G.CO.D.12', url: 'https://www.jmap.org/htmlstandard/G.CO.D.12.htm' },
       { name: 'Constructions (Advanced)', standard: 'G.CO.D.13', url: 'https://www.jmap.org/htmlstandard/G.CO.D.13.htm' },
@@ -87,12 +90,14 @@ const GEOMETRY_JMAP_TOPICS = [
       { name: 'Interior and Exterior Angles', standard: 'G.CO.C.10', url: 'https://www.jmap.org/htmlstandard/G.CO.C.10.htm' },
       { name: 'Polygon Similarity', standard: 'G.SRT.A.2', url: 'https://www.jmap.org/htmlstandard/G.SRT.A.2.htm' },
       { name: 'Coordinate Geometry Proofs', standard: 'G.GPE.B.4', url: 'https://www.jmap.org/htmlstandard/G.GPE.B.4.htm' },
+      { name: 'Perimeter and Area using Coordinates', standard: 'G.GPE.B.7', url: 'https://www.jmap.org/htmlstandard/G.GPE.B.7.htm' },
     ],
   },
   {
     category: 'CONICS',
     topics: [
       { name: 'Equations of Circles', standard: 'G.GPE.A.1', url: 'https://www.jmap.org/htmlstandard/G.GPE.A.1.htm' },
+      { name: 'Similar Circles', standard: 'G.C.A.1', url: 'https://www.jmap.org/htmlstandard/G.C.A.1.htm' },
       { name: 'Chords, Secants, and Tangents', standard: 'G.C.A.2', url: 'https://www.jmap.org/htmlstandard/G.C.A.2.htm' },
       { name: 'Inscribed Angles', standard: 'G.C.A.2', url: 'https://www.jmap.org/htmlstandard/G.C.A.2.htm' },
       { name: 'Arc Length and Sector Area', standard: 'G.C.B.5', url: 'https://www.jmap.org/htmlstandard/G.C.B.5.htm' },
