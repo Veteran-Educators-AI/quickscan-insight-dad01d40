@@ -28,17 +28,24 @@ export interface WorksheetQuestion {
   category: string;
 }
 
+// Advancement levels A-F for diagnostic worksheets
+export type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+
 interface GeneratedQuestion {
   questionNumber: number;
   topic: string;
   standard: string;
   question: string;
   difficulty: 'medium' | 'hard' | 'challenging';
+  advancementLevel?: AdvancementLevel; // For diagnostic worksheets
   svg?: string;
   imageUrl?: string;
   imagePrompt?: string;
   clipartUrl?: string;
 }
+
+// Worksheet mode types
+export type WorksheetMode = 'practice' | 'basic_assessment' | 'diagnostic';
 
 interface SavedWorksheet {
   id: string;
@@ -58,6 +65,7 @@ interface SavedWorksheet {
     useAIImages?: boolean;
     imageSize?: number;
     includeClipart?: boolean;
+    worksheetMode?: WorksheetMode;
   };
   created_at: string;
   share_code: string | null;
@@ -75,18 +83,18 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const { user } = useAuth();
   const [worksheetTitle, setWorksheetTitle] = useState('Math Practice Worksheet');
   const [hasUserEditedTitle, setHasUserEditedTitle] = useState(false);
-  const [worksheetType, setWorksheetType] = useState<'practice' | 'assessment'>('practice');
+  const [worksheetMode, setWorksheetMode] = useState<WorksheetMode>('practice');
   const [teacherName, setTeacherName] = useState('');
 
   // Auto-update title to first topic name when questions are added
   useEffect(() => {
     if (selectedQuestions.length > 0 && !hasUserEditedTitle) {
-      const prefix = worksheetType === 'assessment' ? 'Assessment: ' : '';
+      const prefix = worksheetMode === 'basic_assessment' ? 'Assessment: ' : worksheetMode === 'diagnostic' ? 'Diagnostic: ' : '';
       setWorksheetTitle(prefix + selectedQuestions[0].topicName);
     } else if (selectedQuestions.length === 0 && !hasUserEditedTitle) {
-      setWorksheetTitle(worksheetType === 'assessment' ? 'Math Assessment' : 'Math Practice Worksheet');
+      setWorksheetTitle(worksheetMode === 'basic_assessment' ? 'Math Assessment' : worksheetMode === 'diagnostic' ? 'Diagnostic Assessment' : 'Math Practice Worksheet');
     }
-  }, [selectedQuestions, hasUserEditedTitle, worksheetType]);
+  }, [selectedQuestions, hasUserEditedTitle, worksheetMode]);
   const [showAnswerLines, setShowAnswerLines] = useState(true);
   const [questionCount, setQuestionCount] = useState('5');
   const [difficultyFilter, setDifficultyFilter] = useState<string[]>(['medium', 'hard', 'challenging']);
@@ -208,6 +216,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           useAIImages,
           imageSize,
           includeClipart: clipartGenerated,
+          worksheetMode,
         })),
       };
       const { error } = await supabase.from('worksheets').insert([worksheetData]);
@@ -366,6 +375,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           includeGraphPaper,
           includeCoordinateGeometry,
           useAIImages,
+          worksheetMode, // Pass worksheet mode to generate advancement levels for diagnostic
         },
       });
 
@@ -730,11 +740,16 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           yPosition = margin;
         }
 
-        // Question number and difficulty badge
+        // Question number, advancement level (for diagnostic), and difficulty badge
         pdf.setFontSize(11);
         pdf.setFont('helvetica', 'bold');
         const difficultyText = question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1);
-        pdf.text(`${question.questionNumber}. [${difficultyText}]`, margin, yPosition);
+        
+        if (worksheetMode === 'diagnostic' && question.advancementLevel) {
+          pdf.text(`${question.questionNumber}. [Level ${question.advancementLevel}] [${difficultyText}]`, margin, yPosition);
+        } else {
+          pdf.text(`${question.questionNumber}. [${difficultyText}]`, margin, yPosition);
+        }
         yPosition += 6;
 
         // Topic and standard reference
@@ -1021,6 +1036,30 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     }
   };
 
+  const getAdvancementLevelColor = (level: AdvancementLevel) => {
+    switch (level) {
+      case 'A': return 'bg-green-100 text-green-800 border-green-300';
+      case 'B': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+      case 'C': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'D': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'E': return 'bg-red-100 text-red-800 border-red-300';
+      case 'F': return 'bg-gray-100 text-gray-800 border-gray-300';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const getAdvancementLevelDescription = (level: AdvancementLevel) => {
+    switch (level) {
+      case 'A': return 'Advanced';
+      case 'B': return 'Proficient';
+      case 'C': return 'Developing';
+      case 'D': return 'Beginning';
+      case 'E': return 'Emerging';
+      case 'F': return 'Foundational';
+      default: return '';
+    }
+  };
+
   if (selectedQuestions.length === 0 && !isCompiled && !showSavedWorksheets) {
     return (
       <Card className="border-dashed">
@@ -1163,46 +1202,99 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               {/* Worksheet Type Selection */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">What are you building?</Label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-2">
                   <Button
                     type="button"
-                    variant={worksheetType === 'practice' ? 'default' : 'outline'}
-                    className={`h-auto py-4 flex flex-col items-center gap-2 ${
-                      worksheetType === 'practice' 
+                    variant={worksheetMode === 'practice' ? 'default' : 'outline'}
+                    className={`h-auto py-3 flex flex-col items-center gap-1.5 ${
+                      worksheetMode === 'practice' 
                         ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2' 
                         : 'hover:bg-muted'
                     }`}
                     onClick={() => {
-                      setWorksheetType('practice');
+                      setWorksheetMode('practice');
                       if (!hasUserEditedTitle) {
                         setWorksheetTitle(selectedQuestions.length > 0 ? selectedQuestions[0].topicName : 'Math Practice Worksheet');
                       }
                     }}
                   >
-                    <BookOpen className="h-6 w-6" />
-                    <span className="font-semibold">Practice Worksheet</span>
-                    <span className="text-xs opacity-80 text-center">For practice and homework</span>
+                    <BookOpen className="h-5 w-5" />
+                    <span className="font-semibold text-xs">Practice</span>
+                    <span className="text-[10px] opacity-80 text-center leading-tight">Homework & classwork</span>
                   </Button>
                   <Button
                     type="button"
-                    variant={worksheetType === 'assessment' ? 'default' : 'outline'}
-                    className={`h-auto py-4 flex flex-col items-center gap-2 ${
-                      worksheetType === 'assessment' 
+                    variant={worksheetMode === 'basic_assessment' ? 'default' : 'outline'}
+                    className={`h-auto py-3 flex flex-col items-center gap-1.5 ${
+                      worksheetMode === 'basic_assessment' 
                         ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2' 
                         : 'hover:bg-muted'
                     }`}
                     onClick={() => {
-                      setWorksheetType('assessment');
+                      setWorksheetMode('basic_assessment');
                       if (!hasUserEditedTitle) {
                         setWorksheetTitle(selectedQuestions.length > 0 ? 'Assessment: ' + selectedQuestions[0].topicName : 'Math Assessment');
                       }
                     }}
                   >
-                    <FileText className="h-6 w-6" />
-                    <span className="font-semibold">Assessment</span>
-                    <span className="text-xs opacity-80 text-center">For quizzes and tests</span>
+                    <FileText className="h-5 w-5" />
+                    <span className="font-semibold text-xs">Assessment</span>
+                    <span className="text-[10px] opacity-80 text-center leading-tight">Quizzes & tests</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={worksheetMode === 'diagnostic' ? 'default' : 'outline'}
+                    className={`h-auto py-3 flex flex-col items-center gap-1.5 ${
+                      worksheetMode === 'diagnostic' 
+                        ? 'bg-purple-600 text-white ring-2 ring-purple-600 ring-offset-2' 
+                        : 'hover:bg-muted border-purple-200'
+                    }`}
+                    onClick={() => {
+                      setWorksheetMode('diagnostic');
+                      if (!hasUserEditedTitle) {
+                        setWorksheetTitle(selectedQuestions.length > 0 ? 'Diagnostic: ' + selectedQuestions[0].topicName : 'Diagnostic Assessment');
+                      }
+                    }}
+                  >
+                    <Sparkles className="h-5 w-5" />
+                    <span className="font-semibold text-xs">Diagnostic</span>
+                    <span className="text-[10px] opacity-80 text-center leading-tight">Levels A-F</span>
                   </Button>
                 </div>
+                
+                {/* Diagnostic Mode Description */}
+                {worksheetMode === 'diagnostic' && (
+                  <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Sparkles className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-purple-900">Diagnostic Worksheet</p>
+                        <p className="text-xs text-purple-700">
+                          Questions are labeled with advancement levels A-F. Use student responses to generate 
+                          differentiated follow-up worksheets tailored to each student's level.
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {['A', 'B', 'C', 'D', 'E', 'F'].map((level) => (
+                            <Badge 
+                              key={level} 
+                              variant="outline" 
+                              className={`text-[10px] px-1.5 py-0 ${
+                                level === 'A' ? 'bg-green-50 border-green-300 text-green-700' :
+                                level === 'B' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' :
+                                level === 'C' ? 'bg-yellow-50 border-yellow-300 text-yellow-700' :
+                                level === 'D' ? 'bg-orange-50 border-orange-300 text-orange-700' :
+                                level === 'E' ? 'bg-red-50 border-red-300 text-red-700' :
+                                'bg-gray-50 border-gray-300 text-gray-700'
+                              }`}
+                            >
+                              Level {level}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <Separator />
@@ -1459,8 +1551,16 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       key={question.questionNumber}
                       className="py-3 px-2 border-b last:border-b-0"
                     >
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-sm font-bold">{question.questionNumber}.</span>
+                        {question.advancementLevel && worksheetMode === 'diagnostic' && (
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs font-semibold ${getAdvancementLevelColor(question.advancementLevel)}`}
+                          >
+                            Level {question.advancementLevel}
+                          </Badge>
+                        )}
                         <Badge variant="outline" className={`text-xs ${getDifficultyColor(question.difficulty)}`}>
                           {question.difficulty}
                         </Badge>
@@ -1700,8 +1800,20 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             <div className="space-y-8">
               {compiledQuestions.map((question) => (
                 <div key={question.questionNumber} className="space-y-2">
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="font-bold">{question.questionNumber}.</span>
+                    {worksheetMode === 'diagnostic' && question.advancementLevel && (
+                      <span className={`text-xs px-2 py-0.5 rounded border font-semibold ${
+                        question.advancementLevel === 'A' ? 'bg-green-100 text-green-800 border-green-300' :
+                        question.advancementLevel === 'B' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                        question.advancementLevel === 'C' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                        question.advancementLevel === 'D' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                        question.advancementLevel === 'E' ? 'bg-red-100 text-red-800 border-red-300' :
+                        'bg-gray-100 text-gray-800 border-gray-300'
+                      }`}>
+                        Level {question.advancementLevel}
+                      </span>
+                    )}
                     <span className="text-xs px-2 py-0.5 rounded border bg-muted">
                       {question.difficulty}
                     </span>

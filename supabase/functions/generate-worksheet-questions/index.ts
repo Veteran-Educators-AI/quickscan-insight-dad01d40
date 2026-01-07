@@ -13,12 +13,16 @@ interface TopicInput {
   category: string;
 }
 
+type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+type WorksheetMode = 'practice' | 'basic_assessment' | 'diagnostic';
+
 interface GeneratedQuestion {
   questionNumber: number;
   topic: string;
   standard: string;
   question: string;
   difficulty: 'medium' | 'hard' | 'challenging';
+  advancementLevel?: AdvancementLevel;
   svg?: string;
   imageUrl?: string;
   imagePrompt?: string;
@@ -73,7 +77,7 @@ serve(async (req) => {
   }
 
   try {
-    const { topics, questionCount, difficultyLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages } = await req.json() as {
+    const { topics, questionCount, difficultyLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages, worksheetMode } = await req.json() as {
       topics: TopicInput[];
       questionCount: number;
       difficultyLevels?: string[];
@@ -82,6 +86,7 @@ serve(async (req) => {
       includeGraphPaper?: boolean;
       includeCoordinateGeometry?: boolean;
       useAIImages?: boolean;
+      worksheetMode?: WorksheetMode;
     };
 
     if (!topics || topics.length === 0) {
@@ -203,8 +208,35 @@ If the question involves geometry and a diagram would help, include an "imagePro
 If the question involves geometry and a diagram would help, include an "svg" field with a complete SVG string. The svg field should ONLY be included when a visual diagram is genuinely helpful for the question.`
       : '';
 
-    const exampleOutput = useAIImages
+    // Diagnostic mode instructions for advancement levels
+    const diagnosticInstruction = worksheetMode === 'diagnostic' 
+      ? `
+DIAGNOSTIC ASSESSMENT MODE:
+- Each question MUST include an "advancementLevel" field with a value from A to F
+- Level A = Advanced (most challenging, requires synthesis and complex reasoning)
+- Level B = Proficient (challenging, requires analysis and application)
+- Level C = Developing (moderate difficulty, requires application)
+- Level D = Beginning (foundational application with some guidance)
+- Level E = Emerging (basic understanding with scaffolding)
+- Level F = Foundational (entry-level, basic recall and recognition)
+- Distribute questions across ALL levels (A through F) to diagnose student abilities
+- Questions should progressively increase in complexity from F to A
+- This diagnostic data will be used to create differentiated follow-up worksheets`
+      : '';
+
+    const exampleOutput = worksheetMode === 'diagnostic'
       ? `[
+  {
+    "questionNumber": 1,
+    "topic": "Topic Name",
+    "standard": "G.CO.A.1",
+    "question": "The full question text here",
+    "difficulty": "${allowedDifficulties[0]}",
+    "advancementLevel": "C"${useAIImages ? ',\n    "imagePrompt": "A detailed description of the geometric diagram needed"' : ''}
+  }
+]`
+      : useAIImages
+        ? `[
   {
     "questionNumber": 1,
     "topic": "Topic Name",
@@ -214,7 +246,7 @@ If the question involves geometry and a diagram would help, include an "svg" fie
     "imagePrompt": "A detailed description of the geometric diagram needed"
   }
 ]`
-      : `[
+        : `[
   {
     "questionNumber": 1,
     "topic": "Topic Name",
@@ -239,12 +271,14 @@ REQUIREMENTS:
 5. ${difficultyInstruction}
 6. Use real-world contexts where appropriate
 7. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}${graphPaperInstruction}${coordinateGeometryInstruction}
+${diagnosticInstruction}
 
 Respond with a JSON array of questions in this exact format:
 ${exampleOutput}
 ${imageFieldNote}
 
 Difficulty levels allowed: ${allowedDifficulties.join(', ')}
+${worksheetMode === 'diagnostic' ? 'Advancement levels required: A, B, C, D, E, F (distribute across all levels)' : ''}
 
 IMPORTANT: Return ONLY the JSON array, no other text.`;
 
