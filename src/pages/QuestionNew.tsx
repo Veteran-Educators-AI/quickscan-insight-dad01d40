@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, BookOpen, Upload, X, Plus, Trash2, ExternalLink, Loader2, Sparkles, Bot, User, Search } from 'lucide-react';
+import { ArrowLeft, BookOpen, Upload, X, Plus, Trash2, ExternalLink, Loader2, Sparkles, Bot, User, Search, Copy, Check } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -934,15 +934,36 @@ export default function QuestionNew() {
                                   {topic.name}
                                 </label>
                               </div>
-                              <a
-                                href={topic.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-primary hover:underline flex items-center gap-1"
-                              >
-                                {topic.standard}
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={async () => {
+                                    await navigator.clipboard.writeText(topic.standard);
+                                    const btn = document.getElementById(`copy-btn-${topic.standard}-${index}`);
+                                    if (btn) {
+                                      btn.setAttribute('data-copied', 'true');
+                                      setTimeout(() => btn.removeAttribute('data-copied'), 2000);
+                                    }
+                                  }}
+                                  id={`copy-btn-${topic.standard}-${index}`}
+                                >
+                                  <Copy className="h-3 w-3 mr-1 [button[data-copied=true]_&]:hidden" />
+                                  <Check className="h-3 w-3 mr-1 hidden [button[data-copied=true]_&]:block text-green-500" />
+                                  Copy
+                                </Button>
+                                <a
+                                  href={topic.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                                >
+                                  {topic.standard}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </div>
                             </div>
                           ))}
                         </div>
