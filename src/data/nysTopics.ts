@@ -99,6 +99,27 @@ export const GEOMETRY_TOPICS: TopicCategory[] = [
       { name: 'Proof Techniques', standard: 'G.CO.C.9', url: 'https://www.jmap.org/htmlstandard/G.CO.C.9.htm' },
     ],
   },
+  {
+    category: 'AREA AND VOLUME',
+    topics: [
+      { name: 'Area of Polygons', standard: 'G.MG.A.1', url: 'https://www.jmap.org/htmlstandard/G.MG.A.1.htm' },
+      { name: 'Area of Regular Polygons', standard: 'G.MG.A.1', url: 'https://www.jmap.org/htmlstandard/G.MG.A.1.htm' },
+      { name: 'Area of Circles', standard: 'G.C.B.5', url: 'https://www.jmap.org/htmlstandard/G.C.B.5.htm' },
+      { name: 'Area of Composite Figures', standard: 'G.MG.A.3', url: 'https://www.jmap.org/htmlstandard/G.MG.A.3.htm' },
+      { name: 'Volume of Prisms', standard: 'G.GMD.A.3', url: 'https://www.jmap.org/htmlstandard/G.GMD.A.3.htm' },
+      { name: 'Volume of Cylinders', standard: 'G.GMD.A.3', url: 'https://www.jmap.org/htmlstandard/G.GMD.A.3.htm' },
+      { name: 'Volume of Pyramids', standard: 'G.GMD.A.3', url: 'https://www.jmap.org/htmlstandard/G.GMD.A.3.htm' },
+      { name: 'Volume of Cones', standard: 'G.GMD.A.3', url: 'https://www.jmap.org/htmlstandard/G.GMD.A.3.htm' },
+      { name: 'Volume of Spheres', standard: 'G.GMD.A.3', url: 'https://www.jmap.org/htmlstandard/G.GMD.A.3.htm' },
+      { name: 'Surface Area of Prisms', standard: 'G.MG.A.1', url: 'https://www.jmap.org/htmlstandard/G.MG.A.1.htm' },
+      { name: 'Surface Area of Cylinders', standard: 'G.MG.A.1', url: 'https://www.jmap.org/htmlstandard/G.MG.A.1.htm' },
+      { name: 'Surface Area of Pyramids', standard: 'G.MG.A.1', url: 'https://www.jmap.org/htmlstandard/G.MG.A.1.htm' },
+      { name: 'Surface Area of Cones', standard: 'G.MG.A.1', url: 'https://www.jmap.org/htmlstandard/G.MG.A.1.htm' },
+      { name: 'Surface Area of Spheres', standard: 'G.MG.A.1', url: 'https://www.jmap.org/htmlstandard/G.MG.A.1.htm' },
+      { name: 'Cavalieri\'s Principle', standard: 'G.GMD.A.2', url: 'https://www.jmap.org/htmlstandard/G.GMD.A.2.htm' },
+      { name: 'Density', standard: 'G.MG.A.2', url: 'https://www.jmap.org/htmlstandard/G.MG.A.2.htm' },
+    ],
+  },
 ];
 
 export const ALGEBRA1_TOPICS: TopicCategory[] = [
