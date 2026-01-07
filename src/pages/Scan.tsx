@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2 } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,14 +10,16 @@ import { AnalysisResults } from '@/components/scan/AnalysisResults';
 import { BatchQueue } from '@/components/scan/BatchQueue';
 import { BatchReport } from '@/components/scan/BatchReport';
 import { ClassStudentSelector, useClassStudents } from '@/components/scan/ClassStudentSelector';
+import { SaveForLaterTab } from '@/components/scan/SaveForLaterTab';
 import { useAnalyzeStudentWork } from '@/hooks/useAnalyzeStudentWork';
 import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
+import { usePendingScans } from '@/hooks/usePendingScans';
 import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 
-type ScanState = 'idle' | 'camera' | 'preview' | 'choose-method' | 'upload-solution' | 'analyzed' | 'manual-scoring';
-type ScanMode = 'single' | 'batch';
+type ScanState = 'idle' | 'camera' | 'preview' | 'choose-method' | 'upload-solution' | 'analyzed' | 'manual-scoring' | 'analyze-saved';
+type ScanMode = 'single' | 'batch' | 'saved';
 type GradingMethod = 'ai' | 'teacher';
 
 interface ManualResult {
@@ -50,6 +52,8 @@ export default function Scan() {
 
   const { analyze, compareWithSolution, isAnalyzing, isComparing, error, result, rawAnalysis, comparisonResult } = useAnalyzeStudentWork();
   const batch = useBatchAnalysis();
+  const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans();
+  const [analyzingScanId, setAnalyzingScanId] = useState<string | null>(null);
   
   // AI suggestions for manual scoring
   const [aiSuggestions, setAiSuggestions] = useState<{
@@ -225,17 +229,27 @@ export default function Scan() {
       toast.success('Analysis complete!', {
         description: `Score: ${analysisResult.totalScore.earned}/${analysisResult.totalScore.possible} (${analysisResult.totalScore.percentage}%)`,
       });
+      // Update saved scan status if analyzing a saved scan
+      if (analyzingScanId) {
+        await updateScanStatus(analyzingScanId, 'analyzed');
+        refreshPendingScans();
+      }
     } else if (error) {
       toast.error('Analysis failed', { description: error });
     }
   };
 
-  const handleManualScoreSubmit = (manualScoreResult: ManualResult) => {
+  const handleManualScoreSubmit = async (manualScoreResult: ManualResult) => {
     setManualResult(manualScoreResult);
     setScanState('analyzed');
     toast.success('Score saved!', {
       description: `Score: ${manualScoreResult.totalScore.earned}/${manualScoreResult.totalScore.possible} (${manualScoreResult.totalScore.percentage}%)`,
     });
+    // Update saved scan status if analyzing a saved scan
+    if (analyzingScanId) {
+      await updateScanStatus(analyzingScanId, 'analyzed');
+      refreshPendingScans();
+    }
   };
 
   const startBatchAnalysis = async () => {
@@ -312,6 +326,22 @@ export default function Scan() {
     setShowBatchReport(false);
     setManualResult(null);
     setAiSuggestions(null);
+    setAnalyzingScanId(null);
+  };
+
+  // Handle analyzing a saved scan
+  const handleAnalyzeSavedScan = async (scan: { id: string; image_url: string; student_id: string | null }) => {
+    setAnalyzingScanId(scan.id);
+    setFinalImage(scan.image_url);
+    setScanState('choose-method');
+  };
+
+  // Override the analyzed state handler to update scan status
+  const handleAnalysisComplete = async () => {
+    if (analyzingScanId) {
+      await updateScanStatus(analyzingScanId, 'analyzed');
+      refreshPendingScans();
+    }
   };
 
   // Detect if running in Capacitor/native context
@@ -340,14 +370,18 @@ export default function Scan() {
             setSelectedClassId(null);
             setSelectedStudentIds([]);
           }}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="single" className="gap-2">
                 <Camera className="h-4 w-4" />
-                Single Scan
+                Single
               </TabsTrigger>
               <TabsTrigger value="batch" className="gap-2">
                 <Layers className="h-4 w-4" />
-                Batch Mode
+                Batch
+              </TabsTrigger>
+              <TabsTrigger value="saved" className="gap-2">
+                <Clock className="h-4 w-4" />
+                Saved ({pendingScans.length})
               </TabsTrigger>
             </TabsList>
 
@@ -871,6 +905,15 @@ export default function Scan() {
                   )}
                 </>
               )}
+            </TabsContent>
+
+            {/* Save for Later Mode */}
+            <TabsContent value="saved" className="space-y-4 mt-4">
+              <SaveForLaterTab
+                pendingScans={pendingScans}
+                onRefresh={refreshPendingScans}
+                onAnalyzeScan={handleAnalyzeSavedScan}
+              />
             </TabsContent>
           </Tabs>
         </div>
