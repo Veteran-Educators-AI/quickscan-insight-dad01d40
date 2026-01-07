@@ -6,12 +6,14 @@ interface AIDetectionSettings {
   ai_detection_enabled: boolean;
   ai_detection_threshold: number;
   ai_auto_reject_enabled: boolean;
+  parent_ai_notifications: boolean;
 }
 
 const DEFAULT_SETTINGS: AIDetectionSettings = {
   ai_detection_enabled: true,
   ai_detection_threshold: 80,
   ai_auto_reject_enabled: true,
+  parent_ai_notifications: true,
 };
 
 export function useAIDetectionSettings() {
@@ -29,7 +31,7 @@ export function useAIDetectionSettings() {
     try {
       const { data, error } = await supabase
         .from('settings')
-        .select('ai_detection_enabled, ai_detection_threshold, ai_auto_reject_enabled')
+        .select('ai_detection_enabled, ai_detection_threshold, ai_auto_reject_enabled, parent_ai_notifications')
         .eq('teacher_id', user!.id)
         .maybeSingle();
 
@@ -40,6 +42,7 @@ export function useAIDetectionSettings() {
           ai_detection_enabled: data.ai_detection_enabled ?? true,
           ai_detection_threshold: data.ai_detection_threshold ?? 80,
           ai_auto_reject_enabled: data.ai_auto_reject_enabled ?? true,
+          parent_ai_notifications: data.parent_ai_notifications ?? true,
         });
       }
     } catch (error) {

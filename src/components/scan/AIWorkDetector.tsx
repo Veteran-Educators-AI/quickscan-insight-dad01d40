@@ -33,6 +33,7 @@ export function AIWorkDetector({ text, studentName, studentId, questionContext, 
 
   const threshold = settings.ai_detection_threshold;
   const autoRejectEnabled = settings.ai_auto_reject_enabled;
+  const parentNotificationsEnabled = settings.parent_ai_notifications;
   const isRejected = autoRejectEnabled && result?.isLikelyAI && result.confidence > threshold;
 
   const sendParentNotification = async (detectionResult: AIDetectionResult, wasRejected: boolean) => {
@@ -107,8 +108,8 @@ export function AIWorkDetector({ text, studentName, studentId, questionContext, 
       const rejected = autoRejectEnabled && data.isLikelyAI && data.confidence > threshold;
       onRejection?.(rejected);
 
-      // Send parent notification if work is flagged or rejected
-      if (data.isLikelyAI && studentId) {
+      // Send parent notification if work is flagged or rejected and notifications are enabled
+      if (data.isLikelyAI && studentId && parentNotificationsEnabled) {
         sendParentNotification(data, rejected);
       }
 

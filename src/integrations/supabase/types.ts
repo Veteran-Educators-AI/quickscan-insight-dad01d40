@@ -680,6 +680,7 @@ export type Database = {
           id: string
           level_a_notifications: boolean | null
           level_drop_notifications: boolean | null
+          parent_ai_notifications: boolean | null
           teacher_id: string
           updated_at: string
         }
@@ -693,6 +694,7 @@ export type Database = {
           id?: string
           level_a_notifications?: boolean | null
           level_drop_notifications?: boolean | null
+          parent_ai_notifications?: boolean | null
           teacher_id: string
           updated_at?: string
         }
@@ -706,6 +708,7 @@ export type Database = {
           id?: string
           level_a_notifications?: boolean | null
           level_drop_notifications?: boolean | null
+          parent_ai_notifications?: boolean | null
           teacher_id?: string
           updated_at?: string
         }

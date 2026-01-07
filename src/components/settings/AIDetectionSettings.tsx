@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bot, ShieldAlert, Loader2, Save } from 'lucide-react';
+import { Bot, ShieldAlert, Loader2, Save, Mail } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -13,6 +13,7 @@ interface AIDetectionSettingsData {
   ai_detection_enabled: boolean;
   ai_detection_threshold: number;
   ai_auto_reject_enabled: boolean;
+  parent_ai_notifications: boolean;
   level_drop_notifications: boolean;
   level_a_notifications: boolean;
 }
@@ -25,6 +26,7 @@ export function AIDetectionSettings() {
     ai_detection_enabled: true,
     ai_detection_threshold: 80,
     ai_auto_reject_enabled: true,
+    parent_ai_notifications: true,
     level_drop_notifications: true,
     level_a_notifications: true,
   });
@@ -39,7 +41,7 @@ export function AIDetectionSettings() {
     try {
       const { data, error } = await supabase
         .from('settings')
-        .select('ai_detection_enabled, ai_detection_threshold, ai_auto_reject_enabled, level_drop_notifications, level_a_notifications')
+        .select('ai_detection_enabled, ai_detection_threshold, ai_auto_reject_enabled, parent_ai_notifications, level_drop_notifications, level_a_notifications')
         .eq('teacher_id', user!.id)
         .maybeSingle();
 
@@ -50,6 +52,7 @@ export function AIDetectionSettings() {
           ai_detection_enabled: data.ai_detection_enabled ?? true,
           ai_detection_threshold: data.ai_detection_threshold ?? 80,
           ai_auto_reject_enabled: data.ai_auto_reject_enabled ?? true,
+          parent_ai_notifications: data.parent_ai_notifications ?? true,
           level_drop_notifications: data.level_drop_notifications ?? true,
           level_a_notifications: data.level_a_notifications ?? true,
         });
@@ -73,6 +76,7 @@ export function AIDetectionSettings() {
           ai_detection_enabled: settings.ai_detection_enabled,
           ai_detection_threshold: settings.ai_detection_threshold,
           ai_auto_reject_enabled: settings.ai_auto_reject_enabled,
+          parent_ai_notifications: settings.parent_ai_notifications,
           level_drop_notifications: settings.level_drop_notifications,
           level_a_notifications: settings.level_a_notifications,
         }, { onConflict: 'teacher_id' });
@@ -166,6 +170,27 @@ export function AIDetectionSettings() {
             checked={settings.ai_auto_reject_enabled}
             onCheckedChange={(checked) => 
               setSettings(prev => ({ ...prev, ai_auto_reject_enabled: checked }))
+            }
+            disabled={!settings.ai_detection_enabled}
+          />
+        </div>
+
+        {/* Parent AI Notifications Toggle */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="parent-ai-notify" className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-primary" />
+              Parent AI Notifications
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Email parents when student work is flagged for AI content
+            </p>
+          </div>
+          <Switch
+            id="parent-ai-notify"
+            checked={settings.parent_ai_notifications}
+            onCheckedChange={(checked) => 
+              setSettings(prev => ({ ...prev, parent_ai_notifications: checked }))
             }
             disabled={!settings.ai_detection_enabled}
           />
