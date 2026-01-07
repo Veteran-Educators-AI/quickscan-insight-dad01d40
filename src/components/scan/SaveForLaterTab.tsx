@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, Upload, Clock, User, Trash2, Play, CheckCircle, ChevronDown, Check, FileQuestion, PlayCircle, Loader2 } from 'lucide-react';
+import { Camera, Upload, Clock, User, Trash2, Play, CheckCircle, ChevronDown, Check, FileQuestion, PlayCircle, Loader2, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Progress } from '@/components/ui/progress';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -54,6 +55,9 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
   const [openStudentPicker, setOpenStudentPicker] = useState<string | null>(null);
   // Track selected questions per scan
   const [scanQuestions, setScanQuestions] = useState<Record<string, string[]>>({});
+  
+  // Filter state
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'analyzed'>('all');
   
   // Bulk analyze state
   const [isBulkAnalyzing, setIsBulkAnalyzing] = useState(false);
@@ -267,7 +271,18 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
 
   const eligibleCount = getEligibleScansForBulk().length;
 
-  const isNativeContext = typeof window !== 'undefined' && 
+  // Filter scans based on selected status
+  const filteredScans = pendingScans.filter(scan => {
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'pending') return scan.status === 'pending';
+    if (statusFilter === 'analyzed') return scan.status === 'analyzed';
+    return true;
+  });
+
+  const pendingCount = pendingScans.filter(s => s.status === 'pending').length;
+  const analyzedCount = pendingScans.filter(s => s.status === 'analyzed').length;
+
+  const isNativeContext = typeof window !== 'undefined' &&
     (window.navigator.userAgent.includes('Capacitor') || 
      window.navigator.userAgent.includes('wv') ||
      (window as any).Capacitor);
@@ -420,13 +435,40 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
             </CardContent>
           </Card>
 
-          <h3 className="font-semibold flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Saved Scans ({pendingScans.length})
-          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Saved Scans ({pendingScans.length})
+            </h3>
+            
+            <ToggleGroup 
+              type="single" 
+              value={statusFilter} 
+              onValueChange={(value) => value && setStatusFilter(value as 'all' | 'pending' | 'analyzed')}
+              className="justify-start"
+            >
+              <ToggleGroupItem value="all" aria-label="Show all scans" size="sm">
+                All ({pendingScans.length})
+              </ToggleGroupItem>
+              <ToggleGroupItem value="pending" aria-label="Show pending scans" size="sm">
+                Pending ({pendingCount})
+              </ToggleGroupItem>
+              <ToggleGroupItem value="analyzed" aria-label="Show analyzed scans" size="sm">
+                Analyzed ({analyzedCount})
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
           
+          {filteredScans.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="p-6 text-center text-muted-foreground">
+                <Filter className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No {statusFilter === 'all' ? '' : statusFilter} scans found</p>
+              </CardContent>
+            </Card>
+          ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {pendingScans.map((scan) => {
+            {filteredScans.map((scan) => {
               const isCurrentlyAnalyzing = bulkCurrentScanId === scan.id;
               return (
               <Card key={scan.id} className={cn(
@@ -556,6 +598,7 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
               );
             })}
           </div>
+          )}
         </div>
       )}
 
