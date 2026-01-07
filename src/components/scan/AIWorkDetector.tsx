@@ -19,12 +19,13 @@ interface AIDetectionResult {
 interface AIWorkDetectorProps {
   text: string;
   studentName?: string;
+  studentId?: string;
   questionContext?: string;
   onResult?: (result: AIDetectionResult) => void;
   onRejection?: (rejected: boolean) => void;
 }
 
-export function AIWorkDetector({ text, studentName, questionContext, onResult, onRejection }: AIWorkDetectorProps) {
+export function AIWorkDetector({ text, studentName, studentId, questionContext, onResult, onRejection }: AIWorkDetectorProps) {
   const { toast } = useToast();
   const { settings, isLoading: isLoadingSettings } = useAIDetectionSettings();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -33,6 +34,54 @@ export function AIWorkDetector({ text, studentName, questionContext, onResult, o
   const threshold = settings.ai_detection_threshold;
   const autoRejectEnabled = settings.ai_auto_reject_enabled;
   const isRejected = autoRejectEnabled && result?.isLikelyAI && result.confidence > threshold;
+
+  const sendParentNotification = async (detectionResult: AIDetectionResult, wasRejected: boolean) => {
+    if (!studentId) return;
+    
+    try {
+      // Fetch student's parent email
+      const { data: student } = await supabase
+        .from('students')
+        .select('parent_email, first_name, last_name')
+        .eq('id', studentId)
+        .single();
+      
+      if (!student?.parent_email) {
+        console.log('No parent email found for student');
+        return;
+      }
+
+      // Fetch teacher info
+      const { data: { user } } = await supabase.auth.getUser();
+      let teacherName = '';
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+        teacherName = profile?.full_name || '';
+      }
+
+      await supabase.functions.invoke('send-parent-ai-notification', {
+        body: {
+          studentName: `${student.first_name} ${student.last_name}`,
+          parentEmail: student.parent_email,
+          confidence: detectionResult.confidence,
+          indicators: detectionResult.indicators,
+          wasRejected,
+          teacherName
+        }
+      });
+
+      toast({
+        title: 'Parent Notified',
+        description: `A notification was sent to the parent regarding the ${wasRejected ? 'rejected' : 'flagged'} submission.`,
+      });
+    } catch (error) {
+      console.error('Failed to send parent notification:', error);
+    }
+  };
 
   const analyzeWork = async () => {
     if (!text || text.trim().length < 20) {
@@ -57,6 +106,11 @@ export function AIWorkDetector({ text, studentName, questionContext, onResult, o
 
       const rejected = autoRejectEnabled && data.isLikelyAI && data.confidence > threshold;
       onRejection?.(rejected);
+
+      // Send parent notification if work is flagged or rejected
+      if (data.isLikelyAI && studentId) {
+        sendParentNotification(data, rejected);
+      }
 
       if (rejected) {
         toast({
