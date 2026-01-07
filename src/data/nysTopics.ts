@@ -120,6 +120,22 @@ export const GEOMETRY_TOPICS: TopicCategory[] = [
       { name: 'Density', standard: 'G.MG.A.2', url: 'https://www.jmap.org/htmlstandard/G.MG.A.2.htm' },
     ],
   },
+  {
+    category: 'COORDINATE GEOMETRY',
+    topics: [
+      { name: 'Distance Formula', standard: 'G.GPE.B.7', url: 'https://www.jmap.org/htmlstandard/G.GPE.B.7.htm' },
+      { name: 'Midpoint Formula', standard: 'G.GPE.B.6', url: 'https://www.jmap.org/htmlstandard/G.GPE.B.6.htm' },
+      { name: 'Slope', standard: 'G.GPE.B.5', url: 'https://www.jmap.org/htmlstandard/G.GPE.B.5.htm' },
+      { name: 'Parallel and Perpendicular Lines', standard: 'G.GPE.B.5', url: 'https://www.jmap.org/htmlstandard/G.GPE.B.5.htm' },
+      { name: 'Equations of Lines', standard: 'G.GPE.B.5', url: 'https://www.jmap.org/htmlstandard/G.GPE.B.5.htm' },
+      { name: 'Equations of Circles', standard: 'G.GPE.A.1', url: 'https://www.jmap.org/htmlstandard/G.GPE.A.1.htm' },
+      { name: 'Equations of Parabolas', standard: 'G.GPE.A.2', url: 'https://www.jmap.org/htmlstandard/G.GPE.A.2.htm' },
+      { name: 'Coordinate Proofs', standard: 'G.GPE.B.4', url: 'https://www.jmap.org/htmlstandard/G.GPE.B.4.htm' },
+      { name: 'Partitioning a Line Segment', standard: 'G.GPE.B.6', url: 'https://www.jmap.org/htmlstandard/G.GPE.B.6.htm' },
+      { name: 'Perimeter in the Coordinate Plane', standard: 'G.GPE.B.7', url: 'https://www.jmap.org/htmlstandard/G.GPE.B.7.htm' },
+      { name: 'Area in the Coordinate Plane', standard: 'G.GPE.B.7', url: 'https://www.jmap.org/htmlstandard/G.GPE.B.7.htm' },
+    ],
+  },
 ];
 
 export const ALGEBRA1_TOPICS: TopicCategory[] = [
