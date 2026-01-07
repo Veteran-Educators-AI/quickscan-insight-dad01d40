@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, Upload, Clock, User, Trash2, Play, CheckCircle, ChevronDown, Check, FileQuestion } from 'lucide-react';
+import { Camera, Upload, Clock, User, Trash2, Play, CheckCircle, ChevronDown, Check, FileQuestion, PlayCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -39,7 +40,7 @@ interface StudentOption {
 interface SaveForLaterTabProps {
   pendingScans: PendingScan[];
   onRefresh: () => void;
-  onAnalyzeScan: (scan: PendingScan, questionIds: string[]) => void;
+  onAnalyzeScan: (scan: PendingScan, questionIds: string[]) => Promise<void>;
 }
 
 export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: SaveForLaterTabProps) {
@@ -53,6 +54,11 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
   const [openStudentPicker, setOpenStudentPicker] = useState<string | null>(null);
   // Track selected questions per scan
   const [scanQuestions, setScanQuestions] = useState<Record<string, string[]>>({});
+  
+  // Bulk analyze state
+  const [isBulkAnalyzing, setIsBulkAnalyzing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
+  const [bulkCurrentScanId, setBulkCurrentScanId] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nativeInputRef = useRef<HTMLInputElement>(null);
@@ -217,6 +223,50 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
     }
   };
 
+  // Get scans eligible for bulk analysis (have student assigned + questions selected)
+  const getEligibleScansForBulk = () => {
+    return pendingScans.filter(scan => {
+      const questionIds = scanQuestions[scan.id] || [];
+      return scan.student_id && questionIds.length > 0 && scan.status === 'pending';
+    });
+  };
+
+  const handleBulkAnalyze = async () => {
+    const eligibleScans = getEligibleScansForBulk();
+    
+    if (eligibleScans.length === 0) {
+      toast.error('No scans ready for bulk analysis. Ensure scans have a student assigned and questions selected.');
+      return;
+    }
+
+    setIsBulkAnalyzing(true);
+    setBulkProgress(0);
+    
+    let completed = 0;
+    const total = eligibleScans.length;
+
+    for (const scan of eligibleScans) {
+      setBulkCurrentScanId(scan.id);
+      try {
+        const questionIds = scanQuestions[scan.id] || [];
+        await onAnalyzeScan(scan, questionIds);
+        completed++;
+        setBulkProgress((completed / total) * 100);
+      } catch (error) {
+        console.error(`Error analyzing scan ${scan.id}:`, error);
+        toast.error(`Failed to analyze scan for ${scan.student?.first_name || 'Unknown'}`);
+      }
+    }
+
+    setIsBulkAnalyzing(false);
+    setBulkCurrentScanId(null);
+    setBulkProgress(0);
+    toast.success(`Bulk analysis complete: ${completed}/${total} scans analyzed`);
+    onRefresh();
+  };
+
+  const eligibleCount = getEligibleScansForBulk().length;
+
   const isNativeContext = typeof window !== 'undefined' && 
     (window.navigator.userAgent.includes('Capacitor') || 
      window.navigator.userAgent.includes('wv') ||
@@ -326,14 +376,63 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
       {/* Saved Scans List */}
       {pendingScans.length > 0 && (
         <div className="space-y-3">
+          {/* Bulk Analyze Section */}
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium flex items-center gap-2">
+                    <PlayCircle className="h-4 w-4" />
+                    Bulk Analyze
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {eligibleCount} scan(s) ready (with student & questions assigned)
+                  </p>
+                </div>
+                <Button 
+                  onClick={handleBulkAnalyze}
+                  disabled={isBulkAnalyzing || eligibleCount === 0}
+                  size="sm"
+                  variant="hero"
+                >
+                  {isBulkAnalyzing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <PlayCircle className="mr-2 h-4 w-4" />
+                      Analyze All ({eligibleCount})
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              {isBulkAnalyzing && (
+                <div className="space-y-2">
+                  <Progress value={bulkProgress} className="h-2" />
+                  <p className="text-xs text-muted-foreground text-center">
+                    {Math.round(bulkProgress)}% complete
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <h3 className="font-semibold flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Saved Scans ({pendingScans.length})
           </h3>
           
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {pendingScans.map((scan) => (
-              <Card key={scan.id} className="overflow-hidden">
+            {pendingScans.map((scan) => {
+              const isCurrentlyAnalyzing = bulkCurrentScanId === scan.id;
+              return (
+              <Card key={scan.id} className={cn(
+                "overflow-hidden transition-all",
+                isCurrentlyAnalyzing && "ring-2 ring-primary animate-pulse"
+              )}>
                 <div className="aspect-[4/3] relative bg-muted">
                   <img
                     src={scan.image_url}
@@ -432,9 +531,13 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
                       size="sm"
                       className="flex-1"
                       onClick={() => onAnalyzeScan(scan, scanQuestions[scan.id] || [])}
-                      disabled={(scanQuestions[scan.id] || []).length === 0}
+                      disabled={(scanQuestions[scan.id] || []).length === 0 || isBulkAnalyzing}
                     >
-                      <Play className="h-3 w-3 mr-1" />
+                      {isCurrentlyAnalyzing ? (
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      ) : (
+                        <Play className="h-3 w-3 mr-1" />
+                      )}
                       {(scanQuestions[scan.id] || []).length > 0 
                         ? `Analyze (${(scanQuestions[scan.id] || []).length})` 
                         : 'Select Questions'}
@@ -443,13 +546,15 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
                       variant="outline"
                       size="sm"
                       onClick={() => handleDeleteScan(scan.id)}
+                      disabled={isBulkAnalyzing}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
