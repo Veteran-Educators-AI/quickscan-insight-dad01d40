@@ -24,38 +24,47 @@ interface GeneratedQuestion {
   imagePrompt?: string;
 }
 
-async function generateAIImage(prompt: string, lovableApiKey: string): Promise<string | null> {
-  try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+async function callGeminiAPI(prompt: string, apiKey: string): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        modalities: ['image', 'text']
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 8000,
+        }
       }),
-    });
-
-    if (!response.ok) {
-      console.error('AI Image generation error:', await response.text());
-      return null;
     }
+  );
 
-    const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    return imageUrl || null;
-  } catch (error) {
-    console.error('Error generating AI image:', error);
-    return null;
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Gemini API error:', response.status, errorText);
+    
+    if (response.status === 429) {
+      throw { status: 429, message: 'Rate limit exceeded. Please try again in a moment.' };
+    }
+    if (response.status === 403) {
+      throw { status: 403, message: 'API key invalid or quota exceeded. Please check your Google API key settings.' };
+    }
+    throw new Error(`Gemini API error: ${response.status}`);
   }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  
+  if (!content) {
+    throw new Error('No content in Gemini response');
+  }
+  
+  return content;
 }
 
 serve(async (req) => {
@@ -82,9 +91,9 @@ serve(async (req) => {
       );
     }
 
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const geminiApiKey = Deno.env.get('GOOGLE_GEMINI_API_KEY');
+    if (!geminiApiKey) {
+      throw new Error('GOOGLE_GEMINI_API_KEY not configured');
     }
 
     // Build the prompt
@@ -239,34 +248,7 @@ Difficulty levels allowed: ${allowedDifficulties.join(', ')}
 
 IMPORTANT: Return ONLY the JSON array, no other text.`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 8000,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI API error:', errorText);
-      throw new Error(`AI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error('No content in AI response');
-    }
+    const content = await callGeminiAPI(prompt, geminiApiKey);
 
     // Parse the JSON response
     let questions: GeneratedQuestion[];
@@ -288,9 +270,6 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       throw new Error('Failed to parse generated questions');
     }
 
-    // No longer generating images here - they are generated separately via generate-diagram-images endpoint
-    // This allows for a two-step workflow: generate questions first, then generate images
-
     return new Response(
       JSON.stringify({ questions }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -298,6 +277,15 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
 
   } catch (error: unknown) {
     console.error('Error in generate-worksheet-questions:', error);
+    
+    // Handle structured errors with status codes
+    if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
+      return new Response(
+        JSON.stringify({ error: (error as { message: string }).message }),
+        { status: (error as { status: number }).status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     const message = error instanceof Error ? error.message : 'Failed to generate questions';
     return new Response(
       JSON.stringify({ error: message }),
