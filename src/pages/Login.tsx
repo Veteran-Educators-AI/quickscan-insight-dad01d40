@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, CheckCircle, Chrome, Bug } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, CheckCircle, Chrome } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
-import { handleApiError } from '@/lib/apiErrorHandler';
 import scanGeniusLogo from '@/assets/scan-genius-logo.png';
 
 const REMEMBER_ME_KEY = 'scan_genius_remember_me';
@@ -410,35 +409,6 @@ export default function Login() {
           Student data is handled in accordance with FERPA guidelines.
         </p>
 
-        {/* Debug buttons for testing error toasts */}
-        <div className="mt-8 p-4 border border-dashed border-muted-foreground/30 rounded-lg">
-          <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
-            <Bug className="h-3 w-3" /> Test Error Toasts
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleApiError({ status: 429, message: 'Rate limit exceeded' })}
-            >
-              Rate Limit (429)
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleApiError({ status: 402, message: 'Payment required' })}
-            >
-              Quota (402)
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleApiError({ status: 403, message: 'API key invalid' })}
-            >
-              Invalid Key (403)
-            </Button>
-          </div>
-        </div>
       </div>
 
       {/* Forgot Password Modal */}
