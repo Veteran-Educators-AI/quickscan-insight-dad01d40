@@ -25,7 +25,7 @@ interface AppLayoutProps {
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/classes', label: 'Classes', icon: Users },
-  { href: '/questions', label: 'Question Bank', icon: BookOpen },
+  { href: '/questions', label: 'Assessment', icon: ClipboardList },
   { href: '/scan', label: 'Scan', icon: Camera },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/settings', label: 'Settings', icon: Settings },
