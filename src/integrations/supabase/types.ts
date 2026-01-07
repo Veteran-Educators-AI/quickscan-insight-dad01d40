@@ -671,26 +671,41 @@ export type Database = {
       }
       settings: {
         Row: {
+          ai_auto_reject_enabled: boolean | null
+          ai_detection_enabled: boolean | null
+          ai_detection_threshold: number | null
           analysis_provider: string | null
           created_at: string
           grading_scale: Json | null
           id: string
+          level_a_notifications: boolean | null
+          level_drop_notifications: boolean | null
           teacher_id: string
           updated_at: string
         }
         Insert: {
+          ai_auto_reject_enabled?: boolean | null
+          ai_detection_enabled?: boolean | null
+          ai_detection_threshold?: number | null
           analysis_provider?: string | null
           created_at?: string
           grading_scale?: Json | null
           id?: string
+          level_a_notifications?: boolean | null
+          level_drop_notifications?: boolean | null
           teacher_id: string
           updated_at?: string
         }
         Update: {
+          ai_auto_reject_enabled?: boolean | null
+          ai_detection_enabled?: boolean | null
+          ai_detection_threshold?: number | null
           analysis_provider?: string | null
           created_at?: string
           grading_scale?: Json | null
           id?: string
+          level_a_notifications?: boolean | null
+          level_drop_notifications?: boolean | null
           teacher_id?: string
           updated_at?: string
         }

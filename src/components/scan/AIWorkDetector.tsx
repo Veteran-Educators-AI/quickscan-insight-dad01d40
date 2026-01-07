@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { useAIDetectionSettings } from '@/hooks/useAIDetectionSettings';
 
 interface AIDetectionResult {
   isLikelyAI: boolean;
@@ -25,10 +26,13 @@ interface AIWorkDetectorProps {
 
 export function AIWorkDetector({ text, studentName, questionContext, onResult, onRejection }: AIWorkDetectorProps) {
   const { toast } = useToast();
+  const { settings, isLoading: isLoadingSettings } = useAIDetectionSettings();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AIDetectionResult | null>(null);
 
-  const isRejected = result?.isLikelyAI && result.confidence > 80;
+  const threshold = settings.ai_detection_threshold;
+  const autoRejectEnabled = settings.ai_auto_reject_enabled;
+  const isRejected = autoRejectEnabled && result?.isLikelyAI && result.confidence > threshold;
 
   const analyzeWork = async () => {
     if (!text || text.trim().length < 20) {
@@ -51,16 +55,16 @@ export function AIWorkDetector({ text, studentName, questionContext, onResult, o
       setResult(data);
       onResult?.(data);
 
-      const rejected = data.isLikelyAI && data.confidence > 80;
+      const rejected = autoRejectEnabled && data.isLikelyAI && data.confidence > threshold;
       onRejection?.(rejected);
 
       if (rejected) {
         toast({
           title: '🚫 Work Rejected - AI Content Detected',
-          description: `${data.confidence}% confidence this is AI-generated. Student must redo this assignment.`,
+          description: `${data.confidence}% confidence (threshold: ${threshold}%). Student must redo this assignment.`,
           variant: 'destructive',
         });
-      } else if (data.isLikelyAI && data.confidence > 70) {
+      } else if (data.isLikelyAI && data.confidence > threshold - 10) {
         toast({
           title: '⚠️ Potential AI-generated content detected',
           description: `${data.confidence}% confidence. Review the indicators below.`,
@@ -93,11 +97,16 @@ export function AIWorkDetector({ text, studentName, questionContext, onResult, o
     return '[&>div]:bg-yellow-500';
   };
 
+  // Don't show if AI detection is disabled
+  if (!settings.ai_detection_enabled && !isLoadingSettings) {
+    return null;
+  }
+
   return (
     <Card className={cn(
       isRejected
         ? 'border-red-500 bg-red-100/80 dark:bg-red-950/40 ring-2 ring-red-500' 
-        : result?.isLikelyAI && result.confidence > 70 
+        : result?.isLikelyAI && result.confidence > threshold - 10 
           ? 'border-red-200 bg-red-50/50 dark:bg-red-950/20' 
           : 'border-blue-200 bg-blue-50/50 dark:bg-blue-950/20'
     )}>
@@ -114,7 +123,7 @@ export function AIWorkDetector({ text, studentName, questionContext, onResult, o
         {!result ? (
           <Button
             onClick={analyzeWork}
-            disabled={isAnalyzing || text.trim().length < 20}
+            disabled={isAnalyzing || isLoadingSettings || text.trim().length < 20}
             variant="outline"
             className="w-full"
           >
