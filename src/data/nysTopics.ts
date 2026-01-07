@@ -151,6 +151,27 @@ export const GEOMETRY_TOPICS: TopicCategory[] = [
       { name: 'Mapping a Figure onto Itself', standard: 'G.CO.A.3', url: 'https://www.jmap.org/htmlstandard/G.CO.A.3.htm' },
     ],
   },
+  {
+    category: 'SIMILARITY AND CONGRUENCE',
+    topics: [
+      { name: 'Congruent Triangles', standard: 'G.CO.B.7', url: 'https://www.jmap.org/htmlstandard/G.CO.B.7.htm' },
+      { name: 'Triangle Congruence: SSS', standard: 'G.CO.B.8', url: 'https://www.jmap.org/htmlstandard/G.CO.B.8.htm' },
+      { name: 'Triangle Congruence: SAS', standard: 'G.CO.B.8', url: 'https://www.jmap.org/htmlstandard/G.CO.B.8.htm' },
+      { name: 'Triangle Congruence: ASA', standard: 'G.CO.B.8', url: 'https://www.jmap.org/htmlstandard/G.CO.B.8.htm' },
+      { name: 'Triangle Congruence: AAS', standard: 'G.CO.B.8', url: 'https://www.jmap.org/htmlstandard/G.CO.B.8.htm' },
+      { name: 'Triangle Congruence: HL', standard: 'G.CO.B.8', url: 'https://www.jmap.org/htmlstandard/G.CO.B.8.htm' },
+      { name: 'CPCTC', standard: 'G.CO.B.7', url: 'https://www.jmap.org/htmlstandard/G.CO.B.7.htm' },
+      { name: 'Similar Triangles', standard: 'G.SRT.A.2', url: 'https://www.jmap.org/htmlstandard/G.SRT.A.2.htm' },
+      { name: 'Triangle Similarity: AA', standard: 'G.SRT.A.3', url: 'https://www.jmap.org/htmlstandard/G.SRT.A.3.htm' },
+      { name: 'Triangle Similarity: SAS', standard: 'G.SRT.B.5', url: 'https://www.jmap.org/htmlstandard/G.SRT.B.5.htm' },
+      { name: 'Triangle Similarity: SSS', standard: 'G.SRT.B.5', url: 'https://www.jmap.org/htmlstandard/G.SRT.B.5.htm' },
+      { name: 'Proportions in Similar Triangles', standard: 'G.SRT.B.4', url: 'https://www.jmap.org/htmlstandard/G.SRT.B.4.htm' },
+      { name: 'Side Splitter Theorem', standard: 'G.SRT.B.4', url: 'https://www.jmap.org/htmlstandard/G.SRT.B.4.htm' },
+      { name: 'Midsegment of a Triangle', standard: 'G.CO.C.10', url: 'https://www.jmap.org/htmlstandard/G.CO.C.10.htm' },
+      { name: 'Similarity Transformations', standard: 'G.SRT.A.2', url: 'https://www.jmap.org/htmlstandard/G.SRT.A.2.htm' },
+      { name: 'Scale Factor', standard: 'G.SRT.A.1', url: 'https://www.jmap.org/htmlstandard/G.SRT.A.1.htm' },
+    ],
+  },
 ];
 
 export const ALGEBRA1_TOPICS: TopicCategory[] = [
