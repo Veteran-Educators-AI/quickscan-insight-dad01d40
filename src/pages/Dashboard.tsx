@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Users, 
-  BookOpen, 
   ClipboardList, 
   Camera, 
   TrendingUp, 
@@ -80,15 +79,14 @@ export default function Dashboard() {
 
   const quickActions = [
     { label: 'Create Class', href: '/classes/new', icon: Users, color: 'bg-primary/10 text-primary' },
-    { label: 'Add Question', href: '/questions/new', icon: BookOpen, color: 'bg-accent/10 text-accent' },
-    { label: 'New Assessment', href: '/assessments/new', icon: ClipboardList, color: 'bg-success/10 text-success' },
+    { label: 'New Assessment', href: '/questions', icon: ClipboardList, color: 'bg-accent/10 text-accent' },
     { label: 'Start Scanning', href: '/scan', icon: Camera, color: 'bg-warning/10 text-warning' },
   ];
 
   const statCards = [
     { label: 'Classes', value: stats.classCount, icon: Users, href: '/classes' },
     { label: 'Students', value: stats.studentCount, icon: Users, href: '/classes' },
-    { label: 'Questions', value: stats.questionCount, icon: BookOpen, href: '/questions' },
+    { label: 'Questions', value: stats.questionCount, icon: ClipboardList, href: '/questions' },
     { label: 'Scans Today', value: stats.recentAttempts, icon: Camera, href: '/reports' },
   ];
 
