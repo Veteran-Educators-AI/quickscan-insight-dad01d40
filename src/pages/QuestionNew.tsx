@@ -76,10 +76,14 @@ const GEOMETRY_JMAP_TOPICS = [
     topics: [
       { name: 'Triangle Proofs', standard: 'G.CO.C.10', url: 'https://www.jmap.org/htmlstandard/G.CO.C.10.htm' },
       { name: 'Triangle Congruence', standard: 'G.SRT.B.5', url: 'https://www.jmap.org/htmlstandard/G.SRT.B.5.htm' },
+      { name: 'Triangle Proportionality Theorem', standard: 'G.SRT.B.4', url: 'https://www.jmap.org/htmlstandard/G.SRT.B.4.htm' },
       { name: 'Triangle Similarity', standard: 'G.SRT.A.2', url: 'https://www.jmap.org/htmlstandard/G.SRT.A.2.htm' },
       { name: 'Triangle Similarity Proofs', standard: 'G.SRT.A.3', url: 'https://www.jmap.org/htmlstandard/G.SRT.A.3.htm' },
       { name: 'Special Right Triangles', standard: 'G.SRT.C.8', url: 'https://www.jmap.org/htmlstandard/G.SRT.C.8.htm' },
       { name: 'Triangle Inequality Theorem', standard: 'G.CO.C.10', url: 'https://www.jmap.org/htmlstandard/G.CO.C.10.htm' },
+      { name: 'Triangle Congruence Criteria', standard: 'G.CO.B.8', url: 'https://www.jmap.org/htmlstandard/G.CO.B.8.htm' },
+      { name: 'Congruence and Rigid Motions', standard: 'G.CO.B.6', url: 'https://www.jmap.org/htmlstandard/G.CO.B.6.htm' },
+      { name: 'Using Congruence in Proofs', standard: 'G.CO.B.7', url: 'https://www.jmap.org/htmlstandard/G.CO.B.7.htm' },
     ],
   },
   {
@@ -97,16 +101,19 @@ const GEOMETRY_JMAP_TOPICS = [
     category: 'CONICS',
     topics: [
       { name: 'Equations of Circles', standard: 'G.GPE.A.1', url: 'https://www.jmap.org/htmlstandard/G.GPE.A.1.htm' },
+      { name: 'Parabola Focus and Directrix', standard: 'G.GPE.A.2', url: 'https://www.jmap.org/htmlstandard/G.GPE.A.2.htm' },
       { name: 'Similar Circles', standard: 'G.C.A.1', url: 'https://www.jmap.org/htmlstandard/G.C.A.1.htm' },
       { name: 'Chords, Secants, and Tangents', standard: 'G.C.A.2', url: 'https://www.jmap.org/htmlstandard/G.C.A.2.htm' },
       { name: 'Inscribed Angles', standard: 'G.C.A.2', url: 'https://www.jmap.org/htmlstandard/G.C.A.2.htm' },
       { name: 'Arc Length and Sector Area', standard: 'G.C.B.5', url: 'https://www.jmap.org/htmlstandard/G.C.B.5.htm' },
       { name: 'Inscribed and Circumscribed Circles', standard: 'G.C.A.3', url: 'https://www.jmap.org/htmlstandard/G.C.A.3.htm' },
+      { name: 'Constructing Tangent Lines', standard: 'G.C.A.4', url: 'https://www.jmap.org/htmlstandard/G.C.A.4.htm' },
     ],
   },
   {
     category: 'TRANSFORMATIONS',
     topics: [
+      { name: 'Transformation Definitions', standard: 'G.CO.A.2', url: 'https://www.jmap.org/htmlstandard/G.CO.A.2.htm' },
       { name: 'Rotations', standard: 'G.CO.A.4', url: 'https://www.jmap.org/htmlstandard/G.CO.A.4.htm' },
       { name: 'Reflections', standard: 'G.CO.A.4', url: 'https://www.jmap.org/htmlstandard/G.CO.A.4.htm' },
       { name: 'Translations', standard: 'G.CO.A.4', url: 'https://www.jmap.org/htmlstandard/G.CO.A.4.htm' },
@@ -124,6 +131,8 @@ const GEOMETRY_JMAP_TOPICS = [
       { name: 'Solving for an Angle', standard: 'G.SRT.C.8', url: 'https://www.jmap.org/htmlstandard/G.SRT.C.8.htm' },
       { name: 'Law of Sines', standard: 'G.SRT.D.10', url: 'https://www.jmap.org/htmlstandard/G.SRT.D.10.htm' },
       { name: 'Law of Cosines', standard: 'G.SRT.D.10', url: 'https://www.jmap.org/htmlstandard/G.SRT.D.10.htm' },
+      { name: 'Area of Triangle using Trigonometry', standard: 'G.SRT.D.9', url: 'https://www.jmap.org/htmlstandard/G.SRT.D.9.htm' },
+      { name: 'Law of Sines and Cosines Applications', standard: 'G.SRT.D.11', url: 'https://www.jmap.org/htmlstandard/G.SRT.D.11.htm' },
     ],
   },
   {
