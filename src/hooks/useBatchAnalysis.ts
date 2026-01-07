@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { handleApiError } from '@/lib/apiErrorHandler';
 
 interface RubricStep {
   step_number: number;
@@ -263,8 +264,14 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
         },
       });
 
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
+      if (error) {
+        const errorMsg = handleApiError(error, 'Analysis');
+        throw new Error(errorMsg);
+      }
+      if (data?.error) {
+        const errorMsg = handleApiError({ message: data.error }, 'Analysis');
+        throw new Error(errorMsg);
+      }
       if (!data?.success || !data?.analysis) throw new Error('Invalid response');
 
       return {

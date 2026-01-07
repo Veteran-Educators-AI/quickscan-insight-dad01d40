@@ -13,6 +13,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
+import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
 
 interface Topic {
   id: string;
@@ -682,7 +683,15 @@ export default function QuestionNew() {
         body: { imageBase64 },
       });
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        handleApiError(error, 'Answer extraction');
+        return;
+      }
+      
+      if (checkResponseForApiError(data)) {
+        return;
+      }
+      
       if (!data?.success) throw new Error(data?.error || 'Failed to extract answer');
 
       setAnswerText(data.answerText);
@@ -692,11 +701,7 @@ export default function QuestionNew() {
       });
     } catch (err) {
       console.error('Error extracting answer:', err);
-      toast({
-        title: 'Extraction failed',
-        description: 'Could not extract answer automatically. Please enter it manually.',
-        variant: 'destructive',
-      });
+      handleApiError(err, 'Answer extraction');
     } finally {
       setIsExtractingAnswer(false);
     }

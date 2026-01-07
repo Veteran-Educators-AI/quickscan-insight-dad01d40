@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
 
 interface ExtractedStudent {
   firstName: string;
@@ -44,7 +45,14 @@ export function RosterImageConverter() {
         body: { imageBase64: base64Data },
       });
 
-      if (error) throw error;
+      if (error) {
+        handleApiError(error, 'Roster extraction');
+        return;
+      }
+
+      if (checkResponseForApiError(data)) {
+        return;
+      }
 
       if (data?.students && Array.isArray(data.students)) {
         setExtractedStudents(data.students);
@@ -55,13 +63,9 @@ export function RosterImageConverter() {
       } else {
         throw new Error('Could not extract student data from image');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error processing roster image:', error);
-      toast({
-        title: 'Processing failed',
-        description: error.message || 'Failed to extract roster from image',
-        variant: 'destructive',
-      });
+      handleApiError(error, 'Roster extraction');
     } finally {
       setIsProcessing(false);
     }
