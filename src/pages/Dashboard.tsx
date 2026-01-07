@@ -8,7 +8,9 @@ import {
   AlertTriangle,
   ChevronRight,
   Plus,
-  BarChart3
+  BarChart3,
+  GraduationCap,
+  School
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -87,8 +89,8 @@ export default function Dashboard() {
   ];
 
   const statCards = [
-    { label: 'Classes', value: stats.classCount, icon: Users, href: '/classes' },
-    { label: 'Students', value: stats.studentCount, icon: Users, href: '/classes' },
+    { label: 'Classes', value: stats.classCount, icon: School, href: '/classes' },
+    { label: 'Students', value: stats.studentCount, icon: GraduationCap, href: '/classes' },
     { label: 'Questions', value: stats.questionCount, icon: ClipboardList, href: '/questions' },
     { label: 'Scans Today', value: stats.recentAttempts, icon: Camera, href: '/reports' },
   ];
