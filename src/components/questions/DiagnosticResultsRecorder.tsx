@@ -150,6 +150,30 @@ export function DiagnosticResultsRecorder({
 
     setIsSaving(true);
     try {
+      // Fetch previous results for comparison
+      const studentIds = studentScores.map(ss => ss.studentId);
+      const { data: previousResults } = await supabase
+        .from('diagnostic_results')
+        .select('student_id, recommended_level, topic_name')
+        .in('student_id', studentIds)
+        .eq('topic_name', topicName)
+        .order('created_at', { ascending: false });
+
+      // Group by student to get most recent
+      const previousLevelByStudent: Record<string, string> = {};
+      previousResults?.forEach(r => {
+        if (!previousLevelByStudent[r.student_id]) {
+          previousLevelByStudent[r.student_id] = r.recommended_level || '';
+        }
+      });
+
+      // Get teacher profile for email
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email, full_name')
+        .eq('id', user.id)
+        .single();
+
       const resultsToInsert = studentScores.map(ss => {
         const recommendedLevel = calculateRecommendedLevel(ss.scores);
         return {
@@ -179,6 +203,67 @@ export function DiagnosticResultsRecorder({
         .insert(resultsToInsert);
 
       if (error) throw error;
+
+      // Check for level changes and send notifications
+      const LEVEL_ORDER = ['A', 'B', 'C', 'D', 'E', 'F'];
+      const notifications: Array<{ studentId: string; studentName: string; previousLevel: string | null; currentLevel: string; type: 'level_drop' | 'level_a_achieved' }> = [];
+
+      studentScores.forEach(ss => {
+        const student = students.find(s => s.id === ss.studentId);
+        if (!student) return;
+
+        const currentLevel = calculateRecommendedLevel(ss.scores);
+        const previousLevel = previousLevelByStudent[ss.studentId];
+        const studentName = `${student.first_name} ${student.last_name}`;
+
+        // Check for Level A achievement
+        if (currentLevel === 'A' && previousLevel !== 'A') {
+          notifications.push({
+            studentId: ss.studentId,
+            studentName,
+            previousLevel: previousLevel || null,
+            currentLevel,
+            type: 'level_a_achieved'
+          });
+        }
+        // Check for level drop (current level is worse than previous)
+        else if (previousLevel && LEVEL_ORDER.indexOf(currentLevel) > LEVEL_ORDER.indexOf(previousLevel)) {
+          notifications.push({
+            studentId: ss.studentId,
+            studentName,
+            previousLevel,
+            currentLevel,
+            type: 'level_drop'
+          });
+        }
+      });
+
+      // Send notifications in background
+      if (notifications.length > 0 && profile?.email) {
+        notifications.forEach(async (notification) => {
+          try {
+            await supabase.functions.invoke('send-level-notification', {
+              body: {
+                studentId: notification.studentId,
+                studentName: notification.studentName,
+                previousLevel: notification.previousLevel,
+                currentLevel: notification.currentLevel,
+                topicName: topicName,
+                teacherEmail: profile.email,
+                teacherName: profile.full_name || 'Teacher',
+                notificationType: notification.type
+              }
+            });
+          } catch (e) {
+            console.error('Failed to send notification:', e);
+          }
+        });
+
+        toast({
+          title: 'Notifications sent!',
+          description: `${notifications.length} level change notification(s) sent to your email.`,
+        });
+      }
 
       toast({
         title: 'Results saved!',
