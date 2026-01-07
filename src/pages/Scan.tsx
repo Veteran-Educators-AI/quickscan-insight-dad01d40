@@ -54,6 +54,10 @@ export default function Scan() {
   const batch = useBatchAnalysis();
   const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans();
   const [analyzingScanId, setAnalyzingScanId] = useState<string | null>(null);
+  // Track question IDs for multi-question analysis
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [multiQuestionResults, setMultiQuestionResults] = useState<Record<string, any>>({});
   
   // AI suggestions for manual scoring
   const [aiSuggestions, setAiSuggestions] = useState<{
@@ -222,20 +226,47 @@ export default function Scan() {
   const analyzeImage = async () => {
     if (!finalImage) return;
 
-    const analysisResult = await analyze(finalImage, undefined, mockRubricSteps);
-    
-    if (analysisResult) {
+    // Multi-question analysis
+    if (selectedQuestionIds.length > 0) {
+      const results: Record<string, any> = {};
+      
+      for (let i = 0; i < selectedQuestionIds.length; i++) {
+        setCurrentQuestionIndex(i);
+        toast.info(`Analyzing question ${i + 1} of ${selectedQuestionIds.length}...`);
+        
+        const analysisResult = await analyze(finalImage, selectedQuestionIds[i], mockRubricSteps);
+        if (analysisResult) {
+          results[selectedQuestionIds[i]] = analysisResult;
+        }
+      }
+      
+      setMultiQuestionResults(results);
       setScanState('analyzed');
-      toast.success('Analysis complete!', {
-        description: `Score: ${analysisResult.totalScore.earned}/${analysisResult.totalScore.possible} (${analysisResult.totalScore.percentage}%)`,
-      });
-      // Update saved scan status if analyzing a saved scan
+      
+      const totalQuestions = selectedQuestionIds.length;
+      const successCount = Object.keys(results).length;
+      toast.success(`Analysis complete! ${successCount}/${totalQuestions} questions analyzed`);
+      
       if (analyzingScanId) {
         await updateScanStatus(analyzingScanId, 'analyzed');
         refreshPendingScans();
       }
-    } else if (error) {
-      toast.error('Analysis failed', { description: error });
+    } else {
+      // Single question (legacy flow)
+      const analysisResult = await analyze(finalImage, undefined, mockRubricSteps);
+      
+      if (analysisResult) {
+        setScanState('analyzed');
+        toast.success('Analysis complete!', {
+          description: `Score: ${analysisResult.totalScore.earned}/${analysisResult.totalScore.possible} (${analysisResult.totalScore.percentage}%)`,
+        });
+        if (analyzingScanId) {
+          await updateScanStatus(analyzingScanId, 'analyzed');
+          refreshPendingScans();
+        }
+      } else if (error) {
+        toast.error('Analysis failed', { description: error });
+      }
     }
   };
 
@@ -327,12 +358,21 @@ export default function Scan() {
     setManualResult(null);
     setAiSuggestions(null);
     setAnalyzingScanId(null);
+    setSelectedQuestionIds([]);
+    setCurrentQuestionIndex(0);
+    setMultiQuestionResults({});
   };
 
-  // Handle analyzing a saved scan
-  const handleAnalyzeSavedScan = async (scan: { id: string; image_url: string; student_id: string | null }) => {
+  // Handle analyzing a saved scan with multiple questions
+  const handleAnalyzeSavedScan = async (
+    scan: { id: string; image_url: string; student_id: string | null },
+    questionIds: string[]
+  ) => {
     setAnalyzingScanId(scan.id);
     setFinalImage(scan.image_url);
+    setSelectedQuestionIds(questionIds);
+    setCurrentQuestionIndex(0);
+    setMultiQuestionResults({});
     setScanState('choose-method');
   };
 
@@ -607,11 +647,16 @@ export default function Scan() {
               )}
 
               {/* Analysis Results - AI or Manual */}
-              {scanState === 'analyzed' && (result || manualResult) && (
+              {scanState === 'analyzed' && (result || manualResult || Object.keys(multiQuestionResults).length > 0) && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold">
-                      {manualResult ? 'Teacher Scoring Results' : 'AI Grading Results'}
+                      {manualResult 
+                        ? 'Teacher Scoring Results' 
+                        : Object.keys(multiQuestionResults).length > 0
+                          ? `AI Grading Results (${Object.keys(multiQuestionResults).length} Questions)`
+                          : 'AI Grading Results'
+                      }
                     </h2>
                     <Button variant="outline" size="sm" onClick={startNewScan}>
                       <RotateCcw className="h-4 w-4 mr-2" />
@@ -629,7 +674,22 @@ export default function Scan() {
                     </CardContent>
                   </Card>
                   
-                  {result && !manualResult && (
+                  {/* Multi-question results */}
+                  {Object.keys(multiQuestionResults).length > 0 && (
+                    <div className="space-y-4">
+                      {Object.entries(multiQuestionResults).map(([questionId, questionResult], index) => (
+                        <div key={questionId} className="space-y-2">
+                          <h3 className="text-sm font-medium text-muted-foreground">
+                            Question {index + 1}
+                          </h3>
+                          <AnalysisResults result={questionResult} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Single result (legacy) */}
+                  {result && !manualResult && Object.keys(multiQuestionResults).length === 0 && (
                     <AnalysisResults result={result} rawAnalysis={rawAnalysis} />
                   )}
                   

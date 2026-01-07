@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, Upload, Clock, User, Trash2, Play, CheckCircle, ChevronDown, Check } from 'lucide-react';
+import { Camera, Upload, Clock, User, Trash2, Play, CheckCircle, ChevronDown, Check, FileQuestion } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { ClassStudentSelector } from './ClassStudentSelector';
 import { CameraModal } from './CameraModal';
 import { ImagePreview } from './ImagePreview';
+import { MultiQuestionSelector } from './MultiQuestionSelector';
 import { cn } from '@/lib/utils';
 
 interface PendingScan {
@@ -38,7 +39,7 @@ interface StudentOption {
 interface SaveForLaterTabProps {
   pendingScans: PendingScan[];
   onRefresh: () => void;
-  onAnalyzeScan: (scan: PendingScan) => void;
+  onAnalyzeScan: (scan: PendingScan, questionIds: string[]) => void;
 }
 
 export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: SaveForLaterTabProps) {
@@ -50,9 +51,15 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [allStudents, setAllStudents] = useState<StudentOption[]>([]);
   const [openStudentPicker, setOpenStudentPicker] = useState<string | null>(null);
+  // Track selected questions per scan
+  const [scanQuestions, setScanQuestions] = useState<Record<string, string[]>>({});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nativeInputRef = useRef<HTMLInputElement>(null);
+
+  const updateScanQuestions = (scanId: string, questionIds: string[]) => {
+    setScanQuestions(prev => ({ ...prev, [scanId]: questionIds }));
+  };
 
   // Fetch all students for the teacher's classes
   useEffect(() => {
@@ -401,6 +408,12 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
                       </Command>
                     </PopoverContent>
                   </Popover>
+
+                  {/* Multi-Question Selector */}
+                  <MultiQuestionSelector
+                    selectedQuestionIds={scanQuestions[scan.id] || []}
+                    onQuestionsChange={(ids) => updateScanQuestions(scan.id, ids)}
+                  />
                   
                   {scan.class && (
                     <p className="text-xs text-muted-foreground">
@@ -418,10 +431,13 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
                       variant="hero"
                       size="sm"
                       className="flex-1"
-                      onClick={() => onAnalyzeScan(scan)}
+                      onClick={() => onAnalyzeScan(scan, scanQuestions[scan.id] || [])}
+                      disabled={(scanQuestions[scan.id] || []).length === 0}
                     >
                       <Play className="h-3 w-3 mr-1" />
-                      Analyze
+                      {(scanQuestions[scan.id] || []).length > 0 
+                        ? `Analyze (${(scanQuestions[scan.id] || []).length})` 
+                        : 'Select Questions'}
                     </Button>
                     <Button
                       variant="outline"
