@@ -6,6 +6,56 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to call Google Gemini API
+async function callGeminiAPI(contents: any[], apiKey: string) {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Gemini API error:', response.status, errorText);
+    
+    if (response.status === 429) {
+      throw { status: 429, message: "Rate limit exceeded. Please try again in a moment." };
+    }
+    if (response.status === 403) {
+      throw { status: 403, message: "Invalid API key or API not enabled. Check your Google Cloud console." };
+    }
+    throw new Error(`Gemini API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// Helper to format image for Gemini
+function formatImageForGemini(imageBase64: string) {
+  // Remove data URL prefix if present
+  let base64Data = imageBase64;
+  let mimeType = "image/jpeg";
+  
+  if (imageBase64.startsWith('data:')) {
+    const matches = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
+    if (matches) {
+      mimeType = matches[1];
+      base64Data = matches[2];
+    }
+  }
+  
+  return {
+    inline_data: {
+      mime_type: mimeType,
+      data: base64Data,
+    }
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -13,9 +63,9 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const GOOGLE_GEMINI_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY');
+    if (!GOOGLE_GEMINI_API_KEY) {
+      throw new Error('GOOGLE_GEMINI_API_KEY is not configured');
     }
 
     const { imageBase64, solutionBase64, questionId, rubricSteps, identifyOnly, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode } = await req.json();
@@ -34,7 +84,7 @@ serve(async (req) => {
     // If identifyOnly is true, just extract student identification info
     if (identifyOnly) {
       console.log('Identifying student from image...');
-      const identification = await identifyStudent(imageBase64, studentRoster, LOVABLE_API_KEY);
+      const identification = await identifyStudent(imageBase64, studentRoster, GOOGLE_GEMINI_API_KEY);
       return new Response(JSON.stringify({
         success: true,
         identification,
@@ -46,7 +96,7 @@ serve(async (req) => {
     // If compareMode is true, compare student work against provided solution
     if (compareMode && solutionBase64) {
       console.log('Comparing student work against solution...');
-      const comparison = await compareWithSolution(imageBase64, solutionBase64, rubricSteps, LOVABLE_API_KEY);
+      const comparison = await compareWithSolution(imageBase64, solutionBase64, rubricSteps, GOOGLE_GEMINI_API_KEY);
       return new Response(JSON.stringify({
         success: true,
         comparison,
@@ -131,54 +181,18 @@ Identify the problem being solved and evaluate the student's approach.`;
 - Total Score: (points earned / total possible)
 - Feedback: (constructive suggestions for improvement)`;
 
-    // Call Lovable AI with the image
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { 
-            role: "user", 
-            content: [
-              { type: "text", text: userPrompt },
-              { 
-                type: "image_url", 
-                image_url: { 
-                  url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
-                } 
-              }
-            ]
-          }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    // Build Gemini request
+    const contents = [
+      {
+        role: "user",
+        parts: [
+          { text: `${systemPrompt}\n\n${userPrompt}` },
+          formatImageForGemini(imageBase64),
+        ]
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI usage limit reached. Please add credits to continue." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`AI gateway error: ${response.status}`);
-    }
+    ];
 
-    const data = await response.json();
-    const analysisText = data.choices?.[0]?.message?.content;
+    const analysisText = await callGeminiAPI(contents, GOOGLE_GEMINI_API_KEY);
 
     if (!analysisText) {
       throw new Error('No analysis returned from AI');
@@ -220,8 +234,23 @@ Identify the problem being solved and evaluate the student's approach.`;
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in analyze-student-work:', error);
+    
+    // Handle specific error statuses
+    if (error.status === 429) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (error.status === 403) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     return new Response(JSON.stringify({ 
       error: error instanceof Error ? error.message : 'Unknown error occurred' 
     }), {
@@ -287,39 +316,18 @@ Provide your analysis in this exact JSON format:
   "correctness_analysis": "detailed comparison of student work vs solution"
 }`;
 
-  const formatImageUrl = (img: string) => 
-    img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`;
+  const contents = [
+    {
+      role: "user",
+      parts: [
+        { text: `${systemPrompt}\n\n${userPrompt}` },
+        formatImageForGemini(studentImageBase64),
+        formatImageForGemini(solutionImageBase64),
+      ]
+    }
+  ];
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { 
-          role: "user", 
-          content: [
-            { type: "text", text: userPrompt },
-            { type: "image_url", image_url: { url: formatImageUrl(studentImageBase64) } },
-            { type: "image_url", image_url: { url: formatImageUrl(solutionImageBase64) } }
-          ]
-        }
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Comparison API error:', response.status, errorText);
-    throw new Error(`AI gateway error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || '';
+  const content = await callGeminiAPI(contents, apiKey);
   
   console.log('Comparison raw response:', content);
 
@@ -415,52 +423,21 @@ Respond in this exact JSON format (no markdown, just raw JSON):
   "notes": "any relevant observations"
 }`;
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { 
-          role: "user", 
-          content: [
-            { type: "text", text: prompt },
-            { 
-              type: "image_url", 
-              image_url: { 
-                url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
-              } 
-            }
-          ]
-        }
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    console.error('Identification API error:', response.status);
-    return {
-      qrCodeDetected: false,
-      qrCodeContent: null,
-      parsedQRCode: null,
-      handwrittenName: null,
-      matchedStudentId: null,
-      matchedStudentName: null,
-      matchedQuestionId: null,
-      confidence: 'none',
-      rawExtraction: 'API error during identification',
-    };
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || '';
-  
-  console.log('Identification raw response:', content);
+  const contents = [
+    {
+      role: "user",
+      parts: [
+        { text: prompt },
+        formatImageForGemini(imageBase64),
+      ]
+    }
+  ];
 
   try {
+    const content = await callGeminiAPI(contents, apiKey);
+    
+    console.log('Identification raw response:', content);
+
     // Try to extract JSON from the response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -534,7 +511,7 @@ Respond in this exact JSON format (no markdown, just raw JSON):
     matchedStudentName: null,
     matchedQuestionId: null,
     confidence: 'none',
-    rawExtraction: content,
+    rawExtraction: 'Failed to identify student',
   };
 }
 
