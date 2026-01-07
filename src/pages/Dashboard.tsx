@@ -81,6 +81,7 @@ export default function Dashboard() {
   const quickActions = [
     { label: 'Create Class', href: '/classes/new', icon: Users, color: 'bg-primary/10 text-primary' },
     { label: 'New Assessment', href: '/questions', icon: ClipboardList, color: 'bg-accent/10 text-accent' },
+    { label: 'Create Question', href: '/questions/new', icon: Plus, color: 'bg-secondary/50 text-secondary-foreground' },
     { label: 'Start Scanning', href: '/scan', icon: Camera, color: 'bg-warning/10 text-warning' },
     { label: 'View Reports', href: '/reports', icon: BarChart3, color: 'bg-success/10 text-success' },
   ];
