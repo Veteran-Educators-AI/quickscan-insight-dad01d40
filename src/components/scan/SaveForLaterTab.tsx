@@ -1,11 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, Upload, Clock, User, Trash2, Play, CheckCircle, ChevronDown, Check, FileQuestion, PlayCircle, Loader2, Filter } from 'lucide-react';
+import { Camera, Upload, Clock, User, Trash2, Play, CheckCircle, ChevronDown, Check, FileQuestion, PlayCircle, Loader2, Filter, CalendarIcon, X } from 'lucide-react';
+import { format, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Progress } from '@/components/ui/progress';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -58,6 +60,8 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
   
   // Filter state
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'analyzed'>('all');
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   
   // Bulk analyze state
   const [isBulkAnalyzing, setIsBulkAnalyzing] = useState(false);
@@ -271,13 +275,24 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
 
   const eligibleCount = getEligibleScansForBulk().length;
 
-  // Filter scans based on selected status
+  // Filter scans based on selected status and date range
   const filteredScans = pendingScans.filter(scan => {
-    if (statusFilter === 'all') return true;
-    if (statusFilter === 'pending') return scan.status === 'pending';
-    if (statusFilter === 'analyzed') return scan.status === 'analyzed';
+    // Status filter
+    if (statusFilter === 'pending' && scan.status !== 'pending') return false;
+    if (statusFilter === 'analyzed' && scan.status !== 'analyzed') return false;
+    
+    // Date range filter
+    const scanDate = new Date(scan.created_at);
+    if (startDate && isBefore(scanDate, startOfDay(startDate))) return false;
+    if (endDate && isAfter(scanDate, endOfDay(endDate))) return false;
+    
     return true;
   });
+
+  const clearDateFilters = () => {
+    setStartDate(undefined);
+    setEndDate(undefined);
+  };
 
   const pendingCount = pendingScans.filter(s => s.status === 'pending').length;
   const analyzedCount = pendingScans.filter(s => s.status === 'analyzed').length;
@@ -435,28 +450,103 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
             </CardContent>
           </Card>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Saved Scans ({pendingScans.length})
-            </h3>
-            
-            <ToggleGroup 
-              type="single" 
-              value={statusFilter} 
-              onValueChange={(value) => value && setStatusFilter(value as 'all' | 'pending' | 'analyzed')}
-              className="justify-start"
-            >
-              <ToggleGroupItem value="all" aria-label="Show all scans" size="sm">
-                All ({pendingScans.length})
-              </ToggleGroupItem>
-              <ToggleGroupItem value="pending" aria-label="Show pending scans" size="sm">
-                Pending ({pendingCount})
-              </ToggleGroupItem>
-              <ToggleGroupItem value="analyzed" aria-label="Show analyzed scans" size="sm">
-                Analyzed ({analyzedCount})
-              </ToggleGroupItem>
-            </ToggleGroup>
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Saved Scans ({pendingScans.length})
+              </h3>
+              
+              <ToggleGroup 
+                type="single" 
+                value={statusFilter} 
+                onValueChange={(value) => value && setStatusFilter(value as 'all' | 'pending' | 'analyzed')}
+                className="justify-start"
+              >
+                <ToggleGroupItem value="all" aria-label="Show all scans" size="sm">
+                  All ({pendingScans.length})
+                </ToggleGroupItem>
+                <ToggleGroupItem value="pending" aria-label="Show pending scans" size="sm">
+                  Pending ({pendingCount})
+                </ToggleGroupItem>
+                <ToggleGroupItem value="analyzed" aria-label="Show analyzed scans" size="sm">
+                  Analyzed ({analyzedCount})
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+
+            {/* Date Range Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "justify-start text-left font-normal",
+                      !startDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? format(startDate, "MMM d, yyyy") : "Start date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={setStartDate}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <span className="text-muted-foreground text-sm">to</span>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "justify-start text-left font-normal",
+                      !endDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {endDate ? format(endDate, "MMM d, yyyy") : "End date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={endDate}
+                    onSelect={setEndDate}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {(startDate || endDate) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearDateFilters}
+                  className="h-8 px-2"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Clear dates
+                </Button>
+              )}
+
+              {(startDate || endDate) && (
+                <span className="text-sm text-muted-foreground ml-auto">
+                  Showing {filteredScans.length} of {pendingScans.length} scans
+                </span>
+              )}
+            </div>
           </div>
           
           {filteredScans.length === 0 ? (
