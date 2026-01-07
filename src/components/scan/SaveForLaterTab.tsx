@@ -1,13 +1,16 @@
-import { useState, useRef, useCallback } from 'react';
-import { Camera, Upload, Clock, User, Trash2, Play, CheckCircle, X } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Camera, Upload, Clock, User, Trash2, Play, CheckCircle, ChevronDown, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { ClassStudentSelector } from './ClassStudentSelector';
 import { CameraModal } from './CameraModal';
 import { ImagePreview } from './ImagePreview';
+import { cn } from '@/lib/utils';
 
 interface PendingScan {
   id: string;
@@ -26,6 +29,12 @@ interface PendingScan {
   } | null;
 }
 
+interface StudentOption {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
 interface SaveForLaterTabProps {
   pendingScans: PendingScan[];
   onRefresh: () => void;
@@ -39,9 +48,40 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
   const [isSaving, setIsSaving] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [allStudents, setAllStudents] = useState<StudentOption[]>([]);
+  const [openStudentPicker, setOpenStudentPicker] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nativeInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch all students for the teacher's classes
+  useEffect(() => {
+    const fetchAllStudents = async () => {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('students')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          class_id,
+          classes!inner(teacher_id)
+        `)
+        .eq('classes.teacher_id', user.id)
+        .order('last_name');
+
+      if (!error && data) {
+        setAllStudents(data.map(s => ({
+          id: s.id,
+          first_name: s.first_name,
+          last_name: s.last_name,
+        })));
+      }
+    };
+
+    fetchAllStudents();
+  }, [user]);
 
   const handleCameraCapture = useCallback((imageDataUrl: string) => {
     setCapturedImage(imageDataUrl);
@@ -142,6 +182,31 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
     } catch (error) {
       console.error('Error deleting scan:', error);
       toast.error('Failed to delete scan');
+    }
+  };
+
+  const handleAssignStudent = async (scanId: string, studentId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('pending_scans')
+        .update({ student_id: studentId })
+        .eq('id', scanId);
+
+      if (error) throw error;
+
+      const studentName = studentId 
+        ? allStudents.find(s => s.id === studentId)
+        : null;
+      
+      toast.success(studentId 
+        ? `Assigned to ${studentName?.first_name} ${studentName?.last_name}`
+        : 'Student unassigned'
+      );
+      setOpenStudentPicker(null);
+      onRefresh();
+    } catch (error) {
+      console.error('Error assigning student:', error);
+      toast.error('Failed to assign student');
     }
   };
 
@@ -276,14 +341,66 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
                   )}
                 </div>
                 <CardContent className="p-3 space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className={scan.student ? '' : 'text-muted-foreground italic'}>
-                      {scan.student 
-                        ? `${scan.student.first_name} ${scan.student.last_name}`
-                        : 'No student assigned'}
-                    </span>
-                  </div>
+                  {/* Student Selector Dropdown */}
+                  <Popover 
+                    open={openStudentPicker === scan.id} 
+                    onOpenChange={(open) => setOpenStudentPicker(open ? scan.id : null)}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-between text-left font-normal"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className={cn(
+                            "truncate",
+                            !scan.student && "text-muted-foreground italic"
+                          )}>
+                            {scan.student 
+                              ? `${scan.student.first_name} ${scan.student.last_name}`
+                              : 'Assign student...'}
+                          </span>
+                        </div>
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search students..." />
+                        <CommandList>
+                          <CommandEmpty>No students found.</CommandEmpty>
+                          <CommandGroup>
+                            {scan.student_id && (
+                              <CommandItem
+                                value="unassign"
+                                onSelect={() => handleAssignStudent(scan.id, null)}
+                                className="text-muted-foreground"
+                              >
+                                <span className="italic">Unassign student</span>
+                              </CommandItem>
+                            )}
+                            {allStudents.map((student) => (
+                              <CommandItem
+                                key={student.id}
+                                value={`${student.first_name} ${student.last_name}`}
+                                onSelect={() => handleAssignStudent(scan.id, student.id)}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    scan.student_id === student.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {student.first_name} {student.last_name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   
                   {scan.class && (
                     <p className="text-xs text-muted-foreground">
