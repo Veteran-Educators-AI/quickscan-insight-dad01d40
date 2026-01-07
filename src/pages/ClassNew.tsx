@@ -163,6 +163,11 @@ export default function ClassNew() {
                     <SelectItem value="6">Period 6</SelectItem>
                     <SelectItem value="7">Period 7</SelectItem>
                     <SelectItem value="8">Period 8</SelectItem>
+                    <SelectItem value="9">Period 9</SelectItem>
+                    <SelectItem value="10">Period 10</SelectItem>
+                    <SelectItem value="11">Period 11</SelectItem>
+                    <SelectItem value="12">Period 12</SelectItem>
+                    <SelectItem value="13">Period 13</SelectItem>
                     <SelectItem value="homeroom">Homeroom</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
