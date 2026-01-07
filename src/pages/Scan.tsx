@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +14,7 @@ import { SaveForLaterTab } from '@/components/scan/SaveForLaterTab';
 import { useAnalyzeStudentWork } from '@/hooks/useAnalyzeStudentWork';
 import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
 import { usePendingScans } from '@/hooks/usePendingScans';
+import { useSaveAnalysisResults } from '@/hooks/useSaveAnalysisResults';
 import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
@@ -53,10 +54,13 @@ export default function Scan() {
   const { analyze, compareWithSolution, isAnalyzing, isComparing, error, result, rawAnalysis, comparisonResult } = useAnalyzeStudentWork();
   const batch = useBatchAnalysis();
   const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans();
+  const { saveMultiQuestionResults, isSaving } = useSaveAnalysisResults();
   const [analyzingScanId, setAnalyzingScanId] = useState<string | null>(null);
+  const [analyzingScanStudentId, setAnalyzingScanStudentId] = useState<string | null>(null);
   // Track question IDs for multi-question analysis
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [resultsSaved, setResultsSaved] = useState(false);
   const [multiQuestionResults, setMultiQuestionResults] = useState<Record<string, any>>({});
   
   // AI suggestions for manual scoring
@@ -358,9 +362,11 @@ export default function Scan() {
     setManualResult(null);
     setAiSuggestions(null);
     setAnalyzingScanId(null);
+    setAnalyzingScanStudentId(null);
     setSelectedQuestionIds([]);
     setCurrentQuestionIndex(0);
     setMultiQuestionResults({});
+    setResultsSaved(false);
   };
 
   // Handle analyzing a saved scan with multiple questions
@@ -369,11 +375,33 @@ export default function Scan() {
     questionIds: string[]
   ) => {
     setAnalyzingScanId(scan.id);
+    setAnalyzingScanStudentId(scan.student_id);
     setFinalImage(scan.image_url);
     setSelectedQuestionIds(questionIds);
     setCurrentQuestionIndex(0);
     setMultiQuestionResults({});
+    setResultsSaved(false);
     setScanState('choose-method');
+  };
+
+  // Save multi-question analysis results to database
+  const handleSaveResults = async () => {
+    if (!analyzingScanStudentId || Object.keys(multiQuestionResults).length === 0 || !finalImage) {
+      toast.error('Missing student or results to save');
+      return;
+    }
+
+    const success = await saveMultiQuestionResults(
+      analyzingScanStudentId,
+      finalImage,
+      multiQuestionResults,
+      analyzingScanId || undefined
+    );
+
+    if (success) {
+      setResultsSaved(true);
+      refreshPendingScans();
+    }
   };
 
   // Override the analyzed state handler to update scan status
@@ -658,10 +686,35 @@ export default function Scan() {
                           : 'AI Grading Results'
                       }
                     </h2>
-                    <Button variant="outline" size="sm" onClick={startNewScan}>
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      New Scan
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {/* Save to Database button - only show for multi-question with student assigned */}
+                      {Object.keys(multiQuestionResults).length > 0 && analyzingScanStudentId && (
+                        <Button 
+                          variant={resultsSaved ? "outline" : "default"}
+                          size="sm" 
+                          onClick={handleSaveResults}
+                          disabled={isSaving || resultsSaved}
+                        >
+                          {resultsSaved ? (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Saved
+                            </>
+                          ) : isSaving ? (
+                            'Saving...'
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 mr-2" />
+                              Save to Reports
+                            </>
+                          )}
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" onClick={startNewScan}>
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        New Scan
+                      </Button>
+                    </div>
                   </div>
                   
                   <Card>
