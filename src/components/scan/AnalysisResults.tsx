@@ -10,6 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { AIWorkDetector } from './AIWorkDetector';
 
 interface RubricScore {
   criterion: string;
@@ -192,6 +193,15 @@ export function AnalysisResults({
             <p className="text-sm">{result.feedback}</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* AI Work Detection */}
+      {result.ocrText && result.ocrText.length > 20 && (
+        <AIWorkDetector 
+          text={result.ocrText} 
+          studentName={studentName || undefined}
+          questionContext={result.problemIdentified}
+        />
       )}
 
       {/* Detailed Analysis Accordion */}
