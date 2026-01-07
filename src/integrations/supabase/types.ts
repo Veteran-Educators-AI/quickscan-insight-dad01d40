@@ -259,6 +259,103 @@ export type Database = {
           },
         ]
       }
+      diagnostic_results: {
+        Row: {
+          created_at: string
+          id: string
+          level_a_score: number | null
+          level_a_total: number | null
+          level_b_score: number | null
+          level_b_total: number | null
+          level_c_score: number | null
+          level_c_total: number | null
+          level_d_score: number | null
+          level_d_total: number | null
+          level_e_score: number | null
+          level_e_total: number | null
+          level_f_score: number | null
+          level_f_total: number | null
+          notes: string | null
+          recommended_level: string | null
+          standard: string | null
+          student_id: string
+          teacher_id: string
+          topic_name: string
+          updated_at: string
+          worksheet_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          level_a_score?: number | null
+          level_a_total?: number | null
+          level_b_score?: number | null
+          level_b_total?: number | null
+          level_c_score?: number | null
+          level_c_total?: number | null
+          level_d_score?: number | null
+          level_d_total?: number | null
+          level_e_score?: number | null
+          level_e_total?: number | null
+          level_f_score?: number | null
+          level_f_total?: number | null
+          notes?: string | null
+          recommended_level?: string | null
+          standard?: string | null
+          student_id: string
+          teacher_id: string
+          topic_name: string
+          updated_at?: string
+          worksheet_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          level_a_score?: number | null
+          level_a_total?: number | null
+          level_b_score?: number | null
+          level_b_total?: number | null
+          level_c_score?: number | null
+          level_c_total?: number | null
+          level_d_score?: number | null
+          level_d_total?: number | null
+          level_e_score?: number | null
+          level_e_total?: number | null
+          level_f_score?: number | null
+          level_f_total?: number | null
+          notes?: string | null
+          recommended_level?: string | null
+          standard?: string | null
+          student_id?: string
+          teacher_id?: string
+          topic_name?: string
+          updated_at?: string
+          worksheet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diagnostic_results_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagnostic_results_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagnostic_results_worksheet_id_fkey"
+            columns: ["worksheet_id"]
+            isOneToOne: false
+            referencedRelation: "worksheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       misconception_tags: {
         Row: {
           created_at: string
