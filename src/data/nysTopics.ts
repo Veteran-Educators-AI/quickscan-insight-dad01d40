@@ -136,6 +136,21 @@ export const GEOMETRY_TOPICS: TopicCategory[] = [
       { name: 'Area in the Coordinate Plane', standard: 'G.GPE.B.7', url: 'https://www.jmap.org/htmlstandard/G.GPE.B.7.htm' },
     ],
   },
+  {
+    category: 'TRANSFORMATIONS',
+    topics: [
+      { name: 'Translations', standard: 'G.CO.A.4', url: 'https://www.jmap.org/htmlstandard/G.CO.A.4.htm' },
+      { name: 'Reflections', standard: 'G.CO.A.4', url: 'https://www.jmap.org/htmlstandard/G.CO.A.4.htm' },
+      { name: 'Rotations', standard: 'G.CO.A.4', url: 'https://www.jmap.org/htmlstandard/G.CO.A.4.htm' },
+      { name: 'Dilations', standard: 'G.SRT.A.1', url: 'https://www.jmap.org/htmlstandard/G.SRT.A.1.htm' },
+      { name: 'Compositions of Transformations', standard: 'G.CO.A.5', url: 'https://www.jmap.org/htmlstandard/G.CO.A.5.htm' },
+      { name: 'Rigid Motions', standard: 'G.CO.B.6', url: 'https://www.jmap.org/htmlstandard/G.CO.B.6.htm' },
+      { name: 'Symmetry', standard: 'G.CO.A.3', url: 'https://www.jmap.org/htmlstandard/G.CO.A.3.htm' },
+      { name: 'Rotational Symmetry', standard: 'G.CO.A.3', url: 'https://www.jmap.org/htmlstandard/G.CO.A.3.htm' },
+      { name: 'Line Symmetry', standard: 'G.CO.A.3', url: 'https://www.jmap.org/htmlstandard/G.CO.A.3.htm' },
+      { name: 'Mapping a Figure onto Itself', standard: 'G.CO.A.3', url: 'https://www.jmap.org/htmlstandard/G.CO.A.3.htm' },
+    ],
+  },
 ];
 
 export const ALGEBRA1_TOPICS: TopicCategory[] = [
