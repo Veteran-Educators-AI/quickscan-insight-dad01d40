@@ -7,7 +7,8 @@ import {
   TrendingUp, 
   AlertTriangle,
   ChevronRight,
-  Plus
+  Plus,
+  BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,6 +82,7 @@ export default function Dashboard() {
     { label: 'Create Class', href: '/classes/new', icon: Users, color: 'bg-primary/10 text-primary' },
     { label: 'New Assessment', href: '/questions', icon: ClipboardList, color: 'bg-accent/10 text-accent' },
     { label: 'Start Scanning', href: '/scan', icon: Camera, color: 'bg-warning/10 text-warning' },
+    { label: 'View Reports', href: '/reports', icon: BarChart3, color: 'bg-success/10 text-success' },
   ];
 
   const statCards = [
