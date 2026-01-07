@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { NYS_SUBJECTS, searchTopics, type JMAPTopic, type TopicCategory } from '@/data/nysTopics';
 import { WorksheetBuilder, type WorksheetQuestion } from '@/components/questions/WorksheetBuilder';
+import { DifferentiatedWorksheetGenerator } from '@/components/questions/DifferentiatedWorksheetGenerator';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Questions() {
@@ -20,6 +21,7 @@ export default function Questions() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [worksheetQuestions, setWorksheetQuestions] = useState<WorksheetQuestion[]>([]);
   const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set());
+  const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(false);
 
   // Get current subject data
   const currentSubject = NYS_SUBJECTS.find(s => s.id === selectedSubject);
@@ -278,11 +280,20 @@ export default function Questions() {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">Question Bank & Assessments</h1>
-          <p className="text-muted-foreground">
-            Browse NYS Regents aligned topics, create AI-generated worksheets, and download assessments
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="font-display text-2xl font-bold text-foreground">Question Bank & Assessments</h1>
+            <p className="text-muted-foreground">
+              Browse NYS Regents aligned topics, create AI-generated worksheets, and download assessments
+            </p>
+          </div>
+          <Button 
+            onClick={() => setShowDifferentiatedGenerator(true)}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Differentiated Worksheets
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -512,6 +523,12 @@ export default function Questions() {
           </div>
         </div>
       </div>
+
+      {/* Differentiated Worksheet Generator Modal */}
+      <DifferentiatedWorksheetGenerator
+        open={showDifferentiatedGenerator}
+        onOpenChange={setShowDifferentiatedGenerator}
+      />
     </AppLayout>
   );
 }

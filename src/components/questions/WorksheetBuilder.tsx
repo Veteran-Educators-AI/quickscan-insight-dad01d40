@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1764,6 +1764,22 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   </Button>
                 )}
               </div>
+
+              {/* Diagnostic: Record Results Note */}
+              {worksheetMode === 'diagnostic' && (
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <ClipboardList className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-purple-900">Diagnostic Worksheet</p>
+                      <p className="text-xs text-purple-700">
+                        After students complete this worksheet, record their results in the 
+                        "Differentiated Worksheets" tool to generate personalized follow-up worksheets.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <Button
                 variant="ghost"
