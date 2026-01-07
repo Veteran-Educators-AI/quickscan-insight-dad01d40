@@ -26,6 +26,7 @@ export default function ClassNew() {
   const [name, setName] = useState('');
   const [schoolYear, setSchoolYear] = useState('');
   const [classPeriod, setClassPeriod] = useState('');
+  const [customPeriod, setCustomPeriod] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [pendingStudents, setPendingStudents] = useState<ParsedStudent[]>([]);
   const navigate = useNavigate();
@@ -48,7 +49,7 @@ export default function ClassNew() {
           name,
           join_code: joinCode,
           school_year: schoolYear || null,
-          class_period: classPeriod || null,
+          class_period: classPeriod === 'other' ? customPeriod.trim() || null : classPeriod || null,
         })
         .select()
         .single();
@@ -169,9 +170,17 @@ export default function ClassNew() {
                     <SelectItem value="12">Period 12</SelectItem>
                     <SelectItem value="13">Period 13</SelectItem>
                     <SelectItem value="homeroom">Homeroom</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="other">Other (custom)</SelectItem>
                   </SelectContent>
                 </Select>
+                {classPeriod === 'other' && (
+                  <Input
+                    placeholder="Enter custom period name"
+                    value={customPeriod}
+                    onChange={(e) => setCustomPeriod(e.target.value)}
+                    className="mt-2"
+                  />
+                )}
               </div>
 
               <div className="pt-2 border-t space-y-3">
