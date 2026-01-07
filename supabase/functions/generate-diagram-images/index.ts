@@ -11,100 +11,70 @@ interface QuestionWithPrompt {
   imagePrompt: string;
 }
 
-// Generate image using Gemini Flash Image
-async function generateWithGeminiFlash(prompt: string, lovableApiKey: string): Promise<string | null> {
+// Generate image using Google's Imagen via Gemini API
+async function generateImageWithGemini(prompt: string, apiKey: string): Promise<string | null> {
   try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
+    const enhancedPrompt = `Create a clean, educational black and white diagram for a math worksheet. The diagram should be clear, precise, and suitable for printing. ${prompt}. Style: minimalist, educational, with clear labels and measurements. No background color, just clean black lines on white background. Make sure all text labels are legible and properly positioned.`;
+
+    // Use Gemini 2.0 Flash for text-based diagram description
+    // Note: Direct image generation requires Imagen API, but we can generate SVG descriptions
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Generate a complete, valid SVG code for the following diagram. The SVG should be black lines on white background, suitable for a math worksheet. Return ONLY the SVG code, nothing else.
+
+Diagram to create: ${enhancedPrompt}
+
+Requirements:
+- SVG should have width="300" height="300" viewBox="0 0 300 300"
+- Use stroke="#000000" for all lines
+- Use fill="none" for shapes, or fill="#ffffff" for white backgrounds
+- Include clear text labels using <text> elements with font-size="14"
+- Make sure the diagram is centered and well-proportioned`
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 2000,
           }
-        ],
-        modalities: ['image', 'text']
-      }),
-    });
+        }),
+      }
+    );
 
     if (!response.ok) {
-      console.error('Gemini Flash Image error:', await response.text());
+      const errorText = await response.text();
+      console.error('Gemini API error:', response.status, errorText);
       return null;
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    return imageUrl || null;
-  } catch (error) {
-    console.error('Error generating with Gemini Flash:', error);
-    return null;
-  }
-}
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-// Generate image using Gemini Pro Image (next-gen)
-async function generateWithGeminiPro(prompt: string, lovableApiKey: string): Promise<string | null> {
-  try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-3-pro-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        modalities: ['image', 'text']
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('Gemini Pro Image error:', await response.text());
+    if (!content) {
       return null;
     }
 
-    const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    return imageUrl || null;
+    // Extract SVG from the response
+    const svgMatch = content.match(/<svg[\s\S]*?<\/svg>/i);
+    if (svgMatch) {
+      // Convert SVG to data URL
+      const svgString = svgMatch[0];
+      const base64Svg = btoa(unescape(encodeURIComponent(svgString)));
+      return `data:image/svg+xml;base64,${base64Svg}`;
+    }
+
+    return null;
   } catch (error) {
-    console.error('Error generating with Gemini Pro:', error);
+    console.error('Error generating with Gemini:', error);
     return null;
   }
-}
-
-// Try multiple generators for best result
-async function generateBestImage(prompt: string, lovableApiKey: string): Promise<string | null> {
-  const enhancedPrompt = `Create a clean, educational black and white diagram for a math worksheet. The diagram should be clear, precise, and suitable for printing. ${prompt}. Style: minimalist, educational, with clear labels and measurements. No background color, just clean black lines on white background. Make sure all text labels are legible and properly positioned.`;
-
-  // Try Gemini Pro first for higher quality
-  console.log('Trying Gemini Pro Image generator...');
-  let imageUrl = await generateWithGeminiPro(enhancedPrompt, lovableApiKey);
-  
-  if (imageUrl) {
-    console.log('Successfully generated with Gemini Pro');
-    return imageUrl;
-  }
-
-  // Fallback to Gemini Flash
-  console.log('Falling back to Gemini Flash Image generator...');
-  imageUrl = await generateWithGeminiFlash(enhancedPrompt, lovableApiKey);
-  
-  if (imageUrl) {
-    console.log('Successfully generated with Gemini Flash');
-    return imageUrl;
-  }
-
-  console.log('All image generators failed');
-  return null;
 }
 
 serve(async (req) => {
@@ -124,9 +94,9 @@ serve(async (req) => {
       );
     }
 
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const geminiApiKey = Deno.env.get('GOOGLE_GEMINI_API_KEY');
+    if (!geminiApiKey) {
+      throw new Error('GOOGLE_GEMINI_API_KEY not configured');
     }
 
     console.log(`Starting image generation for ${questions.length} questions...`);
@@ -135,7 +105,7 @@ serve(async (req) => {
 
     for (const q of questions) {
       console.log(`Generating image for question ${q.questionNumber}...`);
-      const imageUrl = await generateBestImage(q.imagePrompt, lovableApiKey);
+      const imageUrl = await generateImageWithGemini(q.imagePrompt, geminiApiKey);
       results.push({
         questionNumber: q.questionNumber,
         imageUrl
