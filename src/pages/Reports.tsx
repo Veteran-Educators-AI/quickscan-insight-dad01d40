@@ -12,6 +12,7 @@ import { TopicStrengthsChart } from '@/components/reports/TopicStrengthsChart';
 import { DifferentiationGrouping } from '@/components/reports/DifferentiationGrouping';
 import { EmailResponsesReport } from '@/components/reports/EmailResponsesReport';
 import { ScanAnalysisHistory } from '@/components/reports/ScanAnalysisHistory';
+import { DiagnosticDashboard } from '@/components/reports/DiagnosticDashboard';
 import { useMasteryData } from '@/hooks/useMasteryData';
 
 export default function Reports() {
@@ -151,6 +152,9 @@ export default function Reports() {
               title="Student Mastery by Topic"
               description="Hover over cells to see detailed performance data"
             />
+
+            {/* Diagnostic Dashboard */}
+            <DiagnosticDashboard classId={selectedClassId === 'all' ? undefined : selectedClassId} />
 
             {/* Scan Analysis History */}
             <ScanAnalysisHistory classId={selectedClassId === 'all' ? undefined : selectedClassId} />
