@@ -28,44 +28,47 @@ interface GeneratedQuestion {
   imagePrompt?: string;
 }
 
-async function callGeminiAPI(prompt: string, apiKey: string): Promise<string> {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 8000,
-        }
-      }),
-    }
-  );
+async function callLovableAI(prompt: string): Promise<string> {
+  const apiKey = Deno.env.get('LOVABLE_API_KEY');
+  if (!apiKey) {
+    throw new Error('LOVABLE_API_KEY not configured');
+  }
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { role: 'system', content: 'You are an expert math educator. Return only valid JSON arrays when asked for questions.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 8000,
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('Gemini API error:', response.status, errorText);
+    console.error('Lovable AI error:', response.status, errorText);
     
     if (response.status === 429) {
       throw { status: 429, message: 'Rate limit exceeded. Please try again in a moment.' };
     }
-    if (response.status === 403) {
-      throw { status: 403, message: 'API key invalid or quota exceeded. Please check your Google API key settings.' };
+    if (response.status === 402) {
+      throw { status: 402, message: 'AI credits exhausted. Please add funds to continue.' };
     }
-    throw new Error(`Gemini API error: ${response.status}`);
+    throw new Error(`AI API error: ${response.status}`);
   }
 
   const data = await response.json();
-  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const content = data.choices?.[0]?.message?.content;
   
   if (!content) {
-    throw new Error('No content in Gemini response');
+    throw new Error('No content in AI response');
   }
   
   return content;
@@ -96,11 +99,6 @@ serve(async (req) => {
       );
     }
 
-    const geminiApiKey = Deno.env.get('GOOGLE_GEMINI_API_KEY');
-    if (!geminiApiKey) {
-      throw new Error('GOOGLE_GEMINI_API_KEY not configured');
-    }
-
     // Build the prompt
     const topicsList = topics.map((t, i) => 
       `${i + 1}. Topic: "${t.topicName}" (Standard: ${t.standard}, Subject: ${t.subject}, Category: ${t.category})`
@@ -116,7 +114,6 @@ serve(async (req) => {
     let geometryInstruction = '';
     if (includeGeometry) {
       if (useAIImages) {
-        // When using AI images, ask for image prompts instead of SVGs
         geometryInstruction = `
 8. For geometry-related questions, you MUST include an "imagePrompt" field with a detailed description of the diagram/image needed.
    - The imagePrompt should describe what visual diagram would help students understand the question
@@ -282,7 +279,7 @@ ${worksheetMode === 'diagnostic' ? 'Advancement levels required: A, B, C, D, E, 
 
 IMPORTANT: Return ONLY the JSON array, no other text.`;
 
-    const content = await callGeminiAPI(prompt, geminiApiKey);
+    const content = await callLovableAI(prompt);
 
     // Parse the JSON response
     let questions: GeneratedQuestion[];
