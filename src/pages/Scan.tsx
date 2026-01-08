@@ -1119,13 +1119,45 @@ export default function Scan() {
                   {/* Action buttons */}
                   {batch.items.length > 0 && (
                     <div className="space-y-3">
-                      {/* Auto-identify button */}
+                      {/* QR Scan button - fast local scanning */}
+                      {selectedClassId && students.length > 0 && batch.items.some(item => !item.identification?.qrCodeDetected) && (
+                        <Button
+                          variant="outline"
+                          className="w-full border-green-500/50 text-green-700 dark:text-green-400 hover:bg-green-500/10"
+                          onClick={async () => {
+                            toast.info('Scanning all papers for QR codes...', { icon: <QrCode className="h-4 w-4" /> });
+                            const result = await batch.scanAllQRCodes(students);
+                            if (result.matched > 0) {
+                              toast.success(`Found QR codes in ${result.matched} of ${result.total} papers!`, {
+                                icon: <QrCode className="h-4 w-4" />,
+                              });
+                            } else {
+                              toast.info('No QR codes detected. Try AI identification instead.');
+                            }
+                          }}
+                          disabled={batch.isProcessing || batch.isIdentifying}
+                        >
+                          {batch.isIdentifying ? (
+                            <>
+                              <QrCode className="h-4 w-4 mr-2 animate-pulse" />
+                              Scanning {batch.currentIndex + 1}/{batch.items.length}...
+                            </>
+                          ) : (
+                            <>
+                              <QrCode className="h-4 w-4 mr-2" />
+                              Scan QR Codes (Fast)
+                            </>
+                          )}
+                        </Button>
+                      )}
+
+                      {/* AI Auto-identify button - for papers without QR */}
                       {selectedClassId && students.length > 0 && batch.items.some(item => !item.studentId) && (
                         <Button
                           variant="outline"
                           className="w-full"
                           onClick={() => {
-                            toast.info('Auto-identifying students from papers...');
+                            toast.info('Auto-identifying students from handwritten names...');
                             batch.autoIdentifyAll(students);
                           }}
                           disabled={batch.isProcessing || batch.isIdentifying}
@@ -1138,10 +1170,28 @@ export default function Scan() {
                           ) : (
                             <>
                               <Sparkles className="h-4 w-4 mr-2" />
-                              Auto-Identify Students (QR/Name)
+                              AI Identify Names (Slower)
                             </>
                           )}
                         </Button>
+                      )}
+
+                      {/* Summary of identified papers */}
+                      {batch.items.length > 0 && (
+                        <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <QrCode className="h-3.5 w-3.5 text-green-600" />
+                            {batch.items.filter(i => i.identification?.qrCodeDetected).length} QR matched
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                            {batch.items.filter(i => i.autoAssigned && !i.identification?.qrCodeDetected).length} name matched
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            {batch.items.filter(i => !i.studentId).length} unassigned
+                          </span>
+                        </div>
                       )}
                       
                       <div className="flex gap-3">
