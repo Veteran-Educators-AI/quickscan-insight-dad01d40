@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
+import { renderMathText } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
 import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
 
@@ -1574,7 +1575,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       <p className="text-sm text-muted-foreground mb-1">
                         {question.topic} ({question.standard})
                       </p>
-                      <p className="text-sm">{question.question}</p>
+                      <p className="text-sm font-serif leading-relaxed">{renderMathText(question.question)}</p>
                       {question.imageUrl && (
                         <div className="mt-2 flex flex-col items-center gap-2">
                           <div className="relative group">
@@ -1837,7 +1838,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   <p className="text-sm text-muted-foreground ml-5">
                     {question.topic} ({question.standard})
                   </p>
-                  <p className="ml-5">{question.question}</p>
+                  <p className="ml-5 font-serif leading-relaxed text-base">{renderMathText(question.question)}</p>
                   {question.svg && (
                     <div 
                       className="ml-5 mt-2 flex justify-center"
