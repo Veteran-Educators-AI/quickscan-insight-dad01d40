@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { StudentNameProvider } from "@/lib/StudentNameContext";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { WhatsNewDialog } from "@/components/WhatsNewDialog";
+import { useMfaStatus } from "@/hooks/useMfaStatus";
 
 import { useDeepLinks } from "./hooks/useDeepLinks";
 import Login from "./pages/Login";
@@ -26,14 +27,17 @@ import Help from "./pages/Help";
 import ResetPassword from "./pages/ResetPassword";
 import SharedWorksheet from "./pages/SharedWorksheet";
 import StudentResults from "./pages/StudentResults";
+import MfaChallenge from "./pages/MfaChallenge";
+import MfaEnroll from "./pages/MfaEnroll";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const { status: mfaStatus, isLoading: mfaLoading } = useMfaStatus();
   
-  if (loading) {
+  if (loading || mfaLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
@@ -43,6 +47,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Check MFA status - redirect to enroll or challenge if needed
+  if (mfaStatus === 'not_enrolled') {
+    return <Navigate to="/mfa-enroll" replace />;
+  }
+  
+  if (mfaStatus === 'needs_verification') {
+    return <Navigate to="/mfa-challenge" replace />;
   }
   
   return <>{children}</>;
@@ -77,6 +90,8 @@ function AppRoutes() {
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/mfa-challenge" element={user ? <MfaChallenge /> : <Navigate to="/login" replace />} />
+      <Route path="/mfa-enroll" element={user ? <MfaEnroll /> : <Navigate to="/login" replace />} />
       <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/classes" element={<ProtectedRoute><Classes /></ProtectedRoute>} />
