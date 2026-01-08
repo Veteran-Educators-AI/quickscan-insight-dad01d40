@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Printer, Check, Loader2 } from 'lucide-react';
+import { Printer, Check, Loader2, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PrintableWorksheet } from './PrintableWorksheet';
@@ -41,6 +42,7 @@ export function PrintWorksheetDialog({ classId, students, trigger }: PrintWorksh
   const [loading, setLoading] = useState(false);
   const [assessmentName, setAssessmentName] = useState('Geometry Assessment');
   const [showPreview, setShowPreview] = useState(false);
+  const [includeQRCodes, setIncludeQRCodes] = useState(true);
 
   useEffect(() => {
     if (open) {
@@ -154,6 +156,24 @@ export function PrintWorksheetDialog({ classId, students, trigger }: PrintWorksh
               />
             </div>
 
+            {/* QR Code Toggle */}
+            <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
+              <div className="space-y-0.5">
+                <Label htmlFor="qr-toggle" className="flex items-center gap-2 cursor-pointer">
+                  <QrCode className="h-4 w-4 text-primary" />
+                  Embed Student QR Codes
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Each worksheet will have QR codes linking student to each question for auto-identification during scanning
+                </p>
+              </div>
+              <Switch
+                id="qr-toggle"
+                checked={includeQRCodes}
+                onCheckedChange={setIncludeQRCodes}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               {/* Students Selection */}
               <div className="space-y-2">
@@ -259,6 +279,7 @@ export function PrintWorksheetDialog({ classId, students, trigger }: PrintWorksh
                 student={student}
                 questions={getSelectedQuestions()}
                 assessmentName={assessmentName}
+                showQRCodes={includeQRCodes}
               />
             ))}
           </div>

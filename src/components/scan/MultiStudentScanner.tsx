@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap } from 'lucide-react';
+import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { ManualRegionDrawer } from './ManualRegionDrawer';
 
 interface StudentOption {
   id: string;
@@ -59,6 +60,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const [extractedStudents, setExtractedStudents] = useState<ExtractedStudent[]>([]);
   const [currentGradingIndex, setCurrentGradingIndex] = useState(0);
   const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
+  const [showManualDrawer, setShowManualDrawer] = useState(false);
   
   // Class and roster state
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -174,6 +176,21 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
     } finally {
       setIsExtracting(false);
     }
+  };
+
+  const handleManualRegionsConfirm = (regions: { id: string; x: number; y: number; width: number; height: number }[], croppedImages: string[]) => {
+    const students: ExtractedStudent[] = croppedImages.map((croppedImage, index) => ({
+      id: `student-${index + 1}`,
+      studentName: null,
+      croppedImageBase64: croppedImage,
+      boundingBox: regions[index],
+      status: 'pending' as const,
+      assignedStudentId: null,
+    }));
+    
+    setExtractedStudents(students);
+    setShowManualDrawer(false);
+    toast.success(`Created ${students.length} student regions manually!`);
   };
 
   const assignStudent = (extractedId: string, rosterStudentId: string | null) => {
@@ -464,7 +481,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
       )}
 
       {/* Image Preview & Extraction */}
-      {originalImage && extractedStudents.length === 0 && (
+      {originalImage && extractedStudents.length === 0 && !showManualDrawer && (
         <Card>
           <CardContent className="p-4 space-y-4">
             <img 
@@ -472,33 +489,57 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
               alt="Uploaded class work" 
               className="w-full rounded-lg object-contain max-h-[300px]"
             />
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setOriginalImage(null)}
+                  disabled={isExtracting}
+                >
+                  Change Image
+                </Button>
+                <Button 
+                  variant="hero" 
+                  className="flex-1"
+                  onClick={extractStudentRegions}
+                  disabled={isExtracting}
+                >
+                  {isExtracting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Detecting Student Work...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Auto-Detect Regions
+                    </>
+                  )}
+                </Button>
+              </div>
               <Button 
                 variant="outline" 
-                onClick={() => setOriginalImage(null)}
+                onClick={() => setShowManualDrawer(true)}
                 disabled={isExtracting}
+                className="w-full"
               >
-                Change Image
-              </Button>
-              <Button 
-                variant="hero" 
-                className="flex-1"
-                onClick={extractStudentRegions}
-                disabled={isExtracting}
-              >
-                {isExtracting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Detecting Student Work...
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="h-4 w-4 mr-2" />
-                    Detect Student Regions
-                  </>
-                )}
+                <Square className="h-4 w-4 mr-2" />
+                Draw Regions Manually
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Manual Region Drawer */}
+      {originalImage && showManualDrawer && extractedStudents.length === 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <ManualRegionDrawer
+              imageUrl={originalImage}
+              onRegionsConfirm={handleManualRegionsConfirm}
+              onCancel={() => setShowManualDrawer(false)}
+            />
           </CardContent>
         </Card>
       )}
