@@ -119,6 +119,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [showAnswerLines, setShowAnswerLines] = useState(true);
   const [questionCount, setQuestionCount] = useState('5');
   const [difficultyFilter, setDifficultyFilter] = useState<string[]>(['medium', 'hard', 'challenging']);
+  const [bloomFilter, setBloomFilter] = useState<BloomLevel[]>(['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create']);
   const [includeFormulas, setIncludeFormulas] = useState(false);
   const [includeFormulaSheet, setIncludeFormulaSheet] = useState(false);
   const [includeGraphPaper, setIncludeGraphPaper] = useState(false);
@@ -189,6 +190,14 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       prev.includes(difficulty)
         ? prev.filter(d => d !== difficulty)
         : [...prev, difficulty]
+    );
+  };
+
+  const toggleBloomLevel = (level: BloomLevel) => {
+    setBloomFilter(prev => 
+      prev.includes(level)
+        ? prev.filter(l => l !== level)
+        : [...prev, level]
     );
   };
 
@@ -391,12 +400,13 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           })),
           questionCount: parseInt(questionCount),
           difficultyLevels: difficultyFilter,
+          bloomLevels: bloomFilter,
           includeGeometry: useAIImages,
           includeFormulas,
           includeGraphPaper,
           includeCoordinateGeometry,
           useAIImages,
-          worksheetMode, // Pass worksheet mode to generate advancement levels for diagnostic
+          worksheetMode,
         },
       });
 
@@ -1391,6 +1401,34 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   </div>
                   {difficultyFilter.length === 0 && (
                     <p className="text-xs text-destructive">Select at least one difficulty level</p>
+                  )}
+                </div>
+                
+                {/* Bloom's Taxonomy Filter */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm flex items-center gap-1.5">
+                    Bloom's Taxonomy Levels
+                    <Badge variant="outline" className="text-[10px] font-normal">Cognitive</Badge>
+                  </Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {BLOOM_LEVELS.map((bloom) => (
+                      <button
+                        key={bloom.level}
+                        type="button"
+                        onClick={() => toggleBloomLevel(bloom.level)}
+                        title={bloom.description}
+                        className={`px-2 py-1 text-xs font-medium rounded-full border transition-colors ${
+                          bloomFilter.includes(bloom.level)
+                            ? `${bloom.color} text-white border-transparent`
+                            : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+                        }`}
+                      >
+                        {bloom.label}
+                      </button>
+                    ))}
+                  </div>
+                  {bloomFilter.length === 0 && (
+                    <p className="text-xs text-destructive">Select at least one cognitive level</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">

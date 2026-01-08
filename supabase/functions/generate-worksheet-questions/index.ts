@@ -106,10 +106,11 @@ serve(async (req) => {
   }
 
   try {
-    const { topics, questionCount, difficultyLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages, worksheetMode } = await req.json() as {
+    const { topics, questionCount, difficultyLevels, bloomLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages, worksheetMode } = await req.json() as {
       topics: TopicInput[];
       questionCount: number;
       difficultyLevels?: string[];
+      bloomLevels?: BloomLevel[];
       includeGeometry?: boolean;
       includeFormulas?: boolean;
       includeGraphPaper?: boolean;
@@ -135,6 +136,12 @@ serve(async (req) => {
       ? difficultyLevels 
       : ['medium', 'hard', 'challenging'];
     const difficultyInstruction = `Only generate questions with these difficulty levels: ${allowedDifficulties.join(', ')}.`;
+
+    // Bloom's Taxonomy filter
+    const allowedBloomLevels = bloomLevels && bloomLevels.length > 0 
+      ? bloomLevels 
+      : ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'];
+    const bloomInstruction = `ONLY generate questions for these Bloom's Taxonomy cognitive levels: ${allowedBloomLevels.join(', ')}. Do NOT include questions from other cognitive levels.`;
 
     // Build optional instructions for geometry and formulas
     let geometryInstruction = '';
@@ -323,13 +330,19 @@ LEVEL 6: CREATE (Produce new or original work)
 └── Example: "Create a quadratic equation that has roots at x = 3 and x = -5." / "Design a geometric proof to show that the diagonals of a rhombus are perpendicular."
 
 ═══════════════════════════════════════════════════════════════════════════════
+BLOOM'S LEVEL FILTER (IMPORTANT):
+═══════════════════════════════════════════════════════════════════════════════
+${bloomInstruction}
+
 DISTRIBUTION REQUIREMENTS:
 ═══════════════════════════════════════════════════════════════════════════════
-- For ${questionCount} questions, distribute across levels as follows:
+- For ${questionCount} questions, distribute ONLY across the allowed cognitive levels: ${allowedBloomLevels.join(', ')}
+- If all 6 levels are allowed, use this distribution:
   • 10-15% Remember/Understand (foundation questions to build confidence)
   • 30-40% Apply (core computational and procedural skills)
   • 30-40% Analyze/Evaluate (higher-order thinking and reasoning)
   • 10-20% Create (synthesis and original thinking)
+- If only specific levels are selected, distribute questions evenly across those levels
 - Start with lower-level questions and progress to higher levels
 - Each question should explicitly test the cognitive level indicated
 
@@ -337,10 +350,11 @@ REQUIREMENTS:
 1. Generate exactly ${questionCount} questions total
 2. Distribute questions across the topics (approximately ${questionsPerTopic} per topic)
 3. EVERY question must include "bloomLevel" and "bloomVerb" fields
-4. Include multi-step problems that require showing work at Apply level and above
-5. ${difficultyInstruction}
-6. Use real-world contexts where appropriate (especially for Apply and above)
-7. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}${graphPaperInstruction}${coordinateGeometryInstruction}
+4. ONLY use cognitive levels from the allowed list: ${allowedBloomLevels.join(', ')}
+5. Include multi-step problems that require showing work at Apply level and above
+6. ${difficultyInstruction}
+7. Use real-world contexts where appropriate (especially for Apply and above)
+8. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}${graphPaperInstruction}${coordinateGeometryInstruction}
 ${diagnosticInstruction}
 
 CRITICAL - TEXTBOOK-QUALITY FORMATTING:
