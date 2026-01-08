@@ -20,6 +20,7 @@ import QuestionNew from "./pages/QuestionNew";
 import Scan from "./pages/Scan";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import Help from "./pages/Help";
 import ResetPassword from "./pages/ResetPassword";
 import SharedWorksheet from "./pages/SharedWorksheet";
 import NotFound from "./pages/NotFound";
@@ -86,6 +87,7 @@ function AppRoutes() {
       <Route path="/assessment/*" element={<Navigate to="/questions" replace />} />
       <Route path="/scan" element={<ProtectedRoute><Scan /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+      <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/worksheet/:shareCode" element={<SharedWorksheet />} />
       <Route path="*" element={<NotFound />} />
