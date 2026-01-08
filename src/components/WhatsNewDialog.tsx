@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, QrCode, Square, Users, X, ChevronRight } from 'lucide-react';
+import { Sparkles, QrCode, Square, Users, Eye, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Increment this version when adding new features
-const CURRENT_VERSION = '1.3.0';
+const CURRENT_VERSION = '1.4.0';
 const STORAGE_KEY = 'scan-genius-last-seen-version';
 
 interface Update {
@@ -21,6 +21,23 @@ interface Update {
 }
 
 const updates: Update[] = [
+  {
+    version: '1.4.0',
+    date: 'January 2026',
+    title: 'Student Results View & Batch QR Scanning',
+    features: [
+      {
+        icon: <Eye className="h-5 w-5 text-primary" />,
+        title: 'Student Results Page',
+        description: 'Students can now view their graded work and feedback by scanning the QR code on their worksheet.',
+      },
+      {
+        icon: <QrCode className="h-5 w-5 text-primary" />,
+        title: 'Batch QR Scanning',
+        description: 'Process multiple worksheets at once with fast QR code scanning to auto-match students for rapid grading.',
+      },
+    ],
+  },
   {
     version: '1.3.0',
     date: 'January 2026',
