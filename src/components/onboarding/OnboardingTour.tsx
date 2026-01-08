@@ -67,6 +67,19 @@ const tourSteps: Step[] = [
     disableBeacon: true,
   },
   {
+    target: '[data-tour="nav-help"]',
+    title: '❓ Help Center',
+    content: (
+      <div className="text-left space-y-2">
+        <p><strong>Find answers and learn more.</strong></p>
+        <p className="text-sm text-muted-foreground">
+          Example: Browse FAQ, watch video tutorials, and search documentation whenever you need guidance.
+        </p>
+      </div>
+    ),
+    disableBeacon: true,
+  },
+  {
     target: '[data-tour="nav-settings"]',
     title: '⚙️ Settings',
     content: (
