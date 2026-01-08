@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/lib/auth';
+import { toast } from 'sonner';
 import { 
   Search, 
   BookOpen, 
@@ -21,7 +26,10 @@ import {
   ExternalLink,
   Lightbulb,
   Zap,
-  Shield
+  Shield,
+  MessageSquare,
+  Send,
+  Loader2
 } from 'lucide-react';
 
 interface FAQItem {
@@ -257,8 +265,17 @@ const docArticles: DocArticle[] = [
 const categories = ["All", "Getting Started", "Classes", "Worksheets", "Scanning", "Grading", "AI Detection", "Reports", "Notifications", "Privacy", "Mobile"];
 
 export default function Help() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  
+  // Contact form state
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState(user?.email || '');
+  const [contactSubject, setContactSubject] = useState('');
+  const [contactCategory, setContactCategory] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filteredFAQs = useMemo(() => {
     return faqItems.filter(item => {
@@ -295,6 +312,42 @@ export default function Help() {
       return matchesSearch;
     });
   }, [searchQuery]);
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!contactName.trim() || !contactEmail.trim() || !contactSubject.trim() || !contactCategory || !contactMessage.trim()) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(contactEmail)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      // Simulate API call - in production, this would send to your support system
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      toast.success('Your message has been sent! We\'ll get back to you within 24-48 hours.');
+      
+      // Reset form
+      setContactName('');
+      setContactEmail(user?.email || '');
+      setContactSubject('');
+      setContactCategory('');
+      setContactMessage('');
+    } catch (error) {
+      toast.error('Failed to send message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <AppLayout>
@@ -359,7 +412,7 @@ export default function Help() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="faq" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="faq" className="gap-2">
               <HelpCircle className="h-4 w-4" />
               <span className="hidden sm:inline">FAQ</span>
@@ -371,6 +424,10 @@ export default function Help() {
             <TabsTrigger value="docs" className="gap-2">
               <BookOpen className="h-4 w-4" />
               <span className="hidden sm:inline">Docs</span>
+            </TabsTrigger>
+            <TabsTrigger value="contact" className="gap-2">
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">Contact</span>
             </TabsTrigger>
           </TabsList>
 
@@ -521,6 +578,145 @@ export default function Help() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Contact Tab */}
+          <TabsContent value="contact" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-primary" />
+                  Contact Support
+                </CardTitle>
+                <CardDescription>
+                  Have a question or issue? Fill out the form below and our team will get back to you within 24-48 hours.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleContactSubmit} className="space-y-4">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="contact-name">Your Name *</Label>
+                      <Input
+                        id="contact-name"
+                        placeholder="Enter your name"
+                        value={contactName}
+                        onChange={(e) => setContactName(e.target.value)}
+                        maxLength={100}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contact-email">Email Address *</Label>
+                      <Input
+                        id="contact-email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={contactEmail}
+                        onChange={(e) => setContactEmail(e.target.value)}
+                        maxLength={255}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="contact-category">Category *</Label>
+                      <Select value={contactCategory} onValueChange={setContactCategory}>
+                        <SelectTrigger id="contact-category">
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="question">General Question</SelectItem>
+                          <SelectItem value="bug">Bug Report</SelectItem>
+                          <SelectItem value="feature">Feature Request</SelectItem>
+                          <SelectItem value="account">Account Issue</SelectItem>
+                          <SelectItem value="billing">Billing Question</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contact-subject">Subject *</Label>
+                      <Input
+                        id="contact-subject"
+                        placeholder="Brief description of your issue"
+                        value={contactSubject}
+                        onChange={(e) => setContactSubject(e.target.value)}
+                        maxLength={200}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-message">Message *</Label>
+                    <Textarea
+                      id="contact-message"
+                      placeholder="Please describe your question or issue in detail. Include any relevant information such as steps to reproduce, error messages, or screenshots."
+                      value={contactMessage}
+                      onChange={(e) => setContactMessage(e.target.value)}
+                      rows={6}
+                      maxLength={2000}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground text-right">
+                      {contactMessage.length}/2000 characters
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <p className="text-sm text-muted-foreground">
+                      * Required fields
+                    </p>
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Send Message
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Additional Contact Info */}
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Card>
+                <CardContent className="p-4 flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Clock className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-sm">Response Time</h3>
+                    <p className="text-xs text-muted-foreground">
+                      We typically respond within 24-48 business hours
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Lightbulb className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-sm">Check the FAQ First</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Many common questions are answered in our FAQ section
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
