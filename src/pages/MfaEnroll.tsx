@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Loader2, CheckCircle, Smartphone } from 'lucide-react';
+import { Shield, Loader2, CheckCircle, Smartphone, Download, Copy, Check, Key } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { toast } from 'sonner';
 import scanGeniusLogo from '@/assets/scan-genius-logo.png';
+import { generateRecoveryCodes, hashRecoveryCode, formatRecoveryCodesForPrint } from '@/lib/recoveryCodeUtils';
 
 export default function MfaEnroll() {
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -15,7 +16,10 @@ export default function MfaEnroll() {
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [step, setStep] = useState<'setup' | 'verify'>('setup');
+  const [step, setStep] = useState<'setup' | 'verify' | 'recovery'>('setup');
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+  const [copiedCodes, setCopiedCodes] = useState(false);
+  const [savedCodes, setSavedCodes] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -80,8 +84,29 @@ export default function MfaEnroll() {
         toast.error('Invalid code. Please try again.');
         setCode('');
       } else {
+        // Generate recovery codes
+        const codes = generateRecoveryCodes(8);
+        setRecoveryCodes(codes);
+
+        // Save hashed codes to database
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Delete any existing codes first
+          await supabase.from('mfa_recovery_codes').delete().eq('user_id', user.id);
+
+          // Insert new hashed codes
+          const hashedCodes = await Promise.all(
+            codes.map(async (code) => ({
+              user_id: user.id,
+              code_hash: await hashRecoveryCode(code),
+            }))
+          );
+
+          await supabase.from('mfa_recovery_codes').insert(hashedCodes);
+        }
+
+        setStep('recovery');
         toast.success('Two-factor authentication enabled!');
-        navigate('/dashboard');
       }
     } catch (error: any) {
       console.error('MFA verification error:', error);
@@ -90,6 +115,29 @@ export default function MfaEnroll() {
     } finally {
       setIsVerifying(false);
     }
+  };
+
+  const handleCopyCodes = async () => {
+    const text = formatRecoveryCodesForPrint(recoveryCodes);
+    await navigator.clipboard.writeText(text);
+    setCopiedCodes(true);
+    toast.success('Recovery codes copied to clipboard');
+    setTimeout(() => setCopiedCodes(false), 2000);
+  };
+
+  const handleDownloadCodes = () => {
+    const text = formatRecoveryCodesForPrint(recoveryCodes);
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'scan-genius-recovery-codes.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setSavedCodes(true);
+    toast.success('Recovery codes downloaded');
   };
 
   // Auto-submit when 6 digits entered
@@ -130,9 +178,13 @@ export default function MfaEnroll() {
             <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
               <Shield className="h-6 w-6 text-primary" />
             </div>
-            <CardTitle>Set Up Two-Factor Authentication</CardTitle>
+            <CardTitle>
+              {step === 'recovery' ? 'Save Your Recovery Codes' : 'Set Up Two-Factor Authentication'}
+            </CardTitle>
             <CardDescription>
-              Two-factor authentication is required to protect student data
+              {step === 'recovery' 
+                ? 'Store these codes safely - you\'ll need them if you lose your phone'
+                : 'Two-factor authentication is required to protect student data'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -179,7 +231,7 @@ export default function MfaEnroll() {
                   I've scanned the QR code
                 </Button>
               </>
-            ) : (
+            ) : step === 'verify' ? (
               <>
                 <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -238,6 +290,59 @@ export default function MfaEnroll() {
                     )}
                   </Button>
                 </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-900">
+                  <Key className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    <strong>Important:</strong> Each code can only be used once. Store these in a safe place like a password manager.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 p-4 bg-muted/50 rounded-lg font-mono text-sm">
+                  {recoveryCodes.map((code, index) => (
+                    <div key={index} className="px-2 py-1 bg-background rounded text-center">
+                      {code}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={handleCopyCodes}
+                    className="flex-1"
+                  >
+                    {copiedCodes ? (
+                      <>
+                        <Check className="mr-2 h-4 w-4" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleDownloadCodes}
+                    className="flex-1"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download
+                  </Button>
+                </div>
+
+                <Button 
+                  onClick={() => navigate('/dashboard')} 
+                  className="w-full"
+                  disabled={!savedCodes && !copiedCodes}
+                >
+                  {savedCodes || copiedCodes ? 'Continue to Dashboard' : 'Save codes first to continue'}
+                </Button>
               </>
             )}
           </CardContent>
