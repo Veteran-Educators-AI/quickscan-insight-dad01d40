@@ -13,6 +13,8 @@ interface TopicInput {
   category: string;
 }
 
+// Bloom's Taxonomy Cognitive Levels (lowest to highest)
+type BloomLevel = 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 type WorksheetMode = 'practice' | 'basic_assessment' | 'diagnostic';
 
@@ -22,6 +24,8 @@ interface GeneratedQuestion {
   standard: string;
   question: string;
   difficulty: 'medium' | 'hard' | 'challenging';
+  bloomLevel: BloomLevel;
+  bloomVerb: string; // The action verb used (e.g., "identify", "compare", "design")
   advancementLevel?: AdvancementLevel;
   svg?: string;
   imageUrl?: string;
@@ -275,20 +279,67 @@ DIAGNOSTIC ASSESSMENT MODE:
   }
 ]`;
 
-    const prompt = `You are an expert math educator creating a professional, textbook-quality worksheet for NYS Regents preparation.
+const prompt = `You are an expert math educator creating a professional, textbook-quality worksheet structured around BLOOM'S TAXONOMY for NYS Regents preparation.
 
-Based on the following standards and topics, generate exactly ${questionCount} higher-order thinking questions that require students to apply, analyze, or evaluate concepts. The questions should be challenging but appropriate for high school students.
+Based on the following standards and topics, generate exactly ${questionCount} questions that progressively move through Bloom's Taxonomy cognitive levels.
 
 TOPICS:
 ${topicsList}
 
+═══════════════════════════════════════════════════════════════════════════════
+BLOOM'S TAXONOMY STRUCTURE (MANDATORY - Follow this progression):
+═══════════════════════════════════════════════════════════════════════════════
+
+Each question MUST include a "bloomLevel" field (one of: remember, understand, apply, analyze, evaluate, create) and a "bloomVerb" field with the specific action verb used.
+
+LEVEL 1: REMEMBER (Recall facts and basic concepts)
+├── Verbs: define, identify, list, name, recall, recognize, state, label
+├── Question types: What is the formula for...? Identify the...? What are the...?
+└── Example: "State the Pythagorean theorem." / "Identify which expression represents a quadratic function."
+
+LEVEL 2: UNDERSTAND (Explain ideas or concepts)
+├── Verbs: describe, explain, interpret, classify, summarize, compare, paraphrase
+├── Question types: Explain why...? What does this mean...? Compare...
+└── Example: "Explain why the sum of angles in a triangle equals 180°." / "Describe the relationship between the slope and y-intercept."
+
+LEVEL 3: APPLY (Use information in new situations)
+├── Verbs: solve, calculate, demonstrate, apply, compute, construct, use, implement
+├── Question types: Calculate...? Solve for...? Apply the formula to find...
+└── Example: "Calculate the area of a circle with radius 7 cm." / "Solve: 3x² - 12 = 0"
+
+LEVEL 4: ANALYZE (Draw connections among ideas)
+├── Verbs: analyze, differentiate, examine, compare, contrast, investigate, distinguish
+├── Question types: Why does...? What evidence...? How does X relate to Y...?
+└── Example: "Analyze why the function f(x) = x² has no x-intercepts when shifted up by 5 units." / "Examine the relationship between the discriminant and the nature of roots."
+
+LEVEL 5: EVALUATE (Justify a decision or course of action)
+├── Verbs: evaluate, justify, critique, assess, argue, defend, judge, support
+├── Question types: Is this the best approach...? Justify your reasoning...? Which method is more efficient...?
+└── Example: "Evaluate whether the substitution or elimination method is more efficient for this system." / "Justify why the triangle is a right triangle."
+
+LEVEL 6: CREATE (Produce new or original work)
+├── Verbs: design, construct, develop, formulate, create, devise, compose, plan
+├── Question types: Design a...? Create an equation that...? Develop a strategy to...?
+└── Example: "Create a quadratic equation that has roots at x = 3 and x = -5." / "Design a geometric proof to show that the diagonals of a rhombus are perpendicular."
+
+═══════════════════════════════════════════════════════════════════════════════
+DISTRIBUTION REQUIREMENTS:
+═══════════════════════════════════════════════════════════════════════════════
+- For ${questionCount} questions, distribute across levels as follows:
+  • 10-15% Remember/Understand (foundation questions to build confidence)
+  • 30-40% Apply (core computational and procedural skills)
+  • 30-40% Analyze/Evaluate (higher-order thinking and reasoning)
+  • 10-20% Create (synthesis and original thinking)
+- Start with lower-level questions and progress to higher levels
+- Each question should explicitly test the cognitive level indicated
+
 REQUIREMENTS:
 1. Generate exactly ${questionCount} questions total
 2. Distribute questions across the topics (approximately ${questionsPerTopic} per topic)
-3. Focus on higher-order thinking skills (Bloom's Taxonomy levels: Apply, Analyze, Evaluate, Create)
-4. Include multi-step problems that require showing work
+3. EVERY question must include "bloomLevel" and "bloomVerb" fields
+4. Include multi-step problems that require showing work at Apply level and above
 5. ${difficultyInstruction}
-6. Use real-world contexts where appropriate
+6. Use real-world contexts where appropriate (especially for Apply and above)
 7. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}${graphPaperInstruction}${coordinateGeometryInstruction}
 ${diagnosticInstruction}
 
@@ -313,10 +364,21 @@ CRITICAL - TEXTBOOK-QUALITY FORMATTING:
   ✓ "Solve for x: 2x² - 5x + 3 = 0"
 
 Respond with a JSON array of questions in this exact format:
-${exampleOutput}
+[
+  {
+    "questionNumber": 1,
+    "topic": "Topic Name",
+    "standard": "G.CO.A.1",
+    "question": "The full question text here",
+    "difficulty": "${allowedDifficulties[0]}",
+    "bloomLevel": "apply",
+    "bloomVerb": "calculate"${worksheetMode === 'diagnostic' ? ',\n    "advancementLevel": "C"' : ''}${useAIImages ? ',\n    "imagePrompt": "A detailed description of the diagram needed"' : ''}
+  }
+]
 ${imageFieldNote}
 
 Difficulty levels allowed: ${allowedDifficulties.join(', ')}
+Bloom levels required: remember, understand, apply, analyze, evaluate, create (distribute appropriately)
 ${worksheetMode === 'diagnostic' ? 'Advancement levels required: A, B, C, D, E, F (distribute across all levels)' : ''}
 
 IMPORTANT: Return ONLY the JSON array, no other text.`;

@@ -33,18 +33,37 @@ export interface WorksheetQuestion {
 // Advancement levels A-F for diagnostic worksheets
 export type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
+// Bloom's Taxonomy Cognitive Levels
+export type BloomLevel = 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
+
 interface GeneratedQuestion {
   questionNumber: number;
   topic: string;
   standard: string;
   question: string;
   difficulty: 'medium' | 'hard' | 'challenging';
+  bloomLevel?: BloomLevel;
+  bloomVerb?: string;
   advancementLevel?: AdvancementLevel; // For diagnostic worksheets
   svg?: string;
   imageUrl?: string;
   imagePrompt?: string;
   clipartUrl?: string;
 }
+
+// Bloom's Taxonomy level display helpers
+const BLOOM_LEVELS: { level: BloomLevel; label: string; color: string; description: string }[] = [
+  { level: 'remember', label: 'Remember', color: 'bg-slate-500', description: 'Recall facts and basic concepts' },
+  { level: 'understand', label: 'Understand', color: 'bg-blue-500', description: 'Explain ideas or concepts' },
+  { level: 'apply', label: 'Apply', color: 'bg-green-500', description: 'Use information in new situations' },
+  { level: 'analyze', label: 'Analyze', color: 'bg-yellow-500', description: 'Draw connections among ideas' },
+  { level: 'evaluate', label: 'Evaluate', color: 'bg-orange-500', description: 'Justify decisions or actions' },
+  { level: 'create', label: 'Create', color: 'bg-red-500', description: 'Produce new or original work' },
+];
+
+const getBloomInfo = (level?: BloomLevel) => {
+  return BLOOM_LEVELS.find(b => b.level === level) || BLOOM_LEVELS[2]; // Default to 'apply'
+};
 
 // Worksheet mode types
 export type WorksheetMode = 'practice' | 'basic_assessment' | 'diagnostic';
@@ -742,16 +761,24 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           yPosition = margin;
         }
 
-        // Question number, advancement level (for diagnostic), and difficulty badge
+        // Question number, Bloom's level, advancement level (for diagnostic), and difficulty badge
         pdf.setFontSize(11);
         pdf.setFont('helvetica', 'bold');
         const difficultyText = question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1);
+        const bloomLabel = question.bloomLevel 
+          ? question.bloomLevel.charAt(0).toUpperCase() + question.bloomLevel.slice(1)
+          : '';
         
-        if (worksheetMode === 'diagnostic' && question.advancementLevel) {
-          pdf.text(`${question.questionNumber}. [Level ${question.advancementLevel}] [${difficultyText}]`, margin, yPosition);
-        } else {
-          pdf.text(`${question.questionNumber}. [${difficultyText}]`, margin, yPosition);
+        let headerParts: string[] = [`${question.questionNumber}.`];
+        if (bloomLabel) {
+          headerParts.push(`[${bloomLabel}${question.bloomVerb ? `: ${question.bloomVerb}` : ''}]`);
         }
+        if (worksheetMode === 'diagnostic' && question.advancementLevel) {
+          headerParts.push(`[Level ${question.advancementLevel}]`);
+        }
+        headerParts.push(`[${difficultyText}]`);
+        
+        pdf.text(headerParts.join(' '), margin, yPosition);
         yPosition += 6;
 
         // Topic and standard reference
@@ -1538,6 +1565,29 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             </>
           ) : (
             <>
+              {/* Bloom's Taxonomy Distribution Summary */}
+              <div className="p-3 bg-muted/50 rounded-lg border">
+                <div className="flex items-center gap-2 mb-2">
+                  <BookOpen className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Bloom's Taxonomy Distribution</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {BLOOM_LEVELS.map(bloom => {
+                    const count = compiledQuestions.filter(q => q.bloomLevel === bloom.level).length;
+                    if (count === 0) return null;
+                    return (
+                      <Badge 
+                        key={bloom.level} 
+                        className={`text-xs text-white ${bloom.color}`}
+                        title={bloom.description}
+                      >
+                        {bloom.label}: {count}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Compiled Questions Preview */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -1545,7 +1595,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   {hasQuestionsWithImagePrompts && (
                     <Badge variant={imagesGenerated ? "default" : "secondary"} className="text-xs">
                       {imagesGenerated 
-                        ? `${compiledQuestions.filter(q => q.imageUrl).length} diagrams` 
+                        ? `${compiledQuestions.filter(q => q.imageUrl).length} diagrams`
                         : `${questionsNeedingImages.length} diagrams pending`}
                     </Badge>
                   )}
@@ -1558,6 +1608,18 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     >
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-sm font-bold">{question.questionNumber}.</span>
+                        {/* Bloom's Taxonomy Level Badge */}
+                        {question.bloomLevel && (
+                          <Badge 
+                            className={`text-xs text-white ${getBloomInfo(question.bloomLevel).color}`}
+                            title={getBloomInfo(question.bloomLevel).description}
+                          >
+                            {getBloomInfo(question.bloomLevel).label}
+                            {question.bloomVerb && (
+                              <span className="ml-1 opacity-80">• {question.bloomVerb}</span>
+                            )}
+                          </Badge>
+                        )}
                         {question.advancementLevel && worksheetMode === 'diagnostic' && (
                           <Badge 
                             variant="outline" 
