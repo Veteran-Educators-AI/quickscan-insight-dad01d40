@@ -112,25 +112,16 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
     onClose();
   }, [stopCamera, onClose]);
 
-  // Start camera when modal opens
+  // Start camera when modal opens or facing mode changes
   useEffect(() => {
     if (isOpen) {
       startCamera();
-    } else {
-      stopCamera();
     }
 
     return () => {
       stopCamera();
     };
-  }, [isOpen, startCamera, stopCamera]);
-
-  // Restart camera when facing mode changes
-  useEffect(() => {
-    if (isOpen && !error) {
-      startCamera();
-    }
-  }, [facingMode]);
+  }, [isOpen, facingMode]);
 
   if (!isOpen) return null;
 
