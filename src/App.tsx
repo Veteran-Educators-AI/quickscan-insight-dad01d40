@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { WhatsNewDialog } from "@/components/WhatsNewDialog";
 
 import { useDeepLinks } from "./hooks/useDeepLinks";
 import Login from "./pages/Login";
@@ -103,6 +104,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <OnboardingTour />
+          <WhatsNewDialog />
           <AppRoutes />
         </BrowserRouter>
       </TooltipProvider>
