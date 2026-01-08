@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_usage_logs: {
+        Row: {
+          completion_tokens: number | null
+          created_at: string | null
+          function_name: string
+          id: string
+          latency_ms: number | null
+          prompt_tokens: number | null
+          total_tokens: number | null
+          user_id: string
+        }
+        Insert: {
+          completion_tokens?: number | null
+          created_at?: string | null
+          function_name: string
+          id?: string
+          latency_ms?: number | null
+          prompt_tokens?: number | null
+          total_tokens?: number | null
+          user_id: string
+        }
+        Update: {
+          completion_tokens?: number | null
+          created_at?: string | null
+          function_name?: string
+          id?: string
+          latency_ms?: number | null
+          prompt_tokens?: number | null
+          total_tokens?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       assessment_questions: {
         Row: {
           assessment_id: string
@@ -761,8 +794,10 @@ export type Database = {
       settings: {
         Row: {
           ai_auto_reject_enabled: boolean | null
+          ai_daily_limit: number | null
           ai_detection_enabled: boolean | null
           ai_detection_threshold: number | null
+          ai_hourly_limit: number | null
           analysis_provider: string | null
           created_at: string
           grading_scale: Json | null
@@ -775,8 +810,10 @@ export type Database = {
         }
         Insert: {
           ai_auto_reject_enabled?: boolean | null
+          ai_daily_limit?: number | null
           ai_detection_enabled?: boolean | null
           ai_detection_threshold?: number | null
+          ai_hourly_limit?: number | null
           analysis_provider?: string | null
           created_at?: string
           grading_scale?: Json | null
@@ -789,8 +826,10 @@ export type Database = {
         }
         Update: {
           ai_auto_reject_enabled?: boolean | null
+          ai_daily_limit?: number | null
           ai_detection_enabled?: boolean | null
           ai_detection_threshold?: number | null
+          ai_hourly_limit?: number | null
           analysis_provider?: string | null
           created_at?: string
           grading_scale?: Json | null
@@ -968,7 +1007,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_ai_rate_limit: {
+        Args: {
+          p_daily_limit?: number
+          p_hourly_limit?: number
+          p_user_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       attempt_status: "pending" | "analyzed" | "reviewed"
