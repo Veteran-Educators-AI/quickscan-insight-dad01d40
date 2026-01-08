@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
 import { renderMathText } from '@/lib/mathRenderer';
+import { MathSymbolPreview } from './MathSymbolPreview';
 import jsPDF from 'jspdf';
 import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
 
@@ -1503,6 +1504,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   ))}
                 </ScrollArea>
               </div>
+
+              {/* Math Symbol Preview */}
+              <MathSymbolPreview />
 
               {/* Compile Button */}
               <Button
