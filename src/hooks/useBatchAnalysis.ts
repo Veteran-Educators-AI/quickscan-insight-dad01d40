@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { handleApiError } from '@/lib/apiErrorHandler';
+import jsQR from 'jsqr';
+import { parseStudentQRCode } from '@/components/print/StudentQRCode';
 
 interface RubricStep {
   step_number: number;
@@ -76,6 +78,7 @@ interface UseBatchAnalysisReturn {
   updateItemStudent: (itemId: string, studentId: string, studentName: string) => void;
   clearAll: () => void;
   autoIdentifyAll: (studentRoster: Student[]) => Promise<void>;
+  scanAllQRCodes: (studentRoster: Student[]) => Promise<{ matched: number; total: number }>;
   startBatchAnalysis: (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<void>;
   isProcessing: boolean;
   isIdentifying: boolean;
@@ -173,6 +176,142 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     setSummary(null);
     setCurrentIndex(-1);
   }, []);
+
+  // Local QR code scanning function
+  const scanQRCodeFromImage = async (imageDataUrl: string): Promise<{ studentId: string; questionId: string } | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          resolve(null);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0);
+        
+        // Try scanning different regions
+        const regions = [
+          { x: 0, y: 0, w: Math.min(400, img.width / 2), h: Math.min(400, img.height / 2) },
+          { x: Math.max(0, img.width - 400), y: 0, w: Math.min(400, img.width / 2), h: Math.min(400, img.height / 2) },
+          { x: 0, y: Math.max(0, img.height - 400), w: Math.min(400, img.width / 2), h: Math.min(400, img.height / 2) },
+          { x: 0, y: 0, w: img.width, h: img.height },
+        ];
+
+        for (const region of regions) {
+          try {
+            const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
+            const code = jsQR(imageData.data, region.w, region.h);
+            
+            if (code) {
+              const parsed = parseStudentQRCode(code.data);
+              if (parsed) {
+                resolve(parsed);
+                return;
+              }
+            }
+          } catch (e) {
+            // Continue to next region
+          }
+        }
+
+        resolve(null);
+      };
+
+      img.onerror = () => resolve(null);
+      img.src = imageDataUrl;
+    });
+  };
+
+  // Batch QR code scanning - fast local scanning
+  const scanAllQRCodes = useCallback(async (studentRoster: Student[]): Promise<{ matched: number; total: number }> => {
+    if (items.length === 0 || isIdentifying || isProcessing) {
+      return { matched: 0, total: 0 };
+    }
+
+    setIsIdentifying(true);
+    let matchedCount = 0;
+
+    for (let i = 0; i < items.length; i++) {
+      // Skip already assigned items with high confidence
+      if (items[i].identification?.confidence === 'high' && items[i].studentId) {
+        matchedCount++;
+        continue;
+      }
+
+      setCurrentIndex(i);
+      
+      // Mark as identifying
+      setItems(prev => prev.map((item, idx) => 
+        idx === i ? { ...item, status: 'identifying' } : item
+      ));
+
+      // Try local QR scan first (fast)
+      const qrResult = await scanQRCodeFromImage(items[i].imageDataUrl);
+      
+      if (qrResult) {
+        // Find matching student from roster
+        const matchedStudent = studentRoster.find(s => s.id === qrResult.studentId);
+        
+        if (matchedStudent) {
+          matchedCount++;
+          setItems(prev => prev.map((item, idx) => 
+            idx === i ? {
+              ...item,
+              status: 'pending',
+              studentId: matchedStudent.id,
+              studentName: `${matchedStudent.first_name} ${matchedStudent.last_name}`,
+              questionId: qrResult.questionId,
+              autoAssigned: true,
+              identification: {
+                qrCodeDetected: true,
+                qrCodeContent: JSON.stringify(qrResult),
+                parsedQRCode: qrResult,
+                handwrittenName: null,
+                matchedStudentId: matchedStudent.id,
+                matchedStudentName: `${matchedStudent.first_name} ${matchedStudent.last_name}`,
+                matchedQuestionId: qrResult.questionId,
+                confidence: 'high',
+              },
+            } : item
+          ));
+        } else {
+          // QR detected but student not in roster
+          setItems(prev => prev.map((item, idx) => 
+            idx === i ? {
+              ...item,
+              status: 'pending',
+              questionId: qrResult.questionId,
+              identification: {
+                qrCodeDetected: true,
+                qrCodeContent: JSON.stringify(qrResult),
+                parsedQRCode: qrResult,
+                handwrittenName: null,
+                matchedStudentId: null,
+                matchedStudentName: null,
+                matchedQuestionId: qrResult.questionId,
+                confidence: 'low',
+              },
+            } : item
+          ));
+        }
+      } else {
+        // No QR found, mark as pending
+        setItems(prev => prev.map((item, idx) => 
+          idx === i ? { ...item, status: 'pending' } : item
+        ));
+      }
+    }
+
+    setCurrentIndex(-1);
+    setIsIdentifying(false);
+    
+    return { matched: matchedCount, total: items.length };
+  }, [items, isIdentifying, isProcessing]);
 
   const identifyStudent = async (item: BatchItem, studentRoster: Student[]): Promise<BatchItem> => {
     try {
@@ -383,6 +522,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     updateItemStudent,
     clearAll,
     autoIdentifyAll,
+    scanAllQRCodes,
     startBatchAnalysis,
     isProcessing,
     isIdentifying,
