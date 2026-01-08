@@ -19,13 +19,15 @@ interface PrintableWorksheetProps {
   questions: Question[];
   assessmentName?: string;
   showAnswerBox?: boolean;
+  showQRCodes?: boolean;
 }
 
 export function PrintableWorksheet({ 
   student, 
   questions, 
   assessmentName = 'Assessment',
-  showAnswerBox = true 
+  showAnswerBox = true,
+  showQRCodes = true 
 }: PrintableWorksheetProps) {
   return (
     <div className="print-worksheet bg-white text-black p-8 min-h-screen" style={{ pageBreakAfter: 'always' }}>
@@ -52,14 +54,16 @@ export function PrintableWorksheet({
           <div key={question.id} className="question-block" style={{ pageBreakInside: 'avoid' }}>
             <div className="flex gap-4">
               {/* QR Code */}
-              <div className="flex-shrink-0">
-                <StudentQRCode 
-                  studentId={student.id} 
-                  questionId={question.id} 
-                  size={56}
-                />
-                <p className="text-xs text-gray-500 mt-1 text-center">Q{index + 1}</p>
-              </div>
+              {showQRCodes && (
+                <div className="flex-shrink-0">
+                  <StudentQRCode 
+                    studentId={student.id} 
+                    questionId={question.id} 
+                    size={56}
+                  />
+                  <p className="text-xs text-gray-500 mt-1 text-center">Q{index + 1}</p>
+                </div>
+              )}
 
               {/* Question Content */}
               <div className="flex-1">
