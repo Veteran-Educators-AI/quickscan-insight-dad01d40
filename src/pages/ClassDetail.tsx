@@ -15,8 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PrintWorksheetDialog } from '@/components/print/PrintWorksheetDialog';
 import { useStudentNames } from '@/lib/StudentNameContext';
 import { getStudentPseudonym, getAvailablePseudonyms, setCustomPseudonym } from '@/lib/studentPseudonyms';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 
 interface Student {
   id: string;
@@ -50,7 +49,7 @@ export default function ClassDetail() {
   const [isAdding, setIsAdding] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [editingPseudonymId, setEditingPseudonymId] = useState<string | null>(null);
+  
   const availablePseudonyms = getAvailablePseudonyms();
 
   useEffect(() => {
@@ -106,23 +105,25 @@ export default function ClassDetail() {
   };
 
   const handleUpdatePseudonym = async (studentId: string, newPseudonym: string | null) => {
+    // Handle reset option
+    const actualPseudonym = newPseudonym === '__reset__' ? null : newPseudonym;
+    
     try {
       const { error } = await supabase
         .from('students')
-        .update({ custom_pseudonym: newPseudonym })
+        .update({ custom_pseudonym: actualPseudonym })
         .eq('id', studentId);
 
       if (error) throw error;
 
       // Update local cache
-      setCustomPseudonym(studentId, newPseudonym);
+      setCustomPseudonym(studentId, actualPseudonym);
       
       // Update local state
       setStudents(prev => prev.map(s => 
-        s.id === studentId ? { ...s, custom_pseudonym: newPseudonym } : s
+        s.id === studentId ? { ...s, custom_pseudonym: actualPseudonym } : s
       ));
       
-      setEditingPseudonymId(null);
       toast({ title: 'Pseudonym updated!' });
     } catch (error: any) {
       toast({
@@ -592,43 +593,26 @@ export default function ClassDetail() {
                         <div className="flex items-center gap-2">
                           <span>{displayName}</span>
                           {!revealRealNames && (
-                            <Popover open={editingPseudonymId === student.id} onOpenChange={(open) => setEditingPseudonymId(open ? student.id : null)}>
-                              <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-6 w-6">
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-64 p-3" align="start">
-                                <div className="space-y-2">
-                                  <Label className="text-xs">Change Pseudonym</Label>
-                                  <Select
-                                    value={currentPseudonym}
-                                    onValueChange={(value) => handleUpdatePseudonym(student.id, value)}
-                                  >
-                                    <SelectTrigger className="h-8 text-sm">
-                                      <SelectValue placeholder="Select pseudonym" />
-                                    </SelectTrigger>
-                                    <SelectContent className="max-h-60">
-                                      {availablePseudonyms.map((p) => (
-                                        <SelectItem key={p} value={p} className="text-sm">
-                                          {p}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  {student.custom_pseudonym && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="w-full text-xs"
-                                      onClick={() => handleUpdatePseudonym(student.id, null)}
-                                    >
-                                      Reset to Default
-                                    </Button>
-                                  )}
-                                </div>
-                              </PopoverContent>
-                            </Popover>
+                            <Select
+                              value={currentPseudonym}
+                              onValueChange={(value) => handleUpdatePseudonym(student.id, value)}
+                            >
+                              <SelectTrigger className="h-7 w-7 p-0 border-0 bg-transparent hover:bg-muted [&>svg]:hidden">
+                                <Pencil className="h-3 w-3 mx-auto text-muted-foreground" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-60">
+                                {student.custom_pseudonym && (
+                                  <SelectItem value="__reset__" className="text-xs text-muted-foreground">
+                                    ↩ Reset to Default
+                                  </SelectItem>
+                                )}
+                                {availablePseudonyms.map((p) => (
+                                  <SelectItem key={p} value={p} className="text-sm">
+                                    {p}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           )}
                         </div>
                       </TableCell>
