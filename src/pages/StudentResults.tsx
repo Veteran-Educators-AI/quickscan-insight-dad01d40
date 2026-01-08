@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -23,15 +22,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import logo from '@/assets/scan-genius-logo.png';
+import { getStudentPseudonym } from '@/lib/studentPseudonyms';
 
 interface AttemptData {
   id: string;
   status: string;
   created_at: string;
-  student: {
-    first_name: string;
-    last_name: string;
-  };
+  studentId: string;
   question: {
     prompt_text: string | null;
     jmap_id: string | null;
@@ -65,8 +62,9 @@ export default function StudentResults() {
   const [attempt, setAttempt] = useState<AttemptData | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [studentName, setStudentName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const studentPseudonym = studentId ? getStudentPseudonym(studentId) : 'Student';
 
   // Fetch results and comments
   useEffect(() => {
@@ -85,7 +83,7 @@ export default function StudentResults() {
             id,
             status,
             created_at,
-            students!inner (first_name, last_name),
+            student_id,
             questions!inner (prompt_text, jmap_id),
             scores (points_earned, notes, rubrics (description, points)),
             attempt_images (image_url, ocr_text)
@@ -108,7 +106,7 @@ export default function StudentResults() {
             id: data.id,
             status: data.status,
             created_at: data.created_at,
-            student: data.students as unknown as { first_name: string; last_name: string },
+            studentId: data.student_id,
             question: data.questions as unknown as { prompt_text: string | null; jmap_id: string | null },
             scores: (data.scores || []).map((s: any) => ({
               points_earned: s.points_earned,
@@ -157,7 +155,7 @@ export default function StudentResults() {
           attempt_id: attempt.id,
           content: newComment.trim(),
           author_type: 'student',
-          author_name: studentName.trim() || null,
+          author_name: studentPseudonym,
         })
         .select()
         .single();
@@ -258,7 +256,7 @@ export default function StudentResults() {
               </div>
               <div className="flex-1">
                 <h2 className="text-lg font-semibold">
-                  {attempt.student.first_name} {attempt.student.last_name}
+                  {studentPseudonym}
                 </h2>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                   <span className="flex items-center gap-1">
@@ -428,17 +426,6 @@ export default function StudentResults() {
               <p className="text-sm text-muted-foreground">
                 Have a question about your grade or need help understanding something? Ask your teacher here!
               </p>
-              
-              <div className="space-y-2">
-                <Label htmlFor="student-name" className="text-sm">Your Name (optional)</Label>
-                <Input
-                  id="student-name"
-                  placeholder="Enter your name"
-                  value={studentName}
-                  onChange={(e) => setStudentName(e.target.value.slice(0, 100))}
-                  maxLength={100}
-                />
-              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="comment" className="text-sm">Your Question or Comment</Label>

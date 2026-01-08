@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { getStudentPseudonym } from '@/lib/studentPseudonyms';
 
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -214,7 +215,7 @@ export function DiagnosticResultsRecorder({
 
         const currentLevel = calculateRecommendedLevel(ss.scores);
         const previousLevel = previousLevelByStudent[ss.studentId];
-        const studentName = `${student.first_name} ${student.last_name}`;
+        const studentName = getStudentPseudonym(ss.studentId);
 
         // Check for Level A achievement
         if (currentLevel === 'A' && previousLevel !== 'A') {
@@ -325,7 +326,7 @@ export function DiagnosticResultsRecorder({
                 <div key={student.id} className="p-3 border rounded-lg space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">
-                      {student.last_name}, {student.first_name}
+                      {getStudentPseudonym(student.id)}
                     </span>
                     <Badge variant="outline" className={getLevelColor(recommendedLevel)}>
                       Recommended: Level {recommendedLevel}

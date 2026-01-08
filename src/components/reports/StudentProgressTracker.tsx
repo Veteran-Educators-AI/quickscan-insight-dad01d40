@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { getStudentPseudonym } from '@/lib/studentPseudonyms';
 
 interface StudentProgressTrackerProps {
   classId?: string;
@@ -126,7 +127,7 @@ export function StudentProgressTracker({ classId }: StudentProgressTrackerProps)
       if (!byStudent[studentId]) {
         byStudent[studentId] = {
           studentId,
-          studentName: `${student.first_name} ${student.last_name}`,
+          studentName: getStudentPseudonym(studentId),
           assessments: [],
           currentLevel: 'F',
           startLevel: 'F',
@@ -239,7 +240,7 @@ export function StudentProgressTracker({ classId }: StudentProgressTrackerProps)
             <SelectItem value="all">All Students Overview</SelectItem>
             {students?.map((student) => (
               <SelectItem key={student.id} value={student.id}>
-                {student.first_name} {student.last_name}
+                {getStudentPseudonym(student.id)}
               </SelectItem>
             ))}
           </SelectContent>

@@ -7,6 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { getStudentPseudonym } from '@/lib/studentPseudonyms';
 
 interface EmailResponsesReportProps {
   classId?: string;
@@ -228,10 +229,7 @@ export function EmailResponsesReport({ classId }: EmailResponsesReportProps) {
                           <CheckCircle className="h-4 w-4 text-emerald-500" />
                           <div>
                             <p className="font-medium text-sm">
-                              {attempt.student.first_name} {attempt.student.last_name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {attempt.student.email}
+                              {getStudentPseudonym(attempt.student.id)}
                             </p>
                           </div>
                         </div>
@@ -267,7 +265,7 @@ export function EmailResponsesReport({ classId }: EmailResponsesReportProps) {
                         <Clock className="h-4 w-4 text-amber-500" />
                         <div>
                           <p className="font-medium text-sm">
-                            {attempt.student.first_name} {attempt.student.last_name}
+                            {getStudentPseudonym(attempt.student.id)}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {attempt.question.jmap_id || 'Question'}

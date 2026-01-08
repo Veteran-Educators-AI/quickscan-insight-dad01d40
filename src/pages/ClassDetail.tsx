@@ -13,7 +13,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PrintWorksheetDialog } from '@/components/print/PrintWorksheetDialog';
-
+import { getStudentPseudonym } from '@/lib/studentPseudonyms';
 interface Student {
   id: string;
   first_name: string;
@@ -503,20 +503,22 @@ export default function ClassDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {students.map((student) => (
+                  {students.map((student) => {
+                    const pseudonym = getStudentPseudonym(student.id);
+                    return (
                     <TableRow key={student.id} className={selectedStudents.has(student.id) ? 'bg-muted/50' : ''}>
                       <TableCell>
                         <Checkbox
                           checked={selectedStudents.has(student.id)}
                           onCheckedChange={() => toggleSelectStudent(student.id)}
-                          aria-label={`Select ${student.first_name} ${student.last_name}`}
+                          aria-label={`Select ${pseudonym}`}
                         />
                       </TableCell>
                       <TableCell className="font-medium">
-                        {student.last_name}, {student.first_name}
+                        {pseudonym}
                       </TableCell>
-                      <TableCell>{student.student_id || '—'}</TableCell>
-                      <TableCell>{student.email || '—'}</TableCell>
+                      <TableCell>—</TableCell>
+                      <TableCell>—</TableCell>
                       <TableCell>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -528,7 +530,7 @@ export default function ClassDetail() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Remove Student?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This will remove {student.first_name} {student.last_name} and all their assessment data. This action cannot be undone.
+                                This will remove {pseudonym} and all their assessment data. This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -540,11 +542,12 @@ export default function ClassDetail() {
                                 Remove
                               </AlertDialogAction>
                             </AlertDialogFooter>
-                          </AlertDialogContent>
+                        </AlertDialogContent>
                         </AlertDialog>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    )}
+                  )}
                 </TableBody>
               </Table>
             )}
