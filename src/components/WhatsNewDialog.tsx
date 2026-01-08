@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Sparkles, QrCode, Square, Users, Eye, MessageCircle, Link2, ChevronRight } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -138,9 +138,9 @@ export function WhatsNewDialog() {
             </div>
             <div>
               <DialogTitle className="text-lg">What's New</DialogTitle>
-              <p className="text-sm text-muted-foreground">
+              <DialogDescription className="text-sm">
                 Version {latestUpdate.version} • {latestUpdate.date}
-              </p>
+              </DialogDescription>
             </div>
           </div>
         </DialogHeader>
