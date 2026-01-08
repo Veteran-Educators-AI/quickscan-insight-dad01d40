@@ -13,7 +13,8 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PrintWorksheetDialog } from '@/components/print/PrintWorksheetDialog';
-import { getStudentPseudonym } from '@/lib/studentPseudonyms';
+import { useStudentNames } from '@/lib/StudentNameContext';
+
 interface Student {
   id: string;
   first_name: string;
@@ -33,6 +34,7 @@ export default function ClassDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { getDisplayName } = useStudentNames();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [classData, setClassData] = useState<ClassData | null>(null);
@@ -504,18 +506,18 @@ export default function ClassDetail() {
                 </TableHeader>
                 <TableBody>
                   {students.map((student) => {
-                    const pseudonym = getStudentPseudonym(student.id);
+                    const displayName = getDisplayName(student.id, student.first_name, student.last_name);
                     return (
                     <TableRow key={student.id} className={selectedStudents.has(student.id) ? 'bg-muted/50' : ''}>
                       <TableCell>
                         <Checkbox
                           checked={selectedStudents.has(student.id)}
                           onCheckedChange={() => toggleSelectStudent(student.id)}
-                          aria-label={`Select ${pseudonym}`}
+                          aria-label={`Select ${displayName}`}
                         />
                       </TableCell>
                       <TableCell className="font-medium">
-                        {pseudonym}
+                        {displayName}
                       </TableCell>
                       <TableCell>—</TableCell>
                       <TableCell>—</TableCell>
@@ -530,7 +532,7 @@ export default function ClassDetail() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Remove Student?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This will remove {pseudonym} and all their assessment data. This action cannot be undone.
+                                This will remove {displayName} and all their assessment data. This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

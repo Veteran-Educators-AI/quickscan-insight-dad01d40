@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { getStudentPseudonym } from '@/lib/studentPseudonyms';
+import { useStudentNames } from '@/lib/StudentNameContext';
 
 interface Student {
   id: string;
@@ -53,6 +53,7 @@ export function EmailQuestionDialog({ questionId, questionTitle, trigger }: Emai
   const [sending, setSending] = useState(false);
   const [sentCount, setSentCount] = useState(0);
   const { toast } = useToast();
+  const { getDisplayName } = useStudentNames();
 
   useEffect(() => {
     if (open) {
@@ -291,7 +292,7 @@ export function EmailQuestionDialog({ questionId, questionTitle, trigger }: Emai
                             >
                               <Checkbox checked={selectedStudents.has(student.id)} />
                               <span className="text-sm">
-                                {getStudentPseudonym(student.id)}
+                                {getDisplayName(student.id, student.first_name, student.last_name)}
                               </span>
                             </div>
                           ))}

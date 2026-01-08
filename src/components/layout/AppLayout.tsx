@@ -11,11 +11,16 @@ import {
   Menu, 
   X,
   LogOut,
-  HelpCircle
+  HelpCircle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/lib/auth';
+import { useStudentNames } from '@/lib/StudentNameContext';
 import { cn } from '@/lib/utils';
 import scanGeniusLogo from '@/assets/scan-genius-logo.png';
 
@@ -38,6 +43,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
+  const { revealRealNames, toggleRevealNames } = useStudentNames();
 
   const handleSignOut = async () => {
     await signOut();
@@ -90,6 +96,32 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           {/* User Menu */}
           <div className="flex items-center gap-3">
+            {/* Admin Name Reveal Toggle */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/50 border border-border">
+                  {revealRealNames ? (
+                    <Eye className="h-4 w-4 text-amber-500" />
+                  ) : (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <Switch
+                    checked={revealRealNames}
+                    onCheckedChange={toggleRevealNames}
+                    className="data-[state=checked]:bg-amber-500"
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p className="font-medium">{revealRealNames ? 'Real Names Visible' : 'FERPA Mode Active'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {revealRealNames 
+                    ? 'Toggle to hide student identities' 
+                    : 'Toggle to reveal real student names'}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+
             <Avatar className="h-8 w-8">
               <AvatarImage 
                 src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture} 
@@ -155,6 +187,25 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </Link>
                 );
               })}
+              <hr className="my-2 border-border" />
+              {/* Mobile Name Reveal Toggle */}
+              <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-secondary/50">
+                <div className="flex items-center gap-2">
+                  {revealRealNames ? (
+                    <Eye className="h-5 w-5 text-amber-500" />
+                  ) : (
+                    <EyeOff className="h-5 w-5 text-muted-foreground" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {revealRealNames ? 'Real Names' : 'FERPA Mode'}
+                  </span>
+                </div>
+                <Switch
+                  checked={revealRealNames}
+                  onCheckedChange={toggleRevealNames}
+                  className="data-[state=checked]:bg-amber-500"
+                />
+              </div>
               <hr className="my-2 border-border" />
               <button
                 onClick={handleSignOut}
