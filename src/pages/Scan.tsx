@@ -1,10 +1,11 @@
 import { useRef, useState, useCallback } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SaveAnalyticsConfirmDialog } from '@/components/scan/SaveAnalyticsConfirmDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { CameraModal } from '@/components/scan/CameraModal';
 import { ImagePreview } from '@/components/scan/ImagePreview';
@@ -18,6 +19,7 @@ import { useAnalyzeStudentWork } from '@/hooks/useAnalyzeStudentWork';
 import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
 import { usePendingScans } from '@/hooks/usePendingScans';
 import { useSaveAnalysisResults } from '@/hooks/useSaveAnalysisResults';
+import { useQRCodeScanner } from '@/hooks/useQRCodeScanner';
 import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
 import { MultiStudentScanner } from '@/components/scan/MultiStudentScanner';
 import { toast } from 'sonner';
@@ -64,6 +66,8 @@ export default function Scan() {
   const batch = useBatchAnalysis();
   const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans();
   const { saveResults, saveMultiQuestionResults, isSaving } = useSaveAnalysisResults();
+  const { scanImageForQR, isScanning: isQRScanning, scanResult: qrScanResult, clearResult: clearQRResult } = useQRCodeScanner();
+  
   const [analyzingScanId, setAnalyzingScanId] = useState<string | null>(null);
   const [analyzingScanStudentId, setAnalyzingScanStudentId] = useState<string | null>(null);
   // Track question IDs for multi-question analysis
@@ -72,8 +76,11 @@ export default function Scan() {
   const [resultsSaved, setResultsSaved] = useState(false);
   const [multiQuestionResults, setMultiQuestionResults] = useState<Record<string, any>>({});
   
+  // QR code detection state
+  const [detectedQR, setDetectedQR] = useState<{ studentId: string; questionId: string } | null>(null);
+  
   // Get student name for display
-  const currentStudentId = singleScanStudentId || analyzingScanStudentId;
+  const currentStudentId = detectedQR?.studentId || singleScanStudentId || analyzingScanStudentId;
   const studentName = useStudentName(currentStudentId);
   
   // Confirmation dialog state
@@ -118,10 +125,26 @@ export default function Scan() {
     } else {
       setFinalImage(finalImageDataUrl);
       setCapturedImage(null);
+      
+      // Try to detect QR code
+      toast.info('Scanning for QR codes...');
+      const qrResult = await scanImageForQR(finalImageDataUrl);
+      
+      if (qrResult) {
+        setDetectedQR(qrResult);
+        setSingleScanStudentId(qrResult.studentId);
+        setSelectedQuestionIds([qrResult.questionId]);
+        toast.success('QR code detected! Student and question auto-identified.', {
+          icon: <QrCode className="h-4 w-4" />,
+        });
+      } else {
+        setDetectedQR(null);
+      }
+      
       setScanState('choose-method');
       toast.success('Image uploaded! Choose analysis method.');
     }
-  }, [scanMode, batch, selectedClassId, students]);
+  }, [scanMode, batch, selectedClassId, students, scanImageForQR]);
 
   const handleSolutionUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -387,6 +410,8 @@ export default function Scan() {
     setMultiQuestionResults({});
     setResultsSaved(false);
     setShowStudentPicker(false);
+    setDetectedQR(null);
+    clearQRResult();
   };
 
   // Handle analyzing a saved scan with multiple questions
@@ -664,6 +689,28 @@ export default function Scan() {
                       Start Over
                     </Button>
                   </div>
+
+                  {/* QR Code Detection Banner */}
+                  {detectedQR && (
+                    <Card className="border-green-500/50 bg-green-500/10">
+                      <CardContent className="p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-green-500/20">
+                            <QrCode className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-green-700 dark:text-green-400">QR Code Detected!</p>
+                            <p className="text-sm text-muted-foreground">
+                              Student and question automatically identified from embedded QR code
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="bg-green-500/20 text-green-700 dark:text-green-400">
+                            Auto-linked
+                          </Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   <Card>
                     <CardContent className="p-4">
