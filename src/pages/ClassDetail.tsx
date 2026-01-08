@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +34,7 @@ export default function ClassDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { getDisplayName } = useStudentNames();
+  const { getDisplayName, revealRealNames, toggleRevealNames, remainingSeconds } = useStudentNames();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [classData, setClassData] = useState<ClassData | null>(null);
@@ -499,7 +499,32 @@ export default function ClassDetail() {
                       />
                     </TableHead>
                     <TableHead className="w-12 text-center">#</TableHead>
-                    <TableHead>Name</TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-2">
+                        <span>Name</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={toggleRevealNames}
+                          className="h-7 px-2 gap-1 text-xs"
+                        >
+                          {revealRealNames ? (
+                            <>
+                              <EyeOff className="h-3.5 w-3.5" />
+                              <span>Hide</span>
+                              {remainingSeconds !== null && (
+                                <span className="text-muted-foreground">({Math.floor(remainingSeconds / 60)}:{(remainingSeconds % 60).toString().padStart(2, '0')})</span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="h-3.5 w-3.5" />
+                              <span>Show Real</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </TableHead>
                     <TableHead>Student ID</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead className="w-12"></TableHead>
