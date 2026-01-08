@@ -198,6 +198,33 @@
   .animate-pulse-slow {
     animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
+
+  /* Math and textbook-style typography */
+  .math-text {
+    font-family: 'Source Serif 4', 'Times New Roman', Georgia, serif;
+    font-feature-settings: 'kern' 1, 'liga' 1;
+    letter-spacing: -0.01em;
+  }
+
+  /* Worksheet question styling for print quality */
+  .worksheet-question {
+    font-family: 'Source Serif 4', 'Times New Roman', Georgia, serif;
+    font-size: 1rem;
+    line-height: 1.75;
+    letter-spacing: -0.01em;
+  }
+
+  /* Print-specific styles for worksheets */
+  @media print {
+    .print-worksheet {
+      font-family: 'Source Serif 4', 'Times New Roman', Georgia, serif;
+    }
+    
+    .print-worksheet p {
+      font-size: 11pt;
+      line-height: 1.6;
+    }
+  }
 }
 
 @keyframes fadeIn {

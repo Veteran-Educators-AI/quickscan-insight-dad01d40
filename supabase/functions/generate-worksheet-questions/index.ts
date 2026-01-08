@@ -43,7 +43,29 @@ async function callLovableAI(prompt: string): Promise<string> {
     body: JSON.stringify({
       model: 'google/gemini-2.5-flash',
       messages: [
-        { role: 'system', content: 'You are an expert math educator. Return only valid JSON arrays when asked for questions.' },
+        { role: 'system', content: `You are an expert math educator creating textbook-quality problems. 
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Use proper mathematical Unicode symbols in ALL questions:
+  • Use π (not "pi" or "3.14")
+  • Use √ for square roots (e.g., √2, √3)
+  • Use ² ³ ⁴ for exponents (e.g., x², y³, r⁴)
+  • Use ° for degrees (e.g., 45°, 90°)
+  • Use ∠ for angles (e.g., ∠ABC)
+  • Use ≤ ≥ ≠ for inequalities
+  • Use × for multiplication in expressions
+  • Use ÷ for division where appropriate
+  • Use θ for angle theta
+  • Use ½ ⅓ ¼ ⅔ ¾ for common fractions
+  • Use ⊥ for perpendicular
+  • Use ∥ for parallel
+  • Use △ for triangle notation (e.g., △ABC)
+  • Use ≅ for congruent
+  • Use ~ for similar
+  
+Write questions in a fluid, professional textbook style - complete sentences, clear mathematical language, and elegant formatting.
+
+Return only valid JSON arrays when asked for questions.` },
         { role: 'user', content: prompt }
       ],
       temperature: 0.7,
@@ -253,7 +275,7 @@ DIAGNOSTIC ASSESSMENT MODE:
   }
 ]`;
 
-    const prompt = `You are an expert math educator creating a worksheet for NYS Regents preparation.
+    const prompt = `You are an expert math educator creating a professional, textbook-quality worksheet for NYS Regents preparation.
 
 Based on the following standards and topics, generate exactly ${questionCount} higher-order thinking questions that require students to apply, analyze, or evaluate concepts. The questions should be challenging but appropriate for high school students.
 
@@ -269,6 +291,26 @@ REQUIREMENTS:
 6. Use real-world contexts where appropriate
 7. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}${graphPaperInstruction}${coordinateGeometryInstruction}
 ${diagnosticInstruction}
+
+CRITICAL - TEXTBOOK-QUALITY FORMATTING:
+- Write in fluid, complete sentences like a professional textbook
+- Use proper mathematical Unicode symbols throughout:
+  • π instead of "pi" or "3.14"
+  • √ for roots (√2, √3, √5)
+  • ² ³ ⁴ ⁵ for exponents (x², y³, n⁴)
+  • ° for degrees (30°, 45°, 90°, 180°)
+  • ∠ for angles (∠ABC, ∠XYZ)
+  • ≤ ≥ ≠ for inequalities
+  • θ for angle theta
+  • △ for triangles (△ABC ≅ △DEF)
+  • ⊥ for perpendicular, ∥ for parallel
+  • ≅ for congruent, ~ for similar
+  • ½ ⅓ ¼ ⅔ ¾ for common fractions
+- Format examples:
+  ✓ "In △ABC, if ∠A = 45° and ∠B = 60°, find the measure of ∠C."
+  ✓ "Find the area of a circle with radius r = 5 cm. Express your answer in terms of π."
+  ✓ "Simplify: √48 + 3√12"
+  ✓ "Solve for x: 2x² - 5x + 3 = 0"
 
 Respond with a JSON array of questions in this exact format:
 ${exampleOutput}

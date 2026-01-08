@@ -1,4 +1,5 @@
 import { StudentQRCode } from './StudentQRCode';
+import { renderMathText } from '@/lib/mathRenderer';
 
 interface Student {
   id: string;
@@ -75,7 +76,7 @@ export function PrintableWorksheet({
                 </div>
 
                 {question.prompt_text && (
-                  <p className="mb-3">{question.prompt_text}</p>
+                  <p className="mb-3 font-serif leading-relaxed text-base">{renderMathText(question.prompt_text)}</p>
                 )}
 
                 {question.prompt_image_url && (
