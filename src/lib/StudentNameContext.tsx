@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from 'react';
 import { getStudentPseudonym, getPseudonymInitials } from './studentPseudonyms';
+import { supabase } from '@/integrations/supabase/client';
 
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -12,12 +13,29 @@ interface StudentNameContextType {
 
 const StudentNameContext = createContext<StudentNameContextType | undefined>(undefined);
 
+// Log audit event to database
+async function logAuditEvent(action: string) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase.from('ferpa_audit_log').insert({
+      teacher_id: user.id,
+      action,
+      user_agent: navigator.userAgent,
+    });
+  } catch (error) {
+    console.error('Failed to log audit event:', error);
+  }
+}
+
 export function StudentNameProvider({ children }: { children: ReactNode }) {
   const [revealRealNames, setRevealRealNames] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const resetToPrivate = useCallback(() => {
     setRevealRealNames(false);
+    logAuditEvent('auto_reverted_to_pseudonyms');
   }, []);
 
   const resetInactivityTimer = useCallback(() => {
@@ -62,7 +80,11 @@ export function StudentNameProvider({ children }: { children: ReactNode }) {
   }, [revealRealNames, resetInactivityTimer]);
 
   const toggleRevealNames = useCallback(() => {
-    setRevealRealNames(prev => !prev);
+    setRevealRealNames(prev => {
+      const newValue = !prev;
+      logAuditEvent(newValue ? 'revealed_real_names' : 'hidden_real_names');
+      return newValue;
+    });
   }, []);
 
   const getDisplayName = useCallback((studentId: string, firstName: string, lastName: string) => {

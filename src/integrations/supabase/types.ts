@@ -356,6 +356,33 @@ export type Database = {
           },
         ]
       }
+      ferpa_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          teacher_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          teacher_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          teacher_id?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       misconception_tags: {
         Row: {
           created_at: string
