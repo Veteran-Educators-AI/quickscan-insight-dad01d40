@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getStudentPseudonym } from '@/lib/studentPseudonyms';
 
 interface Student {
   id: string;
@@ -290,10 +291,7 @@ export function EmailQuestionDialog({ questionId, questionTitle, trigger }: Emai
                             >
                               <Checkbox checked={selectedStudents.has(student.id)} />
                               <span className="text-sm">
-                                {student.first_name} {student.last_name}
-                              </span>
-                              <span className="text-xs text-muted-foreground truncate">
-                                {student.email}
+                                {getStudentPseudonym(student.id)}
                               </span>
                             </div>
                           ))}

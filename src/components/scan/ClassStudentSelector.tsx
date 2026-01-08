@@ -20,6 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { getStudentPseudonym } from '@/lib/studentPseudonyms';
 
 interface ClassOption {
   id: string;
@@ -215,7 +216,9 @@ export function ClassStudentSelector({
                     No students in this class
                   </p>
                 ) : (
-                  students.map((student) => (
+                  students.map((student) => {
+                    const pseudonym = getStudentPseudonym(student.id);
+                    return (
                     <div
                       key={student.id}
                       className={cn(
@@ -231,16 +234,12 @@ export function ClassStudentSelector({
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">
-                          {student.last_name}, {student.first_name}
+                          {pseudonym}
                         </p>
-                        {student.student_id && (
-                          <p className="text-xs text-muted-foreground">
-                            ID: {student.student_id}
-                          </p>
-                        )}
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </ScrollArea>

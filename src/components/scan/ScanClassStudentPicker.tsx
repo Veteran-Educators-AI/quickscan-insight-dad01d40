@@ -17,6 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { getStudentPseudonym } from '@/lib/studentPseudonyms';
 
 interface ClassOption {
   id: string;
@@ -167,7 +168,7 @@ export function ScanClassStudentPicker({
             <User className="h-4 w-4 mr-2 shrink-0" />
             {selectedStudent ? (
               <span className="truncate">
-                {selectedStudent.first_name} {selectedStudent.last_name}
+                {getStudentPseudonym(selectedStudent.id)}
               </span>
             ) : (
               <span className="text-muted-foreground">
@@ -183,10 +184,12 @@ export function ScanClassStudentPicker({
             <CommandList>
               <CommandEmpty>No students found.</CommandEmpty>
               <CommandGroup>
-                {students.map((student) => (
+                {students.map((student) => {
+                  const pseudonym = getStudentPseudonym(student.id);
+                  return (
                   <CommandItem
                     key={student.id}
-                    value={`${student.first_name} ${student.last_name}`}
+                    value={pseudonym}
                     onSelect={() => {
                       onStudentChange(student.id);
                       setStudentOpen(false);
@@ -199,15 +202,11 @@ export function ScanClassStudentPicker({
                       )}
                     />
                     <span className="flex-1">
-                      {student.first_name} {student.last_name}
+                      {pseudonym}
                     </span>
-                    {student.student_id && (
-                      <span className="text-xs text-muted-foreground ml-2">
-                        {student.student_id}
-                      </span>
-                    )}
                   </CommandItem>
-                ))}
+                  );
+                })}
               </CommandGroup>
             </CommandList>
           </Command>
@@ -217,7 +216,7 @@ export function ScanClassStudentPicker({
       {selectedStudent && (
         <Badge variant="secondary" className="gap-1">
           <User className="h-3 w-3" />
-          {selectedStudent.first_name} {selectedStudent.last_name}
+          {getStudentPseudonym(selectedStudent.id)}
         </Badge>
       )}
     </div>
@@ -242,7 +241,7 @@ export function useStudentName(studentId: string | null) {
         .single();
 
       if (!error && data) {
-        setStudentName(`${data.first_name} ${data.last_name}`);
+        setStudentName(getStudentPseudonym(studentId));
       }
     }
     fetchStudent();
