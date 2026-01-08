@@ -6,51 +6,59 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function callGeminiAPI(prompt: string, imageBase64: string, apiKey: string): Promise<string> {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
+async function callLovableAI(prompt: string, imageBase64: string): Promise<string> {
+  const apiKey = Deno.env.get('LOVABLE_API_KEY');
+  if (!apiKey) {
+    throw new Error('LOVABLE_API_KEY is not configured');
+  }
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { 
+          role: 'user', 
+          content: [
             {
-              inline_data: {
-                mime_type: "image/jpeg",
-                data: imageBase64
+              type: 'image_url',
+              image_url: {
+                url: `data:image/jpeg;base64,${imageBase64}`
               }
             },
-            { text: prompt }
+            {
+              type: 'text',
+              text: prompt
+            }
           ]
-        }],
-        generationConfig: {
-          maxOutputTokens: 4000,
         }
-      }),
-    }
-  );
+      ],
+      max_tokens: 4000,
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('Gemini API error:', response.status, errorText);
+    console.error('Lovable AI error:', response.status, errorText);
     
     if (response.status === 429) {
       throw { status: 429, message: 'Rate limit exceeded. Please try again in a moment.' };
     }
-    if (response.status === 403) {
-      throw { status: 403, message: 'API key invalid or quota exceeded. Please check your Google API key settings.' };
+    if (response.status === 402) {
+      throw { status: 402, message: 'AI credits exhausted. Please add funds to continue.' };
     }
-    throw new Error(`Gemini API error: ${response.status}`);
+    throw new Error(`AI API error: ${response.status}`);
   }
 
   const data = await response.json();
-  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const content = data.choices?.[0]?.message?.content;
   
   if (!content) {
-    throw new Error('No content in Gemini response');
+    throw new Error('No content in AI response');
   }
   
   return content;
@@ -62,11 +70,6 @@ serve(async (req) => {
   }
 
   try {
-    const geminiApiKey = Deno.env.get('GOOGLE_GEMINI_API_KEY');
-    if (!geminiApiKey) {
-      throw new Error('GOOGLE_GEMINI_API_KEY is not configured');
-    }
-
     const { imageBase64 } = await req.json();
 
     if (!imageBase64) {
@@ -101,7 +104,7 @@ Return ONLY the JSON, no additional text.`;
     // Clean base64 if it has data URL prefix
     const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
 
-    const content = await callGeminiAPI(prompt, cleanBase64, geminiApiKey);
+    const content = await callLovableAI(prompt, cleanBase64);
 
     // Parse the JSON response
     let parsed;
