@@ -4,18 +4,23 @@ interface StudentQRCodeProps {
   studentId: string;
   questionId: string;
   size?: number;
+  includeUrl?: boolean;
 }
 
 /**
  * Generates a QR code encoding student and question IDs for automatic detection
  * Format: JSON object with studentId, questionId, and version for future compatibility
+ * When includeUrl is true, generates a direct URL to the student results page
  */
-export function StudentQRCode({ studentId, questionId, size = 64 }: StudentQRCodeProps) {
-  const qrData = JSON.stringify({
-    v: 1, // version for future compatibility
-    s: studentId, // student ID
-    q: questionId, // question ID
-  });
+export function StudentQRCode({ studentId, questionId, size = 64, includeUrl = false }: StudentQRCodeProps) {
+  // Generate either a URL (for student-facing) or JSON data (for teacher scanning)
+  const qrData = includeUrl 
+    ? `${window.location.origin}/results/${studentId}/${questionId}`
+    : JSON.stringify({
+        v: 1, // version for future compatibility
+        s: studentId, // student ID
+        q: questionId, // question ID
+      });
 
   return (
     <QRCodeSVG
