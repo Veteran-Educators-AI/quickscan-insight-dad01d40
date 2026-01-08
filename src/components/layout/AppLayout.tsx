@@ -43,7 +43,13 @@ export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
-  const { revealRealNames, toggleRevealNames } = useStudentNames();
+  const { revealRealNames, toggleRevealNames, remainingSeconds } = useStudentNames();
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -110,13 +116,21 @@ export function AppLayout({ children }: AppLayoutProps) {
                     onCheckedChange={toggleRevealNames}
                     className="data-[state=checked]:bg-amber-500"
                   />
+                  {revealRealNames && remainingSeconds !== null && (
+                    <span className={cn(
+                      "text-xs font-mono font-medium min-w-[36px]",
+                      remainingSeconds <= 60 ? "text-destructive" : "text-amber-500"
+                    )}>
+                      {formatTime(remainingSeconds)}
+                    </span>
+                  )}
                 </div>
               </TooltipTrigger>
               <TooltipContent side="bottom">
                 <p className="font-medium">{revealRealNames ? 'Real Names Visible' : 'FERPA Mode Active'}</p>
                 <p className="text-xs text-muted-foreground">
                   {revealRealNames 
-                    ? 'Toggle to hide student identities' 
+                    ? `Auto-reverts in ${formatTime(remainingSeconds || 0)} (resets on activity)` 
                     : 'Toggle to reveal real student names'}
                 </p>
               </TooltipContent>
@@ -196,9 +210,19 @@ export function AppLayout({ children }: AppLayoutProps) {
                   ) : (
                     <EyeOff className="h-5 w-5 text-muted-foreground" />
                   )}
-                  <span className="text-sm font-medium">
-                    {revealRealNames ? 'Real Names' : 'FERPA Mode'}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">
+                      {revealRealNames ? 'Real Names' : 'FERPA Mode'}
+                    </span>
+                    {revealRealNames && remainingSeconds !== null && (
+                      <span className={cn(
+                        "text-xs font-mono",
+                        remainingSeconds <= 60 ? "text-destructive" : "text-amber-500"
+                      )}>
+                        Auto-reverts in {formatTime(remainingSeconds)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <Switch
                   checked={revealRealNames}
