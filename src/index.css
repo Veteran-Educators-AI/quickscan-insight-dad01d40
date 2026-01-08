@@ -53,6 +53,7 @@
     --gradient-hero: linear-gradient(145deg, hsl(175 55% 32%) 0%, hsl(195 60% 35%) 50%, hsl(215 55% 40%) 100%);
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(210 20% 98%) 100%);
     --gradient-mastery: linear-gradient(90deg, hsl(0 72% 51%) 0%, hsl(38 92% 50%) 50%, hsl(142 71% 45%) 100%);
+    --gradient-page: linear-gradient(135deg, hsl(210 20% 98%) 0%, hsl(195 25% 96%) 25%, hsl(175 20% 97%) 50%, hsl(210 20% 98%) 75%, hsl(185 20% 96%) 100%);
     
     --shadow-sm: 0 1px 2px 0 hsl(215 25% 15% / 0.05);
     --shadow-md: 0 4px 6px -1px hsl(215 25% 15% / 0.08), 0 2px 4px -2px hsl(215 25% 15% / 0.06);
@@ -121,8 +122,39 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply text-foreground font-sans antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    background: var(--gradient-page);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+      radial-gradient(ellipse 600px 400px at 20% 20%, hsl(175 55% 80% / 0.15), transparent 50%),
+      radial-gradient(ellipse 500px 350px at 80% 30%, hsl(195 60% 75% / 0.12), transparent 50%),
+      radial-gradient(ellipse 450px 300px at 40% 70%, hsl(38 92% 70% / 0.08), transparent 50%),
+      radial-gradient(ellipse 550px 400px at 70% 80%, hsl(175 45% 75% / 0.1), transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .dark body {
+    background: hsl(var(--background));
+  }
+
+  .dark body::before {
+    background: 
+      radial-gradient(ellipse 600px 400px at 20% 20%, hsl(175 55% 40% / 0.08), transparent 50%),
+      radial-gradient(ellipse 500px 350px at 80% 30%, hsl(195 60% 35% / 0.06), transparent 50%),
+      radial-gradient(ellipse 450px 300px at 40% 70%, hsl(38 70% 50% / 0.04), transparent 50%),
+      radial-gradient(ellipse 550px 400px at 70% 80%, hsl(175 45% 40% / 0.05), transparent 50%);
   }
 
   h1, h2, h3, h4, h5, h6 {
