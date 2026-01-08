@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useStudentNames } from '@/lib/StudentNameContext';
+import { GradeHistoryChart } from './GradeHistoryChart';
 
 interface StudentProgressTrackerProps {
   classId?: string;
@@ -101,6 +102,24 @@ export function StudentProgressTracker({ classId }: StudentProgressTrackerProps)
       return data;
     },
     enabled: !!user,
+  });
+
+  // Fetch grade history for selected student
+  const { data: gradeHistory } = useQuery({
+    queryKey: ['grade-history', selectedStudentId],
+    queryFn: async () => {
+      if (selectedStudentId === 'all') return [];
+      
+      const { data, error } = await supabase
+        .from('grade_history')
+        .select('*')
+        .eq('student_id', selectedStudentId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && selectedStudentId !== 'all',
   });
 
   // Process student progress data
@@ -406,6 +425,16 @@ export function StudentProgressTracker({ classId }: StudentProgressTrackerProps)
                 ))}
               </div>
             </div>
+
+            {/* Grade History Chart */}
+            {gradeHistory && gradeHistory.length > 0 && (
+              <div className="mt-6">
+                <GradeHistoryChart 
+                  gradeHistory={gradeHistory} 
+                  topicName="All Topics"
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : (
