@@ -6,8 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper function to call Lovable AI Gateway
-async function callLovableAI(messages: any[], apiKey: string) {
+// Helper function to call Lovable AI Gateway with token logging
+async function callLovableAI(messages: any[], apiKey: string, functionName: string = 'analyze-student-work') {
+  const startTime = Date.now();
+  
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -35,6 +37,12 @@ async function callLovableAI(messages: any[], apiKey: string) {
   }
 
   const data = await response.json();
+  const latencyMs = Date.now() - startTime;
+  
+  // Log token usage for cost monitoring
+  const usage = data.usage || {};
+  console.log(`[TOKEN_USAGE] function=${functionName} model=gemini-2.5-flash-lite prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
+  
   return data.choices?.[0]?.message?.content || '';
 }
 

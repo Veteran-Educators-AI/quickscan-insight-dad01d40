@@ -23,6 +23,7 @@ serve(async (req) => {
     }
 
     // Use Gemini to detect and describe regions of student work
+    const startTime = Date.now();
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -100,6 +101,12 @@ If you cannot detect multiple distinct regions, return an empty array.`
     }
 
     const aiData = await response.json();
+    const latencyMs = Date.now() - startTime;
+    
+    // Log token usage for cost monitoring
+    const usage = aiData.usage || {};
+    console.log(`[TOKEN_USAGE] function=extract-multi-student-regions model=gemini-2.5-flash-lite prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
+    
     const content = aiData.choices?.[0]?.message?.content || '';
     
     console.log('AI detection response:', content);
