@@ -10,7 +10,8 @@ import {
   Plus,
   BarChart3,
   GraduationCap,
-  School
+  School,
+  MessageSquare
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +24,7 @@ interface DashboardStats {
   studentCount: number;
   questionCount: number;
   recentAttempts: number;
+  unreadComments: number;
 }
 
 export default function Dashboard() {
@@ -32,6 +34,7 @@ export default function Dashboard() {
     studentCount: 0,
     questionCount: 0,
     recentAttempts: 0,
+    unreadComments: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -64,11 +67,39 @@ export default function Dashboard() {
           studentCount = count || 0;
         }
 
+        // Fetch unread student comments count
+        let unreadComments = 0;
+        if (classes && classes.length > 0) {
+          const { data: students } = await supabase
+            .from('students')
+            .select('id')
+            .in('class_id', classes.map(c => c.id));
+          
+          if (students && students.length > 0) {
+            const { data: attempts } = await supabase
+              .from('attempts')
+              .select('id')
+              .in('student_id', students.map(s => s.id));
+            
+            if (attempts && attempts.length > 0) {
+              const { count: commentsCount } = await supabase
+                .from('result_comments')
+                .select('*', { count: 'exact', head: true })
+                .in('attempt_id', attempts.map(a => a.id))
+                .eq('author_type', 'student')
+                .eq('is_read', false);
+              
+              unreadComments = commentsCount || 0;
+            }
+          }
+        }
+
         setStats({
           classCount: classCount || 0,
           studentCount,
           questionCount: questionCount || 0,
           recentAttempts: 0,
+          unreadComments,
         });
       } catch (error) {
         console.error('Error fetching stats:', error);
@@ -99,13 +130,38 @@ export default function Dashboard() {
     <AppLayout>
       <div className="space-y-8">
         {/* Header */}
-        <div className="animate-fade-in">
-          <h1 className="font-display text-3xl font-bold text-foreground">
-            Welcome back!
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Here's an overview of your geometry assessments.
-          </p>
+        <div className="animate-fade-in flex items-start justify-between">
+          <div>
+            <h1 className="font-display text-3xl font-bold text-foreground">
+              Welcome back!
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Here's an overview of your geometry assessments.
+            </p>
+          </div>
+          
+          {/* Unread Comments Badge */}
+          {stats.unreadComments > 0 && (
+            <Link to="/reports">
+              <Card className="border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div className="relative">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                      {stats.unreadComments > 9 ? '9+' : stats.unreadComments}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    <p className="font-medium text-foreground">
+                      {stats.unreadComments} unread {stats.unreadComments === 1 ? 'comment' : 'comments'}
+                    </p>
+                    <p className="text-muted-foreground text-xs">from students</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </CardContent>
+              </Card>
+            </Link>
+          )}
         </div>
 
         {/* Quick Actions */}
