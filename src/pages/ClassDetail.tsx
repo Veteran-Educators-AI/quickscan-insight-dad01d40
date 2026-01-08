@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PrintWorksheetDialog } from '@/components/print/PrintWorksheetDialog';
 import { useStudentNames } from '@/lib/StudentNameContext';
+import { getStudentPseudonym, getAvailablePseudonyms, setCustomPseudonym } from '@/lib/studentPseudonyms';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Student {
   id: string;
@@ -21,6 +24,7 @@ interface Student {
   last_name: string;
   student_id: string | null;
   email: string | null;
+  custom_pseudonym: string | null;
 }
 
 interface ClassData {
@@ -46,6 +50,8 @@ export default function ClassDetail() {
   const [isAdding, setIsAdding] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [editingPseudonymId, setEditingPseudonymId] = useState<string | null>(null);
+  const availablePseudonyms = getAvailablePseudonyms();
 
   useEffect(() => {
     if (id) fetchClassData();
@@ -69,6 +75,14 @@ export default function ClassDetail() {
         .order('last_name', { ascending: true });
 
       if (studentsError) throw studentsError;
+      
+      // Load custom pseudonyms into cache
+      (studentsData || []).forEach(student => {
+        if (student.custom_pseudonym) {
+          setCustomPseudonym(student.id, student.custom_pseudonym);
+        }
+      });
+      
       setStudents(studentsData || []);
       setSelectedStudents(new Set()); // Clear selection after refresh
     } catch (error) {
@@ -89,6 +103,34 @@ export default function ClassDetail() {
     setCopiedCode(true);
     toast({ title: 'Copied!', description: 'Join code copied to clipboard' });
     setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleUpdatePseudonym = async (studentId: string, newPseudonym: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('students')
+        .update({ custom_pseudonym: newPseudonym })
+        .eq('id', studentId);
+
+      if (error) throw error;
+
+      // Update local cache
+      setCustomPseudonym(studentId, newPseudonym);
+      
+      // Update local state
+      setStudents(prev => prev.map(s => 
+        s.id === studentId ? { ...s, custom_pseudonym: newPseudonym } : s
+      ));
+      
+      setEditingPseudonymId(null);
+      toast({ title: 'Pseudonym updated!' });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update pseudonym',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleAddStudent = async (e: React.FormEvent) => {
@@ -533,6 +575,7 @@ export default function ClassDetail() {
                 <TableBody>
                   {students.map((student, index) => {
                     const displayName = getDisplayName(student.id, student.first_name, student.last_name);
+                    const currentPseudonym = getStudentPseudonym(student.id);
                     return (
                     <TableRow key={student.id} className={selectedStudents.has(student.id) ? 'bg-muted/50' : ''}>
                       <TableCell>
@@ -546,7 +589,48 @@ export default function ClassDetail() {
                         {index + 1}
                       </TableCell>
                       <TableCell className="font-medium">
-                        {displayName}
+                        <div className="flex items-center gap-2">
+                          <span>{displayName}</span>
+                          {!revealRealNames && (
+                            <Popover open={editingPseudonymId === student.id} onOpenChange={(open) => setEditingPseudonymId(open ? student.id : null)}>
+                              <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6">
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 p-3" align="start">
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Change Pseudonym</Label>
+                                  <Select
+                                    value={currentPseudonym}
+                                    onValueChange={(value) => handleUpdatePseudonym(student.id, value)}
+                                  >
+                                    <SelectTrigger className="h-8 text-sm">
+                                      <SelectValue placeholder="Select pseudonym" />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-60">
+                                      {availablePseudonyms.map((p) => (
+                                        <SelectItem key={p} value={p} className="text-sm">
+                                          {p}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {student.custom_pseudonym && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full text-xs"
+                                      onClick={() => handleUpdatePseudonym(student.id, null)}
+                                    >
+                                      Reset to Default
+                                    </Button>
+                                  )}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>—</TableCell>
                       <TableCell>—</TableCell>
