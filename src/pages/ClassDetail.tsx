@@ -498,6 +498,7 @@ export default function ClassDetail() {
                         aria-label="Select all students"
                       />
                     </TableHead>
+                    <TableHead className="w-12 text-center">#</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Student ID</TableHead>
                     <TableHead>Email</TableHead>
@@ -505,7 +506,7 @@ export default function ClassDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {students.map((student) => {
+                  {students.map((student, index) => {
                     const displayName = getDisplayName(student.id, student.first_name, student.last_name);
                     return (
                     <TableRow key={student.id} className={selectedStudents.has(student.id) ? 'bg-muted/50' : ''}>
@@ -515,6 +516,9 @@ export default function ClassDetail() {
                           onCheckedChange={() => toggleSelectStudent(student.id)}
                           aria-label={`Select ${displayName}`}
                         />
+                      </TableCell>
+                      <TableCell className="text-center text-muted-foreground font-mono text-sm">
+                        {index + 1}
                       </TableCell>
                       <TableCell className="font-medium">
                         {displayName}
