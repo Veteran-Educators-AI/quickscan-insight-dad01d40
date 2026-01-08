@@ -12,6 +12,8 @@ async function callLovableAI(prompt: string, imageBase64: string): Promise<strin
     throw new Error('LOVABLE_API_KEY is not configured');
   }
 
+  const startTime = Date.now();
+  
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -55,6 +57,12 @@ async function callLovableAI(prompt: string, imageBase64: string): Promise<strin
   }
 
   const data = await response.json();
+  const latencyMs = Date.now() - startTime;
+  
+  // Log token usage for cost monitoring
+  const usage = data.usage || {};
+  console.log(`[TOKEN_USAGE] function=extract-roster-from-image model=gemini-2.5-flash-lite prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
+  
   const content = data.choices?.[0]?.message?.content;
   
   if (!content) {
