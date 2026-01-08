@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Camera, X, RotateCcw, FlipHorizontal, ZoomIn, ZoomOut, SwitchCamera } from 'lucide-react';
+import { Camera, X, SwitchCamera, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -159,13 +159,38 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
           <div className="text-center text-white p-6 max-w-md">
             <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
             <p className="text-lg mb-4">{error}</p>
-            <div className="flex gap-3 justify-center">
-              <Button variant="outline" onClick={handleClose} className="bg-transparent border-white text-white hover:bg-white/20">
-                Cancel
-              </Button>
-              <Button onClick={startCamera} className="bg-white text-black hover:bg-white/90">
-                Try Again
-              </Button>
+            <div className="flex flex-col gap-3 items-center">
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        const dataUrl = event.target?.result as string;
+                        stopCamera();
+                        onCapture(dataUrl);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                />
+                <div className="flex items-center gap-2 bg-white text-black px-6 py-3 rounded-md hover:bg-white/90 transition-colors">
+                  <Upload className="h-5 w-5" />
+                  Upload Image Instead
+                </div>
+              </label>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={handleClose} className="bg-transparent border-white text-white hover:bg-white/20">
+                  Cancel
+                </Button>
+                <Button onClick={startCamera} className="bg-white/20 text-white hover:bg-white/30 border border-white">
+                  Try Again
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
