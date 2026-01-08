@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart3, Users, BookOpen } from 'lucide-react';
+import { BarChart3, Users, BookOpen, Share2, Loader2, Copy, Check } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -15,10 +16,61 @@ import { ScanAnalysisHistory } from '@/components/reports/ScanAnalysisHistory';
 import { DiagnosticDashboard } from '@/components/reports/DiagnosticDashboard';
 import { StudentProgressTracker } from '@/components/reports/StudentProgressTracker';
 import { useMasteryData } from '@/hooks/useMasteryData';
+import { toast } from 'sonner';
 
 export default function Reports() {
   const { user } = useAuth();
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
+  const [isExporting, setIsExporting] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleExportToScanScholar = async () => {
+    if (!user) return;
+    
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (selectedClassId !== 'all') {
+        params.set('class_id', selectedClassId);
+      } else {
+        params.set('teacher_id', user.id);
+      }
+
+      const { data, error } = await supabase.functions.invoke('get-student-analytics', {
+        body: null,
+        headers: {},
+      });
+
+      // If invoke doesn't work well, try direct fetch
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-student-analytics?${params.toString()}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics');
+      }
+
+      const analyticsData = await response.json();
+      
+      // Copy to clipboard as JSON
+      await navigator.clipboard.writeText(JSON.stringify(analyticsData, null, 2));
+      setCopied(true);
+      toast.success('Analytics data copied to clipboard! Paste it into Scan Scholar to generate worksheets.');
+      
+      setTimeout(() => setCopied(false), 3000);
+    } catch (err) {
+      console.error('Export error:', err);
+      toast.error('Failed to export analytics data');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Fetch classes for filter
   const { data: classes } = useQuery({
@@ -56,19 +108,36 @@ export default function Reports() {
             <p className="text-muted-foreground">View student performance and analytics</p>
           </div>
           
-          <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filter by class" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Classes</SelectItem>
-              {classes?.map((cls) => (
-                <SelectItem key={cls.id} value={cls.id}>
-                  {cls.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={handleExportToScanScholar}
+              disabled={isExporting || students.length === 0}
+            >
+              {isExporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : copied ? (
+                <Check className="mr-2 h-4 w-4 text-green-500" />
+              ) : (
+                <Share2 className="mr-2 h-4 w-4" />
+              )}
+              {copied ? 'Copied!' : 'Export to Scan Scholar'}
+            </Button>
+
+            <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter by class" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Classes</SelectItem>
+                {classes?.map((cls) => (
+                  <SelectItem key={cls.id} value={cls.id}>
+                    {cls.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {isLoading ? (
