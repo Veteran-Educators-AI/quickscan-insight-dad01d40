@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Loader2 } from 'lucide-react';
+import { Shield, Loader2, Key } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { toast } from 'sonner';
 import scanGeniusLogo from '@/assets/scan-genius-logo.png';
 
 export default function MfaChallenge() {
   const [code, setCode] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [factorId, setFactorId] = useState<string | null>(null);
+  const [showRecovery, setShowRecovery] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -71,12 +74,39 @@ export default function MfaChallenge() {
     }
   };
 
+  const handleRecoveryCode = async () => {
+    if (!recoveryCode.trim()) return;
+
+    setIsVerifying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-recovery-code', {
+        body: { code: recoveryCode },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast.success('Recovery code accepted. Please set up 2FA again.');
+        navigate('/mfa-enroll');
+      } else {
+        toast.error(data.error || 'Invalid recovery code');
+        setRecoveryCode('');
+      }
+    } catch (error: any) {
+      console.error('Recovery code error:', error);
+      toast.error(error.message || 'Failed to verify recovery code');
+      setRecoveryCode('');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   // Auto-submit when 6 digits entered
   useEffect(() => {
-    if (code.length === 6 && factorId) {
+    if (code.length === 6 && factorId && !showRecovery) {
       handleVerify();
     }
-  }, [code, factorId]);
+  }, [code, factorId, showRecovery]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -99,50 +129,117 @@ export default function MfaChallenge() {
         <Card className="shadow-lg border-border/50">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <Shield className="h-6 w-6 text-primary" />
+              {showRecovery ? (
+                <Key className="h-6 w-6 text-primary" />
+              ) : (
+                <Shield className="h-6 w-6 text-primary" />
+              )}
             </div>
-            <CardTitle>Two-Factor Authentication</CardTitle>
+            <CardTitle>
+              {showRecovery ? 'Use Recovery Code' : 'Two-Factor Authentication'}
+            </CardTitle>
             <CardDescription>
-              Enter the 6-digit code from your authenticator app
+              {showRecovery 
+                ? 'Enter one of your backup recovery codes'
+                : 'Enter the 6-digit code from your authenticator app'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex justify-center">
-              <InputOTP
-                maxLength={6}
-                value={code}
-                onChange={setCode}
-                disabled={isVerifying}
-              >
-                <InputOTPGroup>
-                  <InputOTPSlot index={0} />
-                  <InputOTPSlot index={1} />
-                  <InputOTPSlot index={2} />
-                  <InputOTPSlot index={3} />
-                  <InputOTPSlot index={4} />
-                  <InputOTPSlot index={5} />
-                </InputOTPGroup>
-              </InputOTP>
-            </div>
+            {showRecovery ? (
+              <>
+                <Input
+                  placeholder="XXXX-XXXX"
+                  value={recoveryCode}
+                  onChange={(e) => setRecoveryCode(e.target.value.toUpperCase())}
+                  disabled={isVerifying}
+                  className="text-center font-mono text-lg tracking-wider"
+                  maxLength={9}
+                />
 
-            <Button 
-              onClick={handleVerify} 
-              className="w-full" 
-              disabled={code.length !== 6 || isVerifying || !factorId}
-            >
-              {isVerifying ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                'Verify'
-              )}
-            </Button>
+                <Button 
+                  onClick={handleRecoveryCode} 
+                  className="w-full" 
+                  disabled={!recoveryCode.trim() || isVerifying}
+                >
+                  {isVerifying ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    'Use Recovery Code'
+                  )}
+                </Button>
 
-            <p className="text-center text-xs text-muted-foreground">
-              Open your authenticator app (Google Authenticator, Authy, etc.) and enter the code shown for The Scan Genius.
-            </p>
+                <Button 
+                  variant="ghost" 
+                  className="w-full"
+                  onClick={() => {
+                    setShowRecovery(false);
+                    setRecoveryCode('');
+                  }}
+                  disabled={isVerifying}
+                >
+                  Back to authenticator code
+                </Button>
+
+                <p className="text-center text-xs text-muted-foreground">
+                  Using a recovery code will reset your 2FA. You'll need to set it up again.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={code}
+                    onChange={setCode}
+                    disabled={isVerifying}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+
+                <Button 
+                  onClick={handleVerify} 
+                  className="w-full" 
+                  disabled={code.length !== 6 || isVerifying || !factorId}
+                >
+                  {isVerifying ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    'Verify'
+                  )}
+                </Button>
+
+                <Button 
+                  variant="ghost" 
+                  className="w-full"
+                  onClick={() => {
+                    setShowRecovery(true);
+                    setCode('');
+                  }}
+                  disabled={isVerifying}
+                >
+                  <Key className="mr-2 h-4 w-4" />
+                  Use a recovery code
+                </Button>
+
+                <p className="text-center text-xs text-muted-foreground">
+                  Open your authenticator app (Google Authenticator, Authy, etc.) and enter the code shown for The Scan Genius.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
