@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { CheckCircle2, XCircle, AlertTriangle, Lightbulb, Save, UserPlus, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +12,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { AIWorkDetector } from './AIWorkDetector';
+import { GradeOverrideDialog } from './GradeOverrideDialog';
 
 interface RubricScore {
   criterion: string;
@@ -36,6 +38,7 @@ interface AnalysisResultsProps {
   rawAnalysis?: string | null;
   onSaveAnalytics?: () => void;
   onAssociateStudent?: () => void;
+  onGradeOverride?: (grade: number, justification: string) => void;
   isSaving?: boolean;
   studentName?: string | null;
   studentId?: string | null;
@@ -46,10 +49,12 @@ export function AnalysisResults({
   rawAnalysis, 
   onSaveAnalytics, 
   onAssociateStudent,
+  onGradeOverride,
   isSaving = false,
   studentName = null,
   studentId = null
 }: AnalysisResultsProps) {
+  const [overriddenGrade, setOverriddenGrade] = useState<{ grade: number; justification: string } | null>(null);
   const getScoreColor = (percentage: number) => {
     if (percentage >= 80) return 'text-green-600';
     if (percentage >= 60) return 'text-yellow-600';
@@ -70,17 +75,38 @@ export function AnalysisResults({
     return { label: 'Below Standards', variant: 'destructive' as const };
   };
 
-  const grade = result.grade ?? Math.round(55 + (result.totalScore.percentage / 100) * 45);
+  const handleGradeOverride = (newGrade: number, newJustification: string) => {
+    setOverriddenGrade({ grade: newGrade, justification: newJustification });
+    onGradeOverride?.(newGrade, newJustification);
+  };
+
+  const aiGrade = result.grade ?? Math.round(55 + (result.totalScore.percentage / 100) * 45);
+  const grade = overriddenGrade?.grade ?? aiGrade;
+  const gradeJustification = overriddenGrade?.justification ?? result.gradeJustification;
+  const isOverridden = overriddenGrade !== null;
   const gradeBadge = getGradeBadge(grade);
 
   return (
     <div className="space-y-4">
       {/* Grade Summary */}
-      <Card>
+      <Card className={isOverridden ? 'border-primary' : ''}>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center justify-between text-lg">
-            <span>Analysis Results</span>
-            <Badge variant={gradeBadge.variant}>{gradeBadge.label}</Badge>
+            <div className="flex items-center gap-2">
+              <span>Analysis Results</span>
+              {isOverridden && (
+                <Badge variant="outline" className="text-xs">Teacher Override</Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={gradeBadge.variant}>{gradeBadge.label}</Badge>
+              <GradeOverrideDialog
+                currentGrade={grade}
+                currentJustification={gradeJustification}
+                onOverride={handleGradeOverride}
+                disabled={isSaving}
+              />
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
