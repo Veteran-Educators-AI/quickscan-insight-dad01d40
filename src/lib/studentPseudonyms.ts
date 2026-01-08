@@ -35,12 +35,33 @@ function hashCode(str: string): number {
   return Math.abs(hash);
 }
 
+// Cache for custom pseudonyms from database
+const customPseudonymCache = new Map<string, string>();
+
+/**
+ * Sets a custom pseudonym for a student (from database).
+ */
+export function setCustomPseudonym(studentId: string, customPseudonym: string | null): void {
+  if (customPseudonym) {
+    customPseudonymCache.set(studentId, customPseudonym);
+  } else {
+    customPseudonymCache.delete(studentId);
+  }
+  // Clear the generated pseudonym cache so it regenerates
+  pseudonymCache.delete(studentId);
+}
+
 /**
  * Gets or generates a pseudonym for a student ID.
  * Pseudonyms are consistent within a session and unique per student.
  */
 export function getStudentPseudonym(studentId: string): string {
-  // Check cache first
+  // Check for custom pseudonym first
+  if (customPseudonymCache.has(studentId)) {
+    return customPseudonymCache.get(studentId)!;
+  }
+
+  // Check cache
   if (pseudonymCache.has(studentId)) {
     return pseudonymCache.get(studentId)!;
   }
@@ -63,6 +84,13 @@ export function getStudentPseudonym(studentId: string): string {
   usedPseudonyms.add(attemptedPseudonym);
   
   return attemptedPseudonym;
+}
+
+/**
+ * Get all available pseudonym options for selection.
+ */
+export function getAvailablePseudonyms(): string[] {
+  return [...ANIMALS];
 }
 
 /**

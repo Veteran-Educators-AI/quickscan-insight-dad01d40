@@ -854,6 +854,7 @@ export type Database = {
         Row: {
           class_id: string
           created_at: string
+          custom_pseudonym: string | null
           email: string | null
           first_name: string
           id: string
@@ -866,6 +867,7 @@ export type Database = {
         Insert: {
           class_id: string
           created_at?: string
+          custom_pseudonym?: string | null
           email?: string | null
           first_name: string
           id?: string
@@ -878,6 +880,7 @@ export type Database = {
         Update: {
           class_id?: string
           created_at?: string
+          custom_pseudonym?: string | null
           email?: string | null
           first_name?: string
           id?: string
