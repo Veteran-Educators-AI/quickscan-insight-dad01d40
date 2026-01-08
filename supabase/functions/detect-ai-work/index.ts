@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +10,7 @@ interface DetectAIRequest {
   text: string;
   studentName?: string;
   questionContext?: string;
+  teacherId?: string;
 }
 
 interface AIDetectionResult {
@@ -18,13 +20,56 @@ interface AIDetectionResult {
   explanation: string;
 }
 
+// Check rate limit for a user
+async function checkRateLimit(supabase: any, userId: string): Promise<{ allowed: boolean; message?: string }> {
+  const { data, error } = await supabase.rpc('check_ai_rate_limit', { p_user_id: userId });
+  
+  if (error) {
+    console.error('Rate limit check error:', error);
+    return { allowed: true };
+  }
+  
+  if (!data.allowed) {
+    if (data.hourly_remaining === 0) {
+      return { allowed: false, message: `Hourly AI limit reached (${data.hourly_limit}/hour).` };
+    }
+    if (data.daily_remaining === 0) {
+      return { allowed: false, message: `Daily AI limit reached (${data.daily_limit}/day).` };
+    }
+  }
+  
+  return { allowed: true };
+}
+
+// Log AI usage to database
+async function logAIUsage(
+  supabase: any, 
+  userId: string, 
+  functionName: string, 
+  usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number },
+  latencyMs: number
+) {
+  const { error } = await supabase.from('ai_usage_logs').insert({
+    user_id: userId,
+    function_name: functionName,
+    prompt_tokens: usage.prompt_tokens || 0,
+    completion_tokens: usage.completion_tokens || 0,
+    total_tokens: usage.total_tokens || 0,
+    latency_ms: latencyMs,
+  });
+  
+  if (error) {
+    console.error('Failed to log AI usage:', error);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { text, studentName, questionContext }: DetectAIRequest = await req.json();
+    const { text, studentName, questionContext, teacherId }: DetectAIRequest = await req.json();
 
     if (!text || text.trim().length < 20) {
       return new Response(
@@ -41,6 +86,31 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    // Initialize Supabase client for rate limiting
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY 
+      ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+      : null;
+
+    // Check rate limit
+    if (supabase && teacherId) {
+      const rateLimit = await checkRateLimit(supabase, teacherId);
+      if (!rateLimit.allowed) {
+        return new Response(JSON.stringify({ 
+          error: rateLimit.message,
+          rateLimited: true,
+          isLikelyAI: false,
+          confidence: 0,
+          indicators: [],
+          explanation: "Rate limit exceeded"
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const systemPrompt = `You are an expert at detecting AI-generated student work vs genuine student responses. 
@@ -126,6 +196,11 @@ Respond with JSON only.`;
     // Log token usage for cost monitoring
     const usage = data.usage || {};
     console.log(`[TOKEN_USAGE] function=detect-ai-work model=gemini-2.5-flash-lite prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
+    
+    // Log to database if supabase client is provided
+    if (supabase && teacherId) {
+      await logAIUsage(supabase, teacherId, 'detect-ai-work', usage, latencyMs);
+    }
     
     const content = data.choices?.[0]?.message?.content || "";
 

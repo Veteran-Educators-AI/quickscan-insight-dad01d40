@@ -1,11 +1,55 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function callLovableAI(prompt: string, imageBase64: string): Promise<string> {
+// Check rate limit for a user
+async function checkRateLimit(supabase: any, userId: string): Promise<{ allowed: boolean; message?: string }> {
+  const { data, error } = await supabase.rpc('check_ai_rate_limit', { p_user_id: userId });
+  
+  if (error) {
+    console.error('Rate limit check error:', error);
+    return { allowed: true };
+  }
+  
+  if (!data.allowed) {
+    if (data.hourly_remaining === 0) {
+      return { allowed: false, message: `Hourly AI limit reached (${data.hourly_limit}/hour).` };
+    }
+    if (data.daily_remaining === 0) {
+      return { allowed: false, message: `Daily AI limit reached (${data.daily_limit}/day).` };
+    }
+  }
+  
+  return { allowed: true };
+}
+
+// Log AI usage to database
+async function logAIUsage(
+  supabase: any, 
+  userId: string, 
+  functionName: string, 
+  usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number },
+  latencyMs: number
+) {
+  const { error } = await supabase.from('ai_usage_logs').insert({
+    user_id: userId,
+    function_name: functionName,
+    prompt_tokens: usage.prompt_tokens || 0,
+    completion_tokens: usage.completion_tokens || 0,
+    total_tokens: usage.total_tokens || 0,
+    latency_ms: latencyMs,
+  });
+  
+  if (error) {
+    console.error('Failed to log AI usage:', error);
+  }
+}
+
+async function callLovableAI(prompt: string, imageBase64: string, supabase?: any, userId?: string): Promise<string> {
   const apiKey = Deno.env.get('LOVABLE_API_KEY');
   if (!apiKey) {
     throw new Error('LOVABLE_API_KEY is not configured');
@@ -62,6 +106,11 @@ async function callLovableAI(prompt: string, imageBase64: string): Promise<strin
   const usage = data.usage || {};
   console.log(`[TOKEN_USAGE] function=extract-answer-key model=gemini-2.5-flash-lite prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
   
+  // Log to database if supabase client is provided
+  if (supabase && userId) {
+    await logAIUsage(supabase, userId, 'extract-answer-key', usage, latencyMs);
+  }
+  
   const content = data.choices?.[0]?.message?.content;
   
   if (!content) {
@@ -77,10 +126,32 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64 } = await req.json();
+    const { imageBase64, teacherId } = await req.json();
     
     if (!imageBase64) {
       throw new Error('Image data is required');
+    }
+
+    // Initialize Supabase client for rate limiting
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY 
+      ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+      : null;
+
+    // Check rate limit
+    if (supabase && teacherId) {
+      const rateLimit = await checkRateLimit(supabase, teacherId);
+      if (!rateLimit.allowed) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: rateLimit.message,
+          rateLimited: true
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     console.log('Extracting answer from student work image...');
@@ -103,7 +174,7 @@ Be precise and include all mathematical notation. If there are diagrams, describ
     // Clean base64 if it has data URL prefix
     const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
 
-    const extractedText = await callLovableAI(prompt, cleanBase64);
+    const extractedText = await callLovableAI(prompt, cleanBase64, supabase, teacherId);
 
     console.log('Answer extraction complete');
 

@@ -6,8 +6,63 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Check rate limit for a user
+async function checkRateLimit(supabase: any, userId: string): Promise<{ allowed: boolean; message?: string }> {
+  const { data, error } = await supabase.rpc('check_ai_rate_limit', { p_user_id: userId });
+  
+  if (error) {
+    console.error('Rate limit check error:', error);
+    return { allowed: true }; // Allow on error to not block users
+  }
+  
+  if (!data.allowed) {
+    if (data.hourly_remaining === 0) {
+      return { 
+        allowed: false, 
+        message: `Hourly AI limit reached (${data.hourly_limit}/hour). Please wait before scanning more work.` 
+      };
+    }
+    if (data.daily_remaining === 0) {
+      return { 
+        allowed: false, 
+        message: `Daily AI limit reached (${data.daily_limit}/day). Limit resets in 24 hours.` 
+      };
+    }
+  }
+  
+  return { allowed: true };
+}
+
+// Log AI usage to database
+async function logAIUsage(
+  supabase: any, 
+  userId: string, 
+  functionName: string, 
+  usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number },
+  latencyMs: number
+) {
+  const { error } = await supabase.from('ai_usage_logs').insert({
+    user_id: userId,
+    function_name: functionName,
+    prompt_tokens: usage.prompt_tokens || 0,
+    completion_tokens: usage.completion_tokens || 0,
+    total_tokens: usage.total_tokens || 0,
+    latency_ms: latencyMs,
+  });
+  
+  if (error) {
+    console.error('Failed to log AI usage:', error);
+  }
+}
+
 // Helper function to call Lovable AI Gateway with token logging
-async function callLovableAI(messages: any[], apiKey: string, functionName: string = 'analyze-student-work') {
+async function callLovableAI(
+  messages: any[], 
+  apiKey: string, 
+  functionName: string = 'analyze-student-work',
+  supabase?: any,
+  userId?: string
+) {
   const startTime = Date.now();
   
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -42,6 +97,11 @@ async function callLovableAI(messages: any[], apiKey: string, functionName: stri
   // Log token usage for cost monitoring
   const usage = data.usage || {};
   console.log(`[TOKEN_USAGE] function=${functionName} model=gemini-2.5-flash-lite prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
+  
+  // Log to database if supabase client is provided
+  if (supabase && userId) {
+    await logAIUsage(supabase, userId, functionName, usage, latencyMs);
+  }
   
   return data.choices?.[0]?.message?.content || '';
 }
@@ -78,12 +138,26 @@ serve(async (req) => {
       throw new Error('Image data is required');
     }
 
-    // Initialize Supabase client for sending notifications
+    // Initialize Supabase client for sending notifications and rate limiting
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY 
       ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
       : null;
+
+    // Check rate limit if we have a teacher ID and supabase client
+    if (supabase && teacherId) {
+      const rateLimit = await checkRateLimit(supabase, teacherId);
+      if (!rateLimit.allowed) {
+        return new Response(JSON.stringify({ 
+          error: rateLimit.message,
+          rateLimited: true
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     // If identifyOnly is true, just extract student identification info
     if (identifyOnly) {
