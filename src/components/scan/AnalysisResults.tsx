@@ -26,6 +26,8 @@ interface AnalysisResult {
   rubricScores: RubricScore[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
+  grade?: number;
+  gradeJustification?: string;
   feedback: string;
 }
 
@@ -54,39 +56,69 @@ export function AnalysisResults({
     return 'text-red-600';
   };
 
-  const getScoreBadge = (percentage: number) => {
-    if (percentage >= 90) return { label: 'Excellent', variant: 'default' as const };
-    if (percentage >= 80) return { label: 'Good', variant: 'secondary' as const };
-    if (percentage >= 70) return { label: 'Satisfactory', variant: 'secondary' as const };
-    if (percentage >= 60) return { label: 'Needs Work', variant: 'outline' as const };
-    return { label: 'Needs Improvement', variant: 'destructive' as const };
+  const getGradeColor = (grade: number) => {
+    if (grade >= 90) return 'text-green-600';
+    if (grade >= 80) return 'text-blue-600';
+    if (grade >= 70) return 'text-yellow-600';
+    return 'text-orange-600';
   };
 
-  const scoreBadge = getScoreBadge(result.totalScore.percentage);
+  const getGradeBadge = (grade: number) => {
+    if (grade >= 90) return { label: 'Exceeds Standards', variant: 'default' as const };
+    if (grade >= 80) return { label: 'Meets Standards', variant: 'secondary' as const };
+    if (grade >= 70) return { label: 'Approaching Standards', variant: 'outline' as const };
+    return { label: 'Below Standards', variant: 'destructive' as const };
+  };
+
+  const grade = result.grade ?? Math.round(55 + (result.totalScore.percentage / 100) * 45);
+  const gradeBadge = getGradeBadge(grade);
 
   return (
     <div className="space-y-4">
-      {/* Score Summary */}
+      {/* Grade Summary */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center justify-between text-lg">
             <span>Analysis Results</span>
-            <Badge variant={scoreBadge.variant}>{scoreBadge.label}</Badge>
+            <Badge variant={gradeBadge.variant}>{gradeBadge.label}</Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Grade Display */}
           <div className="flex items-center gap-4">
             <div className="flex-1">
               <div className="flex justify-between mb-1">
-                <span className="text-sm text-muted-foreground">Total Score</span>
-                <span className={`font-bold ${getScoreColor(result.totalScore.percentage)}`}>
-                  {result.totalScore.earned} / {result.totalScore.possible}
+                <span className="text-sm text-muted-foreground">Grade (55-100 scale)</span>
+                <span className={`font-bold ${getGradeColor(grade)}`}>
+                  {grade}
                 </span>
               </div>
-              <Progress value={result.totalScore.percentage} className="h-3" />
+              <Progress value={(grade - 55) / 45 * 100} className="h-3" />
             </div>
-            <div className={`text-3xl font-bold ${getScoreColor(result.totalScore.percentage)}`}>
-              {result.totalScore.percentage}%
+            <div className={`text-3xl font-bold ${getGradeColor(grade)}`}>
+              {grade}
+            </div>
+          </div>
+
+          {/* Grade Justification */}
+          {result.gradeJustification && (
+            <div className="bg-muted/50 rounded-md p-3">
+              <p className="text-xs font-medium text-muted-foreground mb-1">Grade Justification</p>
+              <p className="text-sm">{result.gradeJustification}</p>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Raw Score */}
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <div className="flex justify-between mb-1">
+                <span className="text-sm text-muted-foreground">Raw Score</span>
+                <span className={`font-medium ${getScoreColor(result.totalScore.percentage)}`}>
+                  {result.totalScore.earned} / {result.totalScore.possible} ({result.totalScore.percentage}%)
+                </span>
+              </div>
             </div>
           </div>
         </CardContent>

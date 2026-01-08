@@ -255,6 +255,8 @@ Identify the problem being solved and evaluate the student's approach.`;
 - Rubric Scores: (if rubric provided, score each criterion)
 - Misconceptions: (any errors or misunderstandings identified)
 - Total Score: (points earned / total possible)
+- Grade: (a number from 55 to 100, where 55 is the minimum grade. Meeting standards = 80. Exceeding standards = 90-100. Below standards but showing effort = 55-79)
+- Grade Justification: (2-3 sentences explaining why this grade was assigned, referencing specific aspects of the student's work)
 - Feedback: (constructive suggestions for improvement)`;
 
     // Build messages for Lovable AI
@@ -669,6 +671,8 @@ interface ParsedResult {
   rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
+  grade: number;
+  gradeJustification: string;
   feedback: string;
 }
 
@@ -680,6 +684,8 @@ function parseAnalysisResult(text: string, rubricSteps?: any[]): ParsedResult {
     rubricScores: [],
     misconceptions: [],
     totalScore: { earned: 0, possible: 0, percentage: 0 },
+    grade: 55,
+    gradeJustification: '',
     feedback: '',
   };
 
@@ -709,6 +715,22 @@ function parseAnalysisResult(text: string, rubricSteps?: any[]): ParsedResult {
       ? Math.round((result.totalScore.earned / result.totalScore.possible) * 100) 
       : 0;
   }
+
+  // Parse grade (55-100 scale)
+  const gradeMatch = text.match(/Grade[:\s]*(\d+)/i);
+  if (gradeMatch) {
+    const parsedGrade = parseInt(gradeMatch[1]);
+    // Ensure grade is within 55-100 range
+    result.grade = Math.max(55, Math.min(100, parsedGrade));
+  } else if (result.totalScore.percentage > 0) {
+    // Fallback: convert percentage to 55-100 scale
+    // 0% = 55, 100% = 100 (linear mapping)
+    result.grade = Math.round(55 + (result.totalScore.percentage / 100) * 45);
+  }
+
+  // Parse grade justification
+  const justificationMatch = text.match(/Grade Justification[:\s]*([^]*?)(?=Feedback|$)/i);
+  if (justificationMatch) result.gradeJustification = justificationMatch[1].trim();
 
   const feedbackMatch = text.match(/Feedback[:\s]*([^]*?)$/i);
   if (feedbackMatch) result.feedback = feedbackMatch[1].trim();
