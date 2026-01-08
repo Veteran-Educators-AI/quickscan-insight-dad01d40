@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -19,6 +19,7 @@ import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
 import { usePendingScans } from '@/hooks/usePendingScans';
 import { useSaveAnalysisResults } from '@/hooks/useSaveAnalysisResults';
 import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
+import { MultiStudentScanner } from '@/components/scan/MultiStudentScanner';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 
@@ -77,6 +78,9 @@ export default function Scan() {
   
   // Confirmation dialog state
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  
+  // Multi-student grading mode
+  const [showMultiStudentScanner, setShowMultiStudentScanner] = useState(false);
   
   // AI suggestions for manual scoring
   const [aiSuggestions, setAiSuggestions] = useState<{
@@ -945,6 +949,22 @@ export default function Scan() {
                           </Button>
                         </div>
 
+                        {/* Multi-Student Tool */}
+                        <div className="pt-4 border-t">
+                          <Button
+                            variant="outline"
+                            size="lg"
+                            className="w-full border-dashed border-2 hover:border-primary hover:bg-primary/5"
+                            onClick={() => setShowMultiStudentScanner(true)}
+                          >
+                            <Users className="h-5 w-5 mr-2 text-primary" />
+                            <span>
+                              <span className="font-semibold">Multi-Student Grading</span>
+                              <span className="text-muted-foreground ml-2 text-sm">— Grade many from one photo</span>
+                            </span>
+                          </Button>
+                        </div>
+
                         <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
                           <p>💡 <strong>Tip:</strong> For best results, ensure good lighting and capture the full response</p>
                           <p>📱 QR codes on printed assessments will auto-detect student & question</p>
@@ -1153,6 +1173,18 @@ export default function Scan() {
           onConfirm={handlePreviewConfirm}
           onRetake={handlePreviewRetake}
         />
+      )}
+
+      {/* Multi-Student Scanner Modal */}
+      {showMultiStudentScanner && (
+        <Dialog open={showMultiStudentScanner} onOpenChange={setShowMultiStudentScanner}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <MultiStudentScanner 
+              onClose={() => setShowMultiStudentScanner(false)}
+              rubricSteps={mockRubricSteps}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );
