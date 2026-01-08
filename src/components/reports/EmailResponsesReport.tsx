@@ -7,7 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { getStudentPseudonym } from '@/lib/studentPseudonyms';
+import { useStudentNames } from '@/lib/StudentNameContext';
 
 interface EmailResponsesReportProps {
   classId?: string;
@@ -34,6 +34,7 @@ interface EmailAttempt {
 
 export function EmailResponsesReport({ classId }: EmailResponsesReportProps) {
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
+  const { getDisplayName } = useStudentNames();
 
   const { data: emailAttempts, isLoading } = useQuery({
     queryKey: ['email-responses', classId],
@@ -229,7 +230,7 @@ export function EmailResponsesReport({ classId }: EmailResponsesReportProps) {
                           <CheckCircle className="h-4 w-4 text-emerald-500" />
                           <div>
                             <p className="font-medium text-sm">
-                              {getStudentPseudonym(attempt.student.id)}
+                              {getDisplayName(attempt.student.id, attempt.student.first_name, attempt.student.last_name)}
                             </p>
                           </div>
                         </div>
@@ -265,7 +266,7 @@ export function EmailResponsesReport({ classId }: EmailResponsesReportProps) {
                         <Clock className="h-4 w-4 text-amber-500" />
                         <div>
                           <p className="font-medium text-sm">
-                            {getStudentPseudonym(attempt.student.id)}
+                            {getDisplayName(attempt.student.id, attempt.student.first_name, attempt.student.last_name)}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {attempt.question.jmap_id || 'Question'}

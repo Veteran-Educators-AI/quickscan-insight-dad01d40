@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { StudentNameProvider } from "@/lib/StudentNameContext";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { WhatsNewDialog } from "@/components/WhatsNewDialog";
 
@@ -101,15 +102,17 @@ function AppRoutes() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <OnboardingTour />
-          <WhatsNewDialog />
-          <AppRoutes />
-        </BrowserRouter>
-      </TooltipProvider>
+      <StudentNameProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <OnboardingTour />
+            <WhatsNewDialog />
+            <AppRoutes />
+          </BrowserRouter>
+        </TooltipProvider>
+      </StudentNameProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

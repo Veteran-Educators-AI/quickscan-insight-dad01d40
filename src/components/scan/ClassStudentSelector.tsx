@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { getStudentPseudonym } from '@/lib/studentPseudonyms';
+import { useStudentNames } from '@/lib/StudentNameContext';
 
 interface ClassOption {
   id: string;
@@ -54,6 +54,7 @@ export function ClassStudentSelector({
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [classOpen, setClassOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { getDisplayName } = useStudentNames();
 
   // Fetch classes
   useEffect(() => {
@@ -217,7 +218,7 @@ export function ClassStudentSelector({
                   </p>
                 ) : (
                   students.map((student) => {
-                    const pseudonym = getStudentPseudonym(student.id);
+                    const displayName = getDisplayName(student.id, student.first_name, student.last_name);
                     return (
                     <div
                       key={student.id}
@@ -234,7 +235,7 @@ export function ClassStudentSelector({
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">
-                          {pseudonym}
+                          {displayName}
                         </p>
                       </div>
                     </div>

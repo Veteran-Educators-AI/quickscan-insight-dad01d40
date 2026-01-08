@@ -17,7 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { getStudentPseudonym } from '@/lib/studentPseudonyms';
+import { useStudentNames } from '@/lib/StudentNameContext';
 
 interface ClassOption {
   id: string;
@@ -52,6 +52,7 @@ export function ScanClassStudentPicker({
   const [classOpen, setClassOpen] = useState(false);
   const [studentOpen, setStudentOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { getDisplayName } = useStudentNames();
 
   // Fetch classes
   useEffect(() => {
@@ -168,7 +169,7 @@ export function ScanClassStudentPicker({
             <User className="h-4 w-4 mr-2 shrink-0" />
             {selectedStudent ? (
               <span className="truncate">
-                {getStudentPseudonym(selectedStudent.id)}
+                {getDisplayName(selectedStudent.id, selectedStudent.first_name, selectedStudent.last_name)}
               </span>
             ) : (
               <span className="text-muted-foreground">
@@ -185,11 +186,11 @@ export function ScanClassStudentPicker({
               <CommandEmpty>No students found.</CommandEmpty>
               <CommandGroup>
                 {students.map((student) => {
-                  const pseudonym = getStudentPseudonym(student.id);
+                  const displayName = getDisplayName(student.id, student.first_name, student.last_name);
                   return (
                   <CommandItem
                     key={student.id}
-                    value={pseudonym}
+                    value={displayName}
                     onSelect={() => {
                       onStudentChange(student.id);
                       setStudentOpen(false);
@@ -202,7 +203,7 @@ export function ScanClassStudentPicker({
                       )}
                     />
                     <span className="flex-1">
-                      {pseudonym}
+                      {displayName}
                     </span>
                   </CommandItem>
                   );
@@ -216,7 +217,7 @@ export function ScanClassStudentPicker({
       {selectedStudent && (
         <Badge variant="secondary" className="gap-1">
           <User className="h-3 w-3" />
-          {getStudentPseudonym(selectedStudent.id)}
+          {getDisplayName(selectedStudent.id, selectedStudent.first_name, selectedStudent.last_name)}
         </Badge>
       )}
     </div>
@@ -226,6 +227,7 @@ export function ScanClassStudentPicker({
 // Export hook to get student name by ID
 export function useStudentName(studentId: string | null) {
   const [studentName, setStudentName] = useState<string | null>(null);
+  const { getDisplayName } = useStudentNames();
 
   useEffect(() => {
     async function fetchStudent() {
@@ -241,11 +243,11 @@ export function useStudentName(studentId: string | null) {
         .single();
 
       if (!error && data) {
-        setStudentName(getStudentPseudonym(studentId));
+        setStudentName(getDisplayName(studentId, data.first_name, data.last_name));
       }
     }
     fetchStudent();
-  }, [studentId]);
+  }, [studentId, getDisplayName]);
 
   return studentName;
 }
