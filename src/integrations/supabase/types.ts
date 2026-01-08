@@ -416,6 +416,77 @@ export type Database = {
         }
         Relationships: []
       }
+      grade_history: {
+        Row: {
+          attempt_id: string | null
+          created_at: string
+          grade: number
+          grade_justification: string | null
+          id: string
+          raw_score_earned: number | null
+          raw_score_possible: number | null
+          student_id: string
+          teacher_id: string
+          topic_id: string | null
+          topic_name: string
+        }
+        Insert: {
+          attempt_id?: string | null
+          created_at?: string
+          grade: number
+          grade_justification?: string | null
+          id?: string
+          raw_score_earned?: number | null
+          raw_score_possible?: number | null
+          student_id: string
+          teacher_id: string
+          topic_id?: string | null
+          topic_name: string
+        }
+        Update: {
+          attempt_id?: string | null
+          created_at?: string
+          grade?: number
+          grade_justification?: string | null
+          id?: string
+          raw_score_earned?: number | null
+          raw_score_possible?: number | null
+          student_id?: string
+          teacher_id?: string
+          topic_id?: string | null
+          topic_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grade_history_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grade_history_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grade_history_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grade_history_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mfa_recovery_codes: {
         Row: {
           code_hash: string

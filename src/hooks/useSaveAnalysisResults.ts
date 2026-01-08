@@ -17,6 +17,8 @@ interface AnalysisResult {
   rubricScores: RubricScore[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
+  grade?: number;
+  gradeJustification?: string;
   feedback: string;
 }
 
@@ -26,6 +28,8 @@ interface SaveAnalysisParams {
   imageUrl: string;
   result: AnalysisResult;
   pendingScanId?: string;
+  topicName?: string;
+  topicId?: string;
 }
 
 export function useSaveAnalysisResults() {
@@ -87,7 +91,30 @@ export function useSaveAnalysisResults() {
 
       if (scoreError) throw scoreError;
 
-      // 4. Delete the pending scan if provided
+      // 4. Save grade history if we have grade info
+      const grade = params.result.grade ?? Math.round(55 + (params.result.totalScore.percentage / 100) * 45);
+      if (params.topicName) {
+        const { error: gradeHistoryError } = await supabase
+          .from('grade_history')
+          .insert({
+            student_id: params.studentId,
+            topic_id: params.topicId || null,
+            topic_name: params.topicName,
+            grade: grade,
+            grade_justification: params.result.gradeJustification || null,
+            raw_score_earned: params.result.totalScore.earned,
+            raw_score_possible: params.result.totalScore.possible,
+            attempt_id: attempt.id,
+            teacher_id: user.id,
+          });
+
+        if (gradeHistoryError) {
+          console.error('Error saving grade history:', gradeHistoryError);
+          // Don't throw - grade history is secondary
+        }
+      }
+
+      // 5. Delete the pending scan if provided
       if (params.pendingScanId) {
         await supabase
           .from('pending_scans')
