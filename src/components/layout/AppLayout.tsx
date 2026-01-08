@@ -65,11 +65,13 @@ export function AppLayout({ children }: AppLayoutProps) {
               const Icon = item.icon;
               const isActive = location.pathname === item.href || 
                 (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
+              const tourId = item.href.replace('/', 'nav-');
               
               return (
                 <Link
                   key={item.href}
                   to={item.href}
+                  data-tour={tourId}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                     isActive 

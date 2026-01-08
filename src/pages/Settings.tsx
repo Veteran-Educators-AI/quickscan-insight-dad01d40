@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Settings as SettingsIcon, Shield, Smartphone, Copy, Check, Camera, Upload, KeyRound, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings as SettingsIcon, Shield, Smartphone, Copy, Check, Camera, Upload, KeyRound, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
 import { AIDetectionSettings } from '@/components/settings/AIDetectionSettings';
+import { useOnboardingTour } from '@/hooks/useOnboardingTour';
 
 const DEPLOYED_URL = 'https://eb414783-3d02-49de-9a11-3c5e9daba81a.lovableproject.com';
 
@@ -96,6 +97,12 @@ Make sure to configure these permissions in your native projects:
 export default function Settings() {
   const [copied, setCopied] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
+  const { resetTour } = useOnboardingTour();
+
+  const handleRestartTour = () => {
+    resetTour();
+    toast.success('Tour restarted! Navigate to Dashboard to begin.');
+  };
 
   const handleCopyUrl = async () => {
     try {
@@ -126,8 +133,20 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><SettingsIcon className="h-5 w-5" /> General</CardTitle>
           </CardHeader>
-          <CardContent className="text-muted-foreground">
-            Settings will be available here. Configure grading scales, misconception tags, and topic maps.
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Settings will be available here. Configure grading scales, misconception tags, and topic maps.
+            </p>
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <div>
+                <div className="font-medium text-sm">Guided Tour</div>
+                <div className="text-xs text-muted-foreground">Restart the onboarding walkthrough</div>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleRestartTour}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Restart Tour
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
