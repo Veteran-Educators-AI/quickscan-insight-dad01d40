@@ -3,12 +3,14 @@ import { getStudentPseudonym, getPseudonymInitials } from './studentPseudonyms';
 import { supabase } from '@/integrations/supabase/client';
 
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const COUNTDOWN_INTERVAL_MS = 1000; // 1 second
 
 interface StudentNameContextType {
   revealRealNames: boolean;
   toggleRevealNames: () => void;
   getDisplayName: (studentId: string, firstName: string, lastName: string) => string;
   getDisplayInitials: (studentId: string, firstName: string, lastName: string) => string;
+  remainingSeconds: number | null;
 }
 
 const StudentNameContext = createContext<StudentNameContextType | undefined>(undefined);
@@ -31,14 +33,31 @@ async function logAuditEvent(action: string) {
 
 export function StudentNameProvider({ children }: { children: ReactNode }) {
   const [revealRealNames, setRevealRealNames] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
 
   const resetToPrivate = useCallback(() => {
     setRevealRealNames(false);
+    setRemainingSeconds(null);
     logAuditEvent('auto_reverted_to_pseudonyms');
   }, []);
 
+  const updateCountdown = useCallback(() => {
+    const elapsed = Date.now() - lastActivityRef.current;
+    const remaining = Math.max(0, Math.ceil((INACTIVITY_TIMEOUT_MS - elapsed) / 1000));
+    setRemainingSeconds(remaining);
+    
+    if (remaining <= 0) {
+      resetToPrivate();
+    }
+  }, [resetToPrivate]);
+
   const resetInactivityTimer = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    setRemainingSeconds(Math.ceil(INACTIVITY_TIMEOUT_MS / 1000));
+    
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
@@ -52,11 +71,17 @@ export function StudentNameProvider({ children }: { children: ReactNode }) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+      setRemainingSeconds(null);
       return;
     }
 
-    // Start the inactivity timer
+    // Start the inactivity timer and countdown
     resetInactivityTimer();
+    countdownRef.current = setInterval(updateCountdown, COUNTDOWN_INTERVAL_MS);
 
     // Activity events to track
     const activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
@@ -76,8 +101,11 @@ export function StudentNameProvider({ children }: { children: ReactNode }) {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+      }
     };
-  }, [revealRealNames, resetInactivityTimer]);
+  }, [revealRealNames, resetInactivityTimer, updateCountdown]);
 
   const toggleRevealNames = useCallback(() => {
     setRevealRealNames(prev => {
@@ -107,7 +135,8 @@ export function StudentNameProvider({ children }: { children: ReactNode }) {
       revealRealNames, 
       toggleRevealNames, 
       getDisplayName, 
-      getDisplayInitials 
+      getDisplayInitials,
+      remainingSeconds
     }}>
       {children}
     </StudentNameContext.Provider>
