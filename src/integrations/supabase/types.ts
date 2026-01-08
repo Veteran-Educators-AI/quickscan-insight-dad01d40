@@ -583,6 +583,44 @@ export type Database = {
           },
         ]
       }
+      result_comments: {
+        Row: {
+          attempt_id: string
+          author_name: string | null
+          author_type: string
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean
+        }
+        Insert: {
+          attempt_id: string
+          author_name?: string | null
+          author_type: string
+          content: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+        }
+        Update: {
+          attempt_id?: string
+          author_name?: string | null
+          author_type?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "result_comments_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rubrics: {
         Row: {
           created_at: string

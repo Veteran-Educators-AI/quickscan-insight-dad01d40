@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import {
   CheckCircle2,
   XCircle,
@@ -14,9 +17,11 @@ import {
   FileText,
   User,
   Calendar,
-  ArrowLeft,
   Loader2,
+  MessageCircle,
+  Send,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import logo from '@/assets/scan-genius-logo.png';
 
 interface AttemptData {
@@ -45,12 +50,25 @@ interface AttemptData {
   }[];
 }
 
+interface Comment {
+  id: string;
+  content: string;
+  author_type: 'student' | 'teacher';
+  author_name: string | null;
+  created_at: string;
+}
+
 export default function StudentResults() {
   const { studentId, questionId } = useParams<{ studentId: string; questionId: string }>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState<AttemptData | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Fetch results and comments
   useEffect(() => {
     async function fetchResults() {
       if (!studentId || !questionId) {
@@ -100,6 +118,17 @@ export default function StudentResults() {
             images: data.attempt_images || [],
           };
           setAttempt(transformedData);
+          
+          // Fetch comments for this attempt
+          const { data: commentsData } = await supabase
+            .from('result_comments')
+            .select('*')
+            .eq('attempt_id', data.id)
+            .order('created_at', { ascending: true });
+          
+          if (commentsData) {
+            setComments(commentsData as Comment[]);
+          }
         }
       } catch (err: any) {
         console.error('Error fetching results:', err);
@@ -111,6 +140,40 @@ export default function StudentResults() {
 
     fetchResults();
   }, [studentId, questionId]);
+
+  const handleSubmitComment = async () => {
+    if (!newComment.trim() || !attempt) return;
+    
+    if (newComment.trim().length > 1000) {
+      toast.error('Comment is too long (max 1000 characters)');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      const { data, error } = await supabase
+        .from('result_comments')
+        .insert({
+          attempt_id: attempt.id,
+          content: newComment.trim(),
+          author_type: 'student',
+          author_name: studentName.trim() || null,
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      setComments(prev => [...prev, data as Comment]);
+      setNewComment('');
+      toast.success('Question submitted! Your teacher will respond soon.');
+    } catch (err) {
+      console.error('Error submitting comment:', err);
+      toast.error('Failed to submit your question. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const calculateTotalScore = () => {
     if (!attempt || attempt.scores.length === 0) return { earned: 0, possible: 0, percentage: 0 };
@@ -322,6 +385,91 @@ export default function StudentResults() {
             </CardContent>
           </Card>
         )}
+
+        {/* Comments Section */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MessageCircle className="h-4 w-4" />
+              Questions & Comments
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Existing Comments */}
+            {comments.length > 0 && (
+              <div className="space-y-3">
+                {comments.map((comment) => (
+                  <div 
+                    key={comment.id} 
+                    className={`p-3 rounded-lg ${
+                      comment.author_type === 'teacher' 
+                        ? 'bg-primary/10 border border-primary/20 ml-4' 
+                        : 'bg-muted mr-4'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant={comment.author_type === 'teacher' ? 'default' : 'secondary'} className="text-xs">
+                        {comment.author_type === 'teacher' ? 'Teacher' : comment.author_name || 'You'}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(comment.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-sm">{comment.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {comments.length > 0 && <Separator />}
+
+            {/* New Comment Form */}
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Have a question about your grade or need help understanding something? Ask your teacher here!
+              </p>
+              
+              <div className="space-y-2">
+                <Label htmlFor="student-name" className="text-sm">Your Name (optional)</Label>
+                <Input
+                  id="student-name"
+                  placeholder="Enter your name"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value.slice(0, 100))}
+                  maxLength={100}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="comment" className="text-sm">Your Question or Comment</Label>
+                <Textarea
+                  id="comment"
+                  placeholder="Type your question here..."
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value.slice(0, 1000))}
+                  rows={3}
+                  maxLength={1000}
+                />
+                <p className="text-xs text-muted-foreground text-right">
+                  {newComment.length}/1000
+                </p>
+              </div>
+
+              <Button 
+                onClick={handleSubmitComment}
+                disabled={!newComment.trim() || isSubmitting}
+                className="w-full"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
+                Submit Question
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground py-4">
