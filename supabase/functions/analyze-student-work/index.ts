@@ -6,53 +6,49 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper function to call Google Gemini API
-async function callGeminiAPI(contents: any[], apiKey: string) {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents }),
-    }
-  );
+// Helper function to call Lovable AI Gateway
+async function callLovableAI(messages: any[], apiKey: string) {
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash-lite',
+      messages,
+      max_tokens: 4000,
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('Gemini API error:', response.status, errorText);
+    console.error('Lovable AI error:', response.status, errorText);
     
     if (response.status === 429) {
       throw { status: 429, message: "Rate limit exceeded. Please try again in a moment." };
     }
-    if (response.status === 403) {
-      throw { status: 403, message: "Invalid API key or API not enabled. Check your Google Cloud console." };
+    if (response.status === 402) {
+      throw { status: 402, message: "AI credits exhausted. Please add funds to continue." };
     }
-    throw new Error(`Gemini API error: ${response.status}`);
+    throw new Error(`AI API error: ${response.status}`);
   }
 
   const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return data.choices?.[0]?.message?.content || '';
 }
 
-// Helper to format image for Gemini
-function formatImageForGemini(imageBase64: string) {
-  // Remove data URL prefix if present
-  let base64Data = imageBase64;
-  let mimeType = "image/jpeg";
-  
-  if (imageBase64.startsWith('data:')) {
-    const matches = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
-    if (matches) {
-      mimeType = matches[1];
-      base64Data = matches[2];
-    }
+// Helper to format image for Lovable AI (OpenAI-compatible format)
+function formatImageForLovableAI(imageBase64: string) {
+  // Ensure proper data URL format
+  let dataUrl = imageBase64;
+  if (!imageBase64.startsWith('data:')) {
+    dataUrl = `data:image/jpeg;base64,${imageBase64}`;
   }
   
   return {
-    inline_data: {
-      mime_type: mimeType,
-      data: base64Data,
-    }
+    type: 'image_url',
+    image_url: { url: dataUrl }
   };
 }
 
@@ -63,9 +59,9 @@ serve(async (req) => {
   }
 
   try {
-    const GOOGLE_GEMINI_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY');
-    if (!GOOGLE_GEMINI_API_KEY) {
-      throw new Error('GOOGLE_GEMINI_API_KEY is not configured');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY is not configured');
     }
 
     const { imageBase64, solutionBase64, questionId, rubricSteps, identifyOnly, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode } = await req.json();
@@ -84,7 +80,7 @@ serve(async (req) => {
     // If identifyOnly is true, just extract student identification info
     if (identifyOnly) {
       console.log('Identifying student from image...');
-      const identification = await identifyStudent(imageBase64, studentRoster, GOOGLE_GEMINI_API_KEY);
+      const identification = await identifyStudent(imageBase64, studentRoster, LOVABLE_API_KEY);
       return new Response(JSON.stringify({
         success: true,
         identification,
@@ -96,7 +92,7 @@ serve(async (req) => {
     // If compareMode is true, compare student work against provided solution
     if (compareMode && solutionBase64) {
       console.log('Comparing student work against solution...');
-      const comparison = await compareWithSolution(imageBase64, solutionBase64, rubricSteps, GOOGLE_GEMINI_API_KEY);
+      const comparison = await compareWithSolution(imageBase64, solutionBase64, rubricSteps, LOVABLE_API_KEY);
       return new Response(JSON.stringify({
         success: true,
         comparison,
@@ -114,10 +110,9 @@ serve(async (req) => {
     const isAIMode = assessmentMode === 'ai';
     
     let systemPrompt: string;
-    let userPrompt: string;
+    let userPromptText: string;
 
     if (isAIMode) {
-      // AI-assessed mode: AI solves the problem independently and checks student work
       systemPrompt = `You are an expert math teacher and grader. Your task is to:
 1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions
 2. Identify the mathematical problem the student is solving
@@ -130,15 +125,15 @@ serve(async (req) => {
 
 Be accurate, fair, and educational in your assessment. The key is to independently verify correctness.`;
 
-      userPrompt = `Please analyze this student's handwritten math work.
+      userPromptText = `Please analyze this student's handwritten math work.
 
 IMPORTANT: You must solve this problem yourself first to determine the correct answer, then evaluate the student's work.`;
 
       if (promptText) {
-        userPrompt += `\n\nThe problem statement is: ${promptText}`;
+        userPromptText += `\n\nThe problem statement is: ${promptText}`;
       }
 
-      userPrompt += `
+      userPromptText += `
 
 Steps to follow:
 1. Extract all text and mathematical content from the image (OCR)
@@ -148,7 +143,6 @@ Steps to follow:
 5. Determine if the student's final answer is correct`;
 
     } else {
-      // Teacher-uploaded mode: Compare against provided answer key
       systemPrompt = `You are an expert math teacher and grader. Your task is to:
 1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions
 2. Analyze the student's problem-solving approach and methodology
@@ -158,20 +152,20 @@ Steps to follow:
 
 Be accurate, fair, and educational in your assessment.`;
 
-      userPrompt = `Please analyze this student's handwritten math work.
+      userPromptText = `Please analyze this student's handwritten math work.
 
 Extract all text and mathematical content you can see (OCR).
 Identify the problem being solved and evaluate the student's approach.`;
     }
 
     if (rubricSteps && rubricSteps.length > 0) {
-      userPrompt += `\n\nScore against these rubric criteria:\n`;
+      userPromptText += `\n\nScore against these rubric criteria:\n`;
       rubricSteps.forEach((step: { step_number: number; description: string; points: number }, i: number) => {
-        userPrompt += `${i + 1}. ${step.description} (${step.points} points)\n`;
+        userPromptText += `${i + 1}. ${step.description} (${step.points} points)\n`;
       });
     }
 
-    userPrompt += `\n\nProvide your analysis in the following structure:
+    userPromptText += `\n\nProvide your analysis in the following structure:
 - OCR Text: (extracted handwritten content)
 - Problem Identified: (what problem the student is solving)${isAIMode ? '\n- Correct Solution: (your solution to the problem)' : ''}
 - Approach Analysis: (evaluation of their method)
@@ -181,18 +175,19 @@ Identify the problem being solved and evaluate the student's approach.`;
 - Total Score: (points earned / total possible)
 - Feedback: (constructive suggestions for improvement)`;
 
-    // Build Gemini request
-    const contents = [
-      {
-        role: "user",
-        parts: [
-          { text: `${systemPrompt}\n\n${userPrompt}` },
-          formatImageForGemini(imageBase64),
+    // Build messages for Lovable AI
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { 
+        role: 'user', 
+        content: [
+          { type: 'text', text: userPromptText },
+          formatImageForLovableAI(imageBase64),
         ]
       }
     ];
 
-    const analysisText = await callGeminiAPI(contents, GOOGLE_GEMINI_API_KEY);
+    const analysisText = await callLovableAI(messages, LOVABLE_API_KEY);
 
     if (!analysisText) {
       throw new Error('No analysis returned from AI');
@@ -222,7 +217,6 @@ Identify the problem being solved and evaluate the student's approach.`;
         console.log('Push notification sent to teacher');
       } catch (notifError) {
         console.error('Failed to send push notification:', notifError);
-        // Don't fail the whole request if notification fails
       }
     }
 
@@ -237,16 +231,15 @@ Identify the problem being solved and evaluate the student's approach.`;
   } catch (error: any) {
     console.error('Error in analyze-student-work:', error);
     
-    // Handle specific error statuses
     if (error.status === 429) {
       return new Response(JSON.stringify({ error: error.message }), {
         status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    if (error.status === 403) {
+    if (error.status === 402) {
       return new Response(JSON.stringify({ error: error.message }), {
-        status: 403,
+        status: 402,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -316,23 +309,23 @@ Provide your analysis in this exact JSON format:
   "correctness_analysis": "detailed comparison of student work vs solution"
 }`;
 
-  const contents = [
-    {
-      role: "user",
-      parts: [
-        { text: `${systemPrompt}\n\n${userPrompt}` },
-        formatImageForGemini(studentImageBase64),
-        formatImageForGemini(solutionImageBase64),
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { 
+      role: 'user', 
+      content: [
+        { type: 'text', text: userPrompt },
+        formatImageForLovableAI(studentImageBase64),
+        formatImageForLovableAI(solutionImageBase64),
       ]
     }
   ];
 
-  const content = await callGeminiAPI(contents, apiKey);
+  const content = await callLovableAI(messages, apiKey);
   
   console.log('Comparison raw response:', content);
 
   try {
-    // Extract JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -361,7 +354,6 @@ Provide your analysis in this exact JSON format:
     console.error('Failed to parse comparison response:', e);
   }
 
-  // Return empty result if parsing fails
   return {
     suggestedScores: [],
     totalScore: { earned: 0, possible: 0, percentage: 0 },
@@ -423,27 +415,25 @@ Respond in this exact JSON format (no markdown, just raw JSON):
   "notes": "any relevant observations"
 }`;
 
-  const contents = [
-    {
-      role: "user",
-      parts: [
-        { text: prompt },
-        formatImageForGemini(imageBase64),
+  const messages = [
+    { 
+      role: 'user', 
+      content: [
+        { type: 'text', text: prompt },
+        formatImageForLovableAI(imageBase64),
       ]
     }
   ];
 
   try {
-    const content = await callGeminiAPI(contents, apiKey);
+    const content = await callLovableAI(messages, apiKey);
     
     console.log('Identification raw response:', content);
 
-    // Try to extract JSON from the response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       
-      // Try to parse structured QR code format
       let parsedQRCode: { studentId: string; questionId: string } | null = null;
       let matchedId = parsed.matched_student_id;
       let matchedName = parsed.matched_student_name;
@@ -452,17 +442,14 @@ Respond in this exact JSON format (no markdown, just raw JSON):
       if (parsed.qr_code_content) {
         try {
           const qrData = JSON.parse(parsed.qr_code_content);
-          // Check for our structured format: {v: 1, s: studentId, q: questionId}
           if (qrData.v === 1 && qrData.s && qrData.q) {
             parsedQRCode = {
               studentId: qrData.s,
               questionId: qrData.q,
             };
-            // Use QR code data for matching - high confidence
             matchedId = qrData.s;
             matchedQuestionId = qrData.q;
             
-            // Find student name from roster using QR student ID
             if (studentRoster && studentRoster.length > 0) {
               const student = studentRoster.find(s => s.id === qrData.s);
               if (student) {
@@ -477,7 +464,6 @@ Respond in this exact JSON format (no markdown, just raw JSON):
         }
       }
       
-      // If we have a roster but no match yet, try fuzzy matching on the handwritten name
       if (!matchedId && parsed.handwritten_name && studentRoster && studentRoster.length > 0) {
         const match = fuzzyMatchStudent(parsed.handwritten_name, studentRoster);
         if (match) {
@@ -518,7 +504,6 @@ Respond in this exact JSON format (no markdown, just raw JSON):
 function fuzzyMatchStudent(name: string, roster: StudentRosterItem[]): StudentRosterItem | null {
   const normalizedInput = name.toLowerCase().trim();
   
-  // Try exact match first
   for (const student of roster) {
     const fullName = `${student.first_name} ${student.last_name}`.toLowerCase();
     const reverseName = `${student.last_name} ${student.first_name}`.toLowerCase();
@@ -528,23 +513,19 @@ function fuzzyMatchStudent(name: string, roster: StudentRosterItem[]): StudentRo
     }
   }
   
-  // Try partial matching
   for (const student of roster) {
     const firstName = student.first_name.toLowerCase();
     const lastName = student.last_name.toLowerCase();
     
-    // Check if input contains both first and last name
     if (normalizedInput.includes(firstName) && normalizedInput.includes(lastName)) {
       return student;
     }
     
-    // Check if last name matches (common for handwritten papers)
     if (normalizedInput === lastName || normalizedInput.endsWith(lastName)) {
       return student;
     }
   }
   
-  // Try similarity scoring
   let bestMatch: StudentRosterItem | null = null;
   let bestScore = 0;
   
@@ -620,7 +601,6 @@ function parseAnalysisResult(text: string, rubricSteps?: any[]): ParsedResult {
     feedback: '',
   };
 
-  // Extract sections using regex patterns
   const ocrMatch = text.match(/OCR Text[:\s]*([^]*?)(?=Problem Identified|Approach Analysis|$)/i);
   if (ocrMatch) result.ocrText = ocrMatch[1].trim();
 
