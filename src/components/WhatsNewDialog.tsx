@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, QrCode, Square, Users, Eye, MessageCircle, ChevronRight } from 'lucide-react';
+import { Sparkles, QrCode, Square, Users, Eye, MessageCircle, Link2, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Increment this version when adding new features
-const CURRENT_VERSION = '1.5.0';
+const CURRENT_VERSION = '1.6.0';
 const STORAGE_KEY = 'scan-genius-last-seen-version';
 
 interface Update {
@@ -21,6 +21,18 @@ interface Update {
 }
 
 const updates: Update[] = [
+  {
+    version: '1.6.0',
+    date: 'January 2026',
+    title: 'Scan Scholar Integration',
+    features: [
+      {
+        icon: <Link2 className="h-5 w-5 text-primary" />,
+        title: 'Cross-App Data Sharing',
+        description: 'Share student performance data with Scan Scholar to generate targeted worksheets based on misconceptions and scores.',
+      },
+    ],
+  },
   {
     version: '1.5.0',
     date: 'January 2026',

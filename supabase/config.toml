@@ -23,3 +23,18 @@ verify_jwt = false
 
 [functions.extract-multi-student-regions]
 verify_jwt = false
+
+[functions.get-student-analytics]
+verify_jwt = false
+
+[functions.detect-ai-work]
+verify_jwt = false
+
+[functions.extract-roster-from-image]
+verify_jwt = false
+
+[functions.send-level-notification]
+verify_jwt = false
+
+[functions.send-parent-ai-notification]
+verify_jwt = false
