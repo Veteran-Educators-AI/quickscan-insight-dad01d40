@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,10 +10,20 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import jsPDF from 'jspdf';
+
+interface WorksheetPreset {
+  id: string;
+  name: string;
+  questionCount: string;
+  warmUpCount: string;
+  warmUpDifficulty: 'very-easy' | 'easy';
+}
 
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -117,10 +127,27 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
   const [warmUpCount, setWarmUpCount] = useState('2');
   const [warmUpDifficulty, setWarmUpDifficulty] = useState<'very-easy' | 'easy'>('very-easy');
   
+  // Presets
+  const [presets, setPresets] = useState<WorksheetPreset[]>([]);
+  const [newPresetName, setNewPresetName] = useState('');
+  const [showSavePreset, setShowSavePreset] = useState(false);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState('');
+
+  // Load presets from localStorage on mount
+  useEffect(() => {
+    const savedPresets = localStorage.getItem('worksheet-presets');
+    if (savedPresets) {
+      try {
+        setPresets(JSON.parse(savedPresets));
+      } catch (e) {
+        console.error('Error loading presets:', e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (open && user) {
@@ -225,6 +252,43 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Preset functions
+  const savePreset = () => {
+    if (!newPresetName.trim()) {
+      toast({ title: 'Please enter a preset name', variant: 'destructive' });
+      return;
+    }
+    
+    const newPreset: WorksheetPreset = {
+      id: Date.now().toString(),
+      name: newPresetName.trim(),
+      questionCount,
+      warmUpCount,
+      warmUpDifficulty,
+    };
+    
+    const updatedPresets = [...presets, newPreset];
+    setPresets(updatedPresets);
+    localStorage.setItem('worksheet-presets', JSON.stringify(updatedPresets));
+    setNewPresetName('');
+    setShowSavePreset(false);
+    toast({ title: 'Preset saved!', description: `"${newPreset.name}" saved for quick reuse.` });
+  };
+
+  const loadPreset = (preset: WorksheetPreset) => {
+    setQuestionCount(preset.questionCount);
+    setWarmUpCount(preset.warmUpCount);
+    setWarmUpDifficulty(preset.warmUpDifficulty);
+    toast({ title: 'Preset loaded', description: `Applied "${preset.name}" settings.` });
+  };
+
+  const deletePreset = (presetId: string) => {
+    const updatedPresets = presets.filter(p => p.id !== presetId);
+    setPresets(updatedPresets);
+    localStorage.setItem('worksheet-presets', JSON.stringify(updatedPresets));
+    toast({ title: 'Preset deleted' });
   };
 
   const toggleStudent = (studentId: string) => {
@@ -516,6 +580,59 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 py-4">
+          {/* Presets */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Label className="text-sm font-medium">Presets:</Label>
+            {presets.length === 0 ? (
+              <span className="text-xs text-muted-foreground">No saved presets</span>
+            ) : (
+              presets.map(preset => (
+                <div key={preset.id} className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadPreset(preset)}
+                    className="h-7 text-xs"
+                  >
+                    {preset.name}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deletePreset(preset.id)}
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))
+            )}
+            <Popover open={showSavePreset} onOpenChange={setShowSavePreset}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                  <Save className="h-3 w-3" />
+                  Save Current
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-3">
+                <div className="space-y-2">
+                  <Label className="text-sm">Preset Name</Label>
+                  <Input
+                    placeholder="e.g., Quick Quiz"
+                    value={newPresetName}
+                    onChange={(e) => setNewPresetName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && savePreset()}
+                  />
+                  <Button size="sm" className="w-full" onClick={savePreset}>
+                    Save Preset
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <Separator />
+
           {/* Class Selection */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
