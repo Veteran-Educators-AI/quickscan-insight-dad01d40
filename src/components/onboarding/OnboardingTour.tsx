@@ -41,6 +41,29 @@ const tourSteps: Step[] = [
     disableBeacon: true,
   },
   {
+    target: '[data-tour="nav-questions"]',
+    title: '🔀 Diagnostic Forms (Anti-Copy)',
+    content: (
+      <div className="text-left space-y-2">
+        <p><strong>Create up to 10 unique diagnostic forms (A-J)!</strong></p>
+        <p className="text-sm text-muted-foreground">
+          <strong>How it works:</strong>
+        </p>
+        <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1">
+          <li>Select topics and click "Generate Differentiated Worksheets"</li>
+          <li>Choose 2-10 forms under "Diagnostic Forms (Anti-Copy)"</li>
+          <li>Each form has unique questions covering the same concepts</li>
+          <li>Students sitting together get different forms automatically</li>
+          <li>No copying = accurate diagnostic data!</li>
+        </ol>
+        <p className="text-xs text-muted-foreground mt-1">
+          Difficulty options: Super Easy, Easy, Medium, Hard
+        </p>
+      </div>
+    ),
+    disableBeacon: true,
+  },
+  {
     target: '[data-tour="nav-scan"]',
     title: '📷 Scan Student Work',
     content: (
