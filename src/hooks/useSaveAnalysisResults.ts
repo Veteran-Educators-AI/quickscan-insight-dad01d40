@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
+import { usePushStudentData } from './usePushStudentData';
 
 interface RubricScore {
   criterion: string;
@@ -24,16 +25,20 @@ interface AnalysisResult {
 
 interface SaveAnalysisParams {
   studentId: string;
+  studentName?: string;
+  className?: string;
   questionId: string;
   imageUrl: string;
   result: AnalysisResult;
   pendingScanId?: string;
   topicName?: string;
   topicId?: string;
+  classId?: string;
 }
 
 export function useSaveAnalysisResults() {
   const { user } = useAuth();
+  const { pushData } = usePushStudentData();
   const [isSaving, setIsSaving] = useState(false);
 
   const saveResults = async (params: SaveAnalysisParams): Promise<string | null> => {
@@ -121,6 +126,26 @@ export function useSaveAnalysisResults() {
           .delete()
           .eq('id', params.pendingScanId);
       }
+
+      // 6. Push data to webhook (sister app integration)
+      pushData({
+        eventType: 'scan_analysis',
+        studentId: params.studentId,
+        studentName: params.studentName || 'Unknown Student',
+        classId: params.classId,
+        className: params.className,
+        data: {
+          attemptId: attempt.id,
+          topicName: params.topicName,
+          topicId: params.topicId,
+          totalScore: params.result.totalScore,
+          grade: grade,
+          gradeJustification: params.result.gradeJustification,
+          misconceptions: params.result.misconceptions,
+          rubricScores: params.result.rubricScores,
+          feedback: params.result.feedback,
+        },
+      });
 
       return attempt.id;
     } catch (err) {
