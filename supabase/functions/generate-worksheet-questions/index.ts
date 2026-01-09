@@ -137,14 +137,23 @@ serve(async (req) => {
     
     // Handle warm-up mode with very easy questions
     const isWarmup = worksheetMode === 'warmup';
+    const warmupDifficulty = difficultyLevels?.[0] || 'very-easy';
     const allowedDifficulties = isWarmup 
-      ? ['easy']
+      ? [warmupDifficulty]
       : (difficultyLevels && difficultyLevels.length > 0 
         ? difficultyLevels 
         : ['medium', 'hard', 'challenging']);
-    const difficultyInstruction = isWarmup
-      ? 'Generate ONLY very easy, confidence-building questions. These should be simple recall or basic one-step problems that any student can solve to build confidence.'
-      : `Only generate questions with these difficulty levels: ${allowedDifficulties.join(', ')}.`;
+    
+    let difficultyInstruction: string;
+    if (isWarmup) {
+      if (warmupDifficulty === 'very-easy') {
+        difficultyInstruction = 'Generate ONLY very easy, confidence-building questions. These should be extremely simple recall or basic one-step arithmetic that ANY student can solve immediately. Examples: "What is 3 + 5?", "What is the area of a square with side 2?". NO multi-step problems. Keep it VERY simple.';
+      } else {
+        difficultyInstruction = 'Generate easy confidence-building questions. These should be simple one-step application problems. Examples: "If a rectangle has length 4 and width 3, what is its area?", "Solve: 2x = 10". Keep problems straightforward with minimal steps.';
+      }
+    } else {
+      difficultyInstruction = `Only generate questions with these difficulty levels: ${allowedDifficulties.join(', ')}.`;
+    }
 
     // Variation instruction for unique questions per student
     const variationInstruction = variationSeed 
