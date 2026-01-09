@@ -30,6 +30,7 @@ interface GeneratedQuestion {
   svg?: string;
   imageUrl?: string;
   imagePrompt?: string;
+  hint?: string;
 }
 
 async function callLovableAI(prompt: string): Promise<string> {
@@ -106,7 +107,7 @@ serve(async (req) => {
   }
 
   try {
-    const { topics, questionCount, difficultyLevels, bloomLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages, worksheetMode, variationSeed, studentName, formVariation, formSeed } = await req.json() as {
+    const { topics, questionCount, difficultyLevels, bloomLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages, worksheetMode, variationSeed, studentName, formVariation, formSeed, includeHints } = await req.json() as {
       topics: TopicInput[];
       questionCount: number;
       difficultyLevels?: string[];
@@ -121,6 +122,7 @@ serve(async (req) => {
       studentName?: string;
       formVariation?: string;
       formSeed?: number;
+      includeHints?: boolean;
     };
 
     if (!topics || topics.length === 0) {
@@ -297,6 +299,23 @@ If the question involves geometry and a diagram would help, include an "imagePro
 If the question involves geometry and a diagram would help, include an "svg" field with a complete SVG string. The svg field should ONLY be included when a visual diagram is genuinely helpful for the question.`
       : '';
 
+    // Hint instruction for students
+    const hintInstruction = includeHints
+      ? `
+STUDENT HINTS (REQUIRED):
+- Every question MUST include a "hint" field with a helpful hint for students
+- Hints should give students a starting point WITHOUT giving away the answer
+- Good hints include:
+  • "Remember the formula for..." 
+  • "Start by identifying what you're trying to find..."
+  • "Think about how these two values relate..."
+  • "Try drawing a picture to help you visualize..."
+  • "What operation do you use when you see the word 'total'?"
+- Keep hints encouraging and student-friendly
+- Hints should be 1-2 sentences max
+- The goal is to help students get "unstuck" without doing the problem for them`
+      : '';
+
     // Diagnostic mode instructions for advancement levels
     const diagnosticInstruction = worksheetMode === 'diagnostic' 
       ? `
@@ -325,6 +344,8 @@ WARM-UP MODE (Confidence Building):
 - This warm-up helps students feel confident before tackling harder problems`
       : '';
 
+    const hintExample = includeHints ? ',\n    "hint": "Remember to use the formula for area. What shape is this?"' : '';
+
     const exampleOutput = worksheetMode === 'diagnostic'
       ? `[
   {
@@ -333,7 +354,7 @@ WARM-UP MODE (Confidence Building):
     "standard": "G.CO.A.1",
     "question": "The full question text here",
     "difficulty": "${allowedDifficulties[0]}",
-    "advancementLevel": "C"${useAIImages ? ',\n    "imagePrompt": "A detailed description of the geometric diagram needed"' : ''}
+    "advancementLevel": "C"${hintExample}${useAIImages ? ',\n    "imagePrompt": "A detailed description of the geometric diagram needed"' : ''}
   }
 ]`
       : useAIImages
@@ -343,7 +364,7 @@ WARM-UP MODE (Confidence Building):
     "topic": "Topic Name",
     "standard": "G.CO.A.1",
     "question": "The full question text here",
-    "difficulty": "${allowedDifficulties[0]}",
+    "difficulty": "${allowedDifficulties[0]}"${hintExample},
     "imagePrompt": "A detailed description of the geometric diagram needed"
   }
 ]`
@@ -353,7 +374,7 @@ WARM-UP MODE (Confidence Building):
     "topic": "Topic Name",
     "standard": "G.CO.A.1",
     "question": "The full question text here",
-    "difficulty": "${allowedDifficulties[0]}"${includeGeometry ? ',\n    "svg": "<svg width=\\"200\\" height=\\"200\\" viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>"' : ''}
+    "difficulty": "${allowedDifficulties[0]}"${hintExample}${includeGeometry ? ',\n    "svg": "<svg width=\\"200\\" height=\\"200\\" viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>"' : ''}
   }
 ]`;
 
@@ -427,6 +448,7 @@ REQUIREMENTS:
 7. Use real-world contexts where appropriate (especially for Apply and above)
 8. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}${graphPaperInstruction}${coordinateGeometryInstruction}
 ${diagnosticInstruction}
+${hintInstruction}
 ${formInstruction}
 ${variationInstruction}
 
@@ -459,7 +481,7 @@ Respond with a JSON array of questions in this exact format:
     "question": "The full question text here",
     "difficulty": "${allowedDifficulties[0]}",
     "bloomLevel": "apply",
-    "bloomVerb": "calculate"${worksheetMode === 'diagnostic' ? ',\n    "advancementLevel": "C"' : ''}${useAIImages ? ',\n    "imagePrompt": "A detailed description of the diagram needed"' : ''}
+    "bloomVerb": "calculate"${worksheetMode === 'diagnostic' ? ',\n    "advancementLevel": "C"' : ''}${includeHints ? ',\n    "hint": "Remember to use the formula for..."' : ''}${useAIImages ? ',\n    "imagePrompt": "A detailed description of the diagram needed"' : ''}
   }
 ]
 ${imageFieldNote}

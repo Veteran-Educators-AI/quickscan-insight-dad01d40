@@ -24,6 +24,7 @@ interface WorksheetPreset {
   warmUpCount: string;
   warmUpDifficulty: 'super-easy' | 'easy' | 'very-easy';
   formCount: string;
+  includeHints?: boolean;
 }
 
 const FORM_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'] as const;
@@ -71,6 +72,7 @@ interface GeneratedQuestion {
   question: string;
   difficulty: string;
   advancementLevel: AdvancementLevel;
+  hint?: string;
 }
 
 interface DifferentiatedWorksheetGeneratorProps {
@@ -132,6 +134,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [warmUpCount, setWarmUpCount] = useState('2');
   const [warmUpDifficulty, setWarmUpDifficulty] = useState<'super-easy' | 'easy' | 'very-easy'>('very-easy');
   const [formCount, setFormCount] = useState(diagnosticMode ? '4' : '1');
+  const [includeHints, setIncludeHints] = useState(false);
 
   // Pre-configure for diagnostic mode when opened
   useEffect(() => {
@@ -282,6 +285,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       warmUpCount,
       warmUpDifficulty,
       formCount,
+      includeHints,
     };
     
     const updatedPresets = [...presets, newPreset];
@@ -297,6 +301,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     setWarmUpCount(preset.warmUpCount);
     setWarmUpDifficulty(preset.warmUpDifficulty);
     setFormCount(preset.formCount || '1');
+    setIncludeHints(preset.includeHints ?? false);
     toast({ title: 'Preset loaded', description: `Applied "${preset.name}" settings.` });
   };
 
@@ -386,6 +391,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 worksheetMode: 'warmup',
                 formVariation: form,
                 formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
+                includeHints,
               },
             });
             warmUpQuestions = warmUpData?.questions || [];
@@ -409,6 +415,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               worksheetMode: 'diagnostic',
               formVariation: form,
               formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
+              includeHints,
             },
           });
           
@@ -514,6 +521,21 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 yPosition += 5;
               });
 
+              // Add hint if available
+              if (question.hint && includeHints) {
+                yPosition += 2;
+                pdf.setFontSize(9);
+                pdf.setFont('helvetica', 'italic');
+                pdf.setTextColor(120, 100, 50);
+                const hintLines = pdf.splitTextToSize(`💡 Hint: ${question.hint}`, contentWidth - 15);
+                hintLines.forEach((line: string) => {
+                  pdf.text(line, margin + 10, yPosition);
+                  yPosition += 4;
+                });
+                pdf.setTextColor(0);
+                pdf.setFontSize(11);
+              }
+
               // Smaller answer space for warm-up
               yPosition += 3;
               pdf.setDrawColor(200);
@@ -562,6 +584,25 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               pdf.text(line, margin + 5, yPosition);
               yPosition += 5;
             });
+
+            // Add hint if available
+            if (question.hint && includeHints) {
+              yPosition += 2;
+              pdf.setFontSize(9);
+              pdf.setFont('helvetica', 'italic');
+              pdf.setTextColor(120, 100, 50);
+              const hintLines = pdf.splitTextToSize(`💡 Hint: ${question.hint}`, contentWidth - 15);
+              hintLines.forEach((line: string) => {
+                if (yPosition > pageHeight - 25) {
+                  pdf.addPage();
+                  yPosition = margin;
+                }
+                pdf.text(line, margin + 10, yPosition);
+                yPosition += 4;
+              });
+              pdf.setTextColor(0);
+              pdf.setFontSize(11);
+            }
 
             // Answer lines
             yPosition += 5;
@@ -802,6 +843,23 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             </div>
           </div>
           <p className="text-xs text-muted-foreground">Confidence-building questions at the start of each worksheet</p>
+
+          {/* Include Hints Option */}
+          <div className="flex items-center space-x-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <Checkbox
+              id="includeHints"
+              checked={includeHints}
+              onCheckedChange={(checked) => setIncludeHints(checked === true)}
+            />
+            <div className="flex-1">
+              <Label htmlFor="includeHints" className="text-sm font-medium text-amber-900 cursor-pointer">
+                💡 Include Hints for Students
+              </Label>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Add a helpful hint under each question so students don't get stuck. Great for practice and building confidence!
+              </p>
+            </div>
+          </div>
 
           <Separator />
 
