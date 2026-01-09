@@ -106,7 +106,7 @@ serve(async (req) => {
   }
 
   try {
-    const { topics, questionCount, difficultyLevels, bloomLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages, worksheetMode, variationSeed, studentName } = await req.json() as {
+    const { topics, questionCount, difficultyLevels, bloomLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages, worksheetMode, variationSeed, studentName, formVariation, formSeed } = await req.json() as {
       topics: TopicInput[];
       questionCount: number;
       difficultyLevels?: string[];
@@ -119,6 +119,8 @@ serve(async (req) => {
       worksheetMode?: WorksheetMode;
       variationSeed?: number;
       studentName?: string;
+      formVariation?: string;
+      formSeed?: number;
     };
 
     if (!topics || topics.length === 0) {
@@ -146,16 +148,43 @@ serve(async (req) => {
     
     let difficultyInstruction: string;
     if (isWarmup) {
-      if (warmupDifficulty === 'very-easy') {
+      if (warmupDifficulty === 'super-easy') {
+        difficultyInstruction = 'Generate ONLY super easy questions. These should be basic math facts that students can answer in seconds. Examples: "What is 2 + 2?", "What is 3 × 4?", "What is half of 10?". Single-step basic arithmetic ONLY. No word problems, no multi-step calculations.';
+      } else if (warmupDifficulty === 'very-easy') {
         difficultyInstruction = 'Generate ONLY very easy, confidence-building questions. These should be extremely simple recall or basic one-step arithmetic that ANY student can solve immediately. Examples: "What is 3 + 5?", "What is the area of a square with side 2?". NO multi-step problems. Keep it VERY simple.';
       } else {
         difficultyInstruction = 'Generate easy confidence-building questions. These should be simple one-step application problems. Examples: "If a rectangle has length 4 and width 3, what is its area?", "Solve: 2x = 10". Keep problems straightforward with minimal steps.';
       }
     } else {
-      difficultyInstruction = `Only generate questions with these difficulty levels: ${allowedDifficulties.join(', ')}.`;
+      // Map super-easy and easy to specific instructions for main questions
+      const hasEasyLevels = allowedDifficulties.some(d => d === 'easy' || d === 'super-easy');
+      if (hasEasyLevels) {
+        difficultyInstruction = `Generate questions with these difficulty levels: ${allowedDifficulties.join(', ')}.
+- "super-easy": Basic math facts, single arithmetic operations (e.g., "What is 7 × 8?", "Simplify: 15 ÷ 3")
+- "easy": Simple one-step problems with straightforward application (e.g., "Find the area of a rectangle with length 5 and width 3")
+- "medium": Standard problems requiring 2-3 steps
+- "hard": Complex problems requiring analysis and multiple steps
+- "challenging": Advanced problems requiring synthesis and creative problem-solving`;
+      } else {
+        difficultyInstruction = `Only generate questions with these difficulty levels: ${allowedDifficulties.join(', ')}.`;
+      }
     }
 
-    // Variation instruction for unique questions per student
+    // Form-based variation for anti-copying (different from per-student variation)
+    const formInstruction = formVariation && formSeed
+      ? `
+FORM VARIATION (CRITICAL - ANTI-COPYING MEASURE FOR DIAGNOSTICS):
+- This is Form ${formVariation} of the diagnostic assessment
+- Use form seed: ${formSeed} to ensure this form has COMPLETELY DIFFERENT questions from other forms
+- Forms A, B, C, D, E should each have UNIQUE question sets testing the SAME concepts
+- Vary: specific numbers, contexts, problem scenarios, names in word problems
+- Keep: same difficulty level, same concepts being tested, same skills assessed
+- Example: Form A might ask "Find the area of a rectangle 5×3", Form B asks "Find the area of a rectangle 7×4"
+- This prevents students sitting together from copying each other's answers
+- Each form tests the same material but with different specific problems`
+      : '';
+
+    // Legacy variation instruction for unique questions per student (kept for backward compatibility)
     const variationInstruction = variationSeed 
       ? `
 VARIATION REQUIREMENT (CRITICAL - ANTI-COPYING MEASURE):
@@ -398,6 +427,7 @@ REQUIREMENTS:
 7. Use real-world contexts where appropriate (especially for Apply and above)
 8. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}${graphPaperInstruction}${coordinateGeometryInstruction}
 ${diagnosticInstruction}
+${formInstruction}
 ${variationInstruction}
 
 CRITICAL - TEXTBOOK-QUALITY FORMATTING:

@@ -22,9 +22,12 @@ interface WorksheetPreset {
   name: string;
   questionCount: string;
   warmUpCount: string;
-  warmUpDifficulty: 'very-easy' | 'easy';
-  variationsCount: string;
+  warmUpDifficulty: 'super-easy' | 'easy' | 'very-easy';
+  formCount: string;
 }
+
+const FORM_LETTERS = ['A', 'B', 'C', 'D', 'E'] as const;
+type FormLetter = typeof FORM_LETTERS[number];
 
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -126,8 +129,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
   const [students, setStudents] = useState<StudentWithDiagnostic[]>([]);
   const [questionCount, setQuestionCount] = useState('5');
   const [warmUpCount, setWarmUpCount] = useState('2');
-  const [warmUpDifficulty, setWarmUpDifficulty] = useState<'very-easy' | 'easy'>('very-easy');
-  const [variationsCount, setVariationsCount] = useState('1');
+const [warmUpDifficulty, setWarmUpDifficulty] = useState<'super-easy' | 'easy' | 'very-easy'>('very-easy');
+  const [formCount, setFormCount] = useState('1');
   
   // Presets
   const [presets, setPresets] = useState<WorksheetPreset[]>([]);
@@ -269,7 +272,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
       questionCount,
       warmUpCount,
       warmUpDifficulty,
-      variationsCount,
+      formCount,
     };
     
     const updatedPresets = [...presets, newPreset];
@@ -284,7 +287,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
     setQuestionCount(preset.questionCount);
     setWarmUpCount(preset.warmUpCount);
     setWarmUpDifficulty(preset.warmUpDifficulty);
-    setVariationsCount(preset.variationsCount || '1');
+    setFormCount(preset.formCount || '1');
     toast({ title: 'Preset loaded', description: `Applied "${preset.name}" settings.` });
   };
 
@@ -340,28 +343,28 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
       const contentWidth = pageWidth - margin * 2;
       let isFirstPage = true;
 
-      const numVariations = parseInt(variationsCount);
-      const totalWorksheets = selectedStudents.length * numVariations;
-      let processedWorksheets = 0;
-
-      for (const level of LEVELS) {
-        const studentsAtLevel = studentsByLevel[level];
-        if (!studentsAtLevel || studentsAtLevel.length === 0) continue;
-
-        // Generate worksheets for each student at this level
-        for (let studentIdx = 0; studentIdx < studentsAtLevel.length; studentIdx++) {
-          const student = studentsAtLevel[studentIdx];
+      const numForms = parseInt(formCount);
+      const formsToGenerate = FORM_LETTERS.slice(0, numForms);
+      
+      // Pre-generate unique question sets for each form and level combination
+      // This ensures students with the same level but different forms get different questions
+      const formQuestionCache: Record<string, { warmUp: GeneratedQuestion[], main: GeneratedQuestion[] }> = {};
+      
+      // Calculate total work: forms * levels with students
+      const levelsWithStudents = LEVELS.filter(l => studentsByLevel[l]?.length > 0);
+      const totalGenerations = numForms * levelsWithStudents.length;
+      let generationsComplete = 0;
+      
+      // Pre-generate questions for each form/level combination
+      for (const form of formsToGenerate) {
+        for (const level of levelsWithStudents) {
+          const cacheKey = `${form}-${level}`;
+          setGenerationStatus(`Generating Form ${form} questions for Level ${level}...`);
           
-          // Generate the specified number of variations for each student
-          for (let variationNum = 1; variationNum <= numVariations; variationNum++) {
-            const variationSeed = getStudentVariationSeed(student.first_name, student.last_name) + variationNum;
-            
-            setGenerationStatus(`Generating worksheet ${variationNum}/${numVariations} for ${student.first_name} ${student.last_name} (Level ${level})...`);
-
-          // Generate warm-up questions first (very basic confidence builders)
+          // Generate warm-up questions for this form
           let warmUpQuestions: GeneratedQuestion[] = [];
           if (parseInt(warmUpCount) > 0) {
-            const { data: warmUpData, error: warmUpError } = await supabase.functions.invoke('generate-worksheet-questions', {
+            const { data: warmUpData } = await supabase.functions.invoke('generate-worksheet-questions', {
               body: {
                 topics: [{
                   topicName: selectedTopic || 'General Math',
@@ -372,15 +375,15 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
                 questionCount: parseInt(warmUpCount),
                 difficultyLevels: [warmUpDifficulty],
                 worksheetMode: 'warmup',
-                variationSeed: variationSeed,
-                studentName: `${student.first_name} ${student.last_name}`,
+                formVariation: form,
+                formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
               },
             });
             warmUpQuestions = warmUpData?.questions || [];
           }
-
-          // Generate level-appropriate questions with variation
-          const { data, error } = await supabase.functions.invoke('generate-worksheet-questions', {
+          
+          // Generate main questions for this form/level
+          const { data } = await supabase.functions.invoke('generate-worksheet-questions', {
             body: {
               topics: [{
                 topicName: selectedTopic || 'General Math',
@@ -393,19 +396,46 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
                 ? ['hard', 'challenging'] 
                 : level === 'C' || level === 'D'
                 ? ['medium', 'hard']
-                : ['medium'],
+                : ['easy', 'super-easy', 'medium'],
               worksheetMode: 'diagnostic',
-              variationSeed: variationSeed,
-              studentName: `${student.first_name} ${student.last_name}`,
+              formVariation: form,
+              formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
             },
           });
+          
+          formQuestionCache[cacheKey] = {
+            warmUp: warmUpQuestions,
+            main: data?.questions || [],
+          };
+          
+          generationsComplete++;
+          setGenerationProgress((generationsComplete / totalGenerations) * 50);
+        }
+      }
+      
+      const totalWorksheets = selectedStudents.length;
+      let processedWorksheets = 0;
 
-          if (error) {
-            console.error(`Error generating Level ${level} questions for ${student.first_name}:`, error);
-            continue;
-          }
+      for (const level of LEVELS) {
+        const studentsAtLevel = studentsByLevel[level];
+        if (!studentsAtLevel || studentsAtLevel.length === 0) continue;
 
-          const questions: GeneratedQuestion[] = data.questions || [];
+        // Generate worksheets for each student at this level
+        for (let studentIdx = 0; studentIdx < studentsAtLevel.length; studentIdx++) {
+          const student = studentsAtLevel[studentIdx];
+          
+          // Assign form based on student index (rotating through available forms)
+          const formIndex = studentIdx % numForms;
+          const assignedForm = formsToGenerate[formIndex];
+          const cacheKey = `${assignedForm}-${level}`;
+          
+          setGenerationStatus(`Creating worksheet for ${student.first_name} ${student.last_name} (Level ${level}, Form ${assignedForm})...`);
+
+          // Use pre-generated questions from cache
+          const cachedQuestions = formQuestionCache[cacheKey];
+          const warmUpQuestions = cachedQuestions?.warmUp || [];
+          const questions: GeneratedQuestion[] = cachedQuestions?.main || [];
+          
           if (!isFirstPage) {
             pdf.addPage();
           }
@@ -413,7 +443,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
 
           let yPosition = margin;
 
-          // Header with level indicator
+          // Header with level and form indicator
           pdf.setFillColor(
             level === 'A' ? 34 : level === 'B' ? 16 : level === 'C' ? 250 : level === 'D' ? 251 : level === 'E' ? 254 : 243,
             level === 'A' ? 197 : level === 'B' ? 185 : level === 'C' ? 204 : level === 'D' ? 146 : level === 'E' ? 202 : 244,
@@ -424,17 +454,22 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
           pdf.setFontSize(16);
           pdf.setFont('helvetica', 'bold');
           pdf.setTextColor(0);
-          pdf.text(`Level ${level} - ${getLevelDescription(level)}`, pageWidth / 2, yPosition + 5, { align: 'center' });
+          pdf.text(`Level ${level} - ${getLevelDescription(level)}${numForms > 1 ? ` | Form ${assignedForm}` : ''}`, pageWidth / 2, yPosition + 5, { align: 'center' });
 
           pdf.setFontSize(12);
           pdf.setFont('helvetica', 'normal');
-          pdf.text(`${selectedTopic || 'Math Practice'} - Differentiated Worksheet`, pageWidth / 2, yPosition + 12, { align: 'center' });
+          pdf.text(`${selectedTopic || 'Math Practice'} - Diagnostic Worksheet`, pageWidth / 2, yPosition + 12, { align: 'center' });
           yPosition += 30;
 
-          // Student info
+          // Student info with form indicator
           pdf.setFontSize(11);
           pdf.text(`Name: ${student.first_name} ${student.last_name}`, margin, yPosition);
-          pdf.text(`Date: _______________`, pageWidth - margin - 50, yPosition);
+          if (numForms > 1) {
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(`Form ${assignedForm}`, pageWidth - margin - 25, yPosition);
+            pdf.setFont('helvetica', 'normal');
+          }
+          pdf.text(`Date: _______________`, pageWidth - margin - 75, yPosition);
           yPosition += 10;
 
           pdf.setLineWidth(0.5);
@@ -538,25 +573,23 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
           pdf.setFontSize(8);
           pdf.setTextColor(150);
           pdf.text(
-            `Differentiated Worksheet - Level ${level}${numVariations > 1 ? ` (Variation ${variationNum})` : ''} | Generated by Scan Genius`,
+            `Diagnostic Worksheet - Level ${level}${numForms > 1 ? ` | Form ${assignedForm}` : ''} | Generated by Scan Genius`,
             pageWidth / 2,
             pageHeight - 10,
             { align: 'center' }
           );
           processedWorksheets++;
-          setGenerationProgress((processedWorksheets / totalWorksheets) * 100);
-          }
+          setGenerationProgress(50 + (processedWorksheets / totalWorksheets) * 50);
         }
       }
 
       // Download the PDF
-      const fileName = `Class_Set_${selectedTopic || 'Math'}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const fileName = `Class_Set_${selectedTopic || 'Math'}_Forms_${formsToGenerate.join('')}_${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(fileName);
 
-      const totalSheets = selectedStudents.length * numVariations;
       toast({
         title: '🎉 Class set is ready!',
-        description: `Created ${totalSheets} worksheet${totalSheets !== 1 ? 's' : ''} for ${selectedStudents.length} student${selectedStudents.length !== 1 ? 's' : ''}${numVariations > 1 ? ` (${numVariations} variations each)` : ''}.`,
+        description: `Created ${totalWorksheets} diagnostic worksheet${totalWorksheets !== 1 ? 's' : ''} for ${selectedStudents.length} student${selectedStudents.length !== 1 ? 's' : ''}${numForms > 1 ? ` across ${numForms} different forms (A-${formsToGenerate[numForms-1]}) to prevent copying` : ''}.`,
       });
 
       onOpenChange(false);
@@ -691,20 +724,20 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
             </div>
 
             <div className="space-y-2">
-              <Label>Variations per Student</Label>
-              <Select value={variationsCount} onValueChange={setVariationsCount}>
+              <Label>Diagnostic Forms (Anti-Copy)</Label>
+              <Select value={formCount} onValueChange={setFormCount}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">1 version (standard)</SelectItem>
-                  <SelectItem value="2">2 versions</SelectItem>
-                  <SelectItem value="3">3 versions</SelectItem>
-                  <SelectItem value="4">4 versions</SelectItem>
-                  <SelectItem value="5">5 versions</SelectItem>
+                  <SelectItem value="1">1 form (standard)</SelectItem>
+                  <SelectItem value="2">2 forms (A, B)</SelectItem>
+                  <SelectItem value="3">3 forms (A, B, C)</SelectItem>
+                  <SelectItem value="4">4 forms (A, B, C, D)</SelectItem>
+                  <SelectItem value="5">5 forms (A, B, C, D, E)</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">Different questions at same level</p>
+              <p className="text-xs text-muted-foreground">Different question sets prevent copying between students</p>
             </div>
           </div>
 
@@ -728,13 +761,14 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
               <Label>Warm-Up Difficulty</Label>
               <Select 
                 value={warmUpDifficulty} 
-                onValueChange={(v) => setWarmUpDifficulty(v as 'very-easy' | 'easy')}
+                onValueChange={(v) => setWarmUpDifficulty(v as 'super-easy' | 'easy' | 'very-easy')}
                 disabled={warmUpCount === '0'}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="super-easy">Super Easy (basic facts)</SelectItem>
                   <SelectItem value="very-easy">Very Easy (basic recall)</SelectItem>
                   <SelectItem value="easy">Easy (simple application)</SelectItem>
                 </SelectContent>
