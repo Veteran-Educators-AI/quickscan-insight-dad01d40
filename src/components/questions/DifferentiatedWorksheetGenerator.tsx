@@ -88,6 +88,17 @@ const getLevelDescription = (level: AdvancementLevel) => {
   }
 };
 
+// Generate a simple hash from student name for variation
+const getStudentVariationSeed = (firstName: string, lastName: string): number => {
+  const str = `${firstName}${lastName}`;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+};
+
 interface ClassOption {
   id: string;
   name: string;
@@ -259,43 +270,66 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
       const contentWidth = pageWidth - margin * 2;
       let isFirstPage = true;
 
-      const totalLevels = Object.keys(studentsByLevel).length;
-      let processedLevels = 0;
+      const totalStudents = selectedStudents.length;
+      let processedStudents = 0;
 
       for (const level of LEVELS) {
         const studentsAtLevel = studentsByLevel[level];
         if (!studentsAtLevel || studentsAtLevel.length === 0) continue;
 
-        setGenerationStatus(`Generating Level ${level} worksheet for ${studentsAtLevel.length} student(s)...`);
+        // Generate a unique worksheet for each student at this level
+        for (let studentIdx = 0; studentIdx < studentsAtLevel.length; studentIdx++) {
+          const student = studentsAtLevel[studentIdx];
+          const variationSeed = getStudentVariationSeed(student.first_name, student.last_name);
+          
+          setGenerationStatus(`Generating worksheet for ${student.first_name} ${student.last_name} (Level ${level})...`);
 
-        // Generate questions for this level
-        const { data, error } = await supabase.functions.invoke('generate-worksheet-questions', {
-          body: {
-            topics: [{
-              topicName: selectedTopic || 'General Math',
-              standard: '',
-              subject: 'Mathematics',
-              category: 'Differentiated Practice',
-            }],
-            questionCount: parseInt(questionCount),
-            difficultyLevels: level === 'A' || level === 'B' 
-              ? ['hard', 'challenging'] 
-              : level === 'C' || level === 'D'
-              ? ['medium', 'hard']
-              : ['medium'],
-            worksheetMode: 'diagnostic',
-          },
-        });
+          // Generate warm-up questions first (very basic confidence builders)
+          const { data: warmUpData, error: warmUpError } = await supabase.functions.invoke('generate-worksheet-questions', {
+            body: {
+              topics: [{
+                topicName: selectedTopic || 'General Math',
+                standard: '',
+                subject: 'Mathematics',
+                category: 'Warm-Up',
+              }],
+              questionCount: 2,
+              difficultyLevels: ['easy'],
+              worksheetMode: 'warmup',
+              variationSeed: variationSeed,
+              studentName: `${student.first_name} ${student.last_name}`,
+            },
+          });
 
-        if (error) {
-          console.error(`Error generating Level ${level} questions:`, error);
-          continue;
-        }
+          const warmUpQuestions: GeneratedQuestion[] = warmUpData?.questions || [];
 
-        const questions: GeneratedQuestion[] = data.questions || [];
+          // Generate level-appropriate questions with variation
+          const { data, error } = await supabase.functions.invoke('generate-worksheet-questions', {
+            body: {
+              topics: [{
+                topicName: selectedTopic || 'General Math',
+                standard: '',
+                subject: 'Mathematics',
+                category: 'Differentiated Practice',
+              }],
+              questionCount: parseInt(questionCount),
+              difficultyLevels: level === 'A' || level === 'B' 
+                ? ['hard', 'challenging'] 
+                : level === 'C' || level === 'D'
+                ? ['medium', 'hard']
+                : ['medium'],
+              worksheetMode: 'diagnostic',
+              variationSeed: variationSeed,
+              studentName: `${student.first_name} ${student.last_name}`,
+            },
+          });
 
-        // Generate a worksheet for each student at this level
-        for (const student of studentsAtLevel) {
+          if (error) {
+            console.error(`Error generating Level ${level} questions for ${student.first_name}:`, error);
+            continue;
+          }
+
+          const questions: GeneratedQuestion[] = data.questions || [];
           if (!isFirstPage) {
             pdf.addPage();
           }
@@ -331,7 +365,62 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
           pdf.line(margin, yPosition, pageWidth - margin, yPosition);
           yPosition += 10;
 
-          // Questions
+          // Warm-Up Section (confidence builders)
+          if (warmUpQuestions.length > 0) {
+            pdf.setFillColor(240, 253, 244); // Light green
+            pdf.rect(margin, yPosition - 3, contentWidth, 8, 'F');
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(22, 101, 52);
+            pdf.text('✨ Warm-Up: Let\'s Get Started!', margin + 3, yPosition + 2);
+            yPosition += 12;
+            pdf.setTextColor(0);
+
+            for (const question of warmUpQuestions) {
+              if (yPosition > pageHeight - 50) {
+                pdf.addPage();
+                yPosition = margin;
+              }
+
+              pdf.setFontSize(11);
+              pdf.setFont('helvetica', 'bold');
+              pdf.text(`${question.questionNumber}.`, margin, yPosition);
+              yPosition += 6;
+
+              pdf.setFont('helvetica', 'normal');
+              const lines = pdf.splitTextToSize(question.question, contentWidth - 10);
+              lines.forEach((line: string) => {
+                pdf.text(line, margin + 5, yPosition);
+                yPosition += 5;
+              });
+
+              // Smaller answer space for warm-up
+              yPosition += 3;
+              pdf.setDrawColor(200);
+              pdf.setLineWidth(0.2);
+              for (let i = 0; i < 2; i++) {
+                pdf.line(margin + 5, yPosition, pageWidth - margin, yPosition);
+                yPosition += 7;
+              }
+              yPosition += 5;
+            }
+
+            // Separator before main questions
+            yPosition += 5;
+            pdf.setLineWidth(0.3);
+            pdf.setDrawColor(150);
+            pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+            yPosition += 8;
+
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(60);
+            pdf.text('📝 Practice Questions', margin, yPosition);
+            yPosition += 10;
+            pdf.setTextColor(0);
+          }
+
+          // Main Questions
           for (const question of questions) {
             if (yPosition > pageHeight - 60) {
               pdf.addPage();
@@ -378,10 +467,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
             pageHeight - 10,
             { align: 'center' }
           );
+          processedStudents++;
+          setGenerationProgress((processedStudents / totalStudents) * 100);
         }
-
-        processedLevels++;
-        setGenerationProgress((processedLevels / totalLevels) * 100);
       }
 
       // Download the PDF

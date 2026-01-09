@@ -16,7 +16,7 @@ interface TopicInput {
 // Bloom's Taxonomy Cognitive Levels (lowest to highest)
 type BloomLevel = 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
-type WorksheetMode = 'practice' | 'basic_assessment' | 'diagnostic';
+type WorksheetMode = 'practice' | 'basic_assessment' | 'diagnostic' | 'warmup';
 
 interface GeneratedQuestion {
   questionNumber: number;
@@ -106,7 +106,7 @@ serve(async (req) => {
   }
 
   try {
-    const { topics, questionCount, difficultyLevels, bloomLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages, worksheetMode } = await req.json() as {
+    const { topics, questionCount, difficultyLevels, bloomLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages, worksheetMode, variationSeed, studentName } = await req.json() as {
       topics: TopicInput[];
       questionCount: number;
       difficultyLevels?: string[];
@@ -117,6 +117,8 @@ serve(async (req) => {
       includeCoordinateGeometry?: boolean;
       useAIImages?: boolean;
       worksheetMode?: WorksheetMode;
+      variationSeed?: number;
+      studentName?: string;
     };
 
     if (!topics || topics.length === 0) {
@@ -132,10 +134,29 @@ serve(async (req) => {
     ).join('\n');
 
     const questionsPerTopic = Math.ceil(questionCount / topics.length);
-    const allowedDifficulties = difficultyLevels && difficultyLevels.length > 0 
-      ? difficultyLevels 
-      : ['medium', 'hard', 'challenging'];
-    const difficultyInstruction = `Only generate questions with these difficulty levels: ${allowedDifficulties.join(', ')}.`;
+    
+    // Handle warm-up mode with very easy questions
+    const isWarmup = worksheetMode === 'warmup';
+    const allowedDifficulties = isWarmup 
+      ? ['easy']
+      : (difficultyLevels && difficultyLevels.length > 0 
+        ? difficultyLevels 
+        : ['medium', 'hard', 'challenging']);
+    const difficultyInstruction = isWarmup
+      ? 'Generate ONLY very easy, confidence-building questions. These should be simple recall or basic one-step problems that any student can solve to build confidence.'
+      : `Only generate questions with these difficulty levels: ${allowedDifficulties.join(', ')}.`;
+
+    // Variation instruction for unique questions per student
+    const variationInstruction = variationSeed 
+      ? `
+VARIATION REQUIREMENT (CRITICAL - ANTI-COPYING MEASURE):
+- Use variation seed: ${variationSeed}
+- Generate UNIQUE questions that differ from other students' worksheets
+- Vary: numbers, contexts, names in word problems, specific values, order of operations
+- Keep the same concepts and difficulty, but change the specific details
+- Example: Instead of "Find the area of a rectangle with length 5 and width 3", use different numbers like "6 and 4" or different contexts like "Find the perimeter of a garden..."
+- This ensures each student ${studentName ? `(${studentName})` : ''} gets a unique worksheet`
+      : '';
 
     // Bloom's Taxonomy filter
     const allowedBloomLevels = bloomLevels && bloomLevels.length > 0 
@@ -252,6 +273,18 @@ DIAGNOSTIC ASSESSMENT MODE:
 - Distribute questions across ALL levels (A through F) to diagnose student abilities
 - Questions should progressively increase in complexity from F to A
 - This diagnostic data will be used to create differentiated follow-up worksheets`
+      : worksheetMode === 'warmup'
+      ? `
+WARM-UP MODE (Confidence Building):
+- Generate ONLY very simple, easy questions that build student confidence
+- These should be "quick wins" - problems any student can solve
+- Focus on basic recall, simple one-step calculations, or recognition
+- Use encouraging, approachable language
+- Examples: "What is 5 + 7?", "If a rectangle has length 4 and width 2, what is its area?"
+- Keep questions SHORT and straightforward
+- NO complex multi-step problems
+- NO challenging vocabulary
+- This warm-up helps students feel confident before tackling harder problems`
       : '';
 
     const exampleOutput = worksheetMode === 'diagnostic'
@@ -356,6 +389,7 @@ REQUIREMENTS:
 7. Use real-world contexts where appropriate (especially for Apply and above)
 8. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}${graphPaperInstruction}${coordinateGeometryInstruction}
 ${diagnosticInstruction}
+${variationInstruction}
 
 CRITICAL - TEXTBOOK-QUALITY FORMATTING:
 - Write in fluid, complete sentences like a professional textbook
