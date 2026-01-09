@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +22,17 @@ export default function Questions() {
   const [worksheetQuestions, setWorksheetQuestions] = useState<WorksheetQuestion[]>([]);
   const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set());
   const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(false);
+  const [diagnosticMode, setDiagnosticMode] = useState(false);
+
+  const openDiagnosticMode = () => {
+    setDiagnosticMode(true);
+    setShowDifferentiatedGenerator(true);
+  };
+
+  const openRegularMode = () => {
+    setDiagnosticMode(false);
+    setShowDifferentiatedGenerator(true);
+  };
 
   // Get current subject data
   const currentSubject = NYS_SUBJECTS.find(s => s.id === selectedSubject);
@@ -287,13 +298,23 @@ export default function Questions() {
               Browse NYS Regents aligned topics, create AI-generated worksheets, and download assessments
             </p>
           </div>
-          <Button 
-            onClick={() => setShowDifferentiatedGenerator(true)}
-            className="bg-purple-600 hover:bg-purple-700"
-          >
-            <Sparkles className="h-4 w-4 mr-2" />
-            Differentiated Worksheets
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={openDiagnosticMode}
+              variant="default"
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <ClipboardCheck className="h-4 w-4 mr-2" />
+              Quick Start Diagnostic
+            </Button>
+            <Button 
+              onClick={openRegularMode}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Differentiated Worksheets
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -527,7 +548,11 @@ export default function Questions() {
       {/* Differentiated Worksheet Generator Modal */}
       <DifferentiatedWorksheetGenerator
         open={showDifferentiatedGenerator}
-        onOpenChange={setShowDifferentiatedGenerator}
+        onOpenChange={(open) => {
+          setShowDifferentiatedGenerator(open);
+          if (!open) setDiagnosticMode(false);
+        }}
+        diagnosticMode={diagnosticMode}
       />
     </AppLayout>
   );

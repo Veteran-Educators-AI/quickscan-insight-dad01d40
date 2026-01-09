@@ -76,6 +76,7 @@ interface GeneratedQuestion {
 interface DifferentiatedWorksheetGeneratorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  diagnosticMode?: boolean;
 }
 
 const LEVELS: AdvancementLevel[] = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -118,7 +119,7 @@ interface ClassOption {
   name: string;
 }
 
-export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: DifferentiatedWorksheetGeneratorProps) {
+export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosticMode = false }: DifferentiatedWorksheetGeneratorProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -129,8 +130,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
   const [students, setStudents] = useState<StudentWithDiagnostic[]>([]);
   const [questionCount, setQuestionCount] = useState('5');
   const [warmUpCount, setWarmUpCount] = useState('2');
-const [warmUpDifficulty, setWarmUpDifficulty] = useState<'super-easy' | 'easy' | 'very-easy'>('very-easy');
-  const [formCount, setFormCount] = useState('1');
+  const [warmUpDifficulty, setWarmUpDifficulty] = useState<'super-easy' | 'easy' | 'very-easy'>('very-easy');
+  const [formCount, setFormCount] = useState(diagnosticMode ? '4' : '1');
+
+  // Pre-configure for diagnostic mode when opened
+  useEffect(() => {
+    if (open && diagnosticMode) {
+      setFormCount('4');
+      setWarmUpDifficulty('easy');
+    }
+  }, [open, diagnosticMode]);
   
   // Presets
   const [presets, setPresets] = useState<WorksheetPreset[]>([]);
@@ -614,11 +623,23 @@ const [warmUpDifficulty, setWarmUpDifficulty] = useState<'super-easy' | 'easy' |
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-purple-600" />
-            Generate Differentiated Worksheets
+            {diagnosticMode ? (
+              <>
+                <FileText className="h-5 w-5 text-emerald-600" />
+                Quick Start Diagnostic
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-5 w-5 text-purple-600" />
+                Generate Differentiated Worksheets
+              </>
+            )}
           </DialogTitle>
           <DialogDescription>
-            Create personalized follow-up worksheets based on student diagnostic results. Each student receives a worksheet tailored to their recommended advancement level.
+            {diagnosticMode 
+              ? "Create diagnostic worksheets with multiple forms (A-J) to prevent copying. Each form has unique questions covering the same concepts."
+              : "Create personalized follow-up worksheets based on student diagnostic results. Each student receives a worksheet tailored to their recommended advancement level."
+            }
           </DialogDescription>
         </DialogHeader>
 
