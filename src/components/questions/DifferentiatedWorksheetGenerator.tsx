@@ -115,6 +115,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
   const [students, setStudents] = useState<StudentWithDiagnostic[]>([]);
   const [questionCount, setQuestionCount] = useState('5');
   const [warmUpCount, setWarmUpCount] = useState('2');
+  const [warmUpDifficulty, setWarmUpDifficulty] = useState<'very-easy' | 'easy'>('very-easy');
   
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -297,7 +298,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
                   category: 'Warm-Up',
                 }],
                 questionCount: parseInt(warmUpCount),
-                difficultyLevels: ['easy'],
+                difficultyLevels: [warmUpDifficulty],
                 worksheetMode: 'warmup',
                 variationSeed: variationSeed,
                 studentName: `${student.first_name} ${student.last_name}`,
@@ -561,21 +562,40 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Warm-Up Questions</Label>
-            <Select value={warmUpCount} onValueChange={setWarmUpCount}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">No warm-up</SelectItem>
-                <SelectItem value="1">1 question</SelectItem>
-                <SelectItem value="2">2 questions</SelectItem>
-                <SelectItem value="3">3 questions</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">Easy confidence-building questions at the start</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Warm-Up Questions</Label>
+              <Select value={warmUpCount} onValueChange={setWarmUpCount}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">No warm-up</SelectItem>
+                  <SelectItem value="1">1 question</SelectItem>
+                  <SelectItem value="2">2 questions</SelectItem>
+                  <SelectItem value="3">3 questions</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Warm-Up Difficulty</Label>
+              <Select 
+                value={warmUpDifficulty} 
+                onValueChange={(v) => setWarmUpDifficulty(v as 'very-easy' | 'easy')}
+                disabled={warmUpCount === '0'}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="very-easy">Very Easy (basic recall)</SelectItem>
+                  <SelectItem value="easy">Easy (simple application)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground">Confidence-building questions at the start of each worksheet</p>
 
           <Separator />
 
