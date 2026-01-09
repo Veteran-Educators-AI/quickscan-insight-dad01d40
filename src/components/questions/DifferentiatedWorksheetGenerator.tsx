@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2 } from 'lucide-react';
+import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,9 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
 import jsPDF from 'jspdf';
 
 interface WorksheetPreset {
@@ -63,6 +66,7 @@ interface StudentWithDiagnostic extends Student {
   diagnosticResult?: DiagnosticResult;
   recommendedLevel: AdvancementLevel;
   selected: boolean;
+  hasAdaptiveData?: boolean;
 }
 
 interface GeneratedQuestion {
@@ -135,6 +139,17 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [warmUpDifficulty, setWarmUpDifficulty] = useState<'super-easy' | 'easy' | 'very-easy'>('very-easy');
   const [formCount, setFormCount] = useState(diagnosticMode ? '4' : '1');
   const [includeHints, setIncludeHints] = useState(false);
+  const [useAdaptiveDifficulty, setUseAdaptiveDifficulty] = useState(true);
+
+  // Adaptive levels based on student performance data
+  const { 
+    students: adaptiveStudents, 
+    isLoading: isLoadingAdaptive,
+    studentLevelMap: adaptiveLevelMap,
+  } = useAdaptiveLevels({ 
+    classId: selectedClassId, 
+    topicName: selectedTopic 
+  });
 
   // Pre-configure for diagnostic mode when opened
   useEffect(() => {
@@ -183,7 +198,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     if (selectedTopic && selectedClassId) {
       fetchStudentsWithDiagnostics();
     }
-  }, [selectedTopic]);
+  }, [selectedTopic, adaptiveLevelMap, useAdaptiveDifficulty]);
 
   const fetchClasses = async () => {
     try {
@@ -247,7 +262,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
       if (diagnosticsError) throw diagnosticsError;
 
-      // Merge students with their most recent diagnostic result
+      // Merge students with their most recent diagnostic result and adaptive levels
       const studentsWithDiagnostics: StudentWithDiagnostic[] = (studentsData || []).map(student => {
         const studentDiagnostics = (diagnosticsData || [])
           .filter(d => d.student_id === student.id)
@@ -255,11 +270,22 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
         
         const latestDiagnostic = studentDiagnostics[0];
         
+        // Get adaptive level if available and enabled
+        const adaptiveLevel = adaptiveLevelMap[student.id];
+        const adaptiveStudent = adaptiveStudents.find(s => s.studentId === student.id);
+        const hasPerformanceData = adaptiveStudent?.hasPerformanceData ?? false;
+        
+        // Use adaptive level if enabled and available, otherwise fall back to diagnostic
+        const recommendedLevel = (useAdaptiveDifficulty && adaptiveLevel) 
+          ? adaptiveLevel 
+          : (latestDiagnostic?.recommended_level as AdvancementLevel) || 'C';
+        
         return {
           ...student,
           diagnosticResult: latestDiagnostic,
-          recommendedLevel: (latestDiagnostic?.recommended_level as AdvancementLevel) || 'C',
-          selected: !!latestDiagnostic,
+          recommendedLevel,
+          selected: !!latestDiagnostic || hasPerformanceData,
+          hasAdaptiveData: hasPerformanceData,
         };
       });
 
@@ -319,7 +345,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   };
 
   const selectAll = () => {
-    setStudents(prev => prev.map(s => ({ ...s, selected: !!s.diagnosticResult })));
+    setStudents(prev => prev.map(s => ({ ...s, selected: !!s.diagnosticResult || !!s.hasAdaptiveData })));
   };
 
   const deselectAll = () => {
@@ -657,7 +683,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   };
 
   const selectedCount = students.filter(s => s.selected).length;
-  const studentsWithDiagnostics = students.filter(s => s.diagnosticResult);
+  const studentsWithDiagnostics = students.filter(s => s.diagnosticResult || s.hasAdaptiveData);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -861,6 +887,54 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             </div>
           </div>
 
+          {/* Adaptive Difficulty Option */}
+          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Brain className="h-5 w-5 text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="adaptiveDifficulty" className="text-sm font-medium text-purple-900 cursor-pointer flex items-center gap-2">
+                  Adaptive Difficulty
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <TrendingUp className="h-3.5 w-3.5 text-purple-500" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-sm">
+                          Analyzes each student's past performance to automatically adjust difficulty levels. 
+                          Students improving will get slightly harder questions, while struggling students get more support.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </Label>
+                <p className="text-xs text-purple-700 mt-0.5">
+                  Auto-adjust difficulty based on analyzed student work data
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="adaptiveDifficulty"
+              checked={useAdaptiveDifficulty}
+              onCheckedChange={setUseAdaptiveDifficulty}
+            />
+          </div>
+
+          {useAdaptiveDifficulty && adaptiveStudents.length > 0 && (
+            <div className="p-3 bg-muted/50 rounded-lg border">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                <TrendingUp className="h-4 w-4 text-green-500" />
+                <span className="font-medium">Performance-based adjustments active</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {adaptiveStudents.filter(s => s.hasPerformanceData).length} students have graded work data. 
+                Their worksheet levels will be personalized based on their performance trends.
+              </p>
+            </div>
+          )}
+
           <Separator />
 
           {/* Students with Diagnostic Results */}
@@ -895,36 +969,61 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   <div className="space-y-2">
                     {students.map(student => {
                       const hasDiagnostic = !!student.diagnosticResult;
+                      const hasData = hasDiagnostic || student.hasAdaptiveData;
+                      const adaptiveInfo = adaptiveStudents.find(s => s.studentId === student.id);
+                      const isAdaptiveAdjusted = useAdaptiveDifficulty && student.hasAdaptiveData && adaptiveInfo;
                       
                       return (
                         <div
                           key={student.id}
                           className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
                             student.selected ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted/50'
-                          } ${!hasDiagnostic ? 'opacity-50' : ''}`}
+                          } ${!hasData ? 'opacity-50' : ''}`}
                         >
                           <div className="flex items-center gap-3">
                             <Checkbox
                               checked={student.selected}
                               onCheckedChange={() => toggleStudent(student.id)}
-                              disabled={!hasDiagnostic}
+                              disabled={!hasData}
                             />
                             <div>
-                              <p className="font-medium text-sm">
+                              <p className="font-medium text-sm flex items-center gap-1.5">
                                 {student.last_name}, {student.first_name}
+                                {isAdaptiveAdjusted && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <TrendingUp className="h-3 w-3 text-purple-500" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p className="text-xs">Level adjusted based on performance data</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
                               </p>
                               {hasDiagnostic ? (
                                 <p className="text-xs text-muted-foreground">
                                   Last assessed: {new Date(student.diagnosticResult!.created_at).toLocaleDateString()}
+                                  {isAdaptiveAdjusted && (
+                                    <span className="ml-1 text-purple-600">• Adaptive</span>
+                                  )}
+                                </p>
+                              ) : student.hasAdaptiveData ? (
+                                <p className="text-xs text-purple-600">
+                                  Level from graded work analysis
                                 </p>
                               ) : (
-                                <p className="text-xs text-muted-foreground">No diagnostic data</p>
+                                <p className="text-xs text-muted-foreground">No data available</p>
                               )}
                             </div>
                           </div>
                           
-                          {hasDiagnostic && (
-                            <Badge variant="outline" className={getLevelColor(student.recommendedLevel)}>
+                          {hasData && (
+                            <Badge 
+                              variant="outline" 
+                              className={`${getLevelColor(student.recommendedLevel)} ${isAdaptiveAdjusted ? 'ring-1 ring-purple-400' : ''}`}
+                            >
                               Level {student.recommendedLevel}
                             </Badge>
                           )}
