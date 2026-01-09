@@ -873,6 +873,8 @@ export type Database = {
           created_at: string
           grading_scale: Json | null
           id: string
+          integration_webhook_enabled: boolean | null
+          integration_webhook_url: string | null
           level_a_notifications: boolean | null
           level_drop_notifications: boolean | null
           parent_ai_notifications: boolean | null
@@ -889,6 +891,8 @@ export type Database = {
           created_at?: string
           grading_scale?: Json | null
           id?: string
+          integration_webhook_enabled?: boolean | null
+          integration_webhook_url?: string | null
           level_a_notifications?: boolean | null
           level_drop_notifications?: boolean | null
           parent_ai_notifications?: boolean | null
@@ -905,6 +909,8 @@ export type Database = {
           created_at?: string
           grading_scale?: Json | null
           id?: string
+          integration_webhook_enabled?: boolean | null
+          integration_webhook_url?: string | null
           level_a_notifications?: boolean | null
           level_drop_notifications?: boolean | null
           parent_ai_notifications?: boolean | null

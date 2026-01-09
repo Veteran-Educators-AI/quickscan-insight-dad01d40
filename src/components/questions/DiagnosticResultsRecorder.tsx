@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useStudentNames } from '@/lib/StudentNameContext';
+import { usePushStudentData } from '@/hooks/usePushStudentData';
 
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -81,6 +82,7 @@ export function DiagnosticResultsRecorder({
   const { toast } = useToast();
   const { user } = useAuth();
   const { getDisplayName } = useStudentNames();
+  const { pushData } = usePushStudentData();
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -266,6 +268,31 @@ export function DiagnosticResultsRecorder({
           description: `${notifications.length} level change notification(s) sent to your email.`,
         });
       }
+
+      // Push diagnostic results to webhook (sister app integration)
+      studentScores.forEach(ss => {
+        const student = students.find(s => s.id === ss.studentId);
+        if (!student) return;
+
+        const recommendedLevel = calculateRecommendedLevel(ss.scores);
+        const studentName = getDisplayName(ss.studentId, student.first_name, student.last_name);
+
+        pushData({
+          eventType: 'diagnostic_results',
+          studentId: ss.studentId,
+          studentName,
+          classId,
+          data: {
+            worksheetId,
+            worksheetTitle,
+            topicName,
+            standard,
+            recommendedLevel,
+            levelScores: ss.scores,
+            previousLevel: previousLevelByStudent[ss.studentId] || null,
+          },
+        });
+      });
 
       toast({
         title: 'Results saved!',
