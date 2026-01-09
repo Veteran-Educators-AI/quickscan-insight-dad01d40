@@ -26,7 +26,7 @@ interface WorksheetPreset {
   formCount: string;
 }
 
-const FORM_LETTERS = ['A', 'B', 'C', 'D', 'E'] as const;
+const FORM_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'] as const;
 type FormLetter = typeof FORM_LETTERS[number];
 
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
@@ -734,7 +734,12 @@ const [warmUpDifficulty, setWarmUpDifficulty] = useState<'super-easy' | 'easy' |
                   <SelectItem value="2">2 forms (A, B)</SelectItem>
                   <SelectItem value="3">3 forms (A, B, C)</SelectItem>
                   <SelectItem value="4">4 forms (A, B, C, D)</SelectItem>
-                  <SelectItem value="5">5 forms (A, B, C, D, E)</SelectItem>
+                  <SelectItem value="5">5 forms (A-E)</SelectItem>
+                  <SelectItem value="6">6 forms (A-F)</SelectItem>
+                  <SelectItem value="7">7 forms (A-G)</SelectItem>
+                  <SelectItem value="8">8 forms (A-H)</SelectItem>
+                  <SelectItem value="9">9 forms (A-I)</SelectItem>
+                  <SelectItem value="10">10 forms (A-J)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">Different question sets prevent copying between students</p>
