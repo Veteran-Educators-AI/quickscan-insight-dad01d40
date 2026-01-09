@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback } from 'react';
 import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode } from 'lucide-react';
+import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -146,16 +147,25 @@ export default function Scan() {
     }
   }, [scanMode, batch, selectedClassId, students, scanImageForQR]);
 
-  const handleSolutionUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSolutionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string;
+      try {
+        const resizedBlob = await resizeImage(file);
+        const dataUrl = await blobToBase64(resizedBlob);
         setSolutionImage(dataUrl);
         toast.success('Solution uploaded!');
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Error resizing image:', err);
+        // Fallback to original file
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target?.result as string;
+          setSolutionImage(dataUrl);
+          toast.success('Solution uploaded!');
+        };
+        reader.readAsDataURL(file);
+      }
     }
     e.target.value = '';
   };
@@ -210,16 +220,25 @@ export default function Scan() {
     setScanState('camera');
   }, []);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string;
+      try {
+        const resizedBlob = await resizeImage(file);
+        const dataUrl = await blobToBase64(resizedBlob);
         setCapturedImage(dataUrl);
         setScanState('preview');
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Error resizing image:', err);
+        // Fallback to original file
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target?.result as string;
+          setCapturedImage(dataUrl);
+          setScanState('preview');
+        };
+        reader.readAsDataURL(file);
+      }
     }
     e.target.value = '';
   };
@@ -233,7 +252,17 @@ export default function Scan() {
     
     // Process files with auto-identification if class is selected
     const processFile = async (file: File) => {
-      return new Promise<void>((resolve) => {
+      try {
+        const resizedBlob = await resizeImage(file);
+        const dataUrl = await blobToBase64(resizedBlob);
+        if (selectedClassId && students.length > 0) {
+          await batch.addImageWithAutoIdentify(dataUrl, students);
+        } else {
+          batch.addImage(dataUrl);
+        }
+      } catch (err) {
+        console.error('Error resizing image:', err);
+        // Fallback to original file
         const reader = new FileReader();
         reader.onload = async (ev) => {
           const dataUrl = ev.target?.result as string;
@@ -242,10 +271,9 @@ export default function Scan() {
           } else {
             batch.addImage(dataUrl);
           }
-          resolve();
         };
         reader.readAsDataURL(file);
-      });
+      }
     };
 
     // Process all files
@@ -255,16 +283,25 @@ export default function Scan() {
     e.target.value = '';
   };
 
-  const handleNativeCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNativeCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string;
+      try {
+        const resizedBlob = await resizeImage(file);
+        const dataUrl = await blobToBase64(resizedBlob);
         setCapturedImage(dataUrl);
         setScanState('preview');
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Error resizing image:', err);
+        // Fallback to original file
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target?.result as string;
+          setCapturedImage(dataUrl);
+          setScanState('preview');
+        };
+        reader.readAsDataURL(file);
+      }
     }
     e.target.value = '';
   };
@@ -1005,10 +1042,8 @@ export default function Scan() {
                             onClick={() => setShowMultiStudentScanner(true)}
                           >
                             <Users className="h-5 w-5 mr-2 text-primary" />
-                            <span>
-                              <span className="font-semibold">Multi-Student Grading</span>
-                              <span className="text-muted-foreground ml-2 text-sm">— Grade many from one photo</span>
-                            </span>
+                            <span className="font-semibold">MSG</span>
+                            <span className="text-muted-foreground ml-2 text-sm">— Grade many students from one photo</span>
                           </Button>
                         </div>
 
