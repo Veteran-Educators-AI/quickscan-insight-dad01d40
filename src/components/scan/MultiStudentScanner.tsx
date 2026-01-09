@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square } from 'lucide-react';
+import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -111,16 +112,25 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
     fetchStudents();
   }, [selectedClassId]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string;
+      try {
+        const resizedBlob = await resizeImage(file);
+        const dataUrl = await blobToBase64(resizedBlob);
         setOriginalImage(dataUrl);
         setExtractedStudents([]);
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Error resizing image:', err);
+        // Fallback to original file
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target?.result as string;
+          setOriginalImage(dataUrl);
+          setExtractedStudents([]);
+        };
+        reader.readAsDataURL(file);
+      }
     }
     e.target.value = '';
   };
