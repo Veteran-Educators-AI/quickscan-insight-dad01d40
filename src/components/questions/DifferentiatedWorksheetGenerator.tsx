@@ -114,6 +114,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [students, setStudents] = useState<StudentWithDiagnostic[]>([]);
   const [questionCount, setQuestionCount] = useState('5');
+  const [warmUpCount, setWarmUpCount] = useState('2');
   
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -285,23 +286,25 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
           setGenerationStatus(`Generating worksheet for ${student.first_name} ${student.last_name} (Level ${level})...`);
 
           // Generate warm-up questions first (very basic confidence builders)
-          const { data: warmUpData, error: warmUpError } = await supabase.functions.invoke('generate-worksheet-questions', {
-            body: {
-              topics: [{
-                topicName: selectedTopic || 'General Math',
-                standard: '',
-                subject: 'Mathematics',
-                category: 'Warm-Up',
-              }],
-              questionCount: 2,
-              difficultyLevels: ['easy'],
-              worksheetMode: 'warmup',
-              variationSeed: variationSeed,
-              studentName: `${student.first_name} ${student.last_name}`,
-            },
-          });
-
-          const warmUpQuestions: GeneratedQuestion[] = warmUpData?.questions || [];
+          let warmUpQuestions: GeneratedQuestion[] = [];
+          if (parseInt(warmUpCount) > 0) {
+            const { data: warmUpData, error: warmUpError } = await supabase.functions.invoke('generate-worksheet-questions', {
+              body: {
+                topics: [{
+                  topicName: selectedTopic || 'General Math',
+                  standard: '',
+                  subject: 'Mathematics',
+                  category: 'Warm-Up',
+                }],
+                questionCount: parseInt(warmUpCount),
+                difficultyLevels: ['easy'],
+                worksheetMode: 'warmup',
+                variationSeed: variationSeed,
+                studentName: `${student.first_name} ${student.last_name}`,
+              },
+            });
+            warmUpQuestions = warmUpData?.questions || [];
+          }
 
           // Generate level-appropriate questions with variation
           const { data, error } = await supabase.functions.invoke('generate-worksheet-questions', {
@@ -556,6 +559,22 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange }: Differe
                 <SelectItem value="10">10 questions</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Warm-Up Questions</Label>
+            <Select value={warmUpCount} onValueChange={setWarmUpCount}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">No warm-up</SelectItem>
+                <SelectItem value="1">1 question</SelectItem>
+                <SelectItem value="2">2 questions</SelectItem>
+                <SelectItem value="3">3 questions</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Easy confidence-building questions at the start</p>
           </div>
 
           <Separator />
