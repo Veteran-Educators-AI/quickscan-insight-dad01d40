@@ -820,7 +820,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   <SelectValue placeholder="Choose a class..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {classes.map(c => (
+                  {classes.filter(c => c.id && c.id.trim() !== '').map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
