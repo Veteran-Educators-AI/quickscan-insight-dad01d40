@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { toast } from 'sonner';
-import nycalysisLogo from '@/assets/nycalysis-logo.png';
+import nycologicLogo from '@/assets/nycologic-logo.png';
 
 export default function MfaChallenge() {
   const [code, setCode] = useState('');
@@ -120,8 +120,8 @@ export default function MfaChallenge() {
         {/* Logo */}
         <div className="text-center mb-8">
           <img 
-            src={nycalysisLogo} 
-            alt="NYCalysis AI" 
+            src={nycologicLogo} 
+            alt="NYCologic AI" 
             className="h-16 w-auto mx-auto mb-4"
           />
         </div>
