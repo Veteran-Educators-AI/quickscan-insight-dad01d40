@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const brevoApiKey = Deno.env.get("BREVO_API_KEY");
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const corsHeaders = {
@@ -242,7 +243,7 @@ serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
-    // Handle answer submission via GET (clicked from email)
+    // Handle answer submission via GET (clicked from email) - no auth needed for student responses
     if (action === "submit") {
       const attemptId = url.searchParams.get("attemptId");
       const answer = url.searchParams.get("answer");
@@ -257,8 +258,30 @@ serve(async (req) => {
       return await handleAnswerSubmission(attemptId, answer);
     }
 
-    // Handle sending questions via POST
+    // Handle sending questions via POST - requires authentication
     if (req.method === "POST") {
+      // Authentication check for sending questions
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+
+      const { data: { user }, error: userError } = await supabaseAnon.auth.getUser();
+      
+      if (userError || !user) {
+        return new Response(JSON.stringify({ error: "Invalid token" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const body: SendQuestionRequest = await req.json();
       return await sendQuestionEmail(body);
     }

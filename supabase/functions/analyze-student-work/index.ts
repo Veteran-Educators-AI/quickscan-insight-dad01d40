@@ -127,6 +127,37 @@ serve(async (req) => {
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
+    
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      throw new Error('Supabase configuration missing');
+    }
+
+    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: userError } = await authClient.auth.getUser();
+    
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const authenticatedUserId = user.id;
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
@@ -134,20 +165,22 @@ serve(async (req) => {
 
     const { imageBase64, solutionBase64, questionId, rubricSteps, identifyOnly, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode } = await req.json();
     
+    // Ensure teacherId matches authenticated user
+    const effectiveTeacherId = teacherId || authenticatedUserId;
+    
     if (!imageBase64) {
       throw new Error('Image data is required');
     }
 
-    // Initialize Supabase client for sending notifications and rate limiting
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    // Initialize Supabase client with service role for sending notifications and rate limiting
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY 
       ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
       : null;
 
-    // Check rate limit if we have a teacher ID and supabase client
-    if (supabase && teacherId) {
-      const rateLimit = await checkRateLimit(supabase, teacherId);
+    // Check rate limit using effective teacher ID
+    if (supabase && effectiveTeacherId) {
+      const rateLimit = await checkRateLimit(supabase, effectiveTeacherId);
       if (!rateLimit.allowed) {
         return new Response(JSON.stringify({ 
           error: rateLimit.message,
