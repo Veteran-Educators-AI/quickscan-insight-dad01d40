@@ -282,3 +282,55 @@
 :focus-visible {
   @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
 }
+
+/* Brain pulsate animation */
+@keyframes brain-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 25px rgba(220, 38, 38, 0.4));
+  }
+  50% {
+    transform: scale(1.03);
+    filter: drop-shadow(0 0 35px rgba(220, 38, 38, 0.6));
+  }
+}
+
+/* Thinking wave animation */
+@keyframes thinking-wave {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+.animate-brain-pulse {
+  animation: brain-pulse 2s ease-in-out infinite;
+}
+
+.thinking-wave {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid hsl(var(--primary) / 0.5);
+  transform: translate(-50%, -50%) scale(0.8);
+  animation: thinking-wave 2s ease-out infinite;
+}
+
+.thinking-wave:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.thinking-wave:nth-child(3) {
+  animation-delay: 1s;
+}
+
+.thinking-wave:nth-child(4) {
+  animation-delay: 1.5s;
+}
