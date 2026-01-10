@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain } from 'lucide-react';
+import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye } from 'lucide-react';
+import { QuestionPreviewPanel } from './QuestionPreviewPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -1121,6 +1122,17 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               </p>
             </div>
           )}
+
+          {/* Question Preview Panel */}
+          <QuestionPreviewPanel
+            selectedTopics={selectedTopics}
+            customTopics={customTopics}
+            warmUpCount={warmUpCount}
+            warmUpDifficulty={warmUpDifficulty}
+            questionCount={questionCount}
+            includeHints={includeHints}
+            previewLevel={students.find(s => s.selected)?.recommendedLevel || 'C'}
+          />
 
           <Separator />
 
