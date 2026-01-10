@@ -133,7 +133,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [topics, setTopics] = useState<string[]>([]);
-  const [selectedTopic, setSelectedTopic] = useState<string>('');
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [students, setStudents] = useState<StudentWithDiagnostic[]>([]);
   const [questionCount, setQuestionCount] = useState('5');
   const [warmUpCount, setWarmUpCount] = useState('2');
@@ -152,8 +152,17 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     studentLevelMap: adaptiveLevelMap,
   } = useAdaptiveLevels({ 
     classId: selectedClassId, 
-    topicName: selectedTopic || (customTopics.length > 0 ? customTopics[0].topicName : '')
+    topicName: selectedTopics.length > 0 ? selectedTopics[0] : (customTopics.length > 0 ? customTopics[0].topicName : '')
   });
+
+  // Toggle topic selection
+  const toggleTopicSelection = (topicName: string) => {
+    setSelectedTopics(prev => 
+      prev.includes(topicName) 
+        ? prev.filter(t => t !== topicName)
+        : [...prev, topicName]
+    );
+  };
 
   // Pre-configure for diagnostic mode and load initial topics when opened
   useEffect(() => {
@@ -165,14 +174,13 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       // Load initial topics from standards menu selection
       if (initialTopics.length > 0) {
         setCustomTopics(initialTopics);
-        // Auto-select first topic for the dropdown if not already set
-        if (!selectedTopic && initialTopics.length > 0) {
-          setSelectedTopic(initialTopics[0].topicName);
-        }
+        // Auto-select all passed topics
+        setSelectedTopics(initialTopics.map(t => t.topicName));
       }
     } else {
-      // Reset custom topics when closing
+      // Reset custom topics and selection when closing
       setCustomTopics([]);
+      setSelectedTopics([]);
     }
   }, [open, diagnosticMode, initialTopics]);
   
@@ -212,10 +220,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   }, [selectedClassId]);
 
   useEffect(() => {
-    if ((selectedTopic || customTopics.length > 0) && selectedClassId) {
+    if ((selectedTopics.length > 0 || customTopics.length > 0) && selectedClassId) {
       fetchStudentsWithDiagnostics();
     }
-  }, [selectedTopic, customTopics, adaptiveLevelMap, useAdaptiveDifficulty]);
+  }, [selectedTopics, customTopics, adaptiveLevelMap, useAdaptiveDifficulty]);
 
   const fetchClasses = async () => {
     try {
@@ -271,8 +279,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
         .in('student_id', studentIds)
         .eq('teacher_id', user.id);
       
-      if (selectedTopic) {
-        diagnosticQuery = diagnosticQuery.eq('topic_name', selectedTopic);
+      if (selectedTopics.length > 0) {
+        diagnosticQuery = diagnosticQuery.in('topic_name', selectedTopics);
       }
       
       const { data: diagnosticsData, error: diagnosticsError } = await diagnosticQuery;
@@ -430,14 +438,19 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           // Generate warm-up questions for this form
           let warmUpQuestions: GeneratedQuestion[] = [];
           if (parseInt(warmUpCount) > 0) {
-            const { data: warmUpData } = await supabase.functions.invoke('generate-worksheet-questions', {
-              body: {
-                topics: [{
-                  topicName: selectedTopic || 'General Math',
-                  standard: '',
+            // Build topics array for warm-up
+            const warmUpTopicsPayload = selectedTopics.length > 0
+              ? selectedTopics.map(t => ({
+                  topicName: t,
+                  standard: customTopics.find(ct => ct.topicName === t)?.standard || '',
                   subject: 'Mathematics',
                   category: 'Warm-Up',
-                }],
+                }))
+              : [{ topicName: 'General Math', standard: '', subject: 'Mathematics', category: 'Warm-Up' }];
+            
+            const { data: warmUpData } = await supabase.functions.invoke('generate-worksheet-questions', {
+              body: {
+                topics: warmUpTopicsPayload,
                 questionCount: parseInt(warmUpCount),
                 difficultyLevels: [warmUpDifficulty],
                 worksheetMode: 'warmup',
@@ -449,15 +462,20 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             warmUpQuestions = warmUpData?.questions || [];
           }
           
+          // Build topics array for main questions
+          const mainTopicsPayload = selectedTopics.length > 0
+            ? selectedTopics.map(t => ({
+                topicName: t,
+                standard: customTopics.find(ct => ct.topicName === t)?.standard || '',
+                subject: 'Mathematics',
+                category: 'Differentiated Practice',
+              }))
+            : [{ topicName: 'General Math', standard: '', subject: 'Mathematics', category: 'Differentiated Practice' }];
+          
           // Generate main questions for this form/level
           const { data } = await supabase.functions.invoke('generate-worksheet-questions', {
             body: {
-              topics: [{
-                topicName: selectedTopic || 'General Math',
-                standard: '',
-                subject: 'Mathematics',
-                category: 'Differentiated Practice',
-              }],
+              topics: mainTopicsPayload,
               questionCount: parseInt(questionCount),
               difficultyLevels: level === 'A' || level === 'B' 
                 ? ['hard', 'challenging'] 
@@ -526,7 +544,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
           pdf.setFontSize(12);
           pdf.setFont('helvetica', 'normal');
-          pdf.text(`${selectedTopic || 'Math Practice'} - Diagnostic Worksheet`, pageWidth / 2, yPosition + 12, { align: 'center' });
+          const topicsLabel = selectedTopics.length > 0 ? selectedTopics.join(', ') : 'Math Practice';
+          const truncatedTopics = topicsLabel.length > 50 ? topicsLabel.substring(0, 47) + '...' : topicsLabel;
+          pdf.text(`${truncatedTopics} - Diagnostic Worksheet`, pageWidth / 2, yPosition + 12, { align: 'center' });
           yPosition += 30;
 
           // Student info with form indicator
@@ -686,7 +706,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       }
 
       // Download the PDF
-      const fileName = `Class_Set_${selectedTopic || 'Math'}_Forms_${formsToGenerate.join('')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const topicsForFilename = selectedTopics.length > 0 ? selectedTopics[0].replace(/\s+/g, '_').substring(0, 20) : 'Math';
+      const fileName = `Class_Set_${topicsForFilename}_Forms_${formsToGenerate.join('')}_${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(fileName);
 
       toast({
@@ -807,62 +828,92 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             </div>
 
             <div className="space-y-2">
-              <Label>
-                Topic
+              <Label className="flex items-center gap-2">
+                Topics
                 {customTopics.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 text-xs">From Standards</Badge>
+                  <Badge variant="secondary" className="text-xs">From Standards</Badge>
+                )}
+                {selectedTopics.length > 0 && (
+                  <Badge variant="default" className="text-xs">{selectedTopics.length} selected</Badge>
                 )}
               </Label>
-              <Select 
-                value={selectedTopic} 
-                onValueChange={setSelectedTopic} 
-                disabled={topics.length === 0 && customTopics.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={
-                    customTopics.length > 0 
-                      ? "Choose from selected standards..." 
-                      : topics.length === 0 
-                        ? "No diagnostics found" 
-                        : "Choose topic..."
-                  } />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Show custom topics from standards menu first */}
-                  {customTopics.length > 0 && (
-                    <>
-                      <div className="px-2 py-1 text-xs text-muted-foreground font-medium">
-                        From Standards Menu
-                      </div>
-                      {customTopics.map((topic, idx) => (
-                        <SelectItem key={`custom-${idx}`} value={topic.topicName}>
-                          <span className="flex items-center gap-2">
-                            {topic.topicName}
-                            <Badge variant="outline" className="text-xs">{topic.standard}</Badge>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                  {/* Show existing diagnostic topics */}
-                  {topics.length > 0 && (
-                    <>
-                      {customTopics.length > 0 && (
-                        <div className="px-2 py-1 text-xs text-muted-foreground font-medium border-t mt-1 pt-2">
-                          From Past Diagnostics
+              
+              {/* Multi-select topics with checkboxes */}
+              <ScrollArea className="h-[140px] border rounded-md p-2">
+                {(topics.length === 0 && customTopics.length === 0) ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No topics available. Select topics from the standards menu first.
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    {/* Custom topics from standards menu */}
+                    {customTopics.length > 0 && (
+                      <>
+                        <div className="px-2 py-1 text-xs text-muted-foreground font-medium sticky top-0 bg-background">
+                          From Standards Menu
                         </div>
-                      )}
-                      {topics.filter(t => !customTopics.some(ct => ct.topicName === t)).map(topic => (
-                        <SelectItem key={topic} value={topic}>{topic}</SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-              {customTopics.length > 0 && (
-                <p className="text-xs text-emerald-600">
-                  ✓ {customTopics.length} topic(s) loaded from your standards selection
-                </p>
+                        {customTopics.map((topic, idx) => (
+                          <div 
+                            key={`custom-${idx}`}
+                            className={`flex items-center gap-2 p-2 rounded-md cursor-pointer hover:bg-muted/50 ${
+                              selectedTopics.includes(topic.topicName) ? 'bg-primary/10' : ''
+                            }`}
+                            onClick={() => toggleTopicSelection(topic.topicName)}
+                          >
+                            <Checkbox 
+                              checked={selectedTopics.includes(topic.topicName)}
+                              onCheckedChange={() => toggleTopicSelection(topic.topicName)}
+                            />
+                            <span className="flex-1 text-sm">{topic.topicName}</span>
+                            <Badge variant="outline" className="text-xs">{topic.standard}</Badge>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    
+                    {/* Diagnostic topics */}
+                    {topics.length > 0 && (
+                      <>
+                        {customTopics.length > 0 && (
+                          <div className="px-2 py-1 text-xs text-muted-foreground font-medium border-t mt-2 pt-2 sticky top-0 bg-background">
+                            From Past Diagnostics
+                          </div>
+                        )}
+                        {topics.filter(t => !customTopics.some(ct => ct.topicName === t)).map(topic => (
+                          <div 
+                            key={topic}
+                            className={`flex items-center gap-2 p-2 rounded-md cursor-pointer hover:bg-muted/50 ${
+                              selectedTopics.includes(topic) ? 'bg-primary/10' : ''
+                            }`}
+                            onClick={() => toggleTopicSelection(topic)}
+                          >
+                            <Checkbox 
+                              checked={selectedTopics.includes(topic)}
+                              onCheckedChange={() => toggleTopicSelection(topic)}
+                            />
+                            <span className="flex-1 text-sm">{topic}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+              </ScrollArea>
+              
+              {selectedTopics.length > 0 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-emerald-600">
+                    ✓ {selectedTopics.length} topic(s) selected for worksheet
+                  </p>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 text-xs"
+                    onClick={() => setSelectedTopics([])}
+                  >
+                    Clear all
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -1029,7 +1080,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   <CardContent className="flex flex-col items-center justify-center py-8 text-center">
                     <AlertCircle className="h-10 w-10 text-muted-foreground/50 mb-3" />
                     <p className="text-sm text-muted-foreground">
-                      No diagnostic results found for this class{selectedTopic ? ` on "${selectedTopic}"` : ''}.
+                      No diagnostic results found for this class{selectedTopics.length > 0 ? ` on selected topics` : ''}.
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Create a diagnostic worksheet first, then record student results.
