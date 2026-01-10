@@ -145,6 +145,9 @@ export default function Login() {
           <p className="text-muted-foreground mt-2">
             Fast, structured diagnostics for student work
           </p>
+          <p className="text-sm text-muted-foreground/80 mt-1 italic">
+            Developed for urban minds by urban educators
+          </p>
         </div>
 
         <Card className="shadow-lg border-border/50">
