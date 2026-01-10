@@ -140,7 +140,7 @@ export default function Login() {
           <img 
             src={nycologicLogo} 
             alt="NYCologic Ai" 
-            className="h-44 w-auto mx-auto mb-2"
+            className="h-44 w-auto mx-auto mb-2 drop-shadow-[0_0_25px_rgba(220,38,38,0.4)]"
           />
           <h1 className="text-5xl md:text-6xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Darker Grotesque', sans-serif" }}>
             NYCologic <span className="text-primary">Ai</span>
