@@ -900,19 +900,44 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 )}
               </ScrollArea>
               
-              {selectedTopics.length > 0 && (
+              {/* Select All / Clear All buttons */}
+              {(topics.length > 0 || customTopics.length > 0) && (
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-emerald-600">
-                    ✓ {selectedTopics.length} topic(s) selected for worksheet
-                  </p>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 text-xs"
-                    onClick={() => setSelectedTopics([])}
-                  >
-                    Clear all
-                  </Button>
+                  {selectedTopics.length > 0 ? (
+                    <p className="text-xs text-emerald-600">
+                      ✓ {selectedTopics.length} topic(s) selected for worksheet
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      No topics selected
+                    </p>
+                  )}
+                  <div className="flex gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 text-xs"
+                      onClick={() => {
+                        const allTopics = [
+                          ...customTopics.map(ct => ct.topicName),
+                          ...topics.filter(t => !customTopics.some(ct => ct.topicName === t))
+                        ];
+                        setSelectedTopics(allTopics);
+                      }}
+                      disabled={selectedTopics.length === (customTopics.length + topics.filter(t => !customTopics.some(ct => ct.topicName === t)).length)}
+                    >
+                      Select all
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 text-xs"
+                      onClick={() => setSelectedTopics([])}
+                      disabled={selectedTopics.length === 0}
+                    >
+                      Clear all
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
