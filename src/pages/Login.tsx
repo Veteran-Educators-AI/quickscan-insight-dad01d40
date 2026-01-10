@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
-import nycologicLogo from '@/assets/nycologic-logo.png';
+import nycologicLogo from '@/assets/nycologic-ai-logo.png';
 
 const REMEMBER_ME_KEY = 'scan_genius_remember_me';
 
@@ -139,12 +139,9 @@ export default function Login() {
         <div className="text-center mb-8">
           <img 
             src={nycologicLogo} 
-            alt="NYCologic AI" 
-            className="h-20 w-auto mx-auto mb-4"
+            alt="NYCologic Ai" 
+            className="h-32 w-auto mx-auto mb-4"
           />
-          <h1 className="font-display text-3xl font-bold text-foreground">
-            NYCologic AI
-          </h1>
           <p className="text-muted-foreground mt-2">
             Fast, structured diagnostics for student work
           </p>
