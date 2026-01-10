@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { RotateCw, Crop, Check, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { RotateCw, Crop, Check, X, ZoomIn, ZoomOut, Move } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import ReactCrop, { Crop as CropType, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
@@ -19,7 +19,7 @@ function centerAspectCrop(
     makeAspectCrop(
       {
         unit: '%',
-        width: 90,
+        width: 80,
       },
       undefined,
       mediaWidth,
@@ -39,6 +39,7 @@ export function ImagePreview({ imageDataUrl, onConfirm, onRetake }: ImagePreview
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [currentImageUrl, setCurrentImageUrl] = useState(imageDataUrl);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [cropImageLoaded, setCropImageLoaded] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cropCanvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -59,6 +60,13 @@ export function ImagePreview({ imageDataUrl, onConfirm, onRetake }: ImagePreview
     img.src = imageDataUrl;
   }, [imageDataUrl]);
 
+  // Reset crop image loaded state when entering crop mode
+  useEffect(() => {
+    if (isCropping) {
+      setCropImageLoaded(false);
+    }
+  }, [isCropping]);
+
   const rotateImage = () => {
     setRotation(prev => (prev + 90) % 360);
   };
@@ -73,7 +81,10 @@ export function ImagePreview({ imageDataUrl, onConfirm, onRetake }: ImagePreview
 
   const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const { width, height } = e.currentTarget;
-    setCrop(centerAspectCrop(width, height));
+    // Set a default crop that's centered and covers 80% of the image
+    const defaultCrop = centerAspectCrop(width, height);
+    setCrop(defaultCrop);
+    setCropImageLoaded(true);
   }, []);
 
   const applyCrop = async () => {
@@ -187,7 +198,7 @@ export function ImagePreview({ imageDataUrl, onConfirm, onRetake }: ImagePreview
             <X className="h-5 w-5 mr-2" />
             Cancel
           </Button>
-          <span className="text-white font-medium">Crop Image</span>
+          <span className="text-white font-medium">Select Work Area</span>
           <Button
             variant="ghost"
             size="sm"
@@ -202,26 +213,42 @@ export function ImagePreview({ imageDataUrl, onConfirm, onRetake }: ImagePreview
 
         {/* Crop area */}
         <div className="flex-1 relative overflow-auto flex items-center justify-center bg-black p-4">
-          <ReactCrop
-            crop={crop}
-            onChange={(_, percentCrop) => setCrop(percentCrop)}
-            onComplete={(c) => setCompletedCrop(c)}
-            className="max-h-[70vh]"
-          >
-            <img
-              ref={cropImageRef}
-              src={currentImageUrl}
-              alt="Crop preview"
-              onLoad={onImageLoad}
-              className="max-w-full max-h-[70vh] object-contain"
-            />
-          </ReactCrop>
+          <div className="relative">
+            <ReactCrop
+              crop={crop}
+              onChange={(c, percentCrop) => setCrop(percentCrop)}
+              onComplete={(c) => setCompletedCrop(c)}
+              className="[&_.ReactCrop__crop-selection]:border-4 [&_.ReactCrop__crop-selection]:border-primary [&_.ReactCrop__crop-selection]:rounded-md [&_.ReactCrop__drag-handle]:bg-primary [&_.ReactCrop__drag-handle]:w-4 [&_.ReactCrop__drag-handle]:h-4 [&_.ReactCrop__drag-handle]:border-2 [&_.ReactCrop__drag-handle]:border-white [&_.ReactCrop__drag-handle]:rounded-full"
+              style={{ maxHeight: '70vh' }}
+              ruleOfThirds
+            >
+              <img
+                ref={cropImageRef}
+                src={currentImageUrl}
+                alt="Crop preview"
+                onLoad={onImageLoad}
+                className="max-w-full max-h-[70vh] object-contain"
+                style={{ display: 'block' }}
+              />
+            </ReactCrop>
+            
+            {/* Loading indicator while image loads */}
+            {!cropImageLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Instructions */}
         <div className="p-4 bg-black/80 pb-safe">
-          <p className="text-center text-white/60 text-sm">
-            Drag to select the area you want to keep
+          <div className="flex items-center justify-center gap-2 text-white/80 text-sm mb-2">
+            <Move className="h-4 w-4" />
+            <span>Drag corners or edges to adjust selection</span>
+          </div>
+          <p className="text-center text-white/60 text-xs">
+            Select the student's work area for more accurate grading
           </p>
         </div>
 
