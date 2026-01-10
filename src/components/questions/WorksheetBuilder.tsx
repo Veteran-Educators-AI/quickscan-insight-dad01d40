@@ -157,6 +157,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [clipartProgress, setClipartProgress] = useState(0);
   const [clipartStatus, setClipartStatus] = useState('');
   const [clipartGenerated, setClipartGenerated] = useState(false);
+  const [clipartSize, setClipartSize] = useState(15); // Clipart size in mm (10-40)
   
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -902,7 +903,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           }
         }
 
-        // Render clipart if present (small icon next to question number)
+        // Render clipart if present (scalable icon next to question number)
         if (question.clipartUrl) {
           try {
             const clipImg = new Image();
@@ -923,8 +924,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               ctx.drawImage(clipImg, 0, 0);
               const pngDataUrl = canvas.toDataURL('image/png');
               
-              // Add small clipart icon (15mm x 15mm) at right margin
-              pdf.addImage(pngDataUrl, 'PNG', pageWidth - margin - 15, yPosition - 20, 15, 15);
+              // Add clipart icon with user-configured size at right margin
+              const clipartSizeMm = clipartSize;
+              pdf.addImage(pngDataUrl, 'PNG', pageWidth - margin - clipartSizeMm, yPosition - (clipartSizeMm * 0.75), clipartSizeMm, clipartSizeMm);
             }
           } catch (clipError) {
             console.error('Error rendering clipart to PDF:', clipError);
@@ -1814,17 +1816,41 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               )}
 
               {!isGeometryOrTrigSubject && clipartGenerated && (
-                <div className="flex items-center justify-between p-2 bg-primary/10 rounded-lg border border-primary/20">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Palette className="h-4 w-4 text-primary" />
-                    <span className="font-medium text-primary">
-                      {compiledQuestions.filter(q => q.clipartUrl).length} clipart added
-                    </span>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-2 bg-primary/10 rounded-lg border border-primary/20">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Palette className="h-4 w-4 text-primary" />
+                      <span className="font-medium text-primary">
+                        {compiledQuestions.filter(q => q.clipartUrl).length} clipart added
+                      </span>
+                    </div>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={generateClipart}>
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Regenerate
+                    </Button>
                   </div>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={generateClipart}>
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    Regenerate
-                  </Button>
+                  {/* Clipart Size Slider */}
+                  <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm flex items-center gap-1.5">
+                        <Palette className="h-3.5 w-3.5" />
+                        Clipart Size
+                      </Label>
+                      <span className="text-xs text-muted-foreground font-medium">{clipartSize}mm</span>
+                    </div>
+                    <Slider
+                      value={[clipartSize]}
+                      onValueChange={(value) => setClipartSize(value[0])}
+                      min={10}
+                      max={40}
+                      step={5}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Small (10mm)</span>
+                      <span>Large (40mm)</span>
+                    </div>
+                  </div>
                 </div>
               )}
 
