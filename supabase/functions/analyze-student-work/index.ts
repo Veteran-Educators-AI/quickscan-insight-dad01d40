@@ -288,8 +288,9 @@ Identify the problem being solved and evaluate the student's approach.`;
 - Rubric Scores: (if rubric provided, score each criterion)
 - Misconceptions: (any errors or misunderstandings identified)
 - Total Score: (points earned / total possible)
-- Grade: (a number from 55 to 100, where 55 is the minimum grade. Meeting standards = 80. Exceeding standards = 90-100. Below standards but showing effort = 55-79)
-- Grade Justification: (2-3 sentences explaining why this grade was assigned, referencing specific aspects of the student's work)
+- Standards Met: (YES or NO - did the student meet at least one standard criterion in the rubric?)
+- Grade: (a number from 55 to 100. IMPORTANT: 55 is the absolute minimum grade, given ONLY if NO standards criteria are met. If at least one standard is partially met, grade should be 60+. Meeting standards = 80. Exceeding standards = 90-100. Partially meeting standards = 65-79.)
+- Grade Justification: (2-3 sentences explaining why this grade was assigned, referencing specific aspects of the student's work and which standards were or were not met)
 - Feedback: (constructive suggestions for improvement)`;
 
     // Build messages for Lovable AI
@@ -749,16 +750,26 @@ function parseAnalysisResult(text: string, rubricSteps?: any[]): ParsedResult {
       : 0;
   }
 
-  // Parse grade (55-100 scale)
+  // Parse grade (55-100 scale) - 55 ONLY if no standards met
   const gradeMatch = text.match(/Grade[:\s]*(\d+)/i);
+  const standardsMetMatch = text.match(/Standards Met[:\s]*(YES|NO)/i);
+  const standardsMet = standardsMetMatch ? standardsMetMatch[1].toUpperCase() === 'YES' : true;
+  
   if (gradeMatch) {
     const parsedGrade = parseInt(gradeMatch[1]);
     // Ensure grade is within 55-100 range
-    result.grade = Math.max(55, Math.min(100, parsedGrade));
+    // If standards were met (even partially), minimum should be 60
+    if (standardsMet || parsedGrade >= 60) {
+      result.grade = Math.max(55, Math.min(100, parsedGrade));
+    } else {
+      // Only allow 55 if explicitly no standards met
+      result.grade = 55;
+    }
   } else if (result.totalScore.percentage > 0) {
     // Fallback: convert percentage to 55-100 scale
-    // 0% = 55, 100% = 100 (linear mapping)
-    result.grade = Math.round(55 + (result.totalScore.percentage / 100) * 45);
+    // If they earned any points, they showed some effort, so minimum 60
+    const baseGrade = result.totalScore.percentage > 0 ? 60 : 55;
+    result.grade = Math.round(baseGrade + (result.totalScore.percentage / 100) * (100 - baseGrade));
   }
 
   // Parse grade justification

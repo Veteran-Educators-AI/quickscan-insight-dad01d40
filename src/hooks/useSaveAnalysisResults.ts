@@ -97,7 +97,18 @@ export function useSaveAnalysisResults() {
       if (scoreError) throw scoreError;
 
       // 4. Save grade history if we have grade info
-      const grade = params.result.grade ?? Math.round(55 + (params.result.totalScore.percentage / 100) * 45);
+      // Calculate grade: minimum 55, but only if no standards met
+      // If they earned any points, minimum should be 60
+      const hasAnyPoints = params.result.totalScore.earned > 0;
+      const baseGrade = hasAnyPoints ? 60 : 55;
+      const calculatedGrade = hasAnyPoints 
+        ? Math.round(baseGrade + (params.result.totalScore.percentage / 100) * (100 - baseGrade))
+        : 55;
+      const grade = params.result.grade ?? calculatedGrade;
+      
+      // Ensure grade is never below 55
+      const finalGrade = Math.max(55, Math.min(100, grade));
+      
       if (params.topicName) {
         const { error: gradeHistoryError } = await supabase
           .from('grade_history')
@@ -105,7 +116,7 @@ export function useSaveAnalysisResults() {
             student_id: params.studentId,
             topic_id: params.topicId || null,
             topic_name: params.topicName,
-            grade: grade,
+            grade: finalGrade,
             grade_justification: params.result.gradeJustification || null,
             raw_score_earned: params.result.totalScore.earned,
             raw_score_possible: params.result.totalScore.possible,
@@ -139,7 +150,7 @@ export function useSaveAnalysisResults() {
           topicName: params.topicName,
           topicId: params.topicId,
           totalScore: params.result.totalScore,
-          grade: grade,
+          grade: finalGrade,
           gradeJustification: params.result.gradeJustification,
           misconceptions: params.result.misconceptions,
           rubricScores: params.result.rubricScores,
