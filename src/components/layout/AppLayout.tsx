@@ -22,7 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useAuth } from '@/lib/auth';
 import { useStudentNames } from '@/lib/StudentNameContext';
 import { cn } from '@/lib/utils';
-import nycalysisLogo from '@/assets/nycalysis-logo.png';
+import nycologicLogo from '@/assets/nycologic-logo.png';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -64,12 +64,12 @@ export function AppLayout({ children }: AppLayoutProps) {
           {/* Logo */}
           <Link to="/dashboard" className="flex items-center gap-2">
             <img 
-              src={nycalysisLogo} 
-              alt="NYCalysis AI" 
+              src={nycologicLogo} 
+              alt="NYCologic AI" 
               className="h-9 w-auto"
             />
             <span className="hidden font-display text-lg font-semibold text-foreground sm:inline-block">
-              NYCalysis AI
+              NYCologic AI
             </span>
           </Link>
 
