@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { RotateCw, Crop, Check, X, ZoomIn, ZoomOut, Move } from 'lucide-react';
+import { RotateCw, Crop, Check, X, ZoomIn, ZoomOut, Move, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import ReactCrop, { Crop as CropType, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
@@ -30,9 +30,68 @@ function centerAspectCrop(
   );
 }
 
+// Custom hook for pinch-to-zoom gesture
+function usePinchZoom(
+  containerRef: React.RefObject<HTMLElement>,
+  onZoom: (scale: number) => void,
+  initialScale: number = 1
+) {
+  const [scale, setScale] = useState(initialScale);
+  const initialDistance = useRef<number | null>(null);
+  const initialScale$ = useRef(initialScale);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const getDistance = (touches: TouchList) => {
+      if (touches.length < 2) return 0;
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        initialDistance.current = getDistance(e.touches);
+        initialScale$.current = scale;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && initialDistance.current) {
+        e.preventDefault();
+        const currentDistance = getDistance(e.touches);
+        const scaleChange = currentDistance / initialDistance.current;
+        const newScale = Math.max(0.5, Math.min(3, initialScale$.current * scaleChange));
+        setScale(newScale);
+        onZoom(newScale);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      initialDistance.current = null;
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: false });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [containerRef, onZoom, scale]);
+
+  return { scale, setScale };
+}
+
 export function ImagePreview({ imageDataUrl, onConfirm, onRetake }: ImagePreviewProps) {
   const [rotation, setRotation] = useState(0);
   const [scale, setScale] = useState(1);
+  const [cropZoom, setCropZoom] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
   const [crop, setCrop] = useState<CropType>();
@@ -44,6 +103,38 @@ export function ImagePreview({ imageDataUrl, onConfirm, onRetake }: ImagePreview
   const cropCanvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const cropImageRef = useRef<HTMLImageElement>(null);
+  const cropContainerRef = useRef<HTMLDivElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+
+  // Pinch-to-zoom for crop mode
+  const { setScale: setCropZoomScale } = usePinchZoom(
+    cropContainerRef,
+    (newScale) => setCropZoom(newScale),
+    1
+  );
+
+  // Pinch-to-zoom for preview mode
+  usePinchZoom(
+    previewContainerRef,
+    (newScale) => setScale(newScale),
+    1
+  );
+
+  // Handle double-click to center and maximize view
+  const handleDoubleClick = useCallback(() => {
+    if (isCropping) {
+      // In crop mode, reset zoom and center crop
+      setCropZoom(1);
+      setCropZoomScale(1);
+      if (cropImageRef.current) {
+        const { width, height } = cropImageRef.current;
+        setCrop(centerAspectCrop(width, height));
+      }
+    } else {
+      // In preview mode, toggle between fit and 1:1 zoom
+      setScale(prev => prev === 1 ? 1.5 : 1);
+    }
+  }, [isCropping, setCropZoomScale]);
 
   // Load image when URL changes
   useEffect(() => {
@@ -212,13 +303,20 @@ export function ImagePreview({ imageDataUrl, onConfirm, onRetake }: ImagePreview
         </div>
 
         {/* Crop area */}
-        <div className="flex-1 relative overflow-auto flex items-center justify-center bg-black p-4">
-          <div className="relative">
+        <div 
+          ref={cropContainerRef}
+          className="flex-1 relative overflow-auto flex items-center justify-center bg-black p-4"
+          onDoubleClick={handleDoubleClick}
+        >
+          <div 
+            className="relative transition-transform duration-200"
+            style={{ transform: `scale(${cropZoom})` }}
+          >
             <ReactCrop
               crop={crop}
               onChange={(c, percentCrop) => setCrop(percentCrop)}
               onComplete={(c) => setCompletedCrop(c)}
-              className="[&_.ReactCrop__crop-selection]:border-4 [&_.ReactCrop__crop-selection]:border-primary [&_.ReactCrop__crop-selection]:rounded-md [&_.ReactCrop__drag-handle]:bg-primary [&_.ReactCrop__drag-handle]:w-4 [&_.ReactCrop__drag-handle]:h-4 [&_.ReactCrop__drag-handle]:border-2 [&_.ReactCrop__drag-handle]:border-white [&_.ReactCrop__drag-handle]:rounded-full"
+              className="[&_.ReactCrop__crop-selection]:border-4 [&_.ReactCrop__crop-selection]:border-primary [&_.ReactCrop__crop-selection]:rounded-md [&_.ReactCrop__drag-handle]:bg-primary [&_.ReactCrop__drag-handle]:w-5 [&_.ReactCrop__drag-handle]:h-5 [&_.ReactCrop__drag-handle]:border-2 [&_.ReactCrop__drag-handle]:border-white [&_.ReactCrop__drag-handle]:rounded-full [&_.ReactCrop__drag-handle]:shadow-lg"
               style={{ maxHeight: '70vh' }}
               ruleOfThirds
             >
@@ -243,12 +341,19 @@ export function ImagePreview({ imageDataUrl, onConfirm, onRetake }: ImagePreview
 
         {/* Instructions */}
         <div className="p-4 bg-black/80 pb-safe">
-          <div className="flex items-center justify-center gap-2 text-white/80 text-sm mb-2">
-            <Move className="h-4 w-4" />
-            <span>Drag corners or edges to adjust selection</span>
+          <div className="flex items-center justify-center gap-3 text-white/80 text-sm mb-2">
+            <div className="flex items-center gap-1">
+              <Move className="h-4 w-4" />
+              <span>Drag to adjust</span>
+            </div>
+            <span className="text-white/40">•</span>
+            <div className="flex items-center gap-1">
+              <Maximize2 className="h-4 w-4" />
+              <span>Double-tap to reset</span>
+            </div>
           </div>
           <p className="text-center text-white/60 text-xs">
-            Select the student's work area for more accurate grading
+            Pinch to zoom • Select the student's work area for accurate grading
           </p>
         </div>
 
@@ -289,7 +394,11 @@ export function ImagePreview({ imageDataUrl, onConfirm, onRetake }: ImagePreview
       </div>
 
       {/* Image preview area */}
-      <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-black">
+      <div 
+        ref={previewContainerRef}
+        className="flex-1 relative overflow-hidden flex items-center justify-center bg-black"
+        onDoubleClick={handleDoubleClick}
+      >
         <div
           className="transition-transform duration-200"
           style={{

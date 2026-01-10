@@ -80,7 +80,13 @@ export function AnalysisResults({
     onGradeOverride?.(newGrade, newJustification);
   };
 
-  const aiGrade = result.grade ?? Math.round(55 + (result.totalScore.percentage / 100) * 45);
+  // Calculate grade with minimum 55, but only 55 if no points earned
+  const hasAnyPoints = result.totalScore.earned > 0;
+  const baseGrade = hasAnyPoints ? 60 : 55;
+  const calculatedGrade = hasAnyPoints 
+    ? Math.round(baseGrade + (result.totalScore.percentage / 100) * (100 - baseGrade))
+    : 55;
+  const aiGrade = result.grade ?? calculatedGrade;
   const grade = overriddenGrade?.grade ?? aiGrade;
   const gradeJustification = overriddenGrade?.justification ?? result.gradeJustification;
   const isOverridden = overriddenGrade !== null;
