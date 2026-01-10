@@ -932,6 +932,45 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   <SelectItem value="10">10 questions</SelectItem>
                 </SelectContent>
               </Select>
+              
+              {/* Question Distribution Preview */}
+              {selectedTopics.length > 1 && (
+                <div className="mt-2 p-2 bg-muted/50 rounded-md border">
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Question Distribution</p>
+                  <div className="space-y-1">
+                    {(() => {
+                      const totalQuestions = parseInt(questionCount);
+                      const topicCount = selectedTopics.length;
+                      const basePerTopic = Math.floor(totalQuestions / topicCount);
+                      const remainder = totalQuestions % topicCount;
+                      
+                      return selectedTopics.map((topic, idx) => {
+                        const questionsForTopic = basePerTopic + (idx < remainder ? 1 : 0);
+                        const percentage = Math.round((questionsForTopic / totalQuestions) * 100);
+                        
+                        return (
+                          <div key={topic} className="flex items-center gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="truncate max-w-[120px]" title={topic}>
+                                  {topic.length > 18 ? `${topic.slice(0, 18)}...` : topic}
+                                </span>
+                                <span className="text-muted-foreground whitespace-nowrap ml-1">
+                                  ~{questionsForTopic} Q
+                                </span>
+                              </div>
+                              <Progress value={percentage} className="h-1 mt-0.5" />
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1.5 italic">
+                    {parseInt(questionCount)} questions ÷ {selectedTopics.length} topics
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
