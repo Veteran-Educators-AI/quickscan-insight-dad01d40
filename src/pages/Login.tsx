@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
-import scanGeniusLogo from '@/assets/scan-genius-logo.png';
+import nycalysisLogo from '@/assets/nycalysis-logo.png';
 
 const REMEMBER_ME_KEY = 'scan_genius_remember_me';
 
@@ -138,12 +138,12 @@ export default function Login() {
         {/* Logo */}
         <div className="text-center mb-8">
           <img 
-            src={scanGeniusLogo} 
-            alt="The Scan Genius" 
+            src={nycalysisLogo} 
+            alt="NYCalysis AI" 
             className="h-20 w-auto mx-auto mb-4"
           />
           <h1 className="font-display text-3xl font-bold text-foreground">
-            The Scan Genius
+            NYCalysis AI
           </h1>
           <p className="text-muted-foreground mt-2">
             Fast, structured diagnostics for student work
