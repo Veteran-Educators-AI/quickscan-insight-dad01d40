@@ -684,7 +684,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                       {rosterStudents.length > 0 && student.status !== 'saved' ? (
                         <Select
                           value={student.assignedStudentId || ''}
-                          onValueChange={(value) => assignStudent(student.id, value || null)}
+                          onValueChange={(value) => assignStudent(student.id, value === '__unassign__' ? null : (value || null))}
                           disabled={isGrading || isSaving}
                         >
                           <SelectTrigger className="h-7 text-xs">
@@ -692,7 +692,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                           </SelectTrigger>
                           <SelectContent>
                             {student.assignedStudentId && (
-                              <SelectItem value="">Unassign</SelectItem>
+                              <SelectItem value="__unassign__">Unassign</SelectItem>
                             )}
                             {assignedRosterStudent && (
                               <SelectItem value={assignedRosterStudent.id}>
