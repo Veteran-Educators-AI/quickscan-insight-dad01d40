@@ -135,13 +135,21 @@ export default function Login() {
       </div>
 
       <div className="w-full max-w-md animate-fade-in">
-        {/* Logo */}
+        {/* Logo with pulsating brain and thinking waves */}
         <div className="text-center mb-8">
-          <img 
-            src={nycologicLogo} 
-            alt="NYCologic Ai" 
-            className="h-44 w-auto mx-auto mb-2 drop-shadow-[0_0_25px_rgba(220,38,38,0.4)]"
-          />
+          <div className="relative inline-block">
+            {/* Thinking wave rings */}
+            <div className="thinking-wave" />
+            <div className="thinking-wave" />
+            <div className="thinking-wave" />
+            <div className="thinking-wave" />
+            
+            <img 
+              src={nycologicLogo} 
+              alt="NYCologic Ai" 
+              className="h-44 w-auto mx-auto mb-2 animate-brain-pulse relative z-10"
+            />
+          </div>
           <h1 className="text-5xl md:text-6xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Darker Grotesque', sans-serif" }}>
             NYCologic <span className="text-primary">Ai</span>
           </h1>
