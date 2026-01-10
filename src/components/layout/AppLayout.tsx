@@ -23,6 +23,7 @@ import { useAuth } from '@/lib/auth';
 import { useStudentNames } from '@/lib/StudentNameContext';
 import { cn } from '@/lib/utils';
 import nycologicHeadLogo from '@/assets/nycologic-head-logo.png';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -135,6 +136,9 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </p>
               </TooltipContent>
             </Tooltip>
+
+            {/* Dark Mode Toggle */}
+            <ThemeToggle />
 
             <Avatar className="h-8 w-8">
               <AvatarImage 
