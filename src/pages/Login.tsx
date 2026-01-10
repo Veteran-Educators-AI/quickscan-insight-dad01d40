@@ -167,7 +167,7 @@ export default function Login() {
             NYCologic <span className="text-primary">Ai</span>
           </h1>
           <p className="text-muted-foreground mt-2">
-            Fast, structured diagnostics for student work
+            Fast, structured diagnostics aligned to state standards
           </p>
           <p className="text-sm text-muted-foreground/80 mt-1 italic">
             Developed for urban minds by urban educators
