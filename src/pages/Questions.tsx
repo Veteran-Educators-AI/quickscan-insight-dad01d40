@@ -21,15 +21,39 @@ export default function Questions() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [worksheetQuestions, setWorksheetQuestions] = useState<WorksheetQuestion[]>([]);
   const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set());
-  const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(false);
+const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(false);
   const [diagnosticMode, setDiagnosticMode] = useState(false);
+  const [initialTopicsForGenerator, setInitialTopicsForGenerator] = useState<{ topicName: string; standard: string }[]>([]);
+
+  // Get selected topics as array for passing to generator
+  const getSelectedTopicsArray = () => {
+    const allTopics = NYS_SUBJECTS.flatMap(subject =>
+      subject.categories.flatMap(category =>
+        category.topics.map(topic => ({
+          topic,
+          subject: subject.name,
+          category: category.category,
+          id: getTopicId(topic, subject.name, category.category),
+        }))
+      )
+    );
+    
+    return Array.from(selectedTopics).map(topicId => {
+      const found = allTopics.find(t => t.id === topicId);
+      return found ? { topicName: found.topic.name, standard: found.topic.standard } : null;
+    }).filter(Boolean) as { topicName: string; standard: string }[];
+  };
 
   const openDiagnosticMode = () => {
+    const topicsArray = getSelectedTopicsArray();
+    setInitialTopicsForGenerator(topicsArray);
     setDiagnosticMode(true);
     setShowDifferentiatedGenerator(true);
   };
 
   const openRegularMode = () => {
+    const topicsArray = getSelectedTopicsArray();
+    setInitialTopicsForGenerator(topicsArray);
     setDiagnosticMode(false);
     setShowDifferentiatedGenerator(true);
   };
@@ -298,21 +322,38 @@ export default function Questions() {
               Browse NYS Regents aligned topics, create AI-generated worksheets, and download assessments
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button 
-              onClick={openDiagnosticMode}
-              variant="default"
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <ClipboardCheck className="h-4 w-4 mr-2" />
-              Quick Start Diagnostic
-            </Button>
+          <div className="flex gap-2 items-start">
+            <div className="flex flex-col gap-1">
+              <Button 
+                onClick={openDiagnosticMode}
+                variant="default"
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Quick Start Diagnostic
+                {selectedTopics.size > 0 && (
+                  <Badge variant="secondary" className="ml-2 bg-white/20 text-white">
+                    {selectedTopics.size}
+                  </Badge>
+                )}
+              </Button>
+              {selectedTopics.size > 0 && (
+                <span className="text-xs text-emerald-600 text-right">
+                  {selectedTopics.size} topic(s) will be loaded
+                </span>
+              )}
+            </div>
             <Button 
               onClick={openRegularMode}
               className="bg-purple-600 hover:bg-purple-700"
             >
               <Sparkles className="h-4 w-4 mr-2" />
               Differentiated Worksheets
+              {selectedTopics.size > 0 && (
+                <Badge variant="secondary" className="ml-2 bg-white/20 text-white">
+                  {selectedTopics.size}
+                </Badge>
+              )}
             </Button>
           </div>
         </div>
@@ -550,9 +591,13 @@ export default function Questions() {
         open={showDifferentiatedGenerator}
         onOpenChange={(open) => {
           setShowDifferentiatedGenerator(open);
-          if (!open) setDiagnosticMode(false);
+          if (!open) {
+            setDiagnosticMode(false);
+            setInitialTopicsForGenerator([]);
+          }
         }}
         diagnosticMode={diagnosticMode}
+        initialTopics={initialTopicsForGenerator}
       />
     </AppLayout>
   );

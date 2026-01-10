@@ -83,6 +83,7 @@ interface DifferentiatedWorksheetGeneratorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   diagnosticMode?: boolean;
+  initialTopics?: { topicName: string; standard: string }[];
 }
 
 const LEVELS: AdvancementLevel[] = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -125,7 +126,7 @@ interface ClassOption {
   name: string;
 }
 
-export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosticMode = false }: DifferentiatedWorksheetGeneratorProps) {
+export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosticMode = false, initialTopics = [] }: DifferentiatedWorksheetGeneratorProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -140,6 +141,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [formCount, setFormCount] = useState(diagnosticMode ? '4' : '1');
   const [includeHints, setIncludeHints] = useState(false);
   const [useAdaptiveDifficulty, setUseAdaptiveDifficulty] = useState(true);
+  
+  // Topics from standards menu selection
+  const [customTopics, setCustomTopics] = useState<{ topicName: string; standard: string }[]>([]);
 
   // Adaptive levels based on student performance data
   const { 
@@ -148,16 +152,29 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     studentLevelMap: adaptiveLevelMap,
   } = useAdaptiveLevels({ 
     classId: selectedClassId, 
-    topicName: selectedTopic 
+    topicName: selectedTopic || (customTopics.length > 0 ? customTopics[0].topicName : '')
   });
 
-  // Pre-configure for diagnostic mode when opened
+  // Pre-configure for diagnostic mode and load initial topics when opened
   useEffect(() => {
-    if (open && diagnosticMode) {
-      setFormCount('4');
-      setWarmUpDifficulty('easy');
+    if (open) {
+      if (diagnosticMode) {
+        setFormCount('4');
+        setWarmUpDifficulty('easy');
+      }
+      // Load initial topics from standards menu selection
+      if (initialTopics.length > 0) {
+        setCustomTopics(initialTopics);
+        // Auto-select first topic for the dropdown if not already set
+        if (!selectedTopic && initialTopics.length > 0) {
+          setSelectedTopic(initialTopics[0].topicName);
+        }
+      }
+    } else {
+      // Reset custom topics when closing
+      setCustomTopics([]);
     }
-  }, [open, diagnosticMode]);
+  }, [open, diagnosticMode, initialTopics]);
   
   // Presets
   const [presets, setPresets] = useState<WorksheetPreset[]>([]);
@@ -195,10 +212,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   }, [selectedClassId]);
 
   useEffect(() => {
-    if (selectedTopic && selectedClassId) {
+    if ((selectedTopic || customTopics.length > 0) && selectedClassId) {
       fetchStudentsWithDiagnostics();
     }
-  }, [selectedTopic, adaptiveLevelMap, useAdaptiveDifficulty]);
+  }, [selectedTopic, customTopics, adaptiveLevelMap, useAdaptiveDifficulty]);
 
   const fetchClasses = async () => {
     try {
@@ -262,6 +279,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
       if (diagnosticsError) throw diagnosticsError;
 
+      // Check if we have custom topics from standards menu (new diagnostic mode)
+      const isNewDiagnosticFromStandards = customTopics.length > 0;
+
       // Merge students with their most recent diagnostic result and adaptive levels
       const studentsWithDiagnostics: StudentWithDiagnostic[] = (studentsData || []).map(student => {
         const studentDiagnostics = (diagnosticsData || [])
@@ -280,11 +300,17 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           ? adaptiveLevel 
           : (latestDiagnostic?.recommended_level as AdvancementLevel) || 'C';
         
+        // For new diagnostics from standards, pre-select all students
+        // For follow-up worksheets, only select students with existing data
+        const shouldBeSelected = isNewDiagnosticFromStandards 
+          ? true  // Select all students for new diagnostic
+          : (!!latestDiagnostic || hasPerformanceData);  // Only select if has data
+        
         return {
           ...student,
           diagnosticResult: latestDiagnostic,
           recommendedLevel,
-          selected: !!latestDiagnostic || hasPerformanceData,
+          selected: shouldBeSelected,
           hasAdaptiveData: hasPerformanceData,
         };
       });
@@ -781,17 +807,63 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             </div>
 
             <div className="space-y-2">
-              <Label>Topic (from diagnostics)</Label>
-              <Select value={selectedTopic} onValueChange={setSelectedTopic} disabled={topics.length === 0}>
+              <Label>
+                Topic
+                {customTopics.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 text-xs">From Standards</Badge>
+                )}
+              </Label>
+              <Select 
+                value={selectedTopic} 
+                onValueChange={setSelectedTopic} 
+                disabled={topics.length === 0 && customTopics.length === 0}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder={topics.length === 0 ? "No diagnostics found" : "Choose topic..."} />
+                  <SelectValue placeholder={
+                    customTopics.length > 0 
+                      ? "Choose from selected standards..." 
+                      : topics.length === 0 
+                        ? "No diagnostics found" 
+                        : "Choose topic..."
+                  } />
                 </SelectTrigger>
                 <SelectContent>
-                  {topics.map(topic => (
-                    <SelectItem key={topic} value={topic}>{topic}</SelectItem>
-                  ))}
+                  {/* Show custom topics from standards menu first */}
+                  {customTopics.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-xs text-muted-foreground font-medium">
+                        From Standards Menu
+                      </div>
+                      {customTopics.map((topic, idx) => (
+                        <SelectItem key={`custom-${idx}`} value={topic.topicName}>
+                          <span className="flex items-center gap-2">
+                            {topic.topicName}
+                            <Badge variant="outline" className="text-xs">{topic.standard}</Badge>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {/* Show existing diagnostic topics */}
+                  {topics.length > 0 && (
+                    <>
+                      {customTopics.length > 0 && (
+                        <div className="px-2 py-1 text-xs text-muted-foreground font-medium border-t mt-1 pt-2">
+                          From Past Diagnostics
+                        </div>
+                      )}
+                      {topics.filter(t => !customTopics.some(ct => ct.topicName === t)).map(topic => (
+                        <SelectItem key={topic} value={topic}>{topic}</SelectItem>
+                      ))}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
+              {customTopics.length > 0 && (
+                <p className="text-xs text-emerald-600">
+                  ✓ {customTopics.length} topic(s) loaded from your standards selection
+                </p>
+              )}
             </div>
           </div>
 
