@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { toast } from 'sonner';
-import scanGeniusLogo from '@/assets/scan-genius-logo.png';
+import nycalysisLogo from '@/assets/nycalysis-logo.png';
 import { generateRecoveryCodes, hashRecoveryCode, formatRecoveryCodesForPrint } from '@/lib/recoveryCodeUtils';
 
 export default function MfaEnroll() {
@@ -167,8 +167,8 @@ export default function MfaEnroll() {
         {/* Logo */}
         <div className="text-center mb-8">
           <img 
-            src={scanGeniusLogo} 
-            alt="The Scan Genius" 
+            src={nycalysisLogo} 
+            alt="NYCalysis AI" 
             className="h-16 w-auto mx-auto mb-4"
           />
         </div>

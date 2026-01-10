@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
-import scanGeniusLogo from '@/assets/scan-genius-logo.png';
+import nycalysisLogo from '@/assets/nycalysis-logo.png';
 
 export default function ResetPassword() {
   const [isLoading, setIsLoading] = useState(false);
@@ -90,8 +90,8 @@ export default function ResetPassword() {
         <div className="w-full max-w-md animate-fade-in text-center">
           <div className="mb-8">
             <img 
-              src={scanGeniusLogo} 
-              alt="The Scan Genius" 
+              src={nycalysisLogo} 
+              alt="NYCalysis AI" 
               className="h-16 w-auto mx-auto mb-4"
             />
           </div>
@@ -131,8 +131,8 @@ export default function ResetPassword() {
       <div className="w-full max-w-md animate-fade-in">
         <div className="text-center mb-8">
           <img 
-            src={scanGeniusLogo} 
-            alt="The Scan Genius" 
+            src={nycalysisLogo} 
+            alt="NYCalysis AI" 
             className="h-16 w-auto mx-auto mb-4"
           />
           <h1 className="font-display text-2xl font-bold text-foreground">
