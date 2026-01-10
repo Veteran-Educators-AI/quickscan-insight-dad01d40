@@ -144,6 +144,16 @@ export default function Login() {
             <div className="thinking-wave" />
             <div className="thinking-wave" />
             
+            {/* Floating particles */}
+            <div className="brain-particle" />
+            <div className="brain-particle" />
+            <div className="brain-particle" />
+            <div className="brain-particle" />
+            <div className="brain-particle" />
+            <div className="brain-particle" />
+            <div className="brain-particle" />
+            <div className="brain-particle" />
+            
             <img 
               src={nycologicLogo} 
               alt="NYCologic Ai" 

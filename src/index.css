@@ -334,3 +334,114 @@
 .thinking-wave:nth-child(4) {
   animation-delay: 1.5s;
 }
+
+/* Brain particles animation */
+@keyframes float-particle {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.6;
+  }
+  25% {
+    transform: translate(var(--tx1), var(--ty1)) scale(1.2);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(var(--tx2), var(--ty2)) scale(0.8);
+    opacity: 0.4;
+  }
+  75% {
+    transform: translate(var(--tx3), var(--ty3)) scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.brain-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: hsl(var(--primary) / 0.7);
+  box-shadow: 0 0 8px hsl(var(--primary) / 0.5);
+  animation: float-particle 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.brain-particle:nth-child(1) {
+  top: 10%;
+  left: 5%;
+  --tx1: 15px; --ty1: -10px;
+  --tx2: 5px; --ty2: 15px;
+  --tx3: -10px; --ty3: 5px;
+  animation-delay: 0s;
+}
+
+.brain-particle:nth-child(2) {
+  top: 15%;
+  right: 10%;
+  --tx1: -10px; --ty1: 12px;
+  --tx2: 8px; --ty2: -8px;
+  --tx3: -5px; --ty3: -12px;
+  animation-delay: 0.5s;
+}
+
+.brain-particle:nth-child(3) {
+  bottom: 25%;
+  left: 8%;
+  --tx1: 12px; --ty1: 8px;
+  --tx2: -8px; --ty2: -10px;
+  --tx3: 6px; --ty3: 12px;
+  animation-delay: 1s;
+}
+
+.brain-particle:nth-child(4) {
+  bottom: 20%;
+  right: 5%;
+  --tx1: -8px; --ty1: -12px;
+  --tx2: 10px; --ty2: 8px;
+  --tx3: -12px; --ty3: 5px;
+  animation-delay: 1.5s;
+}
+
+.brain-particle:nth-child(5) {
+  top: 40%;
+  left: 0%;
+  --tx1: 10px; --ty1: -8px;
+  --tx2: -5px; --ty2: 12px;
+  --tx3: 8px; --ty3: -5px;
+  animation-delay: 2s;
+  width: 4px;
+  height: 4px;
+}
+
+.brain-particle:nth-child(6) {
+  top: 35%;
+  right: 0%;
+  --tx1: -12px; --ty1: 10px;
+  --tx2: 6px; --ty2: -6px;
+  --tx3: -8px; --ty3: -10px;
+  animation-delay: 2.5s;
+  width: 4px;
+  height: 4px;
+}
+
+.brain-particle:nth-child(7) {
+  top: 5%;
+  left: 40%;
+  --tx1: 8px; --ty1: 10px;
+  --tx2: -10px; --ty2: -5px;
+  --tx3: 5px; --ty3: 8px;
+  animation-delay: 3s;
+  width: 5px;
+  height: 5px;
+}
+
+.brain-particle:nth-child(8) {
+  bottom: 10%;
+  left: 45%;
+  --tx1: -6px; --ty1: -10px;
+  --tx2: 12px; --ty2: 5px;
+  --tx3: -8px; --ty3: 8px;
+  animation-delay: 3.5s;
+  width: 5px;
+  height: 5px;
+}
