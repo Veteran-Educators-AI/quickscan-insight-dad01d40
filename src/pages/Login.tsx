@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
-import nycologicLogo from '@/assets/nycologic-head-logo.png';
+import nycologicLogo from '@/assets/nycologic-brain-logo.png';
 
 const REMEMBER_ME_KEY = 'scan_genius_remember_me';
 
