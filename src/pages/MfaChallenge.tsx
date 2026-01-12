@@ -121,7 +121,7 @@ export default function MfaChallenge() {
         <div className="text-center mb-8">
           <img 
             src={nycologicLogo} 
-            alt="NYCologic Scholar" 
+            alt="NYClogic Ai" 
             className="h-16 w-auto mx-auto mb-4"
           />
         </div>

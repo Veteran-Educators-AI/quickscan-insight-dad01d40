@@ -3,7 +3,7 @@
  * PUSH TO SISTER APP EDGE FUNCTION
  * ============================================================================
  * 
- * This function sends student grade data to the connected sister app (NYCologic Scholar).
+ * This function sends student grade data to the connected sister app (NYClogic Ai).
  * 
  * REQUIRED SECRETS:
  * - SISTER_APP_API_KEY: The API key for authenticating with the sister app
