@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { NYS_SUBJECTS, searchTopics, type JMAPTopic, type TopicCategory } from '@/data/nysTopics';
 import { WorksheetBuilder, type WorksheetQuestion } from '@/components/questions/WorksheetBuilder';
 import { DifferentiatedWorksheetGenerator } from '@/components/questions/DifferentiatedWorksheetGenerator';
@@ -345,38 +346,62 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
             </p>
           </div>
           <div className="flex gap-2 items-start">
-            <div className="flex flex-col gap-1">
-              <Button 
-                onClick={openDiagnosticMode}
-                variant="default"
-                className="bg-emerald-600 hover:bg-emerald-700"
-              >
-                <ClipboardCheck className="h-4 w-4 mr-2" />
-                Quick Start Diagnostic
+            <TooltipProvider>
+              <div className="flex flex-col gap-1">
+                <Button 
+                  onClick={openDiagnosticMode}
+                  variant="default"
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  Quick Start Diagnostic
+                  {(selectedTopics.size > 0 || worksheetQuestions.length > 0) && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="secondary" className="ml-2 bg-white/20 text-white cursor-help">
+                          {getAllTopicsArray().length}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          {selectedTopics.size > 0 && `${selectedTopics.size} selected`}
+                          {selectedTopics.size > 0 && worksheetQuestions.length > 0 && ' + '}
+                          {worksheetQuestions.length > 0 && `${worksheetQuestions.length} in worksheet`}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </Button>
                 {(selectedTopics.size > 0 || worksheetQuestions.length > 0) && (
-                  <Badge variant="secondary" className="ml-2 bg-white/20 text-white">
-                    {getAllTopicsArray().length}
-                  </Badge>
+                  <span className="text-xs text-emerald-600 text-right">
+                    {getAllTopicsArray().length} topic(s) will be loaded
+                  </span>
+                )}
+              </div>
+              <Button 
+                onClick={openRegularMode}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Differentiated Worksheets
+                {(selectedTopics.size > 0 || worksheetQuestions.length > 0) && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="secondary" className="ml-2 bg-white/20 text-white cursor-help">
+                        {getAllTopicsArray().length}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">
+                        {selectedTopics.size > 0 && `${selectedTopics.size} selected`}
+                        {selectedTopics.size > 0 && worksheetQuestions.length > 0 && ' + '}
+                        {worksheetQuestions.length > 0 && `${worksheetQuestions.length} in worksheet`}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
                 )}
               </Button>
-              {(selectedTopics.size > 0 || worksheetQuestions.length > 0) && (
-                <span className="text-xs text-emerald-600 text-right">
-                  {getAllTopicsArray().length} topic(s) will be loaded
-                </span>
-              )}
-            </div>
-            <Button 
-              onClick={openRegularMode}
-              className="bg-purple-600 hover:bg-purple-700"
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              Differentiated Worksheets
-              {(selectedTopics.size > 0 || worksheetQuestions.length > 0) && (
-                <Badge variant="secondary" className="ml-2 bg-white/20 text-white">
-                  {getAllTopicsArray().length}
-                </Badge>
-              )}
-            </Button>
+            </TooltipProvider>
           </div>
         </div>
 
