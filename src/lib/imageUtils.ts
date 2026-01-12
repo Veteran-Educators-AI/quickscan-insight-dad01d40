@@ -397,6 +397,89 @@ export async function autoCropImage(imageDataUrl: string): Promise<string> {
 }
 
 /**
+ * Applies a photocopy-style filter to remove shadows and increase contrast.
+ * Makes the image look like a clean scanned document.
+ */
+export async function applyPhotocopyFilter(imageDataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(imageDataUrl);
+        return;
+      }
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      // Calculate local adaptive thresholding parameters
+      // First pass: convert to grayscale and calculate statistics
+      const gray: number[] = [];
+      let totalGray = 0;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        gray.push(g);
+        totalGray += g;
+      }
+      
+      const avgGray = totalGray / gray.length;
+      
+      // Calculate standard deviation
+      let variance = 0;
+      for (let i = 0; i < gray.length; i++) {
+        variance += Math.pow(gray[i] - avgGray, 2);
+      }
+      const stdDev = Math.sqrt(variance / gray.length);
+
+      // Determine thresholds based on image characteristics
+      // Higher threshold for darker images, lower for lighter
+      const lowThreshold = Math.max(0, avgGray - stdDev * 1.2);
+      const highThreshold = Math.min(255, avgGray + stdDev * 0.8);
+
+      // Second pass: apply contrast enhancement and shadow removal
+      for (let i = 0; i < data.length; i += 4) {
+        const grayValue = gray[i / 4];
+        
+        // Apply sigmoid-like curve for contrast enhancement
+        let enhanced: number;
+        
+        if (grayValue < lowThreshold) {
+          // Dark areas (likely text/content) - make darker
+          enhanced = Math.pow(grayValue / lowThreshold, 1.5) * 60;
+        } else if (grayValue > highThreshold) {
+          // Light areas (background/shadows) - push to white
+          enhanced = 230 + ((grayValue - highThreshold) / (255 - highThreshold)) * 25;
+        } else {
+          // Mid-tones - stretch contrast
+          const normalized = (grayValue - lowThreshold) / (highThreshold - lowThreshold);
+          enhanced = 60 + normalized * 170;
+        }
+        
+        enhanced = Math.max(0, Math.min(255, enhanced));
+        
+        // Apply slight warming for paper-like look
+        data[i] = Math.min(255, enhanced + 3);     // R - slightly warmer
+        data[i + 1] = Math.min(255, enhanced + 1); // G
+        data[i + 2] = enhanced;                     // B
+        data[i + 3] = 255;                          // A
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL('image/jpeg', 0.92));
+    };
+    img.onerror = () => resolve(imageDataUrl);
+    img.src = imageDataUrl;
+  });
+}
+
+/**
  * Enhances image for OCR by applying auto-cropping and perspective correction.
  * Returns enhanced image data URL and enhancement info.
  */

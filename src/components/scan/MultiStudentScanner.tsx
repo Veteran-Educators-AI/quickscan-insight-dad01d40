@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera, Plus, X, Layers, ImageIcon, RefreshCw, AlertTriangle, Crop, RotateCcw, ZoomIn, ZoomOut, Maximize2, Move, Check } from 'lucide-react';
-import { resizeImage, blobToBase64, enhanceImageForOCR, detectDocumentCorners } from '@/lib/imageUtils';
+import { resizeImage, blobToBase64, enhanceImageForOCR, detectDocumentCorners, applyPhotocopyFilter } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -268,17 +268,20 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
         return;
       }
       
+      // Apply photocopy filter first to remove shadows
+      const photocopiedImage = await applyPhotocopyFilter(imageDataUrl);
+      
       // Run blur detection and edge detection in parallel
       const [qualityResult, detectedEdges] = await Promise.all([
-        detectImageBlur(imageDataUrl),
-        detectDocumentCorners(imageDataUrl)
+        detectImageBlur(photocopiedImage),
+        detectDocumentCorners(photocopiedImage)
       ]);
       
       if (rescanImageId) {
         // Re-scanning a specific image - replace it
         setBatchImages(prev => prev.map(img => 
           img.id === rescanImageId 
-            ? { ...img, dataUrl: imageDataUrl, timestamp: new Date(), ...qualityResult, detectedEdges }
+            ? { ...img, dataUrl: photocopiedImage, timestamp: new Date(), ...qualityResult, detectedEdges }
             : img
         ));
         setShowCamera(false);
@@ -287,13 +290,13 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
         if (qualityResult.quality === 'poor') {
           toast.warning('Image replaced, but quality is still low. Consider re-scanning.');
         } else {
-          toast.success('Image replaced successfully!');
+          toast.success('Image replaced with shadow removal applied!');
         }
       } else {
         // In batch mode, add to batch collection
         const newBatchImage: BatchImage = {
           id: `batch-${Date.now()}`,
-          dataUrl: imageDataUrl,
+          dataUrl: photocopiedImage,
           timestamp: new Date(),
           ...qualityResult,
           detectedEdges,
@@ -304,14 +307,16 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
         if (qualityResult.quality === 'poor') {
           toast.warning(`Photo ${batchImages.length + 1} captured but appears blurry. Consider re-scanning.`);
         } else {
-          toast.success(`Photo ${batchImages.length + 1} captured! ${detectedEdges ? 'Paper edges detected.' : ''}`);
+          toast.success(`Photo ${batchImages.length + 1} captured with shadow removal! ${detectedEdges ? 'Paper edges detected.' : ''}`);
         }
       }
     } else {
-      setOriginalImage(imageDataUrl);
+      // Apply photocopy filter for single image mode too
+      const photocopiedImage = await applyPhotocopyFilter(imageDataUrl);
+      setOriginalImage(photocopiedImage);
       setExtractedStudents([]);
       setShowCamera(false);
-      toast.success('Photo captured! Now extract student regions.');
+      toast.success('Photo captured with shadow removal! Now extract student regions.');
     }
   };
 
@@ -347,16 +352,18 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
         try {
           const resizedBlob = await resizeImage(file);
           const dataUrl = await blobToBase64(resizedBlob);
+          // Apply photocopy filter to remove shadows
+          const photocopiedDataUrl = await applyPhotocopyFilter(dataUrl);
           const [qualityResult, detectedEdges] = await Promise.all([
-            detectImageBlur(dataUrl),
-            detectDocumentCorners(dataUrl)
+            detectImageBlur(photocopiedDataUrl),
+            detectDocumentCorners(photocopiedDataUrl)
           ]);
           
           if (qualityResult.quality === 'poor') poorQualityCount++;
           
           const newBatchImage: BatchImage = {
             id: `batch-${Date.now()}-${i}`,
-            dataUrl,
+            dataUrl: photocopiedDataUrl,
             timestamp: new Date(),
             ...qualityResult,
             detectedEdges,
@@ -367,16 +374,18 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
           const reader = new FileReader();
           reader.onload = async (ev) => {
             const dataUrl = ev.target?.result as string;
+            // Apply photocopy filter to remove shadows
+            const photocopiedDataUrl = await applyPhotocopyFilter(dataUrl);
             const [qualityResult, detectedEdges] = await Promise.all([
-              detectImageBlur(dataUrl),
-              detectDocumentCorners(dataUrl)
+              detectImageBlur(photocopiedDataUrl),
+              detectDocumentCorners(photocopiedDataUrl)
             ]);
             
             if (qualityResult.quality === 'poor') poorQualityCount++;
             
             const newBatchImage: BatchImage = {
               id: `batch-${Date.now()}-${i}`,
-              dataUrl,
+              dataUrl: photocopiedDataUrl,
               timestamp: new Date(),
               ...qualityResult,
               detectedEdges,
@@ -388,9 +397,9 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
       }
       
       if (poorQualityCount > 0) {
-        toast.warning(`Added ${filesToProcess} image(s). ${poorQualityCount} appear blurry - consider re-scanning.`);
+        toast.warning(`Added ${filesToProcess} image(s) with shadow removal. ${poorQualityCount} appear blurry - consider re-scanning.`);
       } else {
-        toast.success(`Added ${filesToProcess} image(s) to batch!`);
+        toast.success(`Added ${filesToProcess} image(s) with shadow removal!`);
       }
     }
     e.target.value = '';
@@ -1218,12 +1227,14 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                               onDragLeave={handleDragLeave}
                               onDrop={(e) => handleDrop(e, img.id)}
                               onDragEnd={handleDragEnd}
+                              onDoubleClick={() => openZoomDialog(img.id)}
                               className={cn(
                                 "relative flex-shrink-0 group cursor-grab active:cursor-grabbing transition-all duration-200",
                                 img.quality === 'poor' && "ring-2 ring-destructive ring-offset-2",
                                 draggedImageId === img.id && "opacity-50 scale-95",
                                 dragOverImageId === img.id && "ring-2 ring-primary ring-offset-2 scale-105"
                               )}
+                              title="Double-click to zoom and adjust corners"
                             >
                               <div className="relative h-24 w-24">
                                 <img 
