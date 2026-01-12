@@ -162,6 +162,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [clipartGenerated, setClipartGenerated] = useState(false);
   const [clipartSize, setClipartSize] = useState(15); // Clipart size in mm (10-40)
   
+  // Lightbox state for full-screen image viewing
+  const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
+  const [lightboxQuestionNumber, setLightboxQuestionNumber] = useState<number | null>(null);
+  
   const printRef = useRef<HTMLDivElement>(null);
 
   // Determine if selected topics are geometry/trigonometry related (for shape generation vs clipart)
@@ -1898,11 +1902,15 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                             </HoverCardTrigger>
                             <HoverCardContent side="right" className="w-auto p-2">
                               <div className="flex flex-col items-center gap-2">
-                                <p className="text-xs font-medium text-muted-foreground">Preview</p>
+                                <p className="text-xs font-medium text-muted-foreground">Click to enlarge</p>
                                 <img 
                                   src={question.imageUrl} 
                                   alt={`Preview for question ${question.questionNumber}`}
-                                  className="border rounded max-w-[200px] max-h-[200px] object-contain"
+                                  className="border rounded max-w-[200px] max-h-[200px] object-contain cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => {
+                                    setLightboxImageUrl(question.imageUrl!);
+                                    setLightboxQuestionNumber(question.questionNumber);
+                                  }}
                                 />
                               </div>
                             </HoverCardContent>
@@ -2528,6 +2536,44 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           </Card>
         </div>
       )}
+
+      {/* Lightbox Dialog for Full-Screen Image Viewing */}
+      <Dialog open={!!lightboxImageUrl} onOpenChange={(open) => {
+        if (!open) {
+          setLightboxImageUrl(null);
+          setLightboxQuestionNumber(null);
+        }
+      }}>
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[95vh] p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <ImageIcon className="h-5 w-5" />
+              Question {lightboxQuestionNumber} - Diagram
+            </DialogTitle>
+            <DialogDescription>
+              Full-size diagram preview
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto p-4 pt-0 flex items-center justify-center bg-muted/30">
+            {lightboxImageUrl && (
+              <img 
+                src={lightboxImageUrl} 
+                alt={`Full-size diagram for question ${lightboxQuestionNumber}`}
+                className="max-w-full max-h-[70vh] object-contain rounded-lg border shadow-md"
+              />
+            )}
+          </div>
+          <DialogFooter className="p-4 pt-2">
+            <Button variant="outline" onClick={() => {
+              setLightboxImageUrl(null);
+              setLightboxQuestionNumber(null);
+            }}>
+              <X className="h-4 w-4 mr-2" />
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
