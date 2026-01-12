@@ -11,7 +11,75 @@ interface QuestionWithPrompt {
   imagePrompt: string;
 }
 
-async function generateImageWithLovableAI(prompt: string): Promise<string | null> {
+// Generate image using Nano Banana (google/gemini-2.5-flash-image-preview)
+async function generateImageWithNanoBanana(prompt: string): Promise<string | null> {
+  const apiKey = Deno.env.get('LOVABLE_API_KEY');
+  if (!apiKey) {
+    console.error('LOVABLE_API_KEY not configured');
+    return null;
+  }
+
+  try {
+    const enhancedPrompt = `Create a clean, educational diagram for a math worksheet. The image should be suitable for printing on paper.
+
+${prompt}
+
+Requirements:
+- Clear geometric shapes with clean lines
+- Labels and measurements should be clearly visible
+- Black and white or minimal color scheme for printing
+- Educational and professional style
+- High contrast for readability`;
+
+    console.log('Generating image with Nano Banana...');
+    
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [
+          {
+            role: 'user',
+            content: enhancedPrompt
+          }
+        ],
+        modalities: ['image', 'text']
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Nano Banana API error:', response.status, errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('Nano Banana response received');
+    
+    // Extract image from the response
+    const images = data.choices?.[0]?.message?.images;
+    if (images && images.length > 0) {
+      const imageUrl = images[0]?.image_url?.url;
+      if (imageUrl) {
+        console.log('Successfully generated image with Nano Banana');
+        return imageUrl;
+      }
+    }
+
+    console.log('No image in Nano Banana response');
+    return null;
+  } catch (error) {
+    console.error('Error generating with Nano Banana:', error);
+    return null;
+  }
+}
+
+// Generate SVG diagram using standard AI model
+async function generateSVGWithAI(prompt: string): Promise<string | null> {
   const apiKey = Deno.env.get('LOVABLE_API_KEY');
   if (!apiKey) {
     console.error('LOVABLE_API_KEY not configured');
@@ -77,7 +145,7 @@ Requirements:
 
     return null;
   } catch (error) {
-    console.error('Error generating with Lovable AI:', error);
+    console.error('Error generating SVG with AI:', error);
     return null;
   }
 }
@@ -88,8 +156,9 @@ serve(async (req) => {
   }
 
   try {
-    const { questions } = await req.json() as {
+    const { questions, useNanoBanana } = await req.json() as {
       questions: QuestionWithPrompt[];
+      useNanoBanana?: boolean;
     };
 
     if (!questions || questions.length === 0) {
@@ -99,13 +168,23 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Starting image generation for ${questions.length} questions...`);
+    console.log(`Starting image generation for ${questions.length} questions (Nano Banana: ${useNanoBanana})...`);
 
     const results: { questionNumber: number; imageUrl: string | null }[] = [];
 
     for (const q of questions) {
       console.log(`Generating image for question ${q.questionNumber}...`);
-      const imageUrl = await generateImageWithLovableAI(q.imagePrompt);
+      
+      let imageUrl: string | null = null;
+      
+      if (useNanoBanana) {
+        // Use Nano Banana for realistic image generation
+        imageUrl = await generateImageWithNanoBanana(q.imagePrompt);
+      } else {
+        // Use standard SVG generation
+        imageUrl = await generateSVGWithAI(q.imagePrompt);
+      }
+      
       results.push({
         questionNumber: q.questionNumber,
         imageUrl
