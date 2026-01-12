@@ -158,6 +158,8 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
   const [rescanImageId, setRescanImageId] = useState<string | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [draggedImageId, setDraggedImageId] = useState<string | null>(null);
+  const [dragOverImageId, setDragOverImageId] = useState<string | null>(null);
   
   // Class and roster state
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -339,6 +341,55 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
 
   const removeBatchImage = (id: string) => {
     setBatchImages(prev => prev.filter(img => img.id !== id));
+  };
+
+  // Drag and drop handlers for reordering
+  const handleDragStart = (e: React.DragEvent, imageId: string) => {
+    setDraggedImageId(imageId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', imageId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, imageId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedImageId && imageId !== draggedImageId) {
+      setDragOverImageId(imageId);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverImageId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetImageId: string) => {
+    e.preventDefault();
+    if (!draggedImageId || draggedImageId === targetImageId) {
+      setDraggedImageId(null);
+      setDragOverImageId(null);
+      return;
+    }
+
+    setBatchImages(prev => {
+      const newImages = [...prev];
+      const draggedIndex = newImages.findIndex(img => img.id === draggedImageId);
+      const targetIndex = newImages.findIndex(img => img.id === targetImageId);
+      
+      if (draggedIndex === -1 || targetIndex === -1) return prev;
+      
+      const [draggedItem] = newImages.splice(draggedIndex, 1);
+      newImages.splice(targetIndex, 0, draggedItem);
+      
+      return newImages;
+    });
+
+    setDraggedImageId(null);
+    setDragOverImageId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedImageId(null);
+    setDragOverImageId(null);
   };
 
   const enhanceAllBatchImages = async () => {
@@ -948,16 +999,24 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                           {batchImages.map((img, index) => (
                             <div 
                               key={img.id} 
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, img.id)}
+                              onDragOver={(e) => handleDragOver(e, img.id)}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, img.id)}
+                              onDragEnd={handleDragEnd}
                               className={cn(
-                                "relative flex-shrink-0 group",
-                                img.quality === 'poor' && "ring-2 ring-destructive ring-offset-2"
+                                "relative flex-shrink-0 group cursor-grab active:cursor-grabbing transition-all duration-200",
+                                img.quality === 'poor' && "ring-2 ring-destructive ring-offset-2",
+                                draggedImageId === img.id && "opacity-50 scale-95",
+                                dragOverImageId === img.id && "ring-2 ring-primary ring-offset-2 scale-105"
                               )}
                             >
                               <img 
                                 src={img.dataUrl} 
                                 alt={`Batch image ${index + 1}`}
                                 className={cn(
-                                  "h-24 w-24 object-cover rounded-lg border",
+                                  "h-24 w-24 object-cover rounded-lg border pointer-events-none",
                                   img.quality === 'poor' && "opacity-80"
                                 )}
                               />
