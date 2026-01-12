@@ -66,11 +66,11 @@ export function AppLayout({ children }: AppLayoutProps) {
           <Link to="/dashboard" className="flex items-center gap-2">
             <img 
               src={nycologicHeadLogo} 
-              alt="NYCologic AI" 
+              alt="NYCologic Scholar" 
               className="h-9 w-auto drop-shadow-[0_0_8px_rgba(220,38,38,0.3)] transition-transform duration-200 hover:scale-110"
             />
             <span className="hidden font-display text-lg font-semibold text-foreground sm:inline-block">
-              NYCologic AI
+              NYCologic Scholar
             </span>
           </Link>
 

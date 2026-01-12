@@ -157,14 +157,14 @@ export default function Login() {
               <div className="thinking-wave" />
               
               <img 
-                src={nycologicLogo} 
-                alt="NYCologic Ai" 
+              src={nycologicLogo} 
+                alt="NYCologic Scholar" 
                 className="h-44 w-auto mx-auto mb-2 animate-brain-pulse relative z-10"
               />
             </div>
           </div>
           <h1 className="text-5xl md:text-6xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Darker Grotesque', sans-serif" }}>
-            NYCologic <span className="text-primary">Ai</span>
+            NYCologic <span className="text-primary">Scholar</span>
           </h1>
           <p className="text-muted-foreground mt-2">
             Fast, structured diagnostics aligned to state standards
