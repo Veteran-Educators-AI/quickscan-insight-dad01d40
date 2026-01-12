@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 
 interface RemediationQuestion {
   questionNumber: number;
@@ -21,6 +22,8 @@ interface RemediationActionsProps {
   problemContext?: string;
   studentName?: string;
   studentId?: string;
+  classId?: string;
+  topicName?: string;
   onPushToStudentApp?: (questions: RemediationQuestion[]) => void;
   onGenerateWorksheet?: (questions: RemediationQuestion[]) => void;
 }
@@ -30,13 +33,18 @@ export function RemediationActions({
   problemContext,
   studentName,
   studentId,
+  classId,
+  topicName,
   onPushToStudentApp,
   onGenerateWorksheet,
 }: RemediationActionsProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<RemediationQuestion[] | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set());
+  
+  const { pushToSisterApp } = usePushToSisterApp();
 
   const handleGenerateQuestions = async () => {
     if (misconceptions.length === 0) {
@@ -57,7 +65,6 @@ export function RemediationActions({
       });
 
       if (error) {
-        // Handle rate limit errors
         if (error.message?.includes('429') || error.message?.includes('Rate limit')) {
           toast.error('Rate limit exceeded. Please try again in a moment.');
           return;
@@ -84,11 +91,60 @@ export function RemediationActions({
     }
   };
 
-  const handlePushToApp = () => {
-    if (generatedQuestions) {
-      onPushToStudentApp?.(generatedQuestions);
-      toast.success('Questions sent to student app!');
-      setShowPreview(false);
+  const handlePushToApp = async () => {
+    if (!generatedQuestions || generatedQuestions.length === 0) {
+      toast.error('No questions to push');
+      return;
+    }
+
+    if (!classId) {
+      toast.error('Class ID is required to push to student app');
+      return;
+    }
+
+    setIsPushing(true);
+
+    try {
+      // Format questions for the sister app
+      const questionsFormatted = generatedQuestions.map(q => ({
+        number: q.questionNumber,
+        text: q.question,
+        difficulty: q.difficulty,
+        hint: q.hint,
+        targetMisconception: q.targetMisconception,
+      }));
+
+      const result = await pushToSisterApp({
+        class_id: classId,
+        title: `Remediation Practice: ${topicName || 'Math Skills'}`,
+        description: `Targeted practice for ${misconceptions.length} identified misconception${misconceptions.length > 1 ? 's' : ''}: ${misconceptions.slice(0, 2).join(', ')}${misconceptions.length > 2 ? '...' : ''}`,
+        student_id: studentId,
+        student_name: studentName,
+        topic_name: topicName || 'Remediation Practice',
+        // Include questions as JSON in a custom field
+        xp_reward: generatedQuestions.length * 10, // 10 XP per question
+        coin_reward: generatedQuestions.length * 5, // 5 coins per question
+      });
+
+      if (result.success) {
+        toast.success('Remediation questions sent to student app!');
+        onPushToStudentApp?.(generatedQuestions);
+        setShowPreview(false);
+      } else {
+        throw new Error(result.error || 'Failed to push to student app');
+      }
+    } catch (err) {
+      console.error('Error pushing to student app:', err);
+      const message = err instanceof Error ? err.message : 'Failed to push to student app';
+      
+      // Provide more helpful error messages
+      if (message.includes('API key not configured') || message.includes('endpoint URL not configured')) {
+        toast.error('Sister app integration not configured. Please set up the SISTER_APP_API_KEY and NYCOLOGIC_API_URL secrets.');
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setIsPushing(false);
     }
   };
 
@@ -224,15 +280,30 @@ export function RemediationActions({
               <Printer className="h-4 w-4 mr-2" />
               Generate Worksheet
             </Button>
-            {onPushToStudentApp && studentId && (
+            {studentId && classId && (
               <Button
                 onClick={handlePushToApp}
                 className="w-full sm:w-auto"
                 variant="hero"
+                disabled={isPushing}
               >
-                <Send className="h-4 w-4 mr-2" />
-                Push to Student App
+                {isPushing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Push to Student App
+                  </>
+                )}
               </Button>
+            )}
+            {(!studentId || !classId) && (
+              <p className="text-xs text-muted-foreground text-center sm:text-left">
+                {!studentId ? 'Associate a student to push to app' : 'Class ID required to push to app'}
+              </p>
             )}
           </DialogFooter>
         </DialogContent>

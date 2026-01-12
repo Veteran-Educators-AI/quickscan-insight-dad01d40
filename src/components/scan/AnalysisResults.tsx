@@ -53,6 +53,8 @@ interface AnalysisResultsProps {
   isSaving?: boolean;
   studentName?: string | null;
   studentId?: string | null;
+  classId?: string | null;
+  topicName?: string | null;
 }
 
 export function AnalysisResults({ 
@@ -65,7 +67,9 @@ export function AnalysisResults({
   onGenerateRemediationWorksheet,
   isSaving = false,
   studentName = null,
-  studentId = null
+  studentId = null,
+  classId = null,
+  topicName = null,
 }: AnalysisResultsProps) {
   const [overriddenGrade, setOverriddenGrade] = useState<{ grade: number; justification: string } | null>(null);
   const getScoreColor = (percentage: number) => {
@@ -266,6 +270,8 @@ export function AnalysisResults({
           problemContext={result.problemIdentified}
           studentName={studentName || undefined}
           studentId={studentId || undefined}
+          classId={classId || undefined}
+          topicName={topicName || result.problemIdentified || undefined}
           onPushToStudentApp={onPushRemediationToApp}
           onGenerateWorksheet={onGenerateRemediationWorksheet}
         />
