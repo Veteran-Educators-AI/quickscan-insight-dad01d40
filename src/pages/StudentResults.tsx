@@ -213,8 +213,8 @@ export default function StudentResults() {
       <div className="min-h-screen bg-background">
         <header className="border-b bg-card">
           <div className="container mx-auto px-4 py-4 flex items-center gap-3">
-            <img src={logo} alt="NYCologic Scholar" className="h-8 w-8" />
-            <h1 className="text-xl font-bold">NYCologic Scholar Results</h1>
+            <img src={logo} alt="NYClogic Ai" className="h-8 w-8" />
+            <h1 className="text-xl font-bold">NYClogic Ai Results</h1>
           </div>
         </header>
         <div className="container mx-auto px-4 py-12">
@@ -241,7 +241,7 @@ export default function StudentResults() {
       {/* Header */}
       <header className="border-b bg-card sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex items-center gap-3">
-          <img src={logo} alt="NYCologic Scholar" className="h-8 w-8" />
+          <img src={logo} alt="NYClogic Ai" className="h-8 w-8" />
           <h1 className="text-xl font-bold">Your Results</h1>
         </div>
       </header>
@@ -460,7 +460,7 @@ export default function StudentResults() {
 
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground py-4">
-          <p>Powered by NYCologic Scholar</p>
+          <p>Powered by NYClogic Ai</p>
           <p className="mt-1">Keep up the great work! 📚</p>
         </div>
       </main>
