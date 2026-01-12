@@ -722,6 +722,69 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     }
   };
 
+  // State for regenerating question text
+  const [regeneratingQuestionTextNumber, setRegeneratingQuestionTextNumber] = useState<number | null>(null);
+
+  // Regenerate the text of a single question (to fix formatting issues like π rendering)
+  const regenerateQuestionText = async (questionNumber: number) => {
+    const question = compiledQuestions.find(q => q.questionNumber === questionNumber);
+    if (!question) return;
+
+    setRegeneratingQuestionTextNumber(questionNumber);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-worksheet-questions', {
+        body: {
+          topics: [{
+            topicName: question.topic,
+            standard: question.standard,
+            subject: selectedQuestions[0]?.subject || 'Math',
+            category: selectedQuestions[0]?.category || 'General',
+          }],
+          questionCount: 1,
+          difficultyLevels: [question.difficulty],
+          bloomLevels: question.bloomLevel ? [question.bloomLevel] : ['apply'],
+          includeGeometry: !!question.imagePrompt,
+          includeFormulas,
+          includeGraphPaper,
+          includeCoordinateGeometry,
+          useAIImages,
+          worksheetMode,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.questions && data.questions[0]) {
+        const newQuestion = data.questions[0];
+        const updatedQuestions = compiledQuestions.map(q =>
+          q.questionNumber === questionNumber
+            ? { 
+                ...q, 
+                question: newQuestion.question,
+                bloomLevel: newQuestion.bloomLevel || q.bloomLevel,
+                bloomVerb: newQuestion.bloomVerb || q.bloomVerb,
+                imagePrompt: newQuestion.imagePrompt || q.imagePrompt,
+              }
+            : q
+        );
+        setCompiledQuestions(updatedQuestions);
+        
+        toast({
+          title: 'Question regenerated!',
+          description: `New question text created for question ${questionNumber}.`,
+        });
+      } else {
+        throw new Error('No question returned');
+      }
+    } catch (error) {
+      console.error('Error regenerating question:', error);
+      handleApiError(error, 'Question regeneration');
+    } finally {
+      setRegeneratingQuestionTextNumber(null);
+    }
+  };
+
   const generatePDF = async () => {
     if (compiledQuestions.length === 0) {
       toast({
@@ -1681,7 +1744,30 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       <p className="text-sm text-muted-foreground mb-1">
                         {question.topic} ({question.standard})
                       </p>
-                      <p className="text-sm font-serif leading-relaxed">{renderMathText(question.question)}</p>
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 relative">
+                          <p className="text-sm font-serif leading-relaxed">{renderMathText(question.question)}</p>
+                          {regeneratingQuestionTextNumber === question.questionNumber && (
+                            <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded">
+                              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+                          onClick={() => regenerateQuestionText(question.questionNumber)}
+                          disabled={regeneratingQuestionTextNumber !== null || regeneratingQuestionNumber !== null}
+                          title="Regenerate question (fixes formatting issues like π symbols)"
+                        >
+                          {regeneratingQuestionTextNumber === question.questionNumber ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3 w-3" />
+                          )}
+                        </Button>
+                      </div>
                       {question.imageUrl && (
                         <div className="mt-2 flex flex-col items-center gap-2">
                           <div className="relative group">
