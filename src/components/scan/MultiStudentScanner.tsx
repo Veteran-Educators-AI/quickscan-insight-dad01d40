@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera } from 'lucide-react';
+import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera, Plus, X, Layers, ImageIcon } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,12 @@ import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { ManualRegionDrawer } from './ManualRegionDrawer';
 import { CameraModal } from './CameraModal';
+
+interface BatchImage {
+  id: string;
+  dataUrl: string;
+  timestamp: Date;
+}
 
 interface StudentOption {
   id: string;
@@ -64,6 +70,12 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
   const [showManualDrawer, setShowManualDrawer] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  
+  // Batch scanning state
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchImages, setBatchImages] = useState<BatchImage[]>([]);
+  const [currentBatchIndex, setCurrentBatchIndex] = useState(0);
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
   
   // Class and roster state
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -138,10 +150,126 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   };
 
   const handleCameraCapture = (imageDataUrl: string) => {
-    setOriginalImage(imageDataUrl);
-    setExtractedStudents([]);
-    setShowCamera(false);
-    toast.success('Photo captured! Now extract student regions.');
+    if (batchMode) {
+      // In batch mode, add to batch collection
+      const newBatchImage: BatchImage = {
+        id: `batch-${Date.now()}`,
+        dataUrl: imageDataUrl,
+        timestamp: new Date(),
+      };
+      setBatchImages(prev => [...prev, newBatchImage]);
+      setShowCamera(false);
+      toast.success(`Photo ${batchImages.length + 1} captured! Add more or process all.`);
+    } else {
+      setOriginalImage(imageDataUrl);
+      setExtractedStudents([]);
+      setShowCamera(false);
+      toast.success('Photo captured! Now extract student regions.');
+    }
+  };
+
+  const handleBatchFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+          const resizedBlob = await resizeImage(file);
+          const dataUrl = await blobToBase64(resizedBlob);
+          const newBatchImage: BatchImage = {
+            id: `batch-${Date.now()}-${i}`,
+            dataUrl,
+            timestamp: new Date(),
+          };
+          setBatchImages(prev => [...prev, newBatchImage]);
+        } catch (err) {
+          console.error('Error resizing image:', err);
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const dataUrl = ev.target?.result as string;
+            const newBatchImage: BatchImage = {
+              id: `batch-${Date.now()}-${i}`,
+              dataUrl,
+              timestamp: new Date(),
+            };
+            setBatchImages(prev => [...prev, newBatchImage]);
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+      toast.success(`Added ${files.length} image(s) to batch!`);
+    }
+    e.target.value = '';
+  };
+
+  const removeBatchImage = (id: string) => {
+    setBatchImages(prev => prev.filter(img => img.id !== id));
+  };
+
+  const processAllBatchImages = async () => {
+    if (batchImages.length === 0) return;
+
+    setIsProcessingBatch(true);
+    let allExtractedStudents: ExtractedStudent[] = [];
+    let studentCounter = 0;
+
+    for (let i = 0; i < batchImages.length; i++) {
+      setCurrentBatchIndex(i);
+      toast.info(`Processing image ${i + 1} of ${batchImages.length}...`);
+
+      try {
+        const { data, error } = await supabase.functions.invoke('extract-multi-student-regions', {
+          body: { imageBase64: batchImages[i].dataUrl }
+        });
+
+        if (error) throw error;
+
+        if (data.regions && data.regions.length > 0) {
+          const students: ExtractedStudent[] = data.regions.map((region: any) => {
+            studentCounter++;
+            let matchedStudentId: string | null = null;
+            if (region.detectedName && rosterStudents.length > 0) {
+              const detected = region.detectedName.toLowerCase();
+              const match = rosterStudents.find(s => {
+                const fullName = `${s.first_name} ${s.last_name}`.toLowerCase();
+                const reverseName = `${s.last_name} ${s.first_name}`.toLowerCase();
+                return fullName.includes(detected) || reverseName.includes(detected) || 
+                       detected.includes(s.first_name.toLowerCase()) || 
+                       detected.includes(s.last_name.toLowerCase());
+              });
+              if (match) matchedStudentId = match.id;
+            }
+
+            return {
+              id: `student-${studentCounter}`,
+              studentName: region.detectedName || null,
+              croppedImageBase64: region.croppedImage,
+              boundingBox: region.boundingBox,
+              status: 'pending' as const,
+              assignedStudentId: matchedStudentId,
+            };
+          });
+          
+          allExtractedStudents = [...allExtractedStudents, ...students];
+        }
+      } catch (err) {
+        console.error(`Extraction error for image ${i + 1}:`, err);
+        toast.error(`Failed to extract from image ${i + 1}`);
+      }
+    }
+
+    setExtractedStudents(allExtractedStudents);
+    setIsProcessingBatch(false);
+    
+    if (allExtractedStudents.length > 0) {
+      const matchedCount = allExtractedStudents.filter(s => s.assignedStudentId).length;
+      toast.success(`Found ${allExtractedStudents.length} student work regions from ${batchImages.length} images!${matchedCount > 0 ? ` Auto-matched ${matchedCount} to roster.` : ''}`);
+      // Clear batch after successful processing
+      setBatchImages([]);
+      setBatchMode(false);
+    } else {
+      toast.warning('Could not detect any student regions from the batch. Try clearer images.');
+    }
   };
 
   const extractStudentRegions = async () => {
@@ -465,57 +593,194 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
         </CardContent>
       </Card>
 
-      {/* Image Upload / Camera */}
-      {!originalImage && (
+      {/* Image Upload / Camera / Batch Mode */}
+      {!originalImage && extractedStudents.length === 0 && (
         <Card>
-          <CardContent className="p-8">
-            <div className="text-center space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Camera Option */}
-                <div 
-                  className="w-full min-h-[180px] border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
-                  onClick={() => setShowCamera(true)}
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {/* Mode Toggle */}
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <Button
+                  variant={!batchMode ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBatchMode(false)}
+                  className="gap-2"
                 >
-                  <Camera className="h-10 w-10 text-primary" />
-                  <div>
-                    <p className="font-medium">Scan with Camera</p>
-                    <p className="text-sm text-muted-foreground">
-                      Take a photo of student work
-                    </p>
-                  </div>
-                </div>
-
-                {/* Upload Option */}
-                <div 
-                  className="w-full min-h-[180px] border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
-                  onClick={() => fileInputRef.current?.click()}
+                  <ImageIcon className="h-4 w-4" />
+                  Single Image
+                </Button>
+                <Button
+                  variant={batchMode ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBatchMode(true)}
+                  className="gap-2"
                 >
-                  <Upload className="h-10 w-10 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Upload Image</p>
-                    <p className="text-sm text-muted-foreground">
-                      Select an existing photo
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Badge variant="outline">JPG</Badge>
-                    <Badge variant="outline">PNG</Badge>
-                    <Badge variant="outline">HEIC</Badge>
-                  </div>
-                </div>
+                  <Layers className="h-4 w-4" />
+                  Batch Scan
+                </Button>
               </div>
 
-              <p className="text-xs text-muted-foreground pt-2">
-                Capture or upload a photo containing multiple students' work (e.g., exit tickets, quiz papers arranged on a desk)
-              </p>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
+              {!batchMode ? (
+                /* Single Image Mode */
+                <div className="text-center space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Camera Option */}
+                    <div 
+                      className="w-full min-h-[180px] border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                      onClick={() => setShowCamera(true)}
+                    >
+                      <Camera className="h-10 w-10 text-primary" />
+                      <div>
+                        <p className="font-medium">Scan with Camera</p>
+                        <p className="text-sm text-muted-foreground">
+                          Take a photo of student work
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Upload Option */}
+                    <div 
+                      className="w-full min-h-[180px] border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="h-10 w-10 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Upload Image</p>
+                        <p className="text-sm text-muted-foreground">
+                          Select an existing photo
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Badge variant="outline">JPG</Badge>
+                        <Badge variant="outline">PNG</Badge>
+                        <Badge variant="outline">HEIC</Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground pt-2">
+                    Capture or upload a photo containing multiple students' work
+                  </p>
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </div>
+              ) : (
+                /* Batch Mode */
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Capture multiple pages of student work, then process all at once
+                    </p>
+                  </div>
+
+                  {/* Batch Gallery */}
+                  {batchImages.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary" className="gap-1">
+                          <Layers className="h-3 w-3" />
+                          {batchImages.length} image{batchImages.length !== 1 ? 's' : ''} in batch
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setBatchImages([])}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          Clear All
+                        </Button>
+                      </div>
+                      
+                      <ScrollArea className="w-full">
+                        <div className="flex gap-3 pb-2">
+                          {batchImages.map((img, index) => (
+                            <div 
+                              key={img.id} 
+                              className="relative flex-shrink-0 group"
+                            >
+                              <img 
+                                src={img.dataUrl} 
+                                alt={`Batch image ${index + 1}`}
+                                className="h-24 w-24 object-cover rounded-lg border"
+                              />
+                              <div className="absolute top-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+                                {index + 1}
+                              </div>
+                              <button
+                                onClick={() => removeBatchImage(img.id)}
+                                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
+
+                  {/* Add More Options */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Button
+                      variant="outline"
+                      className="h-24 flex-col gap-2"
+                      onClick={() => setShowCamera(true)}
+                    >
+                      <Camera className="h-6 w-6 text-primary" />
+                      <span>Capture Photo</span>
+                    </Button>
+                    
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleBatchFileSelect}
+                        className="hidden"
+                      />
+                      <div className="h-24 flex flex-col items-center justify-center gap-2 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <Plus className="h-6 w-6 text-muted-foreground" />
+                        <span className="text-sm">Add Images</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Process Batch Button */}
+                  {batchImages.length > 0 && (
+                    <Button
+                      variant="hero"
+                      className="w-full"
+                      onClick={processAllBatchImages}
+                      disabled={isProcessingBatch}
+                    >
+                      {isProcessingBatch ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Processing {currentBatchIndex + 1} of {batchImages.length}...
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="h-4 w-4 mr-2" />
+                          Process All {batchImages.length} Images
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {isProcessingBatch && (
+                    <Progress 
+                      value={((currentBatchIndex + 1) / batchImages.length) * 100} 
+                      className="h-2"
+                    />
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
