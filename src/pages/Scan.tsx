@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { BatchQueue } from '@/components/scan/BatchQueue';
 import { BatchReport } from '@/components/scan/BatchReport';
 import { ClassStudentSelector, useClassStudents } from '@/components/scan/ClassStudentSelector';
 import { ScanClassStudentPicker, useStudentName } from '@/components/scan/ScanClassStudentPicker';
+import { ScanQuestionSelector } from '@/components/scan/ScanQuestionSelector';
 import { SaveForLaterTab } from '@/components/scan/SaveForLaterTab';
 import { useAnalyzeStudentWork } from '@/hooks/useAnalyzeStudentWork';
 import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
@@ -498,7 +499,18 @@ export default function Scan() {
       return;
     }
     
-    if (!result || !finalImage) {
+    // Use either AI result or manual result
+    const resultToSave = result || (manualResult ? {
+      ocrText: '',
+      problemIdentified: '',
+      approachAnalysis: '',
+      rubricScores: manualResult.rubricScores,
+      misconceptions: manualResult.misconceptions,
+      totalScore: manualResult.totalScore,
+      feedback: manualResult.feedback,
+    } : null);
+    
+    if (!resultToSave || !finalImage) {
       toast.error('Missing analysis results to save');
       return;
     }
@@ -516,7 +528,7 @@ export default function Scan() {
       studentId,
       questionId,
       imageUrl: finalImage,
-      result,
+      result: resultToSave,
     });
 
     if (attemptId) {
@@ -887,10 +899,59 @@ export default function Scan() {
                   {/* Single result (legacy) */}
                   {result && !manualResult && Object.keys(multiQuestionResults).length === 0 && (
                     <>
+                      {/* Question Selector - show when no question is pre-selected */}
+                      {!selectedQuestionIds.length && !detectedQR?.questionId && (
+                        <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <FileQuestion className="h-5 w-5 text-amber-600 mt-0.5" />
+                              <div className="flex-1 space-y-3">
+                                <div>
+                                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                                    Select a Question to Save Analytics
+                                  </p>
+                                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                                    Associate this scan with a question from your library to track student progress
+                                  </p>
+                                </div>
+                                <ScanQuestionSelector
+                                  selectedQuestionId={selectedQuestionIds[0] || null}
+                                  onQuestionChange={(questionId) => {
+                                    if (questionId) {
+                                      setSelectedQuestionIds([questionId]);
+                                    } else {
+                                      setSelectedQuestionIds([]);
+                                    }
+                                  }}
+                                  disabled={isSaving}
+                                  compact
+                                />
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                      
+                      {/* Show selected question badge if one is selected */}
+                      {(selectedQuestionIds.length > 0 || detectedQR?.questionId) && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Badge variant="secondary" className="gap-1">
+                            <FileQuestion className="h-3 w-3" />
+                            Question linked
+                          </Badge>
+                          {detectedQR?.questionId && (
+                            <Badge variant="outline" className="gap-1">
+                              <QrCode className="h-3 w-3" />
+                              Auto-detected
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                      
                       <AnalysisResults 
                         result={result} 
                         rawAnalysis={rawAnalysis}
-                        onSaveAnalytics={currentStudentId && !resultsSaved ? () => setShowSaveConfirm(true) : undefined}
+                        onSaveAnalytics={currentStudentId && (selectedQuestionIds.length > 0 || detectedQR?.questionId) && !resultsSaved ? () => setShowSaveConfirm(true) : undefined}
                         onAssociateStudent={() => setShowStudentPicker(true)}
                         isSaving={isSaving}
                         studentName={studentName}
@@ -914,17 +975,71 @@ export default function Scan() {
                   )}
                   
                   {manualResult && (
-                    <AnalysisResults 
-                      result={{
-                        ocrText: '',
-                        problemIdentified: '',
-                        approachAnalysis: '',
-                        rubricScores: manualResult.rubricScores,
-                        misconceptions: manualResult.misconceptions,
-                        totalScore: manualResult.totalScore,
-                        feedback: manualResult.feedback,
-                      }} 
-                    />
+                    <>
+                      {/* Question Selector for manual results */}
+                      {!selectedQuestionIds.length && !detectedQR?.questionId && (
+                        <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <FileQuestion className="h-5 w-5 text-amber-600 mt-0.5" />
+                              <div className="flex-1 space-y-3">
+                                <div>
+                                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                                    Select a Question to Save Analytics
+                                  </p>
+                                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                                    Associate this scan with a question from your library
+                                  </p>
+                                </div>
+                                <ScanQuestionSelector
+                                  selectedQuestionId={selectedQuestionIds[0] || null}
+                                  onQuestionChange={(questionId) => {
+                                    if (questionId) {
+                                      setSelectedQuestionIds([questionId]);
+                                    } else {
+                                      setSelectedQuestionIds([]);
+                                    }
+                                  }}
+                                  disabled={isSaving}
+                                  compact
+                                />
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                      
+                      <AnalysisResults 
+                        result={{
+                          ocrText: '',
+                          problemIdentified: '',
+                          approachAnalysis: '',
+                          rubricScores: manualResult.rubricScores,
+                          misconceptions: manualResult.misconceptions,
+                          totalScore: manualResult.totalScore,
+                          feedback: manualResult.feedback,
+                        }} 
+                        onSaveAnalytics={currentStudentId && (selectedQuestionIds.length > 0 || detectedQR?.questionId) && !resultsSaved ? () => setShowSaveConfirm(true) : undefined}
+                        onAssociateStudent={() => setShowStudentPicker(true)}
+                        isSaving={isSaving}
+                        studentName={studentName}
+                        studentId={currentStudentId}
+                      />
+                      
+                      <SaveAnalyticsConfirmDialog
+                        open={showSaveConfirm}
+                        onOpenChange={setShowSaveConfirm}
+                        onConfirm={async () => {
+                          await handleSaveSingleResult();
+                          setShowSaveConfirm(false);
+                        }}
+                        studentName={studentName}
+                        totalScore={manualResult.totalScore}
+                        rubricScores={manualResult.rubricScores}
+                        questionCount={1}
+                        isSaving={isSaving}
+                      />
+                    </>
                   )}
 
                   {/* Student Picker Dialog */}
