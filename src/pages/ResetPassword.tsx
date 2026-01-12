@@ -91,7 +91,7 @@ export default function ResetPassword() {
           <div className="mb-8">
             <img 
               src={nycologicLogo} 
-              alt="NYCologic AI" 
+              alt="NYCologic Scholar" 
               className="h-16 w-auto mx-auto mb-4"
             />
           </div>
@@ -132,7 +132,7 @@ export default function ResetPassword() {
         <div className="text-center mb-8">
           <img 
             src={nycologicLogo} 
-            alt="NYCologic AI" 
+            alt="NYCologic Scholar" 
             className="h-16 w-auto mx-auto mb-4"
           />
           <h1 className="font-display text-2xl font-bold text-foreground">
