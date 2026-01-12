@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
-
+import { PrintRemediationQuestionsDialog } from '@/components/print/PrintRemediationQuestionsDialog';
 interface RemediationQuestion {
   questionNumber: number;
   question: string;
@@ -42,6 +42,7 @@ export function RemediationActions({
   const [isPushing, setIsPushing] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<RemediationQuestion[] | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set());
   
   const { pushToSisterApp } = usePushToSisterApp();
@@ -150,8 +151,9 @@ export function RemediationActions({
 
   const handlePrintWorksheet = () => {
     if (generatedQuestions) {
-      onGenerateWorksheet?.(generatedQuestions);
+      setShowPrintDialog(true);
       setShowPreview(false);
+      onGenerateWorksheet?.(generatedQuestions);
     }
   };
 
@@ -308,6 +310,17 @@ export function RemediationActions({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Print Remediation Dialog */}
+      {generatedQuestions && (
+        <PrintRemediationQuestionsDialog
+          open={showPrintDialog}
+          onOpenChange={setShowPrintDialog}
+          questions={generatedQuestions}
+          studentName={studentName}
+          topicName={topicName}
+        />
+      )}
     </>
   );
 }
