@@ -530,7 +530,21 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       
       let result = text;
       
-      // First pass: Fix ampersand-interleaved text corruption
+      // First pass: Remove any emoji characters that might cause PDF rendering issues
+      // Emojis don't render well in jsPDF and cause garbled output like "Ø=Ü¡"
+      result = result
+        .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')  // Miscellaneous Symbols, Emoticons
+        .replace(/[\u{2600}-\u{26FF}]/gu, '')    // Miscellaneous Symbols
+        .replace(/[\u{2700}-\u{27BF}]/gu, '')    // Dingbats
+        .replace(/[\u{FE00}-\u{FE0F}]/gu, '')    // Variation Selectors
+        .replace(/[\u{1F000}-\u{1F02F}]/gu, '')  // Mahjong Tiles
+        .replace(/[\u{1F0A0}-\u{1F0FF}]/gu, '')  // Playing Cards
+        .replace(/💡/g, '')                       // Lightbulb (common in hints)
+        .replace(/✨/g, '')                       // Sparkles
+        .replace(/📝/g, '')                       // Memo
+        .replace(/🎉/g, '');                      // Party popper
+      
+      // Second pass: Fix ampersand-interleaved text corruption
       // This catastrophic encoding pattern inserts & between each character
       // Example: "&p&a&i&n&t&e&d&" -> "painted"
       // We need to detect and fix this pattern before other fixes
