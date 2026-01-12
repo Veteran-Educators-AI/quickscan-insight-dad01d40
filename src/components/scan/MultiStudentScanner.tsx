@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
-import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera, Plus, X, Layers, ImageIcon, RefreshCw, AlertTriangle, Crop, RotateCcw } from 'lucide-react';
-import { resizeImage, blobToBase64, enhanceImageForOCR } from '@/lib/imageUtils';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera, Plus, X, Layers, ImageIcon, RefreshCw, AlertTriangle, Crop, RotateCcw, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { resizeImage, blobToBase64, enhanceImageForOCR, detectDocumentCorners } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,12 +10,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { ManualRegionDrawer } from './ManualRegionDrawer';
 import { CameraModal } from './CameraModal';
+
+const MAX_BATCH_IMAGES = 4;
+
+interface DetectedEdge {
+  topLeft: { x: number; y: number };
+  topRight: { x: number; y: number };
+  bottomLeft: { x: number; y: number };
+  bottomRight: { x: number; y: number };
+}
 
 interface BatchImage {
   id: string;
@@ -25,6 +35,7 @@ interface BatchImage {
   blurScore?: number;
   enhanced?: boolean;
   enhancements?: string[];
+  detectedEdges?: DetectedEdge | null;
 }
 
 // Blur detection using Laplacian variance
@@ -161,6 +172,15 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const [draggedImageId, setDraggedImageId] = useState<string | null>(null);
   const [dragOverImageId, setDragOverImageId] = useState<string | null>(null);
   
+  // Zoom state for batch gallery
+  const [zoomDialogOpen, setZoomDialogOpen] = useState(false);
+  const [zoomImageId, setZoomImageId] = useState<string | null>(null);
+  const [zoomScale, setZoomScale] = useState(1);
+  const [zoomPosition, setZoomPosition] = useState({ x: 0, y: 0 });
+  const zoomContainerRef = useRef<HTMLDivElement>(null);
+  const lastTouchDistance = useRef<number | null>(null);
+  const lastPanPosition = useRef<{ x: number; y: number } | null>(null);
+  
   // Class and roster state
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -235,14 +255,24 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
 
   const handleCameraCapture = async (imageDataUrl: string) => {
     if (batchMode) {
-      // Run blur detection
-      const qualityResult = await detectImageBlur(imageDataUrl);
+      // Check max limit
+      if (!rescanImageId && batchImages.length >= MAX_BATCH_IMAGES) {
+        toast.error(`Maximum ${MAX_BATCH_IMAGES} papers allowed per scan.`);
+        setShowCamera(false);
+        return;
+      }
+      
+      // Run blur detection and edge detection in parallel
+      const [qualityResult, detectedEdges] = await Promise.all([
+        detectImageBlur(imageDataUrl),
+        detectDocumentCorners(imageDataUrl)
+      ]);
       
       if (rescanImageId) {
         // Re-scanning a specific image - replace it
         setBatchImages(prev => prev.map(img => 
           img.id === rescanImageId 
-            ? { ...img, dataUrl: imageDataUrl, timestamp: new Date(), ...qualityResult }
+            ? { ...img, dataUrl: imageDataUrl, timestamp: new Date(), ...qualityResult, detectedEdges }
             : img
         ));
         setShowCamera(false);
@@ -260,6 +290,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
           dataUrl: imageDataUrl,
           timestamp: new Date(),
           ...qualityResult,
+          detectedEdges,
         };
         setBatchImages(prev => [...prev, newBatchImage]);
         setShowCamera(false);
@@ -267,7 +298,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
         if (qualityResult.quality === 'poor') {
           toast.warning(`Photo ${batchImages.length + 1} captured but appears blurry. Consider re-scanning.`);
         } else {
-          toast.success(`Photo ${batchImages.length + 1} captured! Add more or process all.`);
+          toast.success(`Photo ${batchImages.length + 1} captured! ${detectedEdges ? 'Paper edges detected.' : ''}`);
         }
       }
     } else {
@@ -291,14 +322,29 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const handleBatchFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
+      const remainingSlots = MAX_BATCH_IMAGES - batchImages.length;
+      if (remainingSlots <= 0) {
+        toast.error(`Maximum ${MAX_BATCH_IMAGES} papers allowed per scan.`);
+        e.target.value = '';
+        return;
+      }
+      
+      const filesToProcess = Math.min(files.length, remainingSlots);
+      if (files.length > remainingSlots) {
+        toast.warning(`Only adding ${filesToProcess} of ${files.length} images (max ${MAX_BATCH_IMAGES} per scan).`);
+      }
+      
       let poorQualityCount = 0;
       
-      for (let i = 0; i < files.length; i++) {
+      for (let i = 0; i < filesToProcess; i++) {
         const file = files[i];
         try {
           const resizedBlob = await resizeImage(file);
           const dataUrl = await blobToBase64(resizedBlob);
-          const qualityResult = await detectImageBlur(dataUrl);
+          const [qualityResult, detectedEdges] = await Promise.all([
+            detectImageBlur(dataUrl),
+            detectDocumentCorners(dataUrl)
+          ]);
           
           if (qualityResult.quality === 'poor') poorQualityCount++;
           
@@ -307,6 +353,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
             dataUrl,
             timestamp: new Date(),
             ...qualityResult,
+            detectedEdges,
           };
           setBatchImages(prev => [...prev, newBatchImage]);
         } catch (err) {
@@ -314,7 +361,10 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
           const reader = new FileReader();
           reader.onload = async (ev) => {
             const dataUrl = ev.target?.result as string;
-            const qualityResult = await detectImageBlur(dataUrl);
+            const [qualityResult, detectedEdges] = await Promise.all([
+              detectImageBlur(dataUrl),
+              detectDocumentCorners(dataUrl)
+            ]);
             
             if (qualityResult.quality === 'poor') poorQualityCount++;
             
@@ -323,6 +373,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
               dataUrl,
               timestamp: new Date(),
               ...qualityResult,
+              detectedEdges,
             };
             setBatchImages(prev => [...prev, newBatchImage]);
           };
@@ -331,9 +382,9 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
       }
       
       if (poorQualityCount > 0) {
-        toast.warning(`Added ${files.length} image(s). ${poorQualityCount} appear blurry - consider re-scanning.`);
+        toast.warning(`Added ${filesToProcess} image(s). ${poorQualityCount} appear blurry - consider re-scanning.`);
       } else {
-        toast.success(`Added ${files.length} image(s) to batch!`);
+        toast.success(`Added ${filesToProcess} image(s) to batch!`);
       }
     }
     e.target.value = '';
@@ -390,6 +441,78 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const handleDragEnd = () => {
     setDraggedImageId(null);
     setDragOverImageId(null);
+  };
+
+  // Zoom handlers for pinch-to-zoom
+  const openZoomDialog = (imageId: string) => {
+    setZoomImageId(imageId);
+    setZoomScale(1);
+    setZoomPosition({ x: 0, y: 0 });
+    setZoomDialogOpen(true);
+  };
+
+  const closeZoomDialog = () => {
+    setZoomDialogOpen(false);
+    setZoomImageId(null);
+    setZoomScale(1);
+    setZoomPosition({ x: 0, y: 0 });
+  };
+
+  const handleZoomWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setZoomScale(prev => Math.min(5, Math.max(0.5, prev + delta)));
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      lastTouchDistance.current = distance;
+    } else if (e.touches.length === 1) {
+      lastPanPosition.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY
+      };
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && lastTouchDistance.current !== null) {
+      e.preventDefault();
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const delta = (distance - lastTouchDistance.current) * 0.01;
+      setZoomScale(prev => Math.min(5, Math.max(0.5, prev + delta)));
+      lastTouchDistance.current = distance;
+    } else if (e.touches.length === 1 && lastPanPosition.current && zoomScale > 1) {
+      const deltaX = e.touches[0].clientX - lastPanPosition.current.x;
+      const deltaY = e.touches[0].clientY - lastPanPosition.current.y;
+      setZoomPosition(prev => ({
+        x: prev.x + deltaX,
+        y: prev.y + deltaY
+      }));
+      lastPanPosition.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY
+      };
+    }
+  }, [zoomScale]);
+
+  const handleTouchEnd = useCallback(() => {
+    lastTouchDistance.current = null;
+    lastPanPosition.current = null;
+  }, []);
+
+  const zoomIn = () => setZoomScale(prev => Math.min(5, prev + 0.5));
+  const zoomOut = () => setZoomScale(prev => Math.max(0.5, prev - 0.5));
+  const resetZoom = () => {
+    setZoomScale(1);
+    setZoomPosition({ x: 0, y: 0 });
   };
 
   const enhanceAllBatchImages = async () => {
@@ -1012,18 +1135,40 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                                 dragOverImageId === img.id && "ring-2 ring-primary ring-offset-2 scale-105"
                               )}
                             >
-                              <img 
-                                src={img.dataUrl} 
-                                alt={`Batch image ${index + 1}`}
-                                className={cn(
-                                  "h-24 w-24 object-cover rounded-lg border pointer-events-none",
-                                  img.quality === 'poor' && "opacity-80"
+                              <div className="relative h-24 w-24">
+                                <img 
+                                  src={img.dataUrl} 
+                                  alt={`Batch image ${index + 1}`}
+                                  className={cn(
+                                    "h-24 w-24 object-cover rounded-lg border pointer-events-none",
+                                    img.quality === 'poor' && "opacity-80"
+                                  )}
+                                />
+                                {/* Detected edges overlay */}
+                                {img.detectedEdges && (
+                                  <svg className="absolute inset-0 h-24 w-24 pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                    <polygon
+                                      points={`${img.detectedEdges.topLeft.x * 100},${img.detectedEdges.topLeft.y * 100} ${img.detectedEdges.topRight.x * 100},${img.detectedEdges.topRight.y * 100} ${img.detectedEdges.bottomRight.x * 100},${img.detectedEdges.bottomRight.y * 100} ${img.detectedEdges.bottomLeft.x * 100},${img.detectedEdges.bottomLeft.y * 100}`}
+                                      fill="none"
+                                      stroke="hsl(var(--primary))"
+                                      strokeWidth="2"
+                                      strokeDasharray="4 2"
+                                    />
+                                  </svg>
                                 )}
-                              />
+                              </div>
                               {/* Image number badge */}
                               <div className="absolute top-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
                                 {index + 1}
                               </div>
+                              
+                              {/* Edge detected badge */}
+                              {img.detectedEdges && (
+                                <div className="absolute bottom-1 left-1 bg-primary/80 text-primary-foreground text-[9px] px-1 py-0.5 rounded">
+                                  <Square className="h-2 w-2 inline mr-0.5" />
+                                  Edges
+                                </div>
+                              )}
                               
                               {/* Quality indicator badge */}
                               {img.quality && (
@@ -1051,7 +1196,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                               )}
                               
                               {/* Poor quality warning label */}
-                              {img.quality === 'poor' && (
+                              {img.quality === 'poor' && !img.detectedEdges && (
                                 <div className="absolute bottom-0 left-0 right-0 bg-destructive text-destructive-foreground text-[10px] text-center py-0.5 rounded-b-lg">
                                   Blurry
                                 </div>
@@ -1059,6 +1204,13 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                               
                               {/* Action buttons overlay */}
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openZoomDialog(img.id); }}
+                                  className="bg-white text-black rounded-full p-1.5 hover:bg-gray-200 transition-colors"
+                                  title="Zoom to inspect"
+                                >
+                                  <ZoomIn className="h-3.5 w-3.5" />
+                                </button>
                                 <button
                                   onClick={() => enhanceSingleImage(img.id)}
                                   disabled={isEnhancing || img.enhanced}
@@ -1440,6 +1592,53 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
         }}
         onCapture={handleCameraCapture}
       />
+
+      {/* Zoom Dialog for pinch-to-zoom inspection */}
+      <Dialog open={zoomDialogOpen} onOpenChange={closeZoomDialog}>
+        <DialogContent className="max-w-4xl h-[80vh] p-0">
+          <DialogHeader className="p-4 pb-2">
+            <DialogTitle className="flex items-center justify-between">
+              <span>Inspect Image</span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={zoomOut} disabled={zoomScale <= 0.5}>
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <span className="text-sm w-16 text-center">{Math.round(zoomScale * 100)}%</span>
+                <Button variant="outline" size="sm" onClick={zoomIn} disabled={zoomScale >= 5}>
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={resetZoom}>
+                  <Maximize2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div 
+            ref={zoomContainerRef}
+            className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing touch-none"
+            onWheel={handleZoomWheel}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            {zoomImageId && batchImages.find(img => img.id === zoomImageId) && (
+              <div className="h-full flex items-center justify-center p-4">
+                <div style={{ transform: `scale(${zoomScale}) translate(${zoomPosition.x / zoomScale}px, ${zoomPosition.y / zoomScale}px)` }} className="transition-transform duration-75">
+                  <img 
+                    src={batchImages.find(img => img.id === zoomImageId)?.dataUrl} 
+                    alt="Zoomed image"
+                    className="max-h-[60vh] max-w-full object-contain rounded-lg"
+                    draggable={false}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground text-center pb-4">
+            Pinch to zoom on touch devices • Scroll to zoom on desktop • Drag to pan when zoomed
+          </p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
