@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Sparkles, FileText, Send, Loader2, BookOpen, Printer, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, Send, Loader2, BookOpen, Printer, ChevronDown, ChevronUp, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
@@ -40,9 +43,13 @@ export function RemediationActions({
 }: RemediationActionsProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<RemediationQuestion[] | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState<'student' | 'parent' | 'both'>('both');
+  const [includeHintsInEmail, setIncludeHintsInEmail] = useState(true);
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set());
   
   const { pushToSisterApp } = usePushToSisterApp();
@@ -154,6 +161,58 @@ export function RemediationActions({
       setShowPrintDialog(true);
       setShowPreview(false);
       onGenerateWorksheet?.(generatedQuestions);
+    }
+  };
+
+  const handleOpenEmailDialog = () => {
+    setShowEmailDialog(true);
+    setShowPreview(false);
+  };
+
+  const handleSendEmail = async () => {
+    if (!generatedQuestions || generatedQuestions.length === 0) {
+      toast.error('No questions to send');
+      return;
+    }
+
+    if (!studentId) {
+      toast.error('Student ID is required to send email');
+      return;
+    }
+
+    setIsSendingEmail(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('send-remediation-email', {
+        body: {
+          studentId,
+          questions: generatedQuestions,
+          topicName: topicName || 'Remediation Practice',
+          recipientType: emailRecipient,
+          includeHints: includeHintsInEmail,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.error) {
+        if (data.missingEmails) {
+          toast.error(`Cannot send: ${data.error}`);
+        } else {
+          throw new Error(data.error);
+        }
+        return;
+      }
+
+      const emailCount = data.emailsSent?.length || 0;
+      toast.success(`Remediation questions sent to ${emailCount} recipient${emailCount > 1 ? 's' : ''}!`);
+      setShowEmailDialog(false);
+    } catch (err) {
+      console.error('Error sending email:', err);
+      const message = err instanceof Error ? err.message : 'Failed to send email';
+      toast.error(message);
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -280,8 +339,18 @@ export function RemediationActions({
               className="w-full sm:w-auto"
             >
               <Printer className="h-4 w-4 mr-2" />
-              Generate Worksheet
+              Print Worksheet
             </Button>
+            {studentId && (
+              <Button
+                variant="outline"
+                onClick={handleOpenEmailDialog}
+                className="w-full sm:w-auto"
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Email Questions
+              </Button>
+            )}
             {studentId && classId && (
               <Button
                 onClick={handlePushToApp}
@@ -297,14 +366,14 @@ export function RemediationActions({
                 ) : (
                   <>
                     <Send className="h-4 w-4 mr-2" />
-                    Push to Student App
+                    Push to App
                   </>
                 )}
               </Button>
             )}
-            {(!studentId || !classId) && (
+            {!studentId && (
               <p className="text-xs text-muted-foreground text-center sm:text-left">
-                {!studentId ? 'Associate a student to push to app' : 'Class ID required to push to app'}
+                Associate a student to enable email and app features
               </p>
             )}
           </DialogFooter>
@@ -321,6 +390,85 @@ export function RemediationActions({
           topicName={topicName}
         />
       )}
+
+      {/* Email Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Email Remediation Questions
+            </DialogTitle>
+            <DialogDescription>
+              Send {generatedQuestions?.length || 0} questions to student or parent email
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Recipient Selection */}
+            <div className="space-y-2">
+              <Label>Send to</Label>
+              <Select value={emailRecipient} onValueChange={(v) => setEmailRecipient(v as typeof emailRecipient)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="student">Student only</SelectItem>
+                  <SelectItem value="parent">Parent only</SelectItem>
+                  <SelectItem value="both">Both student and parent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Include Hints Toggle */}
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="email-hints-toggle" className="cursor-pointer">
+                  Include Hints
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Add helpful hints to the email
+                </p>
+              </div>
+              <Switch
+                id="email-hints-toggle"
+                checked={includeHintsInEmail}
+                onCheckedChange={setIncludeHintsInEmail}
+              />
+            </div>
+
+            {/* Info */}
+            <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
+              <p>The email will include:</p>
+              <ul className="list-disc list-inside mt-1 space-y-1">
+                <li>{generatedQuestions?.length || 0} personalized questions</li>
+                <li>Difficulty level badges</li>
+                {includeHintsInEmail && <li>Helpful hints for each question</li>}
+                <li>Instructions for the student</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEmailDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendEmail} disabled={isSendingEmail}>
+              {isSendingEmail ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Email
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
