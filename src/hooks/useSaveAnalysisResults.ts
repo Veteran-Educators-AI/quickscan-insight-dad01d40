@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 import { usePushStudentData } from './usePushStudentData';
+import { usePushToSisterApp } from './usePushToSisterApp';
 
 interface RubricScore {
   criterion: string;
@@ -39,6 +40,7 @@ interface SaveAnalysisParams {
 export function useSaveAnalysisResults() {
   const { user } = useAuth();
   const { pushData } = usePushStudentData();
+  const { pushToSisterApp } = usePushToSisterApp();
   const [isSaving, setIsSaving] = useState(false);
 
   const saveResults = async (params: SaveAnalysisParams): Promise<string | null> => {
@@ -138,7 +140,7 @@ export function useSaveAnalysisResults() {
           .eq('id', params.pendingScanId);
       }
 
-      // 6. Push data to webhook (sister app integration)
+      // 6. Push data to webhook (generic webhook integration)
       pushData({
         eventType: 'scan_analysis',
         studentId: params.studentId,
@@ -157,6 +159,22 @@ export function useSaveAnalysisResults() {
           feedback: params.result.feedback,
         },
       });
+
+      // 7. Push to sister app (automatic sync)
+      if (params.classId) {
+        pushToSisterApp({
+          class_id: params.classId,
+          title: `Grade: ${params.topicName || 'Assessment'}`,
+          description: `${params.studentName || 'Student'} scored ${finalGrade}% - ${params.result.feedback}`,
+          standard_code: params.topicName || undefined,
+          xp_reward: Math.round(finalGrade / 2), // XP based on grade
+          coin_reward: Math.round(finalGrade / 4), // Coins based on grade
+          student_id: params.studentId,
+          student_name: params.studentName,
+          grade: finalGrade,
+          topic_name: params.topicName,
+        });
+      }
 
       return attempt.id;
     } catch (err) {
