@@ -38,3 +38,12 @@ verify_jwt = false
 
 [functions.send-parent-ai-notification]
 verify_jwt = false
+
+[functions.student-sync]
+verify_jwt = false
+
+[functions.push-to-sister-app]
+verify_jwt = false
+
+[functions.push-student-data]
+verify_jwt = false
