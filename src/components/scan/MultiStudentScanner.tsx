@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera, Plus, X, Layers, ImageIcon, RefreshCw } from 'lucide-react';
+import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera, Plus, X, Layers, ImageIcon, RefreshCw, AlertTriangle } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +21,85 @@ interface BatchImage {
   id: string;
   dataUrl: string;
   timestamp: Date;
+  quality?: 'good' | 'medium' | 'poor';
+  blurScore?: number;
 }
+
+// Blur detection using Laplacian variance
+const detectImageBlur = (imageDataUrl: string): Promise<{ quality: 'good' | 'medium' | 'poor'; blurScore: number }> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve({ quality: 'medium', blurScore: 50 });
+        return;
+      }
+
+      // Resize for faster processing
+      const maxSize = 200;
+      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      // Convert to grayscale and calculate Laplacian variance
+      const gray: number[] = [];
+      for (let i = 0; i < data.length; i += 4) {
+        gray.push(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+      }
+
+      // Apply Laplacian kernel
+      const width = canvas.width;
+      const height = canvas.height;
+      let sum = 0;
+      let sumSq = 0;
+      let count = 0;
+
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const idx = y * width + x;
+          const laplacian = 
+            -gray[idx - width] - 
+            gray[idx - 1] + 
+            4 * gray[idx] - 
+            gray[idx + 1] - 
+            gray[idx + width];
+          
+          sum += laplacian;
+          sumSq += laplacian * laplacian;
+          count++;
+        }
+      }
+
+      // Calculate variance
+      const mean = sum / count;
+      const variance = (sumSq / count) - (mean * mean);
+      
+      // Normalize to 0-100 score (higher = sharper)
+      const blurScore = Math.min(100, Math.max(0, variance / 10));
+      
+      let quality: 'good' | 'medium' | 'poor';
+      if (blurScore >= 40) {
+        quality = 'good';
+      } else if (blurScore >= 20) {
+        quality = 'medium';
+      } else {
+        quality = 'poor';
+      }
+
+      resolve({ quality, blurScore });
+    };
+    img.onerror = () => {
+      resolve({ quality: 'medium', blurScore: 50 });
+    };
+    img.src = imageDataUrl;
+  });
+};
 
 interface StudentOption {
   id: string;
@@ -150,28 +228,42 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
     e.target.value = '';
   };
 
-  const handleCameraCapture = (imageDataUrl: string) => {
+  const handleCameraCapture = async (imageDataUrl: string) => {
     if (batchMode) {
+      // Run blur detection
+      const qualityResult = await detectImageBlur(imageDataUrl);
+      
       if (rescanImageId) {
         // Re-scanning a specific image - replace it
         setBatchImages(prev => prev.map(img => 
           img.id === rescanImageId 
-            ? { ...img, dataUrl: imageDataUrl, timestamp: new Date() }
+            ? { ...img, dataUrl: imageDataUrl, timestamp: new Date(), ...qualityResult }
             : img
         ));
         setShowCamera(false);
         setRescanImageId(null);
-        toast.success('Image replaced successfully!');
+        
+        if (qualityResult.quality === 'poor') {
+          toast.warning('Image replaced, but quality is still low. Consider re-scanning.');
+        } else {
+          toast.success('Image replaced successfully!');
+        }
       } else {
         // In batch mode, add to batch collection
         const newBatchImage: BatchImage = {
           id: `batch-${Date.now()}`,
           dataUrl: imageDataUrl,
           timestamp: new Date(),
+          ...qualityResult,
         };
         setBatchImages(prev => [...prev, newBatchImage]);
         setShowCamera(false);
-        toast.success(`Photo ${batchImages.length + 1} captured! Add more or process all.`);
+        
+        if (qualityResult.quality === 'poor') {
+          toast.warning(`Photo ${batchImages.length + 1} captured but appears blurry. Consider re-scanning.`);
+        } else {
+          toast.success(`Photo ${batchImages.length + 1} captured! Add more or process all.`);
+        }
       }
     } else {
       setOriginalImage(imageDataUrl);
@@ -194,33 +286,50 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const handleBatchFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
+      let poorQualityCount = 0;
+      
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         try {
           const resizedBlob = await resizeImage(file);
           const dataUrl = await blobToBase64(resizedBlob);
+          const qualityResult = await detectImageBlur(dataUrl);
+          
+          if (qualityResult.quality === 'poor') poorQualityCount++;
+          
           const newBatchImage: BatchImage = {
             id: `batch-${Date.now()}-${i}`,
             dataUrl,
             timestamp: new Date(),
+            ...qualityResult,
           };
           setBatchImages(prev => [...prev, newBatchImage]);
         } catch (err) {
           console.error('Error resizing image:', err);
           const reader = new FileReader();
-          reader.onload = (ev) => {
+          reader.onload = async (ev) => {
             const dataUrl = ev.target?.result as string;
+            const qualityResult = await detectImageBlur(dataUrl);
+            
+            if (qualityResult.quality === 'poor') poorQualityCount++;
+            
             const newBatchImage: BatchImage = {
               id: `batch-${Date.now()}-${i}`,
               dataUrl,
               timestamp: new Date(),
+              ...qualityResult,
             };
             setBatchImages(prev => [...prev, newBatchImage]);
           };
           reader.readAsDataURL(file);
         }
       }
-      toast.success(`Added ${files.length} image(s) to batch!`);
+      
+      if (poorQualityCount > 0) {
+        toast.warning(`Added ${files.length} image(s). ${poorQualityCount} appear blurry - consider re-scanning.`);
+      } else {
+        toast.success(`Added ${files.length} image(s) to batch!`);
+      }
     }
     e.target.value = '';
   };
@@ -705,11 +814,25 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                   {/* Batch Gallery */}
                   {batchImages.length > 0 && (
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Badge variant="secondary" className="gap-1">
-                          <Layers className="h-3 w-3" />
-                          {batchImages.length} image{batchImages.length !== 1 ? 's' : ''} in batch
-                        </Badge>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="gap-1">
+                            <Layers className="h-3 w-3" />
+                            {batchImages.length} image{batchImages.length !== 1 ? 's' : ''} in batch
+                          </Badge>
+                          {batchImages.filter(img => img.quality === 'poor').length > 0 && (
+                            <Badge variant="destructive" className="gap-1 animate-pulse">
+                              <AlertTriangle className="h-3 w-3" />
+                              {batchImages.filter(img => img.quality === 'poor').length} blurry
+                            </Badge>
+                          )}
+                          {batchImages.filter(img => img.quality === 'good').length > 0 && (
+                            <Badge variant="outline" className="gap-1 text-green-600 border-green-600">
+                              <CheckCircle className="h-3 w-3" />
+                              {batchImages.filter(img => img.quality === 'good').length} good
+                            </Badge>
+                          )}
+                        </div>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -725,21 +848,66 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                           {batchImages.map((img, index) => (
                             <div 
                               key={img.id} 
-                              className="relative flex-shrink-0 group"
+                              className={cn(
+                                "relative flex-shrink-0 group",
+                                img.quality === 'poor' && "ring-2 ring-destructive ring-offset-2"
+                              )}
                             >
                               <img 
                                 src={img.dataUrl} 
                                 alt={`Batch image ${index + 1}`}
-                                className="h-24 w-24 object-cover rounded-lg border"
+                                className={cn(
+                                  "h-24 w-24 object-cover rounded-lg border",
+                                  img.quality === 'poor' && "opacity-80"
+                                )}
                               />
+                              {/* Image number badge */}
                               <div className="absolute top-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
                                 {index + 1}
                               </div>
+                              
+                              {/* Quality indicator badge */}
+                              {img.quality && (
+                                <div 
+                                  className={cn(
+                                    "absolute top-1 right-1 rounded-full p-1",
+                                    img.quality === 'good' && "bg-green-500",
+                                    img.quality === 'medium' && "bg-yellow-500",
+                                    img.quality === 'poor' && "bg-destructive animate-pulse"
+                                  )}
+                                  title={
+                                    img.quality === 'good' ? 'Good quality' :
+                                    img.quality === 'medium' ? 'Acceptable quality' :
+                                    'Poor quality - consider re-scanning'
+                                  }
+                                >
+                                  {img.quality === 'poor' ? (
+                                    <AlertTriangle className="h-2.5 w-2.5 text-white" />
+                                  ) : img.quality === 'good' ? (
+                                    <CheckCircle className="h-2.5 w-2.5 text-white" />
+                                  ) : (
+                                    <div className="h-2.5 w-2.5" />
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* Poor quality warning label */}
+                              {img.quality === 'poor' && (
+                                <div className="absolute bottom-0 left-0 right-0 bg-destructive text-destructive-foreground text-[10px] text-center py-0.5 rounded-b-lg">
+                                  Blurry
+                                </div>
+                              )}
+                              
                               {/* Action buttons overlay */}
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1">
                                 <button
                                   onClick={() => startRescan(img.id)}
-                                  className="bg-primary text-primary-foreground rounded-full p-1.5 hover:bg-primary/90 transition-colors"
+                                  className={cn(
+                                    "rounded-full p-1.5 transition-colors",
+                                    img.quality === 'poor' 
+                                      ? "bg-yellow-500 text-black hover:bg-yellow-400" 
+                                      : "bg-primary text-primary-foreground hover:bg-primary/90"
+                                  )}
                                   title="Re-scan this image"
                                 >
                                   <RefreshCw className="h-3.5 w-3.5" />
