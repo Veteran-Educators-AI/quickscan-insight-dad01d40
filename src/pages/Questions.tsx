@@ -353,15 +353,15 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
               >
                 <ClipboardCheck className="h-4 w-4 mr-2" />
                 Quick Start Diagnostic
-                {selectedTopics.size > 0 && (
+                {(selectedTopics.size > 0 || worksheetQuestions.length > 0) && (
                   <Badge variant="secondary" className="ml-2 bg-white/20 text-white">
-                    {selectedTopics.size}
+                    {getAllTopicsArray().length}
                   </Badge>
                 )}
               </Button>
-              {selectedTopics.size > 0 && (
+              {(selectedTopics.size > 0 || worksheetQuestions.length > 0) && (
                 <span className="text-xs text-emerald-600 text-right">
-                  {selectedTopics.size} topic(s) will be loaded
+                  {getAllTopicsArray().length} topic(s) will be loaded
                 </span>
               )}
             </div>
@@ -371,9 +371,9 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
             >
               <Sparkles className="h-4 w-4 mr-2" />
               Differentiated Worksheets
-              {selectedTopics.size > 0 && (
+              {(selectedTopics.size > 0 || worksheetQuestions.length > 0) && (
                 <Badge variant="secondary" className="ml-2 bg-white/20 text-white">
-                  {selectedTopics.size}
+                  {getAllTopicsArray().length}
                 </Badge>
               )}
             </Button>
