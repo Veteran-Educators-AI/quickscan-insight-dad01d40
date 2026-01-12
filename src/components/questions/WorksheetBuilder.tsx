@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -727,6 +727,45 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   
   // State for tracking recently corrected symbols per question
   const [correctedSymbols, setCorrectedSymbols] = useState<Record<number, string[]>>({});
+
+  // Helper to detect encoding issues in question text BEFORE regeneration
+  const detectEncodingIssues = (text: string): { hasIssues: boolean; issues: string[] } => {
+    const issues: string[] = [];
+    
+    // Common UTF-8 mojibake patterns that indicate encoding corruption
+    const corruptionPatterns: { pattern: RegExp; description: string }[] = [
+      { pattern: /Â(?=[πθ°²³√≤≥≠±×÷∠△½¼¾⊥∥≅])/g, description: 'Â before symbol' },
+      { pattern: /Â(?=\d)/g, description: 'Â before number (likely π)' },
+      { pattern: /(\d)Â\s/g, description: 'number + Â (likely π)' },
+      { pattern: /Â°/g, description: 'corrupted degree symbol' },
+      { pattern: /Â²/g, description: 'corrupted squared' },
+      { pattern: /Â³/g, description: 'corrupted cubed' },
+      { pattern: /Â½/g, description: 'corrupted ½' },
+      { pattern: /Â¼/g, description: 'corrupted ¼' },
+      { pattern: /Â¾/g, description: 'corrupted ¾' },
+      { pattern: /Â±/g, description: 'corrupted ±' },
+      { pattern: /â‰¤/g, description: 'corrupted ≤' },
+      { pattern: /â‰¥/g, description: 'corrupted ≥' },
+      { pattern: /â‰ /g, description: 'corrupted ≠' },
+      { pattern: /âˆš/g, description: 'corrupted √' },
+      { pattern: /Ï€/g, description: 'corrupted π' },
+      { pattern: /Î¸/g, description: 'corrupted θ' },
+      { pattern: /Î±/g, description: 'corrupted α' },
+      { pattern: /Î²/g, description: 'corrupted β' },
+      { pattern: /â†'/g, description: 'corrupted →' },
+      { pattern: /âˆž/g, description: 'corrupted ∞' },
+      // Generic Â not followed by expected characters (likely corruption)
+      { pattern: /Â(?!\s|$)/g, description: 'stray Â character' },
+    ];
+
+    for (const { pattern, description } of corruptionPatterns) {
+      if (pattern.test(text)) {
+        issues.push(description);
+      }
+    }
+
+    return { hasIssues: issues.length > 0, issues: [...new Set(issues)] }; // Dedupe
+  };
 
   // Helper to detect math symbols that were fixed
   const detectCorrectedSymbols = (oldText: string, newText: string): string[] => {
@@ -1847,6 +1886,27 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                           )}
                         </Button>
                       </div>
+                      {/* Encoding issues warning indicator */}
+                      {(() => {
+                        const encodingCheck = detectEncodingIssues(question.question);
+                        if (encodingCheck.hasIssues && !correctedSymbols[question.questionNumber]) {
+                          return (
+                            <div className="mt-1.5 flex items-center gap-1.5 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md">
+                              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                                  Possible encoding issue detected
+                                </p>
+                                <p className="text-xs text-amber-600 dark:text-amber-400 truncate">
+                                  Click regenerate (↻) to fix: {encodingCheck.issues.slice(0, 2).join(', ')}
+                                  {encodingCheck.issues.length > 2 && ` +${encodingCheck.issues.length - 2} more`}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       {/* Corrected symbols indicator */}
                       {correctedSymbols[question.questionNumber] && correctedSymbols[question.questionNumber].length > 0 && (
                         <div className="mt-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-300">
