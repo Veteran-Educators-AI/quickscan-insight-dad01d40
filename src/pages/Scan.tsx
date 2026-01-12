@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,11 +24,12 @@ import { useSaveAnalysisResults } from '@/hooks/useSaveAnalysisResults';
 import { useQRCodeScanner } from '@/hooks/useQRCodeScanner';
 import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
 import { MultiStudentScanner } from '@/components/scan/MultiStudentScanner';
+import { ScannerImportMode } from '@/components/scan/ScannerImportMode';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 
 type ScanState = 'idle' | 'camera' | 'preview' | 'choose-method' | 'upload-solution' | 'analyzed' | 'manual-scoring' | 'analyze-saved';
-type ScanMode = 'single' | 'batch' | 'saved';
+type ScanMode = 'single' | 'batch' | 'saved' | 'scanner';
 type GradingMethod = 'ai' | 'teacher';
 
 interface ManualResult {
@@ -90,6 +91,9 @@ export default function Scan() {
   
   // Multi-student grading mode
   const [showMultiStudentScanner, setShowMultiStudentScanner] = useState(false);
+  
+  // Scanner import pages
+  const [scannerImportPages, setScannerImportPages] = useState<{ dataUrl: string; order: number }[]>([]);
   
   // AI suggestions for manual scoring
   const [aiSuggestions, setAiSuggestions] = useState<{
@@ -571,7 +575,7 @@ export default function Scan() {
             setSelectedClassId(null);
             setSelectedStudentIds([]);
           }}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="single" className="gap-2">
                 <Camera className="h-4 w-4" />
                 Single
@@ -579,6 +583,10 @@ export default function Scan() {
               <TabsTrigger value="batch" className="gap-2">
                 <Layers className="h-4 w-4" />
                 Batch
+              </TabsTrigger>
+              <TabsTrigger value="scanner" className="gap-2">
+                <FileImage className="h-4 w-4" />
+                Scanner
               </TabsTrigger>
               <TabsTrigger value="saved" className="gap-2">
                 <Clock className="h-4 w-4" />
@@ -1410,6 +1418,22 @@ export default function Scan() {
                   )}
                 </>
               )}
+            </TabsContent>
+
+            {/* Scanner Import Mode */}
+            <TabsContent value="scanner" className="space-y-4 mt-4">
+              <ScannerImportMode
+                onPagesReady={(pages) => {
+                  setScannerImportPages(pages);
+                  // Add all pages to batch for processing
+                  pages.forEach(page => {
+                    batch.addImage(page.dataUrl);
+                  });
+                  setScanMode('batch');
+                  toast.success(`${pages.length} pages added to batch for analysis`);
+                }}
+                onClose={() => setScanMode('single')}
+              />
             </TabsContent>
 
             {/* Save for Later Mode */}
