@@ -125,6 +125,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [includeGraphPaper, setIncludeGraphPaper] = useState(false);
   const [includeCoordinateGeometry, setIncludeCoordinateGeometry] = useState(false);
   const [useAIImages, setUseAIImages] = useState(false);
+  const [useNanoBanana, setUseNanoBanana] = useState(false); // Use Nano Banana for realistic shape images
   const [imageSize, setImageSize] = useState(200); // Image size in pixels (100-400)
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledQuestions, setCompiledQuestions] = useState<GeneratedQuestion[]>([]);
@@ -408,6 +409,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           includeGraphPaper,
           includeCoordinateGeometry,
           useAIImages,
+          useNanoBanana,
           worksheetMode,
         },
       });
@@ -624,6 +626,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             questionNumber: p.questionNumber,
             imagePrompt: p.prompt,
           })),
+          useNanoBanana,
         },
       });
 
@@ -691,6 +694,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             questionNumber: questionNumber,
             imagePrompt: question.imagePrompt,
           }],
+          useNanoBanana,
         },
       });
 
@@ -1709,7 +1713,27 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 
                 {/* Image Size Slider - shown when AI images are enabled */}
                 {useAIImages && (
-                  <div className="space-y-2 ml-5 pl-2 border-l-2 border-muted">
+                  <div className="space-y-3 ml-5 pl-2 border-l-2 border-muted">
+                    {/* Nano Banana Option */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="useNanoBanana"
+                        checked={useNanoBanana}
+                        onChange={(e) => setUseNanoBanana(e.target.checked)}
+                        className="rounded border-input"
+                      />
+                      <Label htmlFor="useNanoBanana" className="text-sm cursor-pointer">
+                        <span className="flex flex-col">
+                          <span className="flex items-center gap-1">
+                            <Palette className="h-3.5 w-3.5 text-primary" />
+                            Use Nano Banana for realistic shapes
+                          </span>
+                          <span className="text-xs text-muted-foreground ml-5">Generates high-quality images using advanced AI model</span>
+                        </span>
+                      </Label>
+                    </div>
+                    
                     <div className="flex items-center justify-between">
                       <Label className="text-sm flex items-center gap-1">
                         <ImageIcon className="h-3.5 w-3.5" />
