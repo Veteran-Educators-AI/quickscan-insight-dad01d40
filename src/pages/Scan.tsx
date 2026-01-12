@@ -956,6 +956,8 @@ export default function Scan() {
                         isSaving={isSaving}
                         studentName={studentName}
                         studentId={currentStudentId}
+                        classId={singleScanClassId}
+                        topicName={result.problemIdentified}
                       />
                       
                       <SaveAnalyticsConfirmDialog
@@ -1024,6 +1026,7 @@ export default function Scan() {
                         isSaving={isSaving}
                         studentName={studentName}
                         studentId={currentStudentId}
+                        classId={singleScanClassId}
                       />
                       
                       <SaveAnalyticsConfirmDialog
