@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer } from 'lucide-react';
 import { QuestionPreviewPanel } from './QuestionPreviewPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -195,6 +195,15 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState('');
+  
+  // Preview state
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(75);
+  const [previewData, setPreviewData] = useState<{
+    students: StudentWithDiagnostic[];
+    questions: Record<string, { warmUp: GeneratedQuestion[], main: GeneratedQuestion[] }>;
+  } | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   // Load presets from localStorage on mount
   useEffect(() => {
@@ -733,6 +742,222 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       setIsGenerating(false);
       setGenerationProgress(0);
     }
+  };
+
+  // Generate preview data (questions only, no PDF)
+  const generatePreview = async () => {
+    const selectedStudents = students.filter(s => s.selected);
+    if (selectedStudents.length === 0) {
+      toast({
+        title: 'No students selected',
+        description: 'Please select at least one student.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerationProgress(0);
+    setGenerationStatus('Generating preview...');
+
+    try {
+      const levelsWithStudents = LEVELS.filter(l => selectedStudents.some(s => s.recommendedLevel === l));
+      const numForms = parseInt(formCount);
+      const formsToGenerate = FORM_LETTERS.slice(0, numForms);
+      const totalGenerations = numForms * levelsWithStudents.length;
+      let generationsComplete = 0;
+
+      const formQuestionCache: Record<string, { warmUp: GeneratedQuestion[], main: GeneratedQuestion[] }> = {};
+
+      for (const form of formsToGenerate) {
+        for (const level of levelsWithStudents) {
+          const cacheKey = `${form}-${level}`;
+          setGenerationStatus(`Generating Form ${form} questions for Level ${level}...`);
+
+          let warmUpQuestions: GeneratedQuestion[] = [];
+          if (parseInt(warmUpCount) > 0) {
+            const warmUpTopicsPayload = selectedTopics.length > 0
+              ? selectedTopics.map(t => ({
+                  topicName: t,
+                  standard: customTopics.find(ct => ct.topicName === t)?.standard || '',
+                  subject: 'Mathematics',
+                  category: 'Warm-Up',
+                }))
+              : [{ topicName: 'General Math', standard: '', subject: 'Mathematics', category: 'Warm-Up' }];
+
+            const { data: warmUpData } = await supabase.functions.invoke('generate-worksheet-questions', {
+              body: {
+                topics: warmUpTopicsPayload,
+                questionCount: parseInt(warmUpCount),
+                difficultyLevels: [warmUpDifficulty],
+                worksheetMode: 'warmup',
+                formVariation: form,
+                formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
+                includeHints,
+              },
+            });
+            warmUpQuestions = warmUpData?.questions || [];
+          }
+
+          const mainTopicsPayload = selectedTopics.length > 0
+            ? selectedTopics.map(t => ({
+                topicName: t,
+                standard: customTopics.find(ct => ct.topicName === t)?.standard || '',
+                subject: 'Mathematics',
+                category: 'Differentiated Practice',
+              }))
+            : [{ topicName: 'General Math', standard: '', subject: 'Mathematics', category: 'Differentiated Practice' }];
+
+          const { data } = await supabase.functions.invoke('generate-worksheet-questions', {
+            body: {
+              topics: mainTopicsPayload,
+              questionCount: parseInt(questionCount),
+              difficultyLevels: level === 'A' || level === 'B'
+                ? ['hard', 'challenging']
+                : level === 'C' || level === 'D'
+                ? ['medium', 'hard']
+                : ['easy', 'super-easy', 'medium'],
+              worksheetMode: 'diagnostic',
+              formVariation: form,
+              formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
+              includeHints,
+            },
+          });
+
+          formQuestionCache[cacheKey] = {
+            warmUp: warmUpQuestions,
+            main: data?.questions || [],
+          };
+
+          generationsComplete++;
+          setGenerationProgress((generationsComplete / totalGenerations) * 100);
+        }
+      }
+
+      setPreviewData({
+        students: selectedStudents,
+        questions: formQuestionCache,
+      });
+      setShowPreview(true);
+    } catch (error) {
+      console.error('Error generating preview:', error);
+      toast({
+        title: 'Preview generation failed',
+        description: 'Could not generate preview.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+      setGenerationProgress(0);
+    }
+  };
+
+  // Render preview worksheet for a student
+  const renderStudentPreview = (student: StudentWithDiagnostic, index: number) => {
+    if (!previewData) return null;
+
+    const numForms = parseInt(formCount);
+    const formsToGenerate = FORM_LETTERS.slice(0, numForms);
+    const studentsByLevel = previewData.students.reduce((acc, s) => {
+      if (!acc[s.recommendedLevel]) acc[s.recommendedLevel] = [];
+      acc[s.recommendedLevel].push(s);
+      return acc;
+    }, {} as Record<AdvancementLevel, StudentWithDiagnostic[]>);
+
+    const studentsAtLevel = studentsByLevel[student.recommendedLevel] || [];
+    const studentIdxInLevel = studentsAtLevel.findIndex(s => s.id === student.id);
+    const formIndex = studentIdxInLevel % numForms;
+    const assignedForm = formsToGenerate[formIndex];
+    const cacheKey = `${assignedForm}-${student.recommendedLevel}`;
+    const questions = previewData.questions[cacheKey];
+
+    const topicsLabel = selectedTopics.length > 0 ? selectedTopics.join(', ') : 'Math Practice';
+
+    return (
+      <div
+        key={student.id}
+        className="bg-white border rounded-lg shadow-sm mb-4"
+        style={{
+          width: '8.5in',
+          minHeight: '11in',
+          padding: '0.5in 0.75in',
+          pageBreakAfter: 'always',
+        }}
+      >
+        {/* Header */}
+        <div
+          className={`rounded-lg p-3 mb-4 ${
+            student.recommendedLevel === 'A' ? 'bg-green-100' :
+            student.recommendedLevel === 'B' ? 'bg-emerald-100' :
+            student.recommendedLevel === 'C' ? 'bg-yellow-100' :
+            student.recommendedLevel === 'D' ? 'bg-orange-100' :
+            student.recommendedLevel === 'E' ? 'bg-red-100' : 'bg-gray-100'
+          }`}
+        >
+          <h2 className="text-lg font-bold text-center">
+            Level {student.recommendedLevel} - {getLevelDescription(student.recommendedLevel)}
+            {numForms > 1 && ` | Form ${assignedForm}`}
+          </h2>
+          <p className="text-sm text-center text-muted-foreground">
+            {topicsLabel} - Diagnostic Worksheet
+          </p>
+        </div>
+
+        {/* Student Info */}
+        <div className="flex justify-between mb-4 pb-2 border-b">
+          <div>
+            <span className="text-sm font-medium">Name: </span>
+            <span className="text-sm">{student.first_name} {student.last_name}</span>
+          </div>
+          <div>
+            <span className="text-sm font-medium">Date: </span>
+            <span className="text-sm">{new Date().toLocaleDateString()}</span>
+          </div>
+        </div>
+
+        {/* Warm-up Section */}
+        {questions?.warmUp && questions.warmUp.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
+              🔥 Warm-Up Questions
+            </h3>
+            <div className="space-y-3">
+              {questions.warmUp.map((q, idx) => (
+                <div key={idx} className="p-2 border rounded bg-gray-50">
+                  <p className="text-sm font-medium">W{idx + 1}. {q.question}</p>
+                  {q.hint && includeHints && (
+                    <p className="text-xs text-muted-foreground mt-1 italic">Hint: {q.hint}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Main Questions */}
+        {questions?.main && questions.main.length > 0 && (
+          <div>
+            <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
+              📝 Practice Questions
+            </h3>
+            <div className="space-y-4">
+              {questions.main.map((q, idx) => (
+                <div key={idx} className="p-3 border rounded">
+                  <p className="text-sm font-medium">{idx + 1}. {q.question}</p>
+                  {q.hint && includeHints && (
+                    <p className="text-xs text-muted-foreground mt-1 italic">Hint: {q.hint}</p>
+                  )}
+                  {/* Answer space */}
+                  <div className="mt-3 border-t pt-2">
+                    <div className="h-16 border border-dashed rounded bg-gray-50"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const selectedCount = students.filter(s => s.selected).length;
@@ -1280,6 +1505,23 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             Cancel
           </Button>
           <Button
+            variant="outline"
+            onClick={generatePreview}
+            disabled={isGenerating || selectedCount === 0}
+          >
+            {isGenerating && !showPreview ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Eye className="h-4 w-4 mr-2" />
+                Preview
+              </>
+            )}
+          </Button>
+          <Button
             onClick={generateDifferentiatedWorksheets}
             disabled={isGenerating || selectedCount === 0}
             className="bg-purple-600 hover:bg-purple-700"
@@ -1298,6 +1540,77 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Preview Modal */}
+      {showPreview && previewData && (
+        <Dialog open={showPreview} onOpenChange={setShowPreview}>
+          <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col p-0">
+            {/* Preview Header */}
+            <div className="flex items-center justify-between p-4 border-b bg-muted/50">
+              <div className="flex items-center gap-4">
+                <h2 className="text-lg font-semibold">Print Preview</h2>
+                <Badge variant="secondary">
+                  {previewData.students.length} worksheet{previewData.students.length !== 1 ? 's' : ''}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Zoom controls */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPreviewZoom(Math.max(25, previewZoom - 25))}
+                  disabled={previewZoom <= 25}
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium w-12 text-center">{previewZoom}%</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPreviewZoom(Math.min(200, previewZoom + 25))}
+                  disabled={previewZoom >= 200}
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <Separator orientation="vertical" className="h-6" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPreview(false)}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Close
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-purple-600 hover:bg-purple-700"
+                  onClick={() => {
+                    setShowPreview(false);
+                    generateDifferentiatedWorksheets();
+                  }}
+                >
+                  <Printer className="h-4 w-4 mr-1" />
+                  Generate PDF
+                </Button>
+              </div>
+            </div>
+
+            {/* Preview Content */}
+            <ScrollArea className="flex-1 p-4 bg-gray-200">
+              <div
+                ref={previewRef}
+                className="flex flex-col items-center"
+                style={{
+                  transform: `scale(${previewZoom / 100})`,
+                  transformOrigin: 'top center',
+                }}
+              >
+                {previewData.students.map((student, index) => renderStudentPreview(student, index))}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 }
