@@ -44,15 +44,37 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
     }).filter(Boolean) as { topicName: string; standard: string }[];
   };
 
+  // Get topics from both selected checkboxes AND worksheet builder
+  const getAllTopicsArray = () => {
+    // Get topics from checkbox selection
+    const fromSelection = getSelectedTopicsArray();
+    
+    // Get topics from worksheet builder
+    const fromWorksheet = worksheetQuestions.map(q => ({
+      topicName: q.topicName,
+      standard: q.standard,
+    }));
+    
+    // Merge and dedupe by topicName
+    const combined = [...fromSelection];
+    fromWorksheet.forEach(wt => {
+      if (!combined.some(t => t.topicName === wt.topicName)) {
+        combined.push(wt);
+      }
+    });
+    
+    return combined;
+  };
+
   const openDiagnosticMode = () => {
-    const topicsArray = getSelectedTopicsArray();
+    const topicsArray = getAllTopicsArray();
     setInitialTopicsForGenerator(topicsArray);
     setDiagnosticMode(true);
     setShowDifferentiatedGenerator(true);
   };
 
   const openRegularMode = () => {
-    const topicsArray = getSelectedTopicsArray();
+    const topicsArray = getAllTopicsArray();
     setInitialTopicsForGenerator(topicsArray);
     setDiagnosticMode(false);
     setShowDifferentiatedGenerator(true);
