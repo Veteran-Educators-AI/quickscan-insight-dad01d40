@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square } from 'lucide-react';
+import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { ManualRegionDrawer } from './ManualRegionDrawer';
+import { CameraModal } from './CameraModal';
 
 interface StudentOption {
   id: string;
@@ -62,6 +63,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const [currentGradingIndex, setCurrentGradingIndex] = useState(0);
   const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
   const [showManualDrawer, setShowManualDrawer] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   
   // Class and roster state
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -133,6 +135,13 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
       }
     }
     e.target.value = '';
+  };
+
+  const handleCameraCapture = (imageDataUrl: string) => {
+    setOriginalImage(imageDataUrl);
+    setExtractedStudents([]);
+    setShowCamera(false);
+    toast.success('Photo captured! Now extract student regions.');
   };
 
   const extractStudentRegions = async () => {
@@ -456,28 +465,50 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
         </CardContent>
       </Card>
 
-      {/* Image Upload */}
+      {/* Image Upload / Camera */}
       {!originalImage && (
         <Card>
           <CardContent className="p-8">
             <div className="text-center space-y-4">
-              <div 
-                className="w-full min-h-[200px] border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Users className="h-12 w-12 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Upload Class Image</p>
-                  <p className="text-sm text-muted-foreground">
-                    Photo containing multiple students' work (e.g., exit tickets, quiz papers arranged on a desk)
-                  </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Camera Option */}
+                <div 
+                  className="w-full min-h-[180px] border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                  onClick={() => setShowCamera(true)}
+                >
+                  <Camera className="h-10 w-10 text-primary" />
+                  <div>
+                    <p className="font-medium">Scan with Camera</p>
+                    <p className="text-sm text-muted-foreground">
+                      Take a photo of student work
+                    </p>
+                  </div>
                 </div>
-                <div className="flex gap-2 mt-2">
-                  <Badge variant="outline">JPG</Badge>
-                  <Badge variant="outline">PNG</Badge>
-                  <Badge variant="outline">HEIC</Badge>
+
+                {/* Upload Option */}
+                <div 
+                  className="w-full min-h-[180px] border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-10 w-10 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Upload Image</p>
+                    <p className="text-sm text-muted-foreground">
+                      Select an existing photo
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge variant="outline">JPG</Badge>
+                    <Badge variant="outline">PNG</Badge>
+                    <Badge variant="outline">HEIC</Badge>
+                  </div>
                 </div>
               </div>
+
+              <p className="text-xs text-muted-foreground pt-2">
+                Capture or upload a photo containing multiple students' work (e.g., exit tickets, quiz papers arranged on a desk)
+              </p>
+              
               <input
                 ref={fileInputRef}
                 type="file"
@@ -761,6 +792,12 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
           </div>
         </div>
       )}
+      {/* Camera Modal */}
+      <CameraModal
+        isOpen={showCamera}
+        onClose={() => setShowCamera(false)}
+        onCapture={handleCameraCapture}
+      />
     </div>
   );
 }
