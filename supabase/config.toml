@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.push-student-data]
 verify_jwt = false
+
+[functions.receive-sister-app-data]
+verify_jwt = false
