@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -204,6 +204,15 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
     setWorksheetQuestions([]);
   };
 
+  const clearAllTopics = () => {
+    setSelectedTopics(new Set());
+    setWorksheetQuestions([]);
+    toast({
+      title: 'All topics cleared',
+      description: 'Selections and worksheet have been reset.',
+    });
+  };
+
   const selectAllInCategory = (category: TopicCategory, subject: string) => {
     const categoryTopicIds = category.topics.map(topic => 
       getTopicId(topic, subject, category.category)
@@ -347,6 +356,23 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
           </div>
           <div className="flex gap-2 items-start">
             <TooltipProvider>
+              {(selectedTopics.size > 0 || worksheetQuestions.length > 0) && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={clearAllTopics}
+                      className="h-9 w-9"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Clear all topics</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
               <div className="flex flex-col gap-1">
                 <Button 
                   onClick={openDiagnosticMode}
