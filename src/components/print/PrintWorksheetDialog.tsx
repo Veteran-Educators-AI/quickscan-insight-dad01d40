@@ -299,9 +299,33 @@ export function PrintWorksheetDialog({ classId, students, trigger }: PrintWorksh
             position: absolute;
             left: 0;
             top: 0;
+            width: 100%;
+            max-width: 8.5in;
+            box-sizing: border-box;
           }
           @page {
-            margin: 0.5in;
+            size: letter;
+            margin: 0.5in 0.75in;
+          }
+          .question-block {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          /* Ensure text wraps properly */
+          p, span, div {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+          }
+          /* Hide overflow */
+          .print-worksheet {
+            overflow: hidden;
+          }
+        }
+        @media screen {
+          .print-worksheet {
+            max-width: 8.5in;
+            margin: 0 auto;
           }
         }
       `}</style>
