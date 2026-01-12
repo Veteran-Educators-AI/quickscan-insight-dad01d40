@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { Loader2, Webhook, TestTube, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, Webhook, TestTube, CheckCircle2, AlertCircle, Link2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
 
 export function IntegrationSettings() {
   const { user } = useAuth();
@@ -18,6 +20,9 @@ export function IntegrationSettings() {
   const [isTesting, setIsTesting] = useState(false);
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookEnabled, setWebhookEnabled] = useState(false);
+  const [sisterAppSyncEnabled, setSisterAppSyncEnabled] = useState(false);
+  const [xpMultiplier, setXpMultiplier] = useState(0.5);
+  const [coinMultiplier, setCoinMultiplier] = useState(0.25);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
 
   useEffect(() => {
@@ -30,7 +35,7 @@ export function IntegrationSettings() {
     try {
       const { data, error } = await supabase
         .from('settings')
-        .select('integration_webhook_url, integration_webhook_enabled')
+        .select('integration_webhook_url, integration_webhook_enabled, sister_app_sync_enabled, sister_app_xp_multiplier, sister_app_coin_multiplier')
         .eq('teacher_id', user!.id)
         .single();
 
@@ -41,6 +46,9 @@ export function IntegrationSettings() {
       if (data) {
         setWebhookUrl(data.integration_webhook_url || "");
         setWebhookEnabled(data.integration_webhook_enabled || false);
+        setSisterAppSyncEnabled(data.sister_app_sync_enabled || false);
+        setXpMultiplier(data.sister_app_xp_multiplier || 0.5);
+        setCoinMultiplier(data.sister_app_coin_multiplier || 0.25);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -60,6 +68,9 @@ export function IntegrationSettings() {
           teacher_id: user.id,
           integration_webhook_url: webhookUrl,
           integration_webhook_enabled: webhookEnabled,
+          sister_app_sync_enabled: sisterAppSyncEnabled,
+          sister_app_xp_multiplier: xpMultiplier,
+          sister_app_coin_multiplier: coinMultiplier,
           updated_at: new Date().toISOString(),
         }, {
           onConflict: 'teacher_id'
@@ -241,6 +252,73 @@ export function IntegrationSettings() {
             <li><strong>Scan Analysis:</strong> Student name, scores, topic performance, misconceptions, recommended level</li>
             <li><strong>Diagnostic Results:</strong> Student name, level scores (A-F), recommended advancement level</li>
           </ul>
+        </div>
+
+        <Separator className="my-6" />
+
+        {/* Sister App Sync Section */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-2">
+            <Link2 className="h-5 w-5 text-primary" />
+            <h3 className="text-lg font-semibold">Connected Apps Sync</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Automatically sync student grades and data with connected sister apps (like gamification or rewards apps).
+          </p>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="sister-sync-enabled">Enable Sister App Sync</Label>
+              <p className="text-sm text-muted-foreground">
+                Automatically push grades when scans are analyzed
+              </p>
+            </div>
+            <Switch
+              id="sister-sync-enabled"
+              checked={sisterAppSyncEnabled}
+              onCheckedChange={setSisterAppSyncEnabled}
+            />
+          </div>
+
+          {sisterAppSyncEnabled && (
+            <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <Label>XP Reward Multiplier</Label>
+                  <span className="text-sm font-medium">{Math.round(xpMultiplier * 100)}% of grade</span>
+                </div>
+                <Slider
+                  value={[xpMultiplier]}
+                  onValueChange={([value]) => setXpMultiplier(value)}
+                  min={0.1}
+                  max={1}
+                  step={0.1}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  A grade of 80 with 50% multiplier = {Math.round(80 * 0.5)} XP
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <Label>Coin Reward Multiplier</Label>
+                  <span className="text-sm font-medium">{Math.round(coinMultiplier * 100)}% of grade</span>
+                </div>
+                <Slider
+                  value={[coinMultiplier]}
+                  onValueChange={([value]) => setCoinMultiplier(value)}
+                  min={0.1}
+                  max={1}
+                  step={0.1}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  A grade of 80 with 25% multiplier = {Math.round(80 * 0.25)} coins
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
