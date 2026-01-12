@@ -492,14 +492,29 @@ export default function Scan() {
   const handleSaveSingleResult = async () => {
     const studentId = currentStudentId;
     
-    if (!studentId || !result || !finalImage) {
-      toast.error('Missing student or results to save');
+    if (!studentId) {
+      toast.error('Please associate a student before saving');
+      setShowStudentPicker(true);
+      return;
+    }
+    
+    if (!result || !finalImage) {
+      toast.error('Missing analysis results to save');
+      return;
+    }
+
+    // Check if we have a valid question ID
+    const questionId = selectedQuestionIds[0] || detectedQR?.questionId;
+    if (!questionId) {
+      toast.error('No question selected. Please select a question from your library or use a QR-coded assessment.', {
+        duration: 5000,
+      });
       return;
     }
 
     const attemptId = await saveResults({
       studentId,
-      questionId: selectedQuestionIds[0] || 'unknown',
+      questionId,
       imageUrl: finalImage,
       result,
     });

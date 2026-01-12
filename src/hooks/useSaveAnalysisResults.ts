@@ -52,6 +52,17 @@ export function useSaveAnalysisResults() {
     setIsSaving(true);
 
     try {
+      // Validate required fields
+      if (!params.studentId) {
+        toast.error('Student ID is required to save results');
+        return null;
+      }
+      
+      if (!params.questionId) {
+        toast.error('Question ID is required to save results. Please select a question from your library.');
+        return null;
+      }
+
       // 1. Create attempt record
       const { data: attempt, error: attemptError } = await supabase
         .from('attempts')
@@ -63,7 +74,20 @@ export function useSaveAnalysisResults() {
         .select('id')
         .single();
 
-      if (attemptError) throw attemptError;
+      if (attemptError) {
+        // Check for foreign key violation
+        if (attemptError.code === '23503') {
+          if (attemptError.message.includes('question_id')) {
+            toast.error('Invalid question. Please select a valid question from your library.');
+          } else if (attemptError.message.includes('student_id')) {
+            toast.error('Invalid student. Please select a valid student.');
+          } else {
+            toast.error('Database constraint error: ' + attemptError.message);
+          }
+          return null;
+        }
+        throw attemptError;
+      }
 
       // 2. Create attempt_image record
       const { error: imageError } = await supabase
