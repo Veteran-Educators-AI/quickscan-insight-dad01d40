@@ -535,3 +535,19 @@ export function fixEncodingCorruption(text: string): string {
 }
 
 export { mathSymbols, superscripts, subscripts, fractions };
+
+/**
+ * Cleans text for print-safe output by removing problematic characters
+ * and ensuring proper encoding
+ */
+export function cleanTextForPrint(text: string): string {
+  if (!text) return '';
+  
+  // First fix any encoding corruption
+  let result = fixEncodingCorruption(text);
+  
+  // Then render math symbols
+  result = renderMathText(result);
+  
+  return result;
+}
