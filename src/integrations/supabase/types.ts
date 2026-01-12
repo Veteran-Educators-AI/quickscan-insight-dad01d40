@@ -936,6 +936,57 @@ export type Database = {
           },
         ]
       }
+      sister_app_sync_log: {
+        Row: {
+          action: string
+          created_at: string
+          data: Json
+          id: string
+          processed: boolean
+          processed_at: string | null
+          source_app: string
+          student_id: string | null
+          teacher_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          data?: Json
+          id?: string
+          processed?: boolean
+          processed_at?: string | null
+          source_app?: string
+          student_id?: string | null
+          teacher_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          processed?: boolean
+          processed_at?: string | null
+          source_app?: string
+          student_id?: string | null
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sister_app_sync_log_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sister_app_sync_log_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           class_id: string
@@ -987,6 +1038,47 @@ export type Database = {
           {
             foreignKeyName: "students_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teacher_api_keys: {
+        Row: {
+          api_key_hash: string
+          api_key_prefix: string
+          created_at: string
+          id: string
+          is_active: boolean
+          last_used_at: string | null
+          name: string
+          teacher_id: string
+        }
+        Insert: {
+          api_key_hash: string
+          api_key_prefix: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          name?: string
+          teacher_id: string
+        }
+        Update: {
+          api_key_hash?: string
+          api_key_prefix?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          name?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_api_keys_teacher_id_fkey"
+            columns: ["teacher_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

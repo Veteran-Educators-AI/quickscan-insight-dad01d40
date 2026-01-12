@@ -8,6 +8,7 @@ import { NotificationSettings } from '@/components/settings/NotificationSettings
 import { AIDetectionSettings } from '@/components/settings/AIDetectionSettings';
 import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
 import { IntegrationSettings } from '@/components/settings/IntegrationSettings';
+import { ApiKeySettings } from '@/components/settings/ApiKeySettings';
 import { useOnboardingTour } from '@/hooks/useOnboardingTour';
 
 const DEPLOYED_URL = 'https://eb414783-3d02-49de-9a11-3c5e9daba81a.lovableproject.com';
@@ -159,6 +160,8 @@ export default function Settings() {
         <TwoFactorSettings />
 
         <IntegrationSettings />
+
+        <ApiKeySettings />
 
         <Card>
           <CardHeader>
