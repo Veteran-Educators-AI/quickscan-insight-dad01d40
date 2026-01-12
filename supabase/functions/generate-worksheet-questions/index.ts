@@ -524,6 +524,58 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
 
     const content = await callLovableAI(prompt);
 
+    // Function to fix common Unicode encoding issues in math text
+    function sanitizeMathText(text: string): string {
+      if (!text) return text;
+      
+      // Fix common encoding corruption patterns
+      let result = text
+        // Fix π corruption patterns (Â often appears before or instead of π)
+        .replace(/Â\s*π/g, 'π')
+        .replace(/Âπ/g, 'π')
+        .replace(/πÂ/g, 'π')
+        .replace(/Â(?=\d)/g, 'π')  // Â followed by digit often means π was intended
+        .replace(/(\d)Â(\s)/g, '$1π$2')  // Number + Â + space pattern
+        .replace(/(\d)Â\s*cubic/gi, '$1π cubic')  // Pattern like "500Â cubic"
+        .replace(/(\d)Â\s*cm/gi, '$1π cm')  // Pattern like "500Â cm"
+        .replace(/(\d)Â\s*(?=[a-z])/gi, '$1π ')  // Number + Â followed by letter
+        // Fix degree symbol issues
+        .replace(/Â°/g, '°')
+        .replace(/°Â/g, '°')
+        // Fix other common UTF-8 mojibake patterns
+        .replace(/Â²/g, '²')
+        .replace(/Â³/g, '³')
+        .replace(/Â½/g, '½')
+        .replace(/Â¼/g, '¼')
+        .replace(/Â¾/g, '¾')
+        .replace(/Â±/g, '±')
+        .replace(/Â·/g, '·')
+        .replace(/â‰¤/g, '≤')
+        .replace(/â‰¥/g, '≥')
+        .replace(/â‰ /g, '≠')
+        .replace(/â†'/g, '→')
+        .replace(/âˆš/g, '√')
+        .replace(/âˆž/g, '∞')
+        .replace(/Î¸/g, 'θ')
+        .replace(/Î±/g, 'α')
+        .replace(/Î²/g, 'β')
+        .replace(/Î³/g, 'γ')
+        .replace(/Î"/g, 'Δ')
+        .replace(/Î´/g, 'δ')
+        .replace(/Ï€/g, 'π')
+        .replace(/Ïˆ/g, 'ψ')
+        .replace(/Ï†/g, 'φ')
+        .replace(/Î£/g, 'Σ')
+        .replace(/Ïƒ/g, 'σ')
+        .replace(/Î©/g, 'Ω')
+        .replace(/Ï‰/g, 'ω')
+        // Clean up any remaining stray Â characters that appear before numbers or letters
+        .replace(/Â\s+/g, ' ')
+        .replace(/\s+Â/g, ' ');
+      
+      return result;
+    }
+
     // Parse the JSON response
     let questions: GeneratedQuestion[];
     try {
@@ -539,6 +591,14 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         cleanContent = cleanContent.slice(0, -3);
       }
       questions = JSON.parse(cleanContent.trim());
+      
+      // Sanitize all question text to fix encoding issues
+      questions = questions.map(q => ({
+        ...q,
+        question: sanitizeMathText(q.question),
+        hint: q.hint ? sanitizeMathText(q.hint) : q.hint,
+        imagePrompt: q.imagePrompt ? sanitizeMathText(q.imagePrompt) : q.imagePrompt,
+      }));
     } catch (parseError) {
       console.error('Failed to parse AI response:', content);
       throw new Error('Failed to parse generated questions');
