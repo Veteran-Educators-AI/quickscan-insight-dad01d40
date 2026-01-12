@@ -724,12 +724,69 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
   // State for regenerating question text
   const [regeneratingQuestionTextNumber, setRegeneratingQuestionTextNumber] = useState<number | null>(null);
+  
+  // State for tracking recently corrected symbols per question
+  const [correctedSymbols, setCorrectedSymbols] = useState<Record<number, string[]>>({});
+
+  // Helper to detect math symbols that were fixed
+  const detectCorrectedSymbols = (oldText: string, newText: string): string[] => {
+    const mathSymbolPatterns: { pattern: RegExp; name: string }[] = [
+      { pattern: /π/g, name: 'π (pi)' },
+      { pattern: /°/g, name: '° (degrees)' },
+      { pattern: /²/g, name: '² (squared)' },
+      { pattern: /³/g, name: '³ (cubed)' },
+      { pattern: /√/g, name: '√ (square root)' },
+      { pattern: /≤/g, name: '≤ (less than or equal)' },
+      { pattern: /≥/g, name: '≥ (greater than or equal)' },
+      { pattern: /≠/g, name: '≠ (not equal)' },
+      { pattern: /±/g, name: '± (plus/minus)' },
+      { pattern: /×/g, name: '× (times)' },
+      { pattern: /÷/g, name: '÷ (divide)' },
+      { pattern: /θ/g, name: 'θ (theta)' },
+      { pattern: /∠/g, name: '∠ (angle)' },
+      { pattern: /△/g, name: '△ (triangle)' },
+      { pattern: /½/g, name: '½ (one half)' },
+      { pattern: /¼/g, name: '¼ (one quarter)' },
+      { pattern: /¾/g, name: '¾ (three quarters)' },
+      { pattern: /⊥/g, name: '⊥ (perpendicular)' },
+      { pattern: /∥/g, name: '∥ (parallel)' },
+      { pattern: /≅/g, name: '≅ (congruent)' },
+    ];
+
+    const corrected: string[] = [];
+    
+    // Check for symbols that appear in new text but were corrupted in old text
+    for (const { pattern, name } of mathSymbolPatterns) {
+      const newMatches = (newText.match(pattern) || []).length;
+      const oldMatches = (oldText.match(pattern) || []).length;
+      
+      // If new text has more of this symbol, it was likely fixed
+      if (newMatches > oldMatches) {
+        corrected.push(name);
+      }
+    }
+    
+    // Also check for common corruption patterns that were fixed
+    const corruptionPatterns = [
+      { old: /Â/g, name: 'encoding errors' },
+      { old: /â€/g, name: 'character corruption' },
+    ];
+    
+    for (const { old, name } of corruptionPatterns) {
+      if (old.test(oldText) && !old.test(newText)) {
+        corrected.push(name);
+      }
+    }
+
+    return corrected;
+  };
 
   // Regenerate the text of a single question (to fix formatting issues like π rendering)
   const regenerateQuestionText = async (questionNumber: number) => {
     const question = compiledQuestions.find(q => q.questionNumber === questionNumber);
     if (!question) return;
 
+    const oldQuestionText = question.question;
     setRegeneratingQuestionTextNumber(questionNumber);
 
     try {
@@ -770,10 +827,32 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         );
         setCompiledQuestions(updatedQuestions);
         
-        toast({
-          title: 'Question regenerated!',
-          description: `New question text created for question ${questionNumber}.`,
-        });
+        // Detect which symbols were corrected
+        const detected = detectCorrectedSymbols(oldQuestionText, newQuestion.question);
+        
+        if (detected.length > 0) {
+          // Store corrected symbols for visual display
+          setCorrectedSymbols(prev => ({ ...prev, [questionNumber]: detected }));
+          
+          // Clear the indicator after 5 seconds
+          setTimeout(() => {
+            setCorrectedSymbols(prev => {
+              const newState = { ...prev };
+              delete newState[questionNumber];
+              return newState;
+            });
+          }, 5000);
+          
+          toast({
+            title: '✓ Symbols corrected!',
+            description: `Fixed: ${detected.join(', ')}`,
+          });
+        } else {
+          toast({
+            title: 'Question regenerated!',
+            description: `New question text created for question ${questionNumber}.`,
+          });
+        }
       } else {
         throw new Error('No question returned');
       }
@@ -1768,6 +1847,26 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                           )}
                         </Button>
                       </div>
+                      {/* Corrected symbols indicator */}
+                      {correctedSymbols[question.questionNumber] && correctedSymbols[question.questionNumber].length > 0 && (
+                        <div className="mt-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-300">
+                          <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white text-xs gap-1">
+                            <Check className="h-3 w-3" />
+                            Symbols fixed
+                          </Badge>
+                          <div className="flex flex-wrap gap-1">
+                            {correctedSymbols[question.questionNumber].map((symbol, idx) => (
+                              <Badge 
+                                key={idx} 
+                                variant="outline" 
+                                className="text-xs border-green-500/50 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30"
+                              >
+                                {symbol}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {question.imageUrl && (
                         <div className="mt-2 flex flex-col items-center gap-2">
                           <div className="relative group">
