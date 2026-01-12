@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
-import { renderMathText } from '@/lib/mathRenderer';
+import { renderMathText, sanitizeForPDF, fixEncodingCorruption } from '@/lib/mathRenderer';
 import { MathSymbolPreview } from './MathSymbolPreview';
 import jsPDF from 'jspdf';
 import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
@@ -926,13 +926,13 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       // Header
       pdf.setFontSize(18);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(worksheetTitle, pageWidth / 2, yPosition, { align: 'center' });
+      pdf.text(sanitizeForPDF(worksheetTitle), pageWidth / 2, yPosition, { align: 'center' });
       yPosition += 10;
 
       if (teacherName) {
         pdf.setFontSize(12);
         pdf.setFont('helvetica', 'normal');
-        pdf.text(`Teacher: ${teacherName}`, pageWidth / 2, yPosition, { align: 'center' });
+        pdf.text(sanitizeForPDF(`Teacher: ${teacherName}`), pageWidth / 2, yPosition, { align: 'center' });
         yPosition += 8;
       }
 
@@ -977,13 +977,14 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(9);
         pdf.setTextColor(100);
-        pdf.text(`${question.topic} (${question.standard})`, margin + 5, yPosition);
+        pdf.text(sanitizeForPDF(`${question.topic} (${question.standard})`), margin + 5, yPosition);
         pdf.setTextColor(0);
         yPosition += 8;
 
-        // Question text - wrap long text
+        // Question text - wrap long text, sanitize for PDF to fix encoding issues
         pdf.setFontSize(11);
-        const lines = pdf.splitTextToSize(question.question, contentWidth - 10);
+        const sanitizedQuestion = sanitizeForPDF(question.question);
+        const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
         
         lines.forEach((line: string) => {
           if (yPosition > pageHeight - 40) {
@@ -1170,7 +1171,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             // Category header
             pdf.setFontSize(11);
             pdf.setFont('helvetica', 'bold');
-            pdf.text(category.category, margin, yPosition);
+            pdf.text(sanitizeForPDF(category.category), margin, yPosition);
             yPosition += 7;
 
             // Formulas in this category
@@ -1183,8 +1184,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 yPosition = margin;
               }
 
-              // Formula name and formula
-              const formulaLine = `• ${formula.name}: ${formula.formula}`;
+              // Formula name and formula - sanitize for PDF
+              const formulaLine = sanitizeForPDF(`• ${formula.name}: ${formula.formula}`);
               const lines = pdf.splitTextToSize(formulaLine, contentWidth - 10);
               
               lines.forEach((line: string) => {
@@ -1196,7 +1197,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               if (formula.description) {
                 pdf.setFontSize(9);
                 pdf.setTextColor(100);
-                pdf.text(`  (${formula.description})`, margin + 10, yPosition);
+                pdf.text(sanitizeForPDF(`  (${formula.description})`), margin + 10, yPosition);
                 pdf.setTextColor(0);
                 pdf.setFontSize(10);
                 yPosition += 5;
@@ -1864,7 +1865,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       </p>
                       <div className="flex items-start gap-2">
                         <div className="flex-1 relative">
-                          <p className="text-sm font-serif leading-relaxed">{renderMathText(question.question)}</p>
+                          <p className="text-sm font-serif leading-relaxed">{renderMathText(fixEncodingCorruption(question.question))}</p>
                           {regeneratingQuestionTextNumber === question.questionNumber && (
                             <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded">
                               <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -2213,7 +2214,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   <p className="text-sm text-muted-foreground ml-5">
                     {question.topic} ({question.standard})
                   </p>
-                  <p className="ml-5 font-serif leading-relaxed text-base">{renderMathText(question.question)}</p>
+                  <p className="ml-5 font-serif leading-relaxed text-base">{renderMathText(fixEncodingCorruption(question.question))}</p>
                   {question.svg && (
                     <div 
                       className="ml-5 mt-2 flex justify-center"

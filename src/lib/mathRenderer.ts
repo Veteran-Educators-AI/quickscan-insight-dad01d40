@@ -244,4 +244,294 @@ export function parseMathText(text: string): Array<{ type: 'text' | 'math'; cont
   return parts;
 }
 
+/**
+ * Converts Unicode math symbols to ASCII-safe text for PDF rendering
+ * jsPDF's default fonts don't support many Unicode math symbols, causing garbled output
+ * This function replaces Unicode symbols with their text representations
+ */
+export function sanitizeForPDF(text: string): string {
+  if (!text) return '';
+  
+  let result = text;
+  
+  // First, fix any existing encoding corruption patterns (mojibake)
+  // These patterns occur when UTF-8 text is incorrectly decoded as Latin-1
+  const mojibakePatterns: [RegExp, string][] = [
+    // Greek letters mojibake
+    [/Ï€/g, 'π'],      // π
+    [/Î¸/g, 'θ'],      // θ
+    [/Î±/g, 'α'],      // α
+    [/Î²/g, 'β'],      // β
+    [/Î³/g, 'γ'],      // γ
+    [/Î"/g, 'Δ'],      // Δ
+    [/Î´/g, 'δ'],      // δ
+    [/Ïˆ/g, 'ψ'],      // ψ
+    [/Ï†/g, 'φ'],      // φ
+    [/Î£/g, 'Σ'],      // Σ
+    [/Ïƒ/g, 'σ'],      // σ
+    [/Î©/g, 'Ω'],      // Ω
+    [/Ï‰/g, 'ω'],      // ω
+    [/Î»/g, 'λ'],      // λ
+    [/Î¼/g, 'μ'],      // μ
+    
+    // Math operators mojibake
+    [/â‰¤/g, '≤'],      // ≤
+    [/â‰¥/g, '≥'],      // ≥
+    [/â‰ /g, '≠'],      // ≠
+    [/â†'/g, '→'],      // →
+    [/âˆš/g, '√'],      // √
+    [/âˆž/g, '∞'],      // ∞
+    [/Ã—/g, '×'],      // ×
+    [/Ã·/g, '÷'],      // ÷
+    [/â€"/g, '—'],      // em dash
+    [/â€™/g, "'"],     // right single quote
+    [/â€œ/g, '"'],     // left double quote
+    [/â€/g, '"'],      // right double quote
+    
+    // Common Â prefix corruption (UTF-8 BOM or encoding issue)
+    [/Â\s*π/g, 'π'],
+    [/Âπ/g, 'π'],
+    [/πÂ/g, 'π'],
+    [/Â°/g, '°'],
+    [/°Â/g, '°'],
+    [/Â²/g, '²'],
+    [/Â³/g, '³'],
+    [/Â½/g, '½'],
+    [/Â¼/g, '¼'],
+    [/Â¾/g, '¾'],
+    [/Â±/g, '±'],
+    [/Â·/g, '·'],
+    
+    // Fix ampersand-interleaved text (& between each character)
+    // This pattern appears when encoding fails catastrophically
+    [/&([a-zA-Z])&([a-zA-Z])&([a-zA-Z])/g, '$1$2$3'],
+    
+    // Clean up remaining stray Â characters
+    [/Â(?=\d)/g, ''],
+    [/(\d)Â\s/g, '$1 '],
+    [/Â\s+/g, ' '],
+    [/\s+Â/g, ' '],
+  ];
+  
+  for (const [pattern, replacement] of mojibakePatterns) {
+    result = result.replace(pattern, replacement);
+  }
+  
+  // Now convert Unicode math symbols to ASCII-safe representations for PDF
+  const pdfSafeReplacements: [RegExp, string][] = [
+    // Greek letters - use word representations
+    [/π/g, 'pi'],
+    [/θ/g, 'theta'],
+    [/α/g, 'alpha'],
+    [/β/g, 'beta'],
+    [/γ/g, 'gamma'],
+    [/δ/g, 'delta'],
+    [/Δ/g, 'Delta'],
+    [/σ/g, 'sigma'],
+    [/Σ/g, 'Sigma'],
+    [/ω/g, 'omega'],
+    [/Ω/g, 'Omega'],
+    [/φ/g, 'phi'],
+    [/Φ/g, 'Phi'],
+    [/λ/g, 'lambda'],
+    [/μ/g, 'mu'],
+    [/ρ/g, 'rho'],
+    [/τ/g, 'tau'],
+    [/ψ/g, 'psi'],
+    
+    // Square root
+    [/√/g, 'sqrt'],
+    
+    // Comparison operators
+    [/≤/g, '<='],
+    [/≥/g, '>='],
+    [/≠/g, '!='],
+    [/≈/g, '~='],
+    
+    // Plus/minus and other operators
+    [/±/g, '+/-'],
+    [/×/g, 'x'],
+    [/÷/g, '/'],
+    [/·/g, '*'],
+    [/∞/g, 'infinity'],
+    
+    // Superscript digits - convert back to caret notation
+    [/⁰/g, '^0'],
+    [/¹/g, '^1'],
+    [/²/g, '^2'],
+    [/³/g, '^3'],
+    [/⁴/g, '^4'],
+    [/⁵/g, '^5'],
+    [/⁶/g, '^6'],
+    [/⁷/g, '^7'],
+    [/⁸/g, '^8'],
+    [/⁹/g, '^9'],
+    [/⁺/g, '^+'],
+    [/⁻/g, '^-'],
+    [/⁼/g, '^='],
+    [/⁽/g, '^('],
+    [/⁾/g, '^)'],
+    [/ⁿ/g, '^n'],
+    [/ˣ/g, '^x'],
+    [/ʸ/g, '^y'],
+    
+    // Subscript digits - convert back to underscore notation
+    [/₀/g, '_0'],
+    [/₁/g, '_1'],
+    [/₂/g, '_2'],
+    [/₃/g, '_3'],
+    [/₄/g, '_4'],
+    [/₅/g, '_5'],
+    [/₆/g, '_6'],
+    [/₇/g, '_7'],
+    [/₈/g, '_8'],
+    [/₉/g, '_9'],
+    [/₊/g, '_+'],
+    [/₋/g, '_-'],
+    [/₌/g, '_='],
+    [/₍/g, '_('],
+    [/₎/g, '_)'],
+    [/ₐ/g, '_a'],
+    [/ₑ/g, '_e'],
+    [/ᵢ/g, '_i'],
+    [/ₙ/g, '_n'],
+    [/ₓ/g, '_x'],
+    
+    // Common fractions
+    [/½/g, '1/2'],
+    [/⅓/g, '1/3'],
+    [/⅔/g, '2/3'],
+    [/¼/g, '1/4'],
+    [/¾/g, '3/4'],
+    [/⅕/g, '1/5'],
+    [/⅖/g, '2/5'],
+    [/⅗/g, '3/5'],
+    [/⅘/g, '4/5'],
+    [/⅙/g, '1/6'],
+    [/⅚/g, '5/6'],
+    [/⅛/g, '1/8'],
+    [/⅜/g, '3/8'],
+    [/⅝/g, '5/8'],
+    [/⅞/g, '7/8'],
+    
+    // Geometry symbols
+    [/∠/g, 'angle '],
+    [/°/g, ' degrees'],
+    [/⊥/g, ' perpendicular '],
+    [/∥/g, ' parallel '],
+    [/≅/g, ' congruent to '],
+    [/~/g, ' similar to '],
+    [/△/g, 'triangle '],
+    [/○/g, 'circle '],
+    [/□/g, 'square '],
+    
+    // Arrows
+    [/→/g, '->'],
+    [/←/g, '<-'],
+    [/↔/g, '<->'],
+    [/⇒/g, '=>'],
+    
+    // Other math symbols
+    [/∴/g, 'therefore'],
+    [/∵/g, 'because'],
+    [/∈/g, ' in '],
+    [/⊂/g, ' subset of '],
+    [/∪/g, ' union '],
+    [/∩/g, ' intersection '],
+    [/′/g, "'"],
+    [/″/g, "''"],
+    [/•/g, '*'],
+  ];
+  
+  for (const [pattern, replacement] of pdfSafeReplacements) {
+    result = result.replace(pattern, replacement);
+  }
+  
+  // Clean up any double spaces that may have been introduced
+  result = result.replace(/\s+/g, ' ').trim();
+  
+  // Clean up spaces before "degrees" when it follows a number
+  result = result.replace(/(\d)\s+degrees/g, '$1 degrees');
+  
+  return result;
+}
+
+/**
+ * Fix encoding corruption in text (mojibake patterns)
+ * Use this to clean up text that may have encoding issues
+ * without converting Unicode symbols to ASCII
+ */
+export function fixEncodingCorruption(text: string): string {
+  if (!text) return '';
+  
+  let result = text;
+  
+  // Fix mojibake patterns (UTF-8 decoded as Latin-1)
+  const mojibakePatterns: [RegExp, string][] = [
+    // Greek letters
+    [/Ï€/g, 'π'],
+    [/Î¸/g, 'θ'],
+    [/Î±/g, 'α'],
+    [/Î²/g, 'β'],
+    [/Î³/g, 'γ'],
+    [/Î"/g, 'Δ'],
+    [/Î´/g, 'δ'],
+    [/Ïˆ/g, 'ψ'],
+    [/Ï†/g, 'φ'],
+    [/Î£/g, 'Σ'],
+    [/Ïƒ/g, 'σ'],
+    [/Î©/g, 'Ω'],
+    [/Ï‰/g, 'ω'],
+    [/Î»/g, 'λ'],
+    [/Î¼/g, 'μ'],
+    
+    // Math operators
+    [/â‰¤/g, '≤'],
+    [/â‰¥/g, '≥'],
+    [/â‰ /g, '≠'],
+    [/â†'/g, '→'],
+    [/âˆš/g, '√'],
+    [/âˆž/g, '∞'],
+    [/Ã—/g, '×'],
+    [/Ã·/g, '÷'],
+    
+    // Common Â prefix patterns
+    [/Â\s*π/g, 'π'],
+    [/Âπ/g, 'π'],
+    [/πÂ/g, 'π'],
+    [/Â°/g, '°'],
+    [/°Â/g, '°'],
+    [/Â²/g, '²'],
+    [/Â³/g, '³'],
+    [/Â½/g, '½'],
+    [/Â¼/g, '¼'],
+    [/Â¾/g, '¾'],
+    [/Â±/g, '±'],
+    [/Â·/g, '·'],
+    
+    // Fix numbers followed by Â (often corrupted π in "terms of π")
+    [/(\d)Â(?=\s|$|\.)/g, '$1π'],
+    [/(\d)Â\s*cm/gi, '$1π cm'],
+    [/(\d)Â\s*cubic/gi, '$1π cubic'],
+    [/(\d)Â\s*square/gi, '$1π square'],
+    
+    // Fix ampersand-interleaved text corruption
+    // Pattern: &a&n&s&w&e&r -> answer
+    [/&([a-zA-Z])(?=&)/g, '$1'],
+    [/&([a-zA-Z])$/g, '$1'],
+    [/^&([a-zA-Z])/g, '$1'],
+    
+    // Clean up remaining stray characters
+    [/Â\s+/g, ' '],
+    [/\s+Â/g, ' '],
+    [/Â(?![a-zA-Z0-9])/g, ''],
+  ];
+  
+  for (const [pattern, replacement] of mojibakePatterns) {
+    result = result.replace(pattern, replacement);
+  }
+  
+  return result;
+}
+
 export { mathSymbols, superscripts, subscripts, fractions };
