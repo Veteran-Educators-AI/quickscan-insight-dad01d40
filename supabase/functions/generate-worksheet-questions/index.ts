@@ -528,50 +528,107 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
     function sanitizeMathText(text: string): string {
       if (!text) return text;
       
-      // Fix common encoding corruption patterns
-      let result = text
-        // Fix π corruption patterns (Â often appears before or instead of π)
-        .replace(/Â\s*π/g, 'π')
-        .replace(/Âπ/g, 'π')
-        .replace(/πÂ/g, 'π')
-        .replace(/Â(?=\d)/g, 'π')  // Â followed by digit often means π was intended
-        .replace(/(\d)Â(\s)/g, '$1π$2')  // Number + Â + space pattern
-        .replace(/(\d)Â\s*cubic/gi, '$1π cubic')  // Pattern like "500Â cubic"
-        .replace(/(\d)Â\s*cm/gi, '$1π cm')  // Pattern like "500Â cm"
-        .replace(/(\d)Â\s*(?=[a-z])/gi, '$1π ')  // Number + Â followed by letter
-        // Fix degree symbol issues
-        .replace(/Â°/g, '°')
-        .replace(/°Â/g, '°')
-        // Fix other common UTF-8 mojibake patterns
-        .replace(/Â²/g, '²')
-        .replace(/Â³/g, '³')
-        .replace(/Â½/g, '½')
-        .replace(/Â¼/g, '¼')
-        .replace(/Â¾/g, '¾')
-        .replace(/Â±/g, '±')
-        .replace(/Â·/g, '·')
-        .replace(/â‰¤/g, '≤')
-        .replace(/â‰¥/g, '≥')
-        .replace(/â‰ /g, '≠')
-        .replace(/â†'/g, '→')
-        .replace(/âˆš/g, '√')
-        .replace(/âˆž/g, '∞')
-        .replace(/Î¸/g, 'θ')
-        .replace(/Î±/g, 'α')
-        .replace(/Î²/g, 'β')
-        .replace(/Î³/g, 'γ')
-        .replace(/Î"/g, 'Δ')
-        .replace(/Î´/g, 'δ')
-        .replace(/Ï€/g, 'π')
-        .replace(/Ïˆ/g, 'ψ')
-        .replace(/Ï†/g, 'φ')
-        .replace(/Î£/g, 'Σ')
-        .replace(/Ïƒ/g, 'σ')
-        .replace(/Î©/g, 'Ω')
-        .replace(/Ï‰/g, 'ω')
-        // Clean up any remaining stray Â characters that appear before numbers or letters
+      let result = text;
+      
+      // First pass: Fix ampersand-interleaved text corruption
+      // This catastrophic encoding pattern inserts & between each character
+      // Example: "&p&a&i&n&t&e&d&" -> "painted"
+      // We need to detect and fix this pattern before other fixes
+      const ampersandPattern = /(&[a-zA-Z]){3,}/g;
+      if (ampersandPattern.test(result)) {
+        // Remove all & characters that are between single letters
+        result = result.replace(/&([a-zA-Z])(?=&|$|\s|\.)/g, '$1');
+        result = result.replace(/^&([a-zA-Z])/g, '$1');
+      }
+      
+      // Fix standalone & before letters (partial corruption)
+      result = result.replace(/&([a-zA-Z])&/g, '$1');
+      
+      // Second pass: Fix mojibake patterns (UTF-8 decoded as Latin-1/Windows-1252)
+      const mojibakePatterns: [RegExp, string][] = [
+        // Greek letters mojibake
+        [/Ï€/g, 'π'],      // π (pi)
+        [/Î¸/g, 'θ'],      // θ (theta)
+        [/Î±/g, 'α'],      // α (alpha)
+        [/Î²/g, 'β'],      // β (beta)
+        [/Î³/g, 'γ'],      // γ (gamma)
+        [/Î"/g, 'Δ'],      // Δ (Delta)
+        [/Î´/g, 'δ'],      // δ (delta)
+        [/Ïˆ/g, 'ψ'],      // ψ (psi)
+        [/Ï†/g, 'φ'],      // φ (phi)
+        [/Î£/g, 'Σ'],      // Σ (Sigma)
+        [/Ïƒ/g, 'σ'],      // σ (sigma)
+        [/Î©/g, 'Ω'],      // Ω (Omega)
+        [/Ï‰/g, 'ω'],      // ω (omega)
+        [/Î»/g, 'λ'],      // λ (lambda)
+        [/Î¼/g, 'μ'],      // μ (mu)
+        [/Ï/g, 'ρ'],       // ρ (rho) - careful, this is generic
+        
+        // Math operators mojibake
+        [/â‰¤/g, '≤'],      // ≤
+        [/â‰¥/g, '≥'],      // ≥
+        [/â‰ /g, '≠'],      // ≠
+        [/â†'/g, '→'],      // →
+        [/â†/g, '←'],       // ←
+        [/âˆš/g, '√'],      // √
+        [/âˆž/g, '∞'],      // ∞
+        [/Ã—/g, '×'],      // ×
+        [/Ã·/g, '÷'],      // ÷
+        [/â€"/g, '—'],      // em dash
+        [/â€™/g, "'"],     // right single quote
+        [/â€œ/g, '"'],     // left double quote
+        [/â€/g, '"'],      // right double quote (partial)
+        [/â€˜/g, "'"],     // left single quote
+        [/â€¦/g, '...'],   // ellipsis
+        [/â€"/g, '-'],      // en dash
+        [/âˆ /g, '∠'],      // angle symbol
+        [/âŠ¥/g, '⊥'],      // perpendicular
+        [/â‰…/g, '≅'],      // congruent
+        [/âˆ†/g, '△'],      // triangle
+        
+        // Fix common Â prefix corruption (UTF-8 BOM or encoding mismatch)
+        [/Â\s*π/g, 'π'],
+        [/Âπ/g, 'π'],
+        [/πÂ/g, 'π'],
+        [/Â°/g, '°'],
+        [/°Â/g, '°'],
+        [/Â²/g, '²'],
+        [/Â³/g, '³'],
+        [/Â½/g, '½'],
+        [/Â¼/g, '¼'],
+        [/Â¾/g, '¾'],
+        [/Â±/g, '±'],
+        [/Â·/g, '·'],
+        [/Âµ/g, 'μ'],      // mu from Latin-1
+        
+        // Fix À (Latin capital A with grave) which often corrupts π
+        [/À(?=\s|$|\.|\,)/g, 'π'],  // À at word boundary -> π
+        [/(\d)\s*À/g, '$1π'],        // number followed by À -> π
+        
+        // Fix numbers followed by Â (common in "terms of π" expressions)
+        [/(\d)Â(?=\s|$|\.)/g, '$1π'],
+        [/(\d)Â\s*cm/gi, '$1π cm'],
+        [/(\d)Â\s*cubic/gi, '$1π cubic'],
+        [/(\d)Â\s*square/gi, '$1π square'],
+        [/(\d)Â\s*meter/gi, '$1π meter'],
+        [/(\d)Â\s*inch/gi, '$1π inch'],
+        [/(\d)Â\s*unit/gi, '$1π unit'],
+      ];
+      
+      for (const [pattern, replacement] of mojibakePatterns) {
+        result = result.replace(pattern, replacement);
+      }
+      
+      // Third pass: Clean up remaining artifacts
+      result = result
+        // Clean up stray Â characters
+        .replace(/Â(?![a-zA-Z0-9°²³])/g, '')
         .replace(/Â\s+/g, ' ')
-        .replace(/\s+Â/g, ' ');
+        .replace(/\s+Â/g, ' ')
+        // Clean up double spaces
+        .replace(/\s{2,}/g, ' ')
+        // Trim
+        .trim();
       
       return result;
     }
