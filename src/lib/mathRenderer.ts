@@ -175,8 +175,13 @@ function convertFractions(text: string): string {
 function convertSymbols(text: string): string {
   let result = text;
   
+  // Special handling for "pi" - replace in all contexts (case-insensitive)
+  // This ensures pi is always converted to π regardless of context
+  result = result.replace(/\bpi\b/gi, 'π');
+  
   // Sort by length (longer first) to avoid partial replacements
   const sortedSymbols = Object.entries(mathSymbols)
+    .filter(([word]) => word.toLowerCase() !== 'pi') // Skip pi, already handled
     .sort((a, b) => b[0].length - a[0].length);
   
   for (const [word, symbol] of sortedSymbols) {
