@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera, Plus, X, Layers, ImageIcon } from 'lucide-react';
+import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera, Plus, X, Layers, ImageIcon, RefreshCw } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -76,6 +76,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const [batchImages, setBatchImages] = useState<BatchImage[]>([]);
   const [currentBatchIndex, setCurrentBatchIndex] = useState(0);
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const [rescanImageId, setRescanImageId] = useState<string | null>(null);
   
   // Class and roster state
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -151,21 +152,43 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
 
   const handleCameraCapture = (imageDataUrl: string) => {
     if (batchMode) {
-      // In batch mode, add to batch collection
-      const newBatchImage: BatchImage = {
-        id: `batch-${Date.now()}`,
-        dataUrl: imageDataUrl,
-        timestamp: new Date(),
-      };
-      setBatchImages(prev => [...prev, newBatchImage]);
-      setShowCamera(false);
-      toast.success(`Photo ${batchImages.length + 1} captured! Add more or process all.`);
+      if (rescanImageId) {
+        // Re-scanning a specific image - replace it
+        setBatchImages(prev => prev.map(img => 
+          img.id === rescanImageId 
+            ? { ...img, dataUrl: imageDataUrl, timestamp: new Date() }
+            : img
+        ));
+        setShowCamera(false);
+        setRescanImageId(null);
+        toast.success('Image replaced successfully!');
+      } else {
+        // In batch mode, add to batch collection
+        const newBatchImage: BatchImage = {
+          id: `batch-${Date.now()}`,
+          dataUrl: imageDataUrl,
+          timestamp: new Date(),
+        };
+        setBatchImages(prev => [...prev, newBatchImage]);
+        setShowCamera(false);
+        toast.success(`Photo ${batchImages.length + 1} captured! Add more or process all.`);
+      }
     } else {
       setOriginalImage(imageDataUrl);
       setExtractedStudents([]);
       setShowCamera(false);
       toast.success('Photo captured! Now extract student regions.');
     }
+  };
+
+  const startRescan = (imageId: string) => {
+    setRescanImageId(imageId);
+    setShowCamera(true);
+  };
+
+  const cancelRescan = () => {
+    setRescanImageId(null);
+    setShowCamera(false);
   };
 
   const handleBatchFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -712,12 +735,23 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                               <div className="absolute top-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
                                 {index + 1}
                               </div>
-                              <button
-                                onClick={() => removeBatchImage(img.id)}
-                                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
+                              {/* Action buttons overlay */}
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => startRescan(img.id)}
+                                  className="bg-primary text-primary-foreground rounded-full p-1.5 hover:bg-primary/90 transition-colors"
+                                  title="Re-scan this image"
+                                >
+                                  <RefreshCw className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => removeBatchImage(img.id)}
+                                  className="bg-destructive text-destructive-foreground rounded-full p-1.5 hover:bg-destructive/90 transition-colors"
+                                  title="Remove this image"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1060,7 +1094,10 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
       {/* Camera Modal */}
       <CameraModal
         isOpen={showCamera}
-        onClose={() => setShowCamera(false)}
+        onClose={() => {
+          setShowCamera(false);
+          setRescanImageId(null);
+        }}
         onCapture={handleCameraCapture}
       />
     </div>
