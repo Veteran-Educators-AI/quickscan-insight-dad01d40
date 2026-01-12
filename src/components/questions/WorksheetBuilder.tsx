@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -1887,6 +1888,26 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         <Badge variant="outline" className={`text-xs ${getDifficultyColor(question.difficulty)}`}>
                           {question.difficulty}
                         </Badge>
+                        {question.imageUrl && (
+                          <HoverCard openDelay={200} closeDelay={100}>
+                            <HoverCardTrigger asChild>
+                              <Badge variant="default" className="text-xs cursor-pointer bg-primary/90 hover:bg-primary">
+                                <ImageIcon className="h-3 w-3 mr-1" />
+                                Diagram
+                              </Badge>
+                            </HoverCardTrigger>
+                            <HoverCardContent side="right" className="w-auto p-2">
+                              <div className="flex flex-col items-center gap-2">
+                                <p className="text-xs font-medium text-muted-foreground">Preview</p>
+                                <img 
+                                  src={question.imageUrl} 
+                                  alt={`Preview for question ${question.questionNumber}`}
+                                  className="border rounded max-w-[200px] max-h-[200px] object-contain"
+                                />
+                              </div>
+                            </HoverCardContent>
+                          </HoverCard>
+                        )}
                         {question.imagePrompt && !question.imageUrl && (
                           <Badge variant="secondary" className="text-xs">
                             <ImageIcon className="h-3 w-3 mr-1" />
