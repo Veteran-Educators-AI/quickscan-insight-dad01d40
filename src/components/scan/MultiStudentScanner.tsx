@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera, Plus, X, Layers, ImageIcon, RefreshCw, AlertTriangle } from 'lucide-react';
-import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
+import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera, Plus, X, Layers, ImageIcon, RefreshCw, AlertTriangle, Crop, RotateCcw } from 'lucide-react';
+import { resizeImage, blobToBase64, enhanceImageForOCR } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,8 @@ interface BatchImage {
   timestamp: Date;
   quality?: 'good' | 'medium' | 'poor';
   blurScore?: number;
+  enhanced?: boolean;
+  enhancements?: string[];
 }
 
 // Blur detection using Laplacian variance
@@ -155,6 +157,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const [currentBatchIndex, setCurrentBatchIndex] = useState(0);
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
   const [rescanImageId, setRescanImageId] = useState<string | null>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
   
   // Class and roster state
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -336,6 +339,87 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
 
   const removeBatchImage = (id: string) => {
     setBatchImages(prev => prev.filter(img => img.id !== id));
+  };
+
+  const enhanceAllBatchImages = async () => {
+    if (batchImages.length === 0) return;
+    
+    setIsEnhancing(true);
+    let enhancedCount = 0;
+    
+    for (let i = 0; i < batchImages.length; i++) {
+      const img = batchImages[i];
+      if (img.enhanced) continue; // Skip already enhanced images
+      
+      try {
+        const result = await enhanceImageForOCR(img.dataUrl);
+        if (result.wasEnhanced) {
+          enhancedCount++;
+          // Re-run blur detection on enhanced image
+          const qualityResult = await detectImageBlur(result.enhancedDataUrl);
+          
+          setBatchImages(prev => prev.map(bImg => 
+            bImg.id === img.id 
+              ? { 
+                  ...bImg, 
+                  dataUrl: result.enhancedDataUrl, 
+                  enhanced: true, 
+                  enhancements: result.enhancements,
+                  ...qualityResult 
+                }
+              : bImg
+          ));
+        } else {
+          // Mark as processed even if no enhancement applied
+          setBatchImages(prev => prev.map(bImg => 
+            bImg.id === img.id ? { ...bImg, enhanced: true, enhancements: [] } : bImg
+          ));
+        }
+      } catch (err) {
+        console.error('Enhancement error:', err);
+      }
+    }
+    
+    setIsEnhancing(false);
+    if (enhancedCount > 0) {
+      toast.success(`Enhanced ${enhancedCount} image(s) with auto-crop and perspective correction!`);
+    } else {
+      toast.info('No significant improvements needed for these images.');
+    }
+  };
+
+  const enhanceSingleImage = async (imageId: string) => {
+    const img = batchImages.find(i => i.id === imageId);
+    if (!img) return;
+    
+    setIsEnhancing(true);
+    try {
+      const result = await enhanceImageForOCR(img.dataUrl);
+      if (result.wasEnhanced) {
+        const qualityResult = await detectImageBlur(result.enhancedDataUrl);
+        setBatchImages(prev => prev.map(bImg => 
+          bImg.id === imageId 
+            ? { 
+                ...bImg, 
+                dataUrl: result.enhancedDataUrl, 
+                enhanced: true, 
+                enhancements: result.enhancements,
+                ...qualityResult 
+              }
+            : bImg
+        ));
+        toast.success(`Image enhanced: ${result.enhancements.join(', ')}`);
+      } else {
+        setBatchImages(prev => prev.map(bImg => 
+          bImg.id === imageId ? { ...bImg, enhanced: true, enhancements: [] } : bImg
+        ));
+        toast.info('No significant improvements needed for this image.');
+      }
+    } catch (err) {
+      console.error('Enhancement error:', err);
+      toast.error('Failed to enhance image');
+    }
+    setIsEnhancing(false);
   };
 
   const processAllBatchImages = async () => {
@@ -833,14 +917,30 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                             </Badge>
                           )}
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setBatchImages([])}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          Clear All
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={enhanceAllBatchImages}
+                            disabled={isEnhancing || batchImages.every(img => img.enhanced)}
+                            className="gap-1"
+                          >
+                            {isEnhancing ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Crop className="h-3 w-3" />
+                            )}
+                            Auto-Enhance
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setBatchImages([])}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            Clear All
+                          </Button>
+                        </div>
                       </div>
                       
                       <ScrollArea className="w-full">
