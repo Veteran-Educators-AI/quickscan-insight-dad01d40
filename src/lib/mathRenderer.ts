@@ -254,53 +254,94 @@ export function sanitizeForPDF(text: string): string {
   
   let result = text;
   
-  // First, fix any existing encoding corruption patterns (mojibake)
+  // First, remove or replace emoji characters that cause corruption in PDF
+  // These emojis render as garbled text like "Ø=Ü¡" in jsPDF
+  const emojiReplacements: [RegExp, string][] = [
+    // Common emojis used in worksheets - replace with text or simple symbols
+    [/💡/g, '->'],        // lightbulb -> arrow for hints
+    [/✨/g, '*'],         // sparkles
+    [/📝/g, ''],          // memo/pencil
+    [/🎉/g, ''],          // party popper
+    [/✓/g, 'v'],          // checkmark
+    [/✗/g, 'x'],          // x mark
+    [/★/g, '*'],          // star
+    [/☆/g, '*'],          // white star
+    [/→/g, '->'],         // right arrow
+    [/←/g, '<-'],         // left arrow
+    [/↔/g, '<->'],        // left-right arrow
+    [/•/g, '-'],          // bullet
+    [/○/g, 'o'],          // circle
+    [/●/g, '*'],          // filled circle
+    [/□/g, '[ ]'],        // empty square
+    [/■/g, '[x]'],        // filled square
+    [/▢/g, '[ ]'],        // white square
+    [/△/g, 'triangle '],  // triangle
+    [/▲/g, 'triangle '],  // filled triangle
+    [/◯/g, 'O'],          // large circle
+    // Remove any other emoji characters (Unicode emoji ranges)
+    [/[\u{1F300}-\u{1F9FF}]/gu, ''],  // Miscellaneous Symbols and Pictographs, Emoticons, etc.
+    [/[\u{2600}-\u{26FF}]/gu, ''],    // Miscellaneous Symbols
+    [/[\u{2700}-\u{27BF}]/gu, ''],    // Dingbats
+    [/[\u{FE00}-\u{FE0F}]/gu, ''],    // Variation Selectors
+    [/[\u{1F000}-\u{1F02F}]/gu, ''],  // Mahjong Tiles
+    [/[\u{1F0A0}-\u{1F0FF}]/gu, ''],  // Playing Cards
+  ];
+  
+  for (const [pattern, replacement] of emojiReplacements) {
+    result = result.replace(pattern, replacement);
+  }
+  
+  // Fix any existing encoding corruption patterns (mojibake)
   // These patterns occur when UTF-8 text is incorrectly decoded as Latin-1
   const mojibakePatterns: [RegExp, string][] = [
     // Greek letters mojibake
-    [/Ï€/g, 'π'],      // π
-    [/Î¸/g, 'θ'],      // θ
-    [/Î±/g, 'α'],      // α
-    [/Î²/g, 'β'],      // β
-    [/Î³/g, 'γ'],      // γ
-    [/Î"/g, 'Δ'],      // Δ
-    [/Î´/g, 'δ'],      // δ
-    [/Ïˆ/g, 'ψ'],      // ψ
-    [/Ï†/g, 'φ'],      // φ
-    [/Î£/g, 'Σ'],      // Σ
-    [/Ïƒ/g, 'σ'],      // σ
-    [/Î©/g, 'Ω'],      // Ω
-    [/Ï‰/g, 'ω'],      // ω
-    [/Î»/g, 'λ'],      // λ
-    [/Î¼/g, 'μ'],      // μ
+    [/Ï€/g, 'pi'],        // π
+    [/Î¸/g, 'theta'],     // θ
+    [/Î±/g, 'alpha'],     // α
+    [/Î²/g, 'beta'],      // β
+    [/Î³/g, 'gamma'],     // γ
+    [/Î"/g, 'Delta'],     // Δ
+    [/Î´/g, 'delta'],     // δ
+    [/Ïˆ/g, 'psi'],       // ψ
+    [/Ï†/g, 'phi'],       // φ
+    [/Î£/g, 'Sigma'],     // Σ
+    [/Ïƒ/g, 'sigma'],     // σ
+    [/Î©/g, 'Omega'],     // Ω
+    [/Ï‰/g, 'omega'],     // ω
+    [/Î»/g, 'lambda'],    // λ
+    [/Î¼/g, 'mu'],        // μ
     
     // Math operators mojibake
-    [/â‰¤/g, '≤'],      // ≤
-    [/â‰¥/g, '≥'],      // ≥
-    [/â‰ /g, '≠'],      // ≠
-    [/â†'/g, '→'],      // →
-    [/âˆš/g, '√'],      // √
-    [/âˆž/g, '∞'],      // ∞
-    [/Ã—/g, '×'],      // ×
-    [/Ã·/g, '÷'],      // ÷
-    [/â€"/g, '—'],      // em dash
-    [/â€™/g, "'"],     // right single quote
-    [/â€œ/g, '"'],     // left double quote
-    [/â€/g, '"'],      // right double quote
+    [/â‰¤/g, '<='],       // ≤
+    [/â‰¥/g, '>='],       // ≥
+    [/â‰ /g, '!='],       // ≠
+    [/â†'/g, '->'],       // →
+    [/âˆš/g, 'sqrt'],     // √
+    [/âˆž/g, 'infinity'], // ∞
+    [/Ã—/g, 'x'],         // ×
+    [/Ã·/g, '/'],         // ÷
+    [/â€"/g, '-'],        // em dash
+    [/â€™/g, "'"],        // right single quote
+    [/â€œ/g, '"'],        // left double quote
+    [/â€/g, '"'],         // right double quote
+    
+    // Common corrupt patterns that appear as "Ø=Ü" (corrupted emoji)
+    [/Ø=Ü[¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿]?/g, ''],  // Corrupted emoji patterns
+    [/Ã˜=Ã[^\s]*/g, ''],  // Another corruption pattern
     
     // Common Â prefix corruption (UTF-8 BOM or encoding issue)
-    [/Â\s*π/g, 'π'],
-    [/Âπ/g, 'π'],
-    [/πÂ/g, 'π'],
-    [/Â°/g, '°'],
-    [/°Â/g, '°'],
-    [/Â²/g, '²'],
-    [/Â³/g, '³'],
-    [/Â½/g, '½'],
-    [/Â¼/g, '¼'],
-    [/Â¾/g, '¾'],
-    [/Â±/g, '±'],
-    [/Â·/g, '·'],
+    [/Â\s*π/g, 'pi'],
+    [/Âπ/g, 'pi'],
+    [/πÂ/g, 'pi'],
+    [/Â°/g, ' degrees'],
+    [/°Â/g, ' degrees'],
+    [/Â²/g, '^2'],
+    [/Â³/g, '^3'],
+    [/Â½/g, '1/2'],
+    [/Â¼/g, '1/4'],
+    [/Â¾/g, '3/4'],
+    [/Â±/g, '+/-'],
+    [/Â·/g, '*'],
     
     // Fix ampersand-interleaved text (& between each character)
     // This pattern appears when encoding fails catastrophically

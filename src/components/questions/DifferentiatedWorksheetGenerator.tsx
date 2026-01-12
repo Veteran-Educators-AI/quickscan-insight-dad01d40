@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
+import { sanitizeForPDF } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
 
 interface WorksheetPreset {
@@ -414,7 +415,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       const pdf = new jsPDF('p', 'mm', 'letter');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 20;
+      const margin = 15; // Reduced from 20mm for better use of page space
       const contentWidth = pageWidth - margin * 2;
       let isFirstPage = true;
 
@@ -572,7 +573,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             pdf.setFontSize(10);
             pdf.setFont('helvetica', 'bold');
             pdf.setTextColor(22, 101, 52);
-            pdf.text('✨ Warm-Up: Let\'s Get Started!', margin + 3, yPosition + 2);
+            pdf.text('* Warm-Up: Let\'s Get Started!', margin + 3, yPosition + 2);
             yPosition += 12;
             pdf.setTextColor(0);
 
@@ -588,7 +589,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               yPosition += 6;
 
               pdf.setFont('helvetica', 'normal');
-              const lines = pdf.splitTextToSize(question.question, contentWidth - 10);
+              const sanitizedQuestion = sanitizeForPDF(question.question);
+              const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
               lines.forEach((line: string) => {
                 pdf.text(line, margin + 5, yPosition);
                 yPosition += 5;
@@ -600,9 +602,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 pdf.setFontSize(9);
                 pdf.setFont('helvetica', 'italic');
                 pdf.setTextColor(120, 100, 50);
-                const hintLines = pdf.splitTextToSize(`💡 Hint: ${question.hint}`, contentWidth - 15);
+                const sanitizedHint = sanitizeForPDF(question.hint);
+                const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, contentWidth - 10);
                 hintLines.forEach((line: string) => {
-                  pdf.text(line, margin + 10, yPosition);
+                  pdf.text(line, margin + 5, yPosition);
                   yPosition += 4;
                 });
                 pdf.setTextColor(0);
@@ -630,7 +633,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             pdf.setFontSize(10);
             pdf.setFont('helvetica', 'bold');
             pdf.setTextColor(60);
-            pdf.text('📝 Practice Questions', margin, yPosition);
+            pdf.text('Practice Questions', margin, yPosition);
             yPosition += 10;
             pdf.setTextColor(0);
           }
@@ -648,7 +651,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             yPosition += 6;
 
             pdf.setFont('helvetica', 'normal');
-            const lines = pdf.splitTextToSize(question.question, contentWidth - 10);
+            const sanitizedQuestion = sanitizeForPDF(question.question);
+            const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
             lines.forEach((line: string) => {
               if (yPosition > pageHeight - 30) {
                 pdf.addPage();
@@ -664,13 +668,14 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               pdf.setFontSize(9);
               pdf.setFont('helvetica', 'italic');
               pdf.setTextColor(120, 100, 50);
-              const hintLines = pdf.splitTextToSize(`💡 Hint: ${question.hint}`, contentWidth - 15);
+              const sanitizedHint = sanitizeForPDF(question.hint);
+              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, contentWidth - 10);
               hintLines.forEach((line: string) => {
                 if (yPosition > pageHeight - 25) {
                   pdf.addPage();
                   yPosition = margin;
                 }
-                pdf.text(line, margin + 10, yPosition);
+                pdf.text(line, margin + 5, yPosition);
                 yPosition += 4;
               });
               pdf.setTextColor(0);
