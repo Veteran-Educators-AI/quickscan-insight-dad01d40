@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera, Plus, X, Layers, ImageIcon, RefreshCw, AlertTriangle, Crop, RotateCcw, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Users, Upload, Loader2, Wand2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Save, UserCheck, GraduationCap, Square, Camera, Plus, X, Layers, ImageIcon, RefreshCw, AlertTriangle, Crop, RotateCcw, ZoomIn, ZoomOut, Maximize2, Move, Check } from 'lucide-react';
 import { resizeImage, blobToBase64, enhanceImageForOCR, detectDocumentCorners } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -180,6 +180,12 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const zoomContainerRef = useRef<HTMLDivElement>(null);
   const lastTouchDistance = useRef<number | null>(null);
   const lastPanPosition = useRef<{ x: number; y: number } | null>(null);
+  
+  // Corner editing state
+  const [isEditingCorners, setIsEditingCorners] = useState(false);
+  const [editableCorners, setEditableCorners] = useState<DetectedEdge | null>(null);
+  const [draggingCorner, setDraggingCorner] = useState<'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' | null>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   
   // Class and roster state
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -445,9 +451,12 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
 
   // Zoom handlers for pinch-to-zoom
   const openZoomDialog = (imageId: string) => {
+    const img = batchImages.find(i => i.id === imageId);
     setZoomImageId(imageId);
     setZoomScale(1);
     setZoomPosition({ x: 0, y: 0 });
+    setIsEditingCorners(false);
+    setEditableCorners(img?.detectedEdges || null);
     setZoomDialogOpen(true);
   };
 
@@ -456,7 +465,88 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
     setZoomImageId(null);
     setZoomScale(1);
     setZoomPosition({ x: 0, y: 0 });
+    setIsEditingCorners(false);
+    setEditableCorners(null);
+    setDraggingCorner(null);
   };
+  
+  const startEditingCorners = () => {
+    const img = batchImages.find(i => i.id === zoomImageId);
+    if (img?.detectedEdges) {
+      setEditableCorners({ ...img.detectedEdges });
+    } else {
+      // Initialize with default corners if none detected
+      setEditableCorners({
+        topLeft: { x: 0.1, y: 0.1 },
+        topRight: { x: 0.9, y: 0.1 },
+        bottomLeft: { x: 0.1, y: 0.9 },
+        bottomRight: { x: 0.9, y: 0.9 }
+      });
+    }
+    setIsEditingCorners(true);
+    setZoomScale(1);
+    setZoomPosition({ x: 0, y: 0 });
+  };
+  
+  const cancelEditingCorners = () => {
+    const img = batchImages.find(i => i.id === zoomImageId);
+    setEditableCorners(img?.detectedEdges || null);
+    setIsEditingCorners(false);
+    setDraggingCorner(null);
+  };
+  
+  const saveEditedCorners = () => {
+    if (!zoomImageId || !editableCorners) return;
+    setBatchImages(prev => prev.map(img => 
+      img.id === zoomImageId 
+        ? { ...img, detectedEdges: editableCorners }
+        : img
+    ));
+    setIsEditingCorners(false);
+    setDraggingCorner(null);
+    toast.success('Corner positions saved!');
+  };
+  
+  const handleCornerMouseDown = (corner: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight') => (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingCorner(corner);
+  };
+  
+  const handleCornerTouchStart = (corner: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight') => (e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingCorner(corner);
+  };
+  
+  const handleCornerMove = useCallback((clientX: number, clientY: number) => {
+    if (!draggingCorner || !editableCorners || !imageContainerRef.current) return;
+    
+    const rect = imageContainerRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    
+    setEditableCorners(prev => prev ? {
+      ...prev,
+      [draggingCorner]: { x, y }
+    } : null);
+  }, [draggingCorner, editableCorners]);
+  
+  const handleCornerMouseMove = useCallback((e: React.MouseEvent) => {
+    if (draggingCorner) {
+      handleCornerMove(e.clientX, e.clientY);
+    }
+  }, [draggingCorner, handleCornerMove]);
+  
+  const handleCornerTouchMove = useCallback((e: React.TouchEvent) => {
+    if (draggingCorner && e.touches.length === 1) {
+      handleCornerMove(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  }, [draggingCorner, handleCornerMove]);
+  
+  const handleCornerEnd = useCallback(() => {
+    setDraggingCorner(null);
+  }, []);
 
   const handleZoomWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -1593,49 +1683,175 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
         onCapture={handleCameraCapture}
       />
 
-      {/* Zoom Dialog for pinch-to-zoom inspection */}
+      {/* Zoom Dialog for pinch-to-zoom inspection and corner editing */}
       <Dialog open={zoomDialogOpen} onOpenChange={closeZoomDialog}>
-        <DialogContent className="max-w-4xl h-[80vh] p-0">
-          <DialogHeader className="p-4 pb-2">
-            <DialogTitle className="flex items-center justify-between">
-              <span>Inspect Image</span>
+        <DialogContent className="max-w-4xl h-[80vh] p-0 flex flex-col">
+          <DialogHeader className="p-4 pb-2 flex-shrink-0">
+            <DialogTitle className="flex items-center justify-between flex-wrap gap-2">
+              <span>{isEditingCorners ? 'Adjust Paper Corners' : 'Inspect Image'}</span>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={zoomOut} disabled={zoomScale <= 0.5}>
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <span className="text-sm w-16 text-center">{Math.round(zoomScale * 100)}%</span>
-                <Button variant="outline" size="sm" onClick={zoomIn} disabled={zoomScale >= 5}>
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={resetZoom}>
-                  <Maximize2 className="h-4 w-4" />
-                </Button>
+                {isEditingCorners ? (
+                  <>
+                    <Button variant="outline" size="sm" onClick={cancelEditingCorners}>
+                      <X className="h-4 w-4 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={saveEditedCorners} className="bg-green-600 hover:bg-green-700">
+                      <Check className="h-4 w-4 mr-1" />
+                      Save Corners
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={startEditingCorners}
+                      className="gap-1"
+                    >
+                      <Move className="h-4 w-4" />
+                      Edit Corners
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={zoomOut} disabled={zoomScale <= 0.5}>
+                      <ZoomOut className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm w-16 text-center">{Math.round(zoomScale * 100)}%</span>
+                    <Button variant="outline" size="sm" onClick={zoomIn} disabled={zoomScale >= 5}>
+                      <ZoomIn className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={resetZoom}>
+                      <Maximize2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
               </div>
             </DialogTitle>
           </DialogHeader>
-          <div 
-            ref={zoomContainerRef}
-            className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing touch-none"
-            onWheel={handleZoomWheel}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
-            {zoomImageId && batchImages.find(img => img.id === zoomImageId) && (
-              <div className="h-full flex items-center justify-center p-4">
-                <div style={{ transform: `scale(${zoomScale}) translate(${zoomPosition.x / zoomScale}px, ${zoomPosition.y / zoomScale}px)` }} className="transition-transform duration-75">
-                  <img 
-                    src={batchImages.find(img => img.id === zoomImageId)?.dataUrl} 
-                    alt="Zoomed image"
-                    className="max-h-[60vh] max-w-full object-contain rounded-lg"
-                    draggable={false}
-                  />
+          
+          {isEditingCorners ? (
+            /* Corner editing mode */
+            <div 
+              className="flex-1 overflow-hidden p-4"
+              onMouseMove={handleCornerMouseMove}
+              onMouseUp={handleCornerEnd}
+              onMouseLeave={handleCornerEnd}
+              onTouchMove={handleCornerTouchMove}
+              onTouchEnd={handleCornerEnd}
+            >
+              {zoomImageId && batchImages.find(img => img.id === zoomImageId) && (
+                <div className="h-full flex items-center justify-center">
+                  <div 
+                    ref={imageContainerRef}
+                    className="relative max-h-full max-w-full"
+                    style={{ touchAction: 'none' }}
+                  >
+                    <img 
+                      src={batchImages.find(img => img.id === zoomImageId)?.dataUrl} 
+                      alt="Edit corners"
+                      className="max-h-[55vh] max-w-full object-contain rounded-lg"
+                      draggable={false}
+                    />
+                    {/* Corner overlay with polygon and draggable handles */}
+                    {editableCorners && (
+                      <svg 
+                        className="absolute inset-0 w-full h-full pointer-events-none" 
+                        style={{ touchAction: 'none' }}
+                      >
+                        {/* Semi-transparent overlay outside the polygon */}
+                        <defs>
+                          <mask id="cornerMask">
+                            <rect width="100%" height="100%" fill="white" />
+                            <polygon
+                              points={`${editableCorners.topLeft.x * 100}%,${editableCorners.topLeft.y * 100}% ${editableCorners.topRight.x * 100}%,${editableCorners.topRight.y * 100}% ${editableCorners.bottomRight.x * 100}%,${editableCorners.bottomRight.y * 100}% ${editableCorners.bottomLeft.x * 100}%,${editableCorners.bottomLeft.y * 100}%`}
+                              fill="black"
+                            />
+                          </mask>
+                        </defs>
+                        <rect width="100%" height="100%" fill="rgba(0,0,0,0.4)" mask="url(#cornerMask)" />
+                        
+                        {/* Edge lines */}
+                        <polygon
+                          points={`${editableCorners.topLeft.x * 100}%,${editableCorners.topLeft.y * 100}% ${editableCorners.topRight.x * 100}%,${editableCorners.topRight.y * 100}% ${editableCorners.bottomRight.x * 100}%,${editableCorners.bottomRight.y * 100}% ${editableCorners.bottomLeft.x * 100}%,${editableCorners.bottomLeft.y * 100}%`}
+                          fill="none"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth="3"
+                        />
+                        
+                        {/* Corner handles */}
+                        {(['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const).map((corner) => (
+                          <g key={corner}>
+                            <circle
+                              cx={`${editableCorners[corner].x * 100}%`}
+                              cy={`${editableCorners[corner].y * 100}%`}
+                              r="12"
+                              fill="hsl(var(--primary))"
+                              stroke="white"
+                              strokeWidth="3"
+                              className="pointer-events-auto cursor-grab active:cursor-grabbing"
+                              style={{ touchAction: 'none' }}
+                              onMouseDown={handleCornerMouseDown(corner)}
+                              onTouchStart={handleCornerTouchStart(corner)}
+                            />
+                            <circle
+                              cx={`${editableCorners[corner].x * 100}%`}
+                              cy={`${editableCorners[corner].y * 100}%`}
+                              r="4"
+                              fill="white"
+                              className="pointer-events-none"
+                            />
+                          </g>
+                        ))}
+                      </svg>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground text-center pb-4">
-            Pinch to zoom on touch devices • Scroll to zoom on desktop • Drag to pan when zoomed
+              )}
+            </div>
+          ) : (
+            /* Normal zoom mode */
+            <div 
+              ref={zoomContainerRef}
+              className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing touch-none"
+              onWheel={handleZoomWheel}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              {zoomImageId && batchImages.find(img => img.id === zoomImageId) && (
+                <div className="h-full flex items-center justify-center p-4">
+                  <div 
+                    style={{ transform: `scale(${zoomScale}) translate(${zoomPosition.x / zoomScale}px, ${zoomPosition.y / zoomScale}px)` }} 
+                    className="transition-transform duration-75 relative"
+                  >
+                    <img 
+                      src={batchImages.find(img => img.id === zoomImageId)?.dataUrl} 
+                      alt="Zoomed image"
+                      className="max-h-[60vh] max-w-full object-contain rounded-lg"
+                      draggable={false}
+                    />
+                    {/* Show detected edges overlay */}
+                    {editableCorners && (
+                      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                        <polygon
+                          points={`${editableCorners.topLeft.x * 100}%,${editableCorners.topLeft.y * 100}% ${editableCorners.topRight.x * 100}%,${editableCorners.topRight.y * 100}% ${editableCorners.bottomRight.x * 100}%,${editableCorners.bottomRight.y * 100}% ${editableCorners.bottomLeft.x * 100}%,${editableCorners.bottomLeft.y * 100}%`}
+                          fill="none"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth="2"
+                          strokeDasharray="8 4"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <p className="text-xs text-muted-foreground text-center pb-4 flex-shrink-0">
+            {isEditingCorners 
+              ? 'Drag the corner handles to adjust paper edges • Tap Save when done'
+              : 'Pinch to zoom on touch devices • Scroll to zoom on desktop • Drag to pan when zoomed'
+            }
           </p>
         </DialogContent>
       </Dialog>
