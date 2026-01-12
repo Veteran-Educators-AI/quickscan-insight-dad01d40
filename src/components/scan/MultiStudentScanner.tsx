@@ -1001,6 +1001,19 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                               {/* Action buttons overlay */}
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1">
                                 <button
+                                  onClick={() => enhanceSingleImage(img.id)}
+                                  disabled={isEnhancing || img.enhanced}
+                                  className={cn(
+                                    "rounded-full p-1.5 transition-colors",
+                                    img.enhanced
+                                      ? "bg-muted text-muted-foreground cursor-not-allowed"
+                                      : "bg-blue-500 text-white hover:bg-blue-400"
+                                  )}
+                                  title={img.enhanced ? "Already enhanced" : "Auto-crop & fix perspective"}
+                                >
+                                  <Crop className="h-3.5 w-3.5" />
+                                </button>
+                                <button
                                   onClick={() => startRescan(img.id)}
                                   className={cn(
                                     "rounded-full p-1.5 transition-colors",
