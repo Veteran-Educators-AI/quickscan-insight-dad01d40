@@ -187,6 +187,15 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const [draggingCorner, setDraggingCorner] = useState<'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' | null>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   
+  // Student work zoom state
+  const [studentZoomOpen, setStudentZoomOpen] = useState(false);
+  const [studentZoomId, setStudentZoomId] = useState<string | null>(null);
+  const [studentZoomScale, setStudentZoomScale] = useState(1);
+  const [studentZoomPosition, setStudentZoomPosition] = useState({ x: 0, y: 0 });
+  const studentZoomContainerRef = useRef<HTMLDivElement>(null);
+  const studentLastTouchDistance = useRef<number | null>(null);
+  const studentLastPanPosition = useRef<{ x: number; y: number } | null>(null);
+  
   // Class and roster state
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -612,6 +621,78 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
   const resetZoom = () => {
     setZoomScale(1);
     setZoomPosition({ x: 0, y: 0 });
+  };
+
+  // Student work zoom handlers
+  const openStudentZoom = (studentId: string) => {
+    setStudentZoomId(studentId);
+    setStudentZoomScale(1);
+    setStudentZoomPosition({ x: 0, y: 0 });
+    setStudentZoomOpen(true);
+  };
+
+  const closeStudentZoom = () => {
+    setStudentZoomOpen(false);
+    setStudentZoomId(null);
+    setStudentZoomScale(1);
+    setStudentZoomPosition({ x: 0, y: 0 });
+  };
+
+  const handleStudentZoomWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setStudentZoomScale(prev => Math.min(5, Math.max(0.5, prev + delta)));
+  }, []);
+
+  const handleStudentTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      studentLastTouchDistance.current = distance;
+    } else if (e.touches.length === 1) {
+      studentLastPanPosition.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY
+      };
+    }
+  }, []);
+
+  const handleStudentTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && studentLastTouchDistance.current !== null) {
+      e.preventDefault();
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const delta = (distance - studentLastTouchDistance.current) * 0.01;
+      setStudentZoomScale(prev => Math.min(5, Math.max(0.5, prev + delta)));
+      studentLastTouchDistance.current = distance;
+    } else if (e.touches.length === 1 && studentLastPanPosition.current && studentZoomScale > 1) {
+      const deltaX = e.touches[0].clientX - studentLastPanPosition.current.x;
+      const deltaY = e.touches[0].clientY - studentLastPanPosition.current.y;
+      setStudentZoomPosition(prev => ({
+        x: prev.x + deltaX,
+        y: prev.y + deltaY
+      }));
+      studentLastPanPosition.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY
+      };
+    }
+  }, [studentZoomScale]);
+
+  const handleStudentTouchEnd = useCallback(() => {
+    studentLastTouchDistance.current = null;
+    studentLastPanPosition.current = null;
+  }, []);
+
+  const studentZoomIn = () => setStudentZoomScale(prev => Math.min(5, prev + 0.5));
+  const studentZoomOut = () => setStudentZoomScale(prev => Math.max(0.5, prev - 0.5));
+  const resetStudentZoom = () => {
+    setStudentZoomScale(1);
+    setStudentZoomPosition({ x: 0, y: 0 });
   };
 
   const enhanceAllBatchImages = async () => {
@@ -1568,12 +1649,20 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                       ''
                     )}
                   >
-                    <div className="relative">
+                    <div 
+                      className="relative cursor-pointer group/img"
+                      onClick={() => openStudentZoom(student.id)}
+                      title="Click to zoom and inspect"
+                    >
                       <img 
                         src={student.croppedImageBase64} 
                         alt={`Student ${student.id}`}
                         className="w-full h-24 object-cover"
                       />
+                      {/* Zoom hint overlay */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                        <ZoomIn className="h-6 w-6 text-white" />
+                      </div>
                       {student.status === 'analyzing' && (
                         <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
                           <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -1863,6 +1952,68 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
               ? 'Drag the corner handles to adjust paper edges • Tap Save when done'
               : 'Pinch to zoom on touch devices • Scroll to zoom on desktop • Drag to pan when zoomed'
             }
+          </p>
+        </DialogContent>
+      </Dialog>
+
+      {/* Student Work Zoom Dialog */}
+      <Dialog open={studentZoomOpen} onOpenChange={closeStudentZoom}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0">
+          <DialogHeader className="p-4 pb-2 flex-shrink-0">
+            <DialogTitle className="flex items-center justify-between gap-4">
+              <span>
+                {studentZoomId && (() => {
+                  const student = extractedStudents.find(s => s.id === studentZoomId);
+                  const assignedRosterStudent = student?.assignedStudentId 
+                    ? rosterStudents.find(r => r.id === student.assignedStudentId)
+                    : null;
+                  return assignedRosterStudent 
+                    ? `${assignedRosterStudent.first_name} ${assignedRosterStudent.last_name}'s Work`
+                    : student?.studentName || `Student Work`;
+                })()}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={studentZoomOut} disabled={studentZoomScale <= 0.5}>
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <span className="text-sm w-16 text-center">{Math.round(studentZoomScale * 100)}%</span>
+                <Button variant="outline" size="sm" onClick={studentZoomIn} disabled={studentZoomScale >= 5}>
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={resetStudentZoom}>
+                  <Maximize2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div 
+            ref={studentZoomContainerRef}
+            className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing touch-none"
+            onWheel={handleStudentZoomWheel}
+            onTouchStart={handleStudentTouchStart}
+            onTouchMove={handleStudentTouchMove}
+            onTouchEnd={handleStudentTouchEnd}
+          >
+            {studentZoomId && extractedStudents.find(s => s.id === studentZoomId) && (
+              <div className="h-full flex items-center justify-center p-4">
+                <div 
+                  style={{ transform: `scale(${studentZoomScale}) translate(${studentZoomPosition.x / studentZoomScale}px, ${studentZoomPosition.y / studentZoomScale}px)` }} 
+                  className="transition-transform duration-75"
+                >
+                  <img 
+                    src={extractedStudents.find(s => s.id === studentZoomId)?.croppedImageBase64} 
+                    alt="Student work zoomed"
+                    className="max-h-[65vh] max-w-full object-contain rounded-lg shadow-lg"
+                    draggable={false}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <p className="text-xs text-muted-foreground text-center pb-4 flex-shrink-0">
+            Pinch to zoom on touch devices • Scroll to zoom on desktop • Drag to pan when zoomed
           </p>
         </DialogContent>
       </Dialog>
