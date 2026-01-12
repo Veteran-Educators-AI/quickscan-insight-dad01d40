@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -131,6 +131,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [isCompiled, setIsCompiled] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(100);
   const [isSaving, setIsSaving] = useState(false);
   const [savedWorksheets, setSavedWorksheets] = useState<SavedWorksheet[]>([]);
   const [showSavedWorksheets, setShowSavedWorksheets] = useState(false);
@@ -1244,10 +1245,19 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       });
       return;
     }
+    window.print();
+  };
+
+  const handlePreview = () => {
+    if (compiledQuestions.length === 0) {
+      toast({
+        title: 'No questions compiled',
+        description: 'Please compile the worksheet first.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setShowPreview(true);
-    setTimeout(() => {
-      window.print();
-    }, 100);
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -2112,7 +2122,15 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 </Button>
                 <Button
                   variant="outline"
+                  onClick={handlePreview}
+                  title="Preview before printing"
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={handlePrint}
+                  title="Print worksheet"
                 >
                   <Printer className="h-4 w-4" />
                 </Button>
@@ -2171,106 +2189,156 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         </CardContent>
       </Card>
 
-      {/* Print Preview */}
+      {/* Print Preview Modal */}
       {showPreview && (
-        <div className="fixed inset-0 bg-white z-50 overflow-auto print:static print:overflow-visible">
-          <div className="print:hidden p-4 bg-muted border-b flex items-center justify-between">
-            <p>Print preview - press Ctrl+P or Cmd+P to print</p>
-            <Button variant="outline" onClick={() => setShowPreview(false)}>
-              Close Preview
-            </Button>
+        <div className="fixed inset-0 bg-muted/90 z-50 flex flex-col print:static print:overflow-visible print:bg-white">
+          {/* Preview Header Toolbar */}
+          <div className="print:hidden flex items-center justify-between p-3 bg-background border-b shadow-sm">
+            <div className="flex items-center gap-4">
+              <h2 className="font-semibold text-lg">Print Preview</h2>
+              <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setPreviewZoom(Math.max(50, previewZoom - 25))}
+                  disabled={previewZoom <= 50}
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-[4rem] text-center">{previewZoom}%</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setPreviewZoom(Math.min(200, previewZoom + 25))}
+                  disabled={previewZoom >= 200}
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {compiledQuestions.length} question{compiledQuestions.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setShowPreview(false)}>
+                <X className="h-4 w-4 mr-2" />
+                Close
+              </Button>
+              <Button onClick={() => { window.print(); }}>
+                <Printer className="h-4 w-4 mr-2" />
+                Print
+              </Button>
+            </div>
           </div>
-          <div ref={printRef} className="p-8 max-w-3xl mx-auto">
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold">{worksheetTitle}</h1>
-              {teacherName && <p className="text-muted-foreground mt-1">Teacher: {teacherName}</p>}
-            </div>
-            <div className="flex justify-between text-sm mb-6 border-b pb-4">
-              <span>Name: _______________________</span>
-              <span>Date: ___________</span>
-              <span>Period: _____</span>
-            </div>
-            <div className="space-y-8">
-              {compiledQuestions.map((question) => (
-                <div key={question.questionNumber} className="space-y-2">
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="font-bold">{question.questionNumber}.</span>
-                    {worksheetMode === 'diagnostic' && question.advancementLevel && (
-                      <span className={`text-xs px-2 py-0.5 rounded border font-semibold ${
-                        question.advancementLevel === 'A' ? 'bg-green-100 text-green-800 border-green-300' :
-                        question.advancementLevel === 'B' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
-                        question.advancementLevel === 'C' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
-                        question.advancementLevel === 'D' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                        question.advancementLevel === 'E' ? 'bg-red-100 text-red-800 border-red-300' :
-                        'bg-gray-100 text-gray-800 border-gray-300'
-                      }`}>
-                        Level {question.advancementLevel}
-                      </span>
-                    )}
-                    <span className="text-xs px-2 py-0.5 rounded border bg-muted">
-                      {question.difficulty}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground ml-5">
-                    {question.topic} ({question.standard})
-                  </p>
-                  <p className="ml-5 font-serif leading-relaxed text-base">{renderMathText(fixEncodingCorruption(question.question))}</p>
-                  {question.svg && (
-                    <div 
-                      className="ml-5 mt-2 flex justify-center"
-                      dangerouslySetInnerHTML={{ __html: question.svg }}
-                    />
-                  )}
-                  {showAnswerLines && (
-                    <div className="ml-5 mt-4 space-y-3">
-                      {[1, 2, 3, 4, 5].map((line) => (
-                        <div key={line} className="border-b border-gray-300" style={{ height: '24px' }} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
 
-            {/* Formula Reference Sheet in Print Preview */}
-            {includeFormulaSheet && (() => {
-              const relevantFormulas = getFormulasForTopics(
-                selectedQuestions.map(q => ({ category: q.category, topicName: q.topicName }))
-              );
-              
-              if (relevantFormulas.length === 0) return null;
-              
-              return (
-                <div className="mt-12 pt-8 border-t-2 border-dashed page-break-before">
-                  <h2 className="text-xl font-bold text-center mb-2">Formula Reference Sheet</h2>
-                  <p className="text-center text-sm text-muted-foreground mb-6">Based on selected topics</p>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {relevantFormulas.map((category) => (
-                      <div key={category.category} className="space-y-2">
-                        <h3 className="font-semibold text-sm border-b pb-1">{category.category}</h3>
-                        <ul className="space-y-1 text-sm">
-                          {category.formulas.map((formula, idx) => (
-                            <li key={idx} className="flex flex-col">
-                              <span>
-                                <span className="font-medium">{formula.name}:</span>{' '}
-                                <span className="font-mono text-xs">{formula.formula}</span>
-                              </span>
-                              {formula.description && (
-                                <span className="text-xs text-muted-foreground ml-4">({formula.description})</span>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
+          {/* Preview Content Area */}
+          <div className="flex-1 overflow-auto p-6 print:p-0 print:overflow-visible">
+            <div 
+              ref={printRef} 
+              className="bg-white mx-auto shadow-xl print:shadow-none"
+              style={{ 
+                width: `${8.5 * (previewZoom / 100)}in`,
+                minHeight: `${11 * (previewZoom / 100)}in`,
+                padding: `${0.75 * (previewZoom / 100)}in`,
+                transform: 'origin-top',
+                boxSizing: 'border-box',
+              }}
+            >
+              <div style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: 'top left', width: `${100 / (previewZoom / 100)}%` }}>
+                <div className="text-center mb-6">
+                  <h1 className="text-2xl font-bold text-black">{worksheetTitle}</h1>
+                  {teacherName && <p className="text-gray-600 mt-1">Teacher: {teacherName}</p>}
+                </div>
+                <div className="flex justify-between text-sm mb-6 border-b border-gray-300 pb-4 text-black">
+                  <span>Name: _______________________</span>
+                  <span>Date: ___________</span>
+                  <span>Period: _____</span>
+                </div>
+                <div className="space-y-8">
+                  {compiledQuestions.map((question) => (
+                    <div key={question.questionNumber} className="space-y-2" style={{ pageBreakInside: 'avoid' }}>
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className="font-bold text-black">{question.questionNumber}.</span>
+                        {worksheetMode === 'diagnostic' && question.advancementLevel && (
+                          <span className={`text-xs px-2 py-0.5 rounded border font-semibold ${
+                            question.advancementLevel === 'A' ? 'bg-green-100 text-green-800 border-green-300' :
+                            question.advancementLevel === 'B' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                            question.advancementLevel === 'C' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                            question.advancementLevel === 'D' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                            question.advancementLevel === 'E' ? 'bg-red-100 text-red-800 border-red-300' :
+                            'bg-gray-100 text-gray-800 border-gray-300'
+                          }`}>
+                            Level {question.advancementLevel}
+                          </span>
+                        )}
+                        <span className="text-xs px-2 py-0.5 rounded border bg-gray-100 text-gray-700 border-gray-200">
+                          {question.difficulty}
+                        </span>
                       </div>
-                    ))}
-                  </div>
+                      <p className="text-sm text-gray-500 ml-5">
+                        {question.topic} ({question.standard})
+                      </p>
+                      <p className="ml-5 font-serif leading-relaxed text-base text-black" style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                        {renderMathText(fixEncodingCorruption(question.question))}
+                      </p>
+                      {question.svg && (
+                        <div 
+                          className="ml-5 mt-2 flex justify-center"
+                          dangerouslySetInnerHTML={{ __html: question.svg }}
+                        />
+                      )}
+                      {showAnswerLines && (
+                        <div className="ml-5 mt-4 space-y-3">
+                          {[1, 2, 3, 4, 5].map((line) => (
+                            <div key={line} className="border-b border-gray-300" style={{ height: '24px' }} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              );
-            })()}
 
-            <div className="mt-12 text-center text-xs text-muted-foreground">
-              Generated with Scan Genius - NYS Regents Aligned
+                {/* Formula Reference Sheet in Print Preview */}
+                {includeFormulaSheet && (() => {
+                  const relevantFormulas = getFormulasForTopics(
+                    selectedQuestions.map(q => ({ category: q.category, topicName: q.topicName }))
+                  );
+                  
+                  if (relevantFormulas.length === 0) return null;
+                  
+                  return (
+                    <div className="mt-12 pt-8 border-t-2 border-dashed border-gray-300" style={{ pageBreakBefore: 'always' }}>
+                      <h2 className="text-xl font-bold text-center mb-2 text-black">Formula Reference Sheet</h2>
+                      <p className="text-center text-sm text-gray-500 mb-6">Based on selected topics</p>
+                      
+                      <div className="grid grid-cols-2 gap-6">
+                        {relevantFormulas.map((category) => (
+                          <div key={category.category} className="space-y-2">
+                            <h3 className="font-semibold text-sm border-b border-gray-200 pb-1 text-black">{category.category}</h3>
+                            <ul className="space-y-1 text-sm">
+                              {category.formulas.map((formula, idx) => (
+                                <li key={idx} className="flex flex-col text-black">
+                                  <span>
+                                    <span className="font-medium">{formula.name}:</span>{' '}
+                                    <span className="font-mono text-xs">{formula.formula}</span>
+                                  </span>
+                                  {formula.description && (
+                                    <span className="text-xs text-gray-500 ml-4">({formula.description})</span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="mt-12 text-center text-xs text-gray-400">
+                  Generated with Scan Genius - NYS Regents Aligned
+                </div>
+              </div>
             </div>
           </div>
         </div>
