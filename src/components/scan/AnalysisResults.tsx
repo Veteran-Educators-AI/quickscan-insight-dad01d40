@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/accordion';
 import { AIWorkDetector } from './AIWorkDetector';
 import { GradeOverrideDialog } from './GradeOverrideDialog';
+import { RemediationActions } from './RemediationActions';
 
 interface RubricScore {
   criterion: string;
@@ -33,12 +34,22 @@ interface AnalysisResult {
   feedback: string;
 }
 
+interface RemediationQuestion {
+  questionNumber: number;
+  question: string;
+  targetMisconception: string;
+  difficulty: 'scaffolded' | 'practice' | 'challenge';
+  hint: string;
+}
+
 interface AnalysisResultsProps {
   result: AnalysisResult;
   rawAnalysis?: string | null;
   onSaveAnalytics?: () => void;
   onAssociateStudent?: () => void;
   onGradeOverride?: (grade: number, justification: string) => void;
+  onPushRemediationToApp?: (questions: RemediationQuestion[]) => void;
+  onGenerateRemediationWorksheet?: (questions: RemediationQuestion[]) => void;
   isSaving?: boolean;
   studentName?: string | null;
   studentId?: string | null;
@@ -50,6 +61,8 @@ export function AnalysisResults({
   onSaveAnalytics, 
   onAssociateStudent,
   onGradeOverride,
+  onPushRemediationToApp,
+  onGenerateRemediationWorksheet,
   isSaving = false,
   studentName = null,
   studentId = null
@@ -244,6 +257,18 @@ export function AnalysisResults({
             </ul>
           </CardContent>
         </Card>
+      )}
+
+      {/* Remediation Actions - Generate practice questions based on misconceptions */}
+      {result.misconceptions.length > 0 && (
+        <RemediationActions
+          misconceptions={result.misconceptions}
+          problemContext={result.problemIdentified}
+          studentName={studentName || undefined}
+          studentId={studentId || undefined}
+          onPushToStudentApp={onPushRemediationToApp}
+          onGenerateWorksheet={onGenerateRemediationWorksheet}
+        />
       )}
 
       {/* Feedback */}
