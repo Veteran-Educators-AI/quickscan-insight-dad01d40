@@ -878,6 +878,9 @@ export type Database = {
           level_a_notifications: boolean | null
           level_drop_notifications: boolean | null
           parent_ai_notifications: boolean | null
+          sister_app_coin_multiplier: number | null
+          sister_app_sync_enabled: boolean | null
+          sister_app_xp_multiplier: number | null
           teacher_id: string
           updated_at: string
         }
@@ -896,6 +899,9 @@ export type Database = {
           level_a_notifications?: boolean | null
           level_drop_notifications?: boolean | null
           parent_ai_notifications?: boolean | null
+          sister_app_coin_multiplier?: number | null
+          sister_app_sync_enabled?: boolean | null
+          sister_app_xp_multiplier?: number | null
           teacher_id: string
           updated_at?: string
         }
@@ -914,6 +920,9 @@ export type Database = {
           level_a_notifications?: boolean | null
           level_drop_notifications?: boolean | null
           parent_ai_notifications?: boolean | null
+          sister_app_coin_multiplier?: number | null
+          sister_app_sync_enabled?: boolean | null
+          sister_app_xp_multiplier?: number | null
           teacher_id?: string
           updated_at?: string
         }

@@ -160,20 +160,31 @@ export function useSaveAnalysisResults() {
         },
       });
 
-      // 7. Push to sister app (automatic sync)
+      // 7. Push to sister app (automatic sync) - check settings first
       if (params.classId) {
-        pushToSisterApp({
-          class_id: params.classId,
-          title: `Grade: ${params.topicName || 'Assessment'}`,
-          description: `${params.studentName || 'Student'} scored ${finalGrade}% - ${params.result.feedback}`,
-          standard_code: params.topicName || undefined,
-          xp_reward: Math.round(finalGrade / 2), // XP based on grade
-          coin_reward: Math.round(finalGrade / 4), // Coins based on grade
-          student_id: params.studentId,
-          student_name: params.studentName,
-          grade: finalGrade,
-          topic_name: params.topicName,
-        });
+        const { data: settings } = await supabase
+          .from('settings')
+          .select('sister_app_sync_enabled, sister_app_xp_multiplier, sister_app_coin_multiplier')
+          .eq('teacher_id', user.id)
+          .single();
+
+        if (settings?.sister_app_sync_enabled) {
+          const xpMultiplier = settings.sister_app_xp_multiplier || 0.5;
+          const coinMultiplier = settings.sister_app_coin_multiplier || 0.25;
+          
+          pushToSisterApp({
+            class_id: params.classId,
+            title: `Grade: ${params.topicName || 'Assessment'}`,
+            description: `${params.studentName || 'Student'} scored ${finalGrade}% - ${params.result.feedback}`,
+            standard_code: params.topicName || undefined,
+            xp_reward: Math.round(finalGrade * xpMultiplier),
+            coin_reward: Math.round(finalGrade * coinMultiplier),
+            student_id: params.studentId,
+            student_name: params.studentName,
+            grade: finalGrade,
+            topic_name: params.topicName,
+          });
+        }
       }
 
       return attempt.id;
