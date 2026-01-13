@@ -135,7 +135,7 @@ export function LessonPlanGenerator({
 
     setIsSaving(true);
     try {
-      const { error } = await supabase.from('lesson_plans').insert({
+      const insertData = {
         teacher_id: user.id,
         title: lessonPlan.title,
         standard: lessonPlan.standard,
@@ -143,10 +143,12 @@ export function LessonPlanGenerator({
         subject: topic?.subject || null,
         objective: lessonPlan.objective,
         duration: lessonPlan.duration,
-        slides: lessonPlan.slides as unknown as Record<string, unknown>[],
-        recommended_worksheets: lessonPlan.recommendedWorksheets as unknown as Record<string, unknown>[],
+        slides: lessonPlan.slides as unknown,
+        recommended_worksheets: lessonPlan.recommendedWorksheets as unknown,
         class_id: classId || null,
-      });
+      };
+      
+      const { error } = await supabase.from('lesson_plans').insert(insertData as any);
 
       if (error) throw error;
 
@@ -164,7 +166,6 @@ export function LessonPlanGenerator({
     } finally {
       setIsSaving(false);
     }
-  };
   };
 
   const generateLessonPlan = async () => {
