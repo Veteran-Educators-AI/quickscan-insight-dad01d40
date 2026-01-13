@@ -523,14 +523,41 @@ export function IntegrationSettings() {
             )}
           </div>
 
-          {/* --- Connection Instructions --- */}
+          {/* --- Connect Google Drive Button --- */}
           {driveChecked && !driveConnected && (
-            <Alert>
-              <AlertDescription>
-                <strong>To connect Google Drive:</strong> You need to sign in with Google when logging into the app. 
-                Google Drive access is granted through your Google account login. Sign out and sign back in with Google to enable Drive integration.
-              </AlertDescription>
-            </Alert>
+            <div className="space-y-4">
+              <Alert>
+                <AlertDescription>
+                  <strong>Connect your Google account</strong> to import scanned documents directly from Google Drive and enable auto-sync features.
+                </AlertDescription>
+              </Alert>
+              <Button
+                onClick={async () => {
+                  const { error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                      redirectTo: window.location.origin + '/settings',
+                      scopes: 'https://www.googleapis.com/auth/drive.readonly',
+                      queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent',
+                      },
+                    },
+                  });
+                  if (error) {
+                    toast({
+                      title: "Connection failed",
+                      description: error.message,
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                className="w-full"
+              >
+                <Cloud className="h-4 w-4 mr-2" />
+                Connect Google Drive
+              </Button>
+            </div>
           )}
 
           {/* --- Auto-Sync Configuration --- */}
