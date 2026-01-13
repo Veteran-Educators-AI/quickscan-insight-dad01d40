@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Shield, CheckCircle, AlertTriangle, Loader2, Trash2 } from 'lucide-react';
+import { Shield, CheckCircle, AlertTriangle, Loader2, Trash2, ShieldOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,9 @@ export function TwoFactorSettings() {
   const [factors, setFactors] = useState<Factor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [showDisableDialog, setShowDisableDialog] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isDisabling, setIsDisabling] = useState(false);
   const navigate = useNavigate();
 
   const loadFactors = async () => {
@@ -65,6 +67,25 @@ export function TwoFactorSettings() {
       toast.error(error.message || 'Failed to reset 2FA');
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  const handleDisableMfa = async () => {
+    setIsDisabling(true);
+    try {
+      // Unenroll all factors
+      for (const factor of factors) {
+        await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      }
+      
+      toast.success('Two-factor authentication has been disabled');
+      setShowDisableDialog(false);
+      setFactors([]);
+    } catch (error: any) {
+      console.error('Error disabling MFA:', error);
+      toast.error(error.message || 'Failed to disable 2FA');
+    } finally {
+      setIsDisabling(false);
     }
   };
 
@@ -124,15 +145,26 @@ export function TwoFactorSettings() {
                       Added {new Date(verifiedFactor.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => setShowResetDialog(true)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Reset
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowResetDialog(true)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Reset
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setShowDisableDialog(true)}
+                    >
+                      <ShieldOff className="h-4 w-4 mr-1" />
+                      Disable
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -189,6 +221,35 @@ export function TwoFactorSettings() {
                 </>
               ) : (
                 'Reset 2FA'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable Two-Factor Authentication?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will completely turn off two-factor authentication for your account. 
+              Your account will be less secure without 2FA protection.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDisabling}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDisableMfa}
+              disabled={isDisabling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDisabling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Disabling...
+                </>
+              ) : (
+                'Disable 2FA'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
