@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { 
   Upload, Loader2, RotateCcw, RotateCw, ArrowUp, ArrowDown, 
   Trash2, Check, Layers, FileImage, Wand2, GripVertical,
-  ZoomIn, ZoomOut, Eye, FolderOpen, RefreshCw, Settings2
+  ZoomIn, ZoomOut, Eye, FolderOpen, RefreshCw, Settings2, Cloud
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { resizeImage, blobToBase64, applyPhotocopyFilter } from '@/lib/imageUtils';
+import { GoogleDriveImport } from './GoogleDriveImport';
 
 interface ScanPage {
   id: string;
@@ -181,6 +182,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const [processProgress, setProcessProgress] = useState(0);
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [driveImportOpen, setDriveImportOpen] = useState(false);
   const [settings, setSettings] = useState({
     autoRotate: true,
     applyPhotocopyFilter: true,
@@ -434,6 +436,53 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
     toast.info('Stopped watching folder');
   };
 
+  // Handle files imported from Google Drive
+  const handleDriveFilesImported = async (driveFiles: { blob: Blob; name: string }[]) => {
+    setDriveImportOpen(false);
+    
+    if (driveFiles.length === 0) return;
+    
+    setIsProcessing(true);
+    setProcessProgress(0);
+    
+    // Sort files by name for natural ordering
+    if (settings.autoOrder) {
+      driveFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    }
+    
+    toast.info(`Processing ${driveFiles.length} scanned pages from Drive...`);
+    
+    try {
+      const newPages: ScanPage[] = [];
+      
+      for (let i = 0; i < driveFiles.length; i++) {
+        const { blob, name } = driveFiles[i];
+        // Convert blob to File for consistent processing
+        const file = new File([blob], name, { type: blob.type });
+        const page = await processImage(file, i, driveFiles.length);
+        newPages.push(page);
+      }
+      
+      // Append to existing pages
+      setPages(prev => {
+        const existingCount = prev.length;
+        return [
+          ...prev,
+          ...newPages.map((p, i) => ({ ...p, order: existingCount + i + 1 }))
+        ];
+      });
+      
+      const autoRotatedCount = newPages.filter(p => p.autoRotated).length;
+      toast.success(`Added ${newPages.length} pages from Drive${autoRotatedCount > 0 ? ` (${autoRotatedCount} auto-rotated)` : ''}`);
+    } catch (error) {
+      console.error('Error processing Drive files:', error);
+      toast.error('Error processing some files');
+    } finally {
+      setIsProcessing(false);
+      setProcessProgress(0);
+    }
+  };
+
   const handleConfirmPages = () => {
     if (pages.length === 0) {
       toast.error('No pages to process');
@@ -522,6 +571,15 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
             >
               <Upload className="h-4 w-4 mr-2" />
               Import Scans
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => setDriveImportOpen(true)}
+              disabled={isProcessing}
+            >
+              <Cloud className="h-4 w-4 mr-2" />
+              Google Drive
             </Button>
             
             {folderWatchSupported && (
@@ -784,6 +842,25 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Google Drive Import Dialog */}
+      <Dialog open={driveImportOpen} onOpenChange={setDriveImportOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Cloud className="h-5 w-5" />
+              Import from Google Drive
+            </DialogTitle>
+            <DialogDescription>
+              Select scanned documents from your Google Drive
+            </DialogDescription>
+          </DialogHeader>
+          <GoogleDriveImport 
+            onFilesSelected={handleDriveFilesImported}
+            onClose={() => setDriveImportOpen(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>
