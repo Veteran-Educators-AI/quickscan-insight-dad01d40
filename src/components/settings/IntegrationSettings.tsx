@@ -529,12 +529,16 @@ export function IntegrationSettings() {
               <Alert>
                 <AlertDescription>
                   <strong>Connect your Google account</strong> to import scanned documents directly from Google Drive and enable auto-sync features.
+                  {user && (
+                    <p className="mt-2 text-xs">
+                      <strong>Note:</strong> If you have 2FA enabled, you'll need to complete verification after signing in with Google. This is a one-time security step.
+                    </p>
+                  )}
                 </AlertDescription>
               </Alert>
               <Button
                 onClick={async () => {
-                  // Use linkIdentity to add Google OAuth to existing account without re-authenticating
-                  const { error } = await supabase.auth.linkIdentity({
+                  const { error } = await supabase.auth.signInWithOAuth({
                     provider: 'google',
                     options: {
                       redirectTo: window.location.origin + '/settings',
