@@ -201,39 +201,11 @@ export function StudentWorkDetailDialog({
                 {/* Score Summary */}
                 <Card className="border-2">
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      {/* Regents Score */}
-                      {result.regentsScore !== undefined && (
-                        <div className="flex flex-col items-center">
-                          <span className="text-xs font-medium text-muted-foreground mb-1">Regents</span>
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${getRegentsScoreColor(result.regentsScore)}`}>
-                            <span className="text-xl font-bold">{result.regentsScore}</span>
-                          </div>
-                          <span className="text-xs font-medium mt-1">
-                            {getRegentsScoreLabel(result.regentsScore)}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Grade */}
-                      <div className={`flex-1 text-center rounded-lg p-3 ${getGradeBgColor(grade)}`}>
-                        <span className="text-xs font-medium text-muted-foreground block">Grade</span>
-                        <div className={`text-4xl font-bold ${getGradeColor(grade)}`}>
-                          {grade}
-                        </div>
-                      </div>
-
-                      {/* Raw Score */}
-                      <div className="flex flex-col items-center">
-                        <span className="text-xs font-medium text-muted-foreground mb-1">Raw</span>
-                        <div className="w-12 h-12 rounded-full border-2 border-muted flex items-center justify-center">
-                          <span className={`text-sm font-bold ${getScoreColor(result.totalScore.percentage)}`}>
-                            {result.totalScore.percentage}%
-                          </span>
-                        </div>
-                        <span className="text-xs mt-1">
-                          {result.totalScore.earned}/{result.totalScore.possible}
-                        </span>
+                    {/* Grade Only */}
+                    <div className={`w-full text-center rounded-lg p-4 ${getGradeBgColor(grade)}`}>
+                      <span className="text-xs font-medium text-muted-foreground block">Final Grade</span>
+                      <div className={`text-5xl font-bold ${getGradeColor(grade)}`}>
+                        {grade}
                       </div>
                     </div>
 
