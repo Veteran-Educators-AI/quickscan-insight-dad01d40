@@ -15,6 +15,7 @@ import { WorksheetBuilder, type WorksheetQuestion } from '@/components/questions
 import { DifferentiatedWorksheetGenerator } from '@/components/questions/DifferentiatedWorksheetGenerator';
 import { LessonPlanGenerator } from '@/components/questions/LessonPlanGenerator';
 import { LessonPlanLibrary } from '@/components/questions/LessonPlanLibrary';
+import { LessonTopicSelector, type PresentationTheme } from '@/components/questions/LessonTopicSelector';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Questions() {
@@ -30,6 +31,8 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
   const [showLessonGenerator, setShowLessonGenerator] = useState(false);
   const [selectedLessonTopic, setSelectedLessonTopic] = useState<{ topicName: string; standard: string; subject?: string } | null>(null);
   const [showLessonLibrary, setShowLessonLibrary] = useState(false);
+  const [showTopicSelector, setShowTopicSelector] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState<PresentationTheme | null>(null);
 
   // Get selected topics as array for passing to generator
   const getSelectedTopicsArray = () => {
@@ -87,22 +90,18 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
   };
 
   const openLessonPlanGenerator = () => {
-    const topicsArray = getAllTopicsArray();
-    if (topicsArray.length === 0) {
-      toast({
-        title: 'No topics selected',
-        description: 'Please select at least one topic to create a lesson plan.',
-      });
-      return;
-    }
-    // Use the first selected topic for the lesson plan
-    const firstTopic = topicsArray[0];
-    const currentSubjectData = NYS_SUBJECTS.find(s => s.id === selectedSubject);
+    // Open topic selector to let user choose from NYS standards
+    setShowTopicSelector(true);
+  };
+
+  const handleTopicSelected = (topic: { topicName: string; standard: string; subject: string }, theme: PresentationTheme) => {
     setSelectedLessonTopic({
-      topicName: firstTopic.topicName,
-      standard: firstTopic.standard,
-      subject: currentSubjectData?.name,
+      topicName: topic.topicName,
+      standard: topic.standard,
+      subject: topic.subject,
     });
+    setSelectedTheme(theme);
+    setShowTopicSelector(false);
     setShowLessonGenerator(true);
   };
 
@@ -711,6 +710,13 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
         initialTopics={initialTopicsForGenerator}
       />
 
+      {/* Topic Selector for Lesson Plan */}
+      <LessonTopicSelector
+        open={showTopicSelector}
+        onOpenChange={setShowTopicSelector}
+        onSelect={handleTopicSelected}
+      />
+
       {/* Lesson Plan Generator Modal */}
       <LessonPlanGenerator
         open={showLessonGenerator}
@@ -718,10 +724,12 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
           setShowLessonGenerator(open);
           if (!open) {
             setSelectedLessonTopic(null);
+            setSelectedTheme(null);
           }
         }}
         topic={selectedLessonTopic}
         relatedTopics={getAllTopicsArray()}
+        presentationTheme={selectedTheme || undefined}
         onOpenLibrary={() => {
           setShowLessonGenerator(false);
           setShowLessonLibrary(true);
