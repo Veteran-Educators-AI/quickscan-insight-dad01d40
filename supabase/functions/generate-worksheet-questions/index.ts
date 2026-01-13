@@ -23,6 +23,7 @@ interface GeneratedQuestion {
   topic: string;
   standard: string;
   question: string;
+  answer?: string; // The correct answer/solution for the teacher's answer key
   difficulty: 'medium' | 'hard' | 'challenging';
   bloomLevel: BloomLevel;
   bloomVerb: string; // The action verb used (e.g., "identify", "compare", "design")
@@ -137,7 +138,7 @@ serve(async (req) => {
       });
     }
 
-    const { topics, questionCount, difficultyLevels, bloomLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages, worksheetMode, variationSeed, studentName, formVariation, formSeed, includeHints } = await req.json() as {
+    const { topics, questionCount, difficultyLevels, bloomLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages, worksheetMode, variationSeed, studentName, formVariation, formSeed, includeHints, includeAnswerKey } = await req.json() as {
       topics: TopicInput[];
       questionCount: number;
       difficultyLevels?: string[];
@@ -153,6 +154,7 @@ serve(async (req) => {
       formVariation?: string;
       formSeed?: number;
       includeHints?: boolean;
+      includeAnswerKey?: boolean;
     };
 
     if (!topics || topics.length === 0) {
@@ -346,6 +348,22 @@ STUDENT HINTS (REQUIRED):
 - The goal is to help students get "unstuck" without doing the problem for them`
       : '';
 
+    // Answer key instruction for teachers
+    const answerKeyInstruction = includeAnswerKey
+      ? `
+TEACHER ANSWER KEY (REQUIRED):
+- Every question MUST include an "answer" field with the complete correct answer
+- For computational problems: Include the final numerical answer AND brief solution steps
+- For conceptual questions: Provide the expected correct response
+- For proofs: Include key steps or approach
+- Format answers clearly and concisely
+- Examples:
+  • "answer": "x = 5 (Divide both sides by 3: 3x = 15 → x = 5)"
+  • "answer": "Area = 25π cm² (A = πr² = π(5)² = 25π)"
+  • "answer": "The angle is 60°. Since angles in a triangle sum to 180°, and two angles are 60° each, the third must be 60°."
+- This is for the teacher's reference when grading student work`
+      : '';
+
     // Diagnostic mode instructions for advancement levels
     const diagnosticInstruction = worksheetMode === 'diagnostic' 
       ? `
@@ -375,6 +393,7 @@ WARM-UP MODE (Confidence Building):
       : '';
 
     const hintExample = includeHints ? ',\n    "hint": "Remember to use the formula for area. What shape is this?"' : '';
+    const answerExample = includeAnswerKey ? ',\n    "answer": "x = 5 (Divide both sides by 3)"' : '';
 
     const exampleOutput = worksheetMode === 'diagnostic'
       ? `[
@@ -384,7 +403,7 @@ WARM-UP MODE (Confidence Building):
     "standard": "G.CO.A.1",
     "question": "The full question text here",
     "difficulty": "${allowedDifficulties[0]}",
-    "advancementLevel": "C"${hintExample}${useAIImages ? ',\n    "imagePrompt": "A detailed description of the geometric diagram needed"' : ''}
+    "advancementLevel": "C"${hintExample}${answerExample}${useAIImages ? ',\n    "imagePrompt": "A detailed description of the geometric diagram needed"' : ''}
   }
 ]`
       : useAIImages
@@ -394,7 +413,7 @@ WARM-UP MODE (Confidence Building):
     "topic": "Topic Name",
     "standard": "G.CO.A.1",
     "question": "The full question text here",
-    "difficulty": "${allowedDifficulties[0]}"${hintExample},
+    "difficulty": "${allowedDifficulties[0]}"${hintExample}${answerExample},
     "imagePrompt": "A detailed description of the geometric diagram needed"
   }
 ]`
@@ -404,7 +423,7 @@ WARM-UP MODE (Confidence Building):
     "topic": "Topic Name",
     "standard": "G.CO.A.1",
     "question": "The full question text here",
-    "difficulty": "${allowedDifficulties[0]}"${hintExample}${includeGeometry ? ',\n    "svg": "<svg width=\\"200\\" height=\\"200\\" viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>"' : ''}
+    "difficulty": "${allowedDifficulties[0]}"${hintExample}${answerExample}${includeGeometry ? ',\n    "svg": "<svg width=\\"200\\" height=\\"200\\" viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>"' : ''}
   }
 ]`;
 
@@ -479,6 +498,7 @@ REQUIREMENTS:
 8. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}${graphPaperInstruction}${coordinateGeometryInstruction}
 ${diagnosticInstruction}
 ${hintInstruction}
+${answerKeyInstruction}
 ${formInstruction}
 ${variationInstruction}
 
@@ -511,7 +531,7 @@ Respond with a JSON array of questions in this exact format:
     "question": "The full question text here",
     "difficulty": "${allowedDifficulties[0]}",
     "bloomLevel": "apply",
-    "bloomVerb": "calculate"${worksheetMode === 'diagnostic' ? ',\n    "advancementLevel": "C"' : ''}${includeHints ? ',\n    "hint": "Remember to use the formula for..."' : ''}${useAIImages ? ',\n    "imagePrompt": "A detailed description of the diagram needed"' : ''}
+    "bloomVerb": "calculate"${worksheetMode === 'diagnostic' ? ',\n    "advancementLevel": "C"' : ''}${includeHints ? ',\n    "hint": "Remember to use the formula for..."' : ''}${includeAnswerKey ? ',\n    "answer": "x = 5 (Divide both sides by 3)"' : ''}${useAIImages ? ',\n    "imagePrompt": "A detailed description of the diagram needed"' : ''}
   }
 ]
 ${imageFieldNote}
@@ -667,6 +687,7 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       questions = questions.map(q => ({
         ...q,
         question: sanitizeMathText(q.question),
+        answer: q.answer ? sanitizeMathText(q.answer) : q.answer,
         hint: q.hint ? sanitizeMathText(q.hint) : q.hint,
         imagePrompt: q.imagePrompt ? sanitizeMathText(q.imagePrompt) : q.imagePrompt,
       }));

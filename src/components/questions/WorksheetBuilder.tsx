@@ -42,6 +42,7 @@ interface GeneratedQuestion {
   topic: string;
   standard: string;
   question: string;
+  answer?: string; // The correct answer for teacher's answer key
   difficulty: 'medium' | 'hard' | 'challenging';
   bloomLevel?: BloomLevel;
   bloomVerb?: string;
@@ -88,6 +89,7 @@ interface SavedWorksheet {
     imageSize?: number;
     includeClipart?: boolean;
     worksheetMode?: WorksheetMode;
+    includeAnswerKey?: boolean;
   };
   created_at: string;
   share_code: string | null;
@@ -128,6 +130,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [useAIImages, setUseAIImages] = useState(false);
   const [useNanoBanana, setUseNanoBanana] = useState(false); // Use Nano Banana for realistic shape images
   const [imageSize, setImageSize] = useState(200); // Image size in pixels (100-400)
+  const [includeAnswerKey, setIncludeAnswerKey] = useState(false); // Include answer key for teachers
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledQuestions, setCompiledQuestions] = useState<GeneratedQuestion[]>([]);
   const [isCompiled, setIsCompiled] = useState(false);
@@ -255,6 +258,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           imageSize,
           includeClipart: clipartGenerated,
           worksheetMode,
+          includeAnswerKey,
         })),
       };
       const { error } = await supabase.from('worksheets').insert([worksheetData]);
@@ -292,6 +296,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setIncludeCoordinateGeometry(worksheet.settings.includeCoordinateGeometry ?? false);
     setUseAIImages(worksheet.settings.useAIImages ?? (worksheet.settings.includeGeometry ?? false));
     setImageSize(worksheet.settings.imageSize ?? 200);
+    setIncludeAnswerKey(worksheet.settings.includeAnswerKey ?? false);
     setIsCompiled(true);
     setShowSavedWorksheets(false);
     toast({
@@ -416,6 +421,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           useAIImages,
           useNanoBanana,
           worksheetMode,
+          includeAnswerKey,
         },
       });
 
@@ -1221,6 +1227,81 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         }
       }
 
+      // Answer Key Section (for teachers)
+      if (includeAnswerKey && compiledQuestions.some(q => q.answer)) {
+        pdf.addPage();
+        yPosition = margin;
+
+        // Answer key header
+        pdf.setFontSize(18);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(0);
+        pdf.text('ANSWER KEY', pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 8;
+
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(sanitizeForPDF(worksheetTitle), pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 10;
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'italic');
+        pdf.setTextColor(100);
+        pdf.text('FOR TEACHER USE ONLY', pageWidth / 2, yPosition, { align: 'center' });
+        pdf.setTextColor(0);
+        yPosition += 10;
+
+        pdf.setLineWidth(0.5);
+        pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+        yPosition += 10;
+
+        // Render each answer
+        for (const question of compiledQuestions) {
+          if (!question.answer) continue;
+
+          // Check if we need a new page
+          if (yPosition > pageHeight - 50) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+
+          // Question number and brief question text
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(`Question ${question.questionNumber}:`, margin, yPosition);
+          yPosition += 6;
+
+          // Topic reference
+          pdf.setFontSize(9);
+          pdf.setFont('helvetica', 'italic');
+          pdf.setTextColor(100);
+          pdf.text(sanitizeForPDF(`${question.topic} (${question.standard})`), margin + 5, yPosition);
+          pdf.setTextColor(0);
+          yPosition += 7;
+
+          // Answer
+          pdf.setFontSize(10);
+          pdf.setFont('helvetica', 'normal');
+          const answerLines = pdf.splitTextToSize(sanitizeForPDF(`Answer: ${question.answer}`), contentWidth - 10);
+          
+          answerLines.forEach((line: string) => {
+            if (yPosition > pageHeight - 20) {
+              pdf.addPage();
+              yPosition = margin;
+            }
+            pdf.text(line, margin + 5, yPosition);
+            yPosition += 5;
+          });
+
+          yPosition += 8;
+          
+          // Separator line
+          pdf.setDrawColor(200);
+          pdf.setLineWidth(0.2);
+          pdf.line(margin + 5, yPosition - 3, pageWidth - margin - 5, yPosition - 3);
+        }
+      }
+
       // Footer
       pdf.setFontSize(8);
       pdf.setTextColor(150);
@@ -1760,6 +1841,26 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     </div>
                   </div>
                 )}
+                
+                {/* Answer Key Option */}
+                <div className="flex items-center gap-2 pt-2 border-t border-dashed">
+                  <input
+                    type="checkbox"
+                    id="includeAnswerKey"
+                    checked={includeAnswerKey}
+                    onChange={(e) => setIncludeAnswerKey(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  <Label htmlFor="includeAnswerKey" className="text-sm cursor-pointer">
+                    <span className="flex flex-col">
+                      <span className="flex items-center gap-1">
+                        <ClipboardList className="h-3.5 w-3.5 text-green-600" />
+                        Include answer key (for teacher)
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-5">Generates a separate answer key page with solutions</span>
+                    </span>
+                  </Label>
+                </div>
               </div>
 
               <Separator />
@@ -2387,6 +2488,30 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     </div>
                   );
                 })()}
+
+                {/* Answer Key Section in Print Preview */}
+                {includeAnswerKey && compiledQuestions.some(q => q.answer) && (
+                  <div className="mt-12 pt-8 border-t-2 border-dashed border-gray-300" style={{ pageBreakBefore: 'always' }}>
+                    <h2 className="text-xl font-bold text-center mb-2 text-black">ANSWER KEY</h2>
+                    <p className="text-center text-sm text-gray-600 mb-1">{worksheetTitle}</p>
+                    <p className="text-center text-xs text-red-600 italic mb-6">FOR TEACHER USE ONLY</p>
+                    
+                    <div className="space-y-4">
+                      {compiledQuestions.filter(q => q.answer).map((question) => (
+                        <div key={question.questionNumber} className="pb-3 border-b border-gray-200">
+                          <div className="flex items-baseline gap-2">
+                            <span className="font-bold text-black">Question {question.questionNumber}:</span>
+                            <span className="text-xs text-gray-500 italic">{question.topic}</span>
+                          </div>
+                          <p className="mt-1 ml-4 text-sm text-black">
+                            <span className="font-medium text-green-700">Answer: </span>
+                            {renderMathText(fixEncodingCorruption(question.answer || ''))}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-12 text-center text-xs text-gray-400">
                   Generated with Scan Genius - NYS Regents Aligned
