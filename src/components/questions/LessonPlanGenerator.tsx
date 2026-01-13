@@ -8,10 +8,11 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType, Pencil, Check, Plus, Trash2, X } from 'lucide-react';
+import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType, Pencil, Check, Plus, Trash2, X, Save, Library } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
+import { useAuth } from '@/lib/auth';
 import jsPDF from 'jspdf';
 import pptxgen from 'pptxgenjs';
 
@@ -47,6 +48,7 @@ interface LessonPlanGeneratorProps {
   } | null;
   relatedTopics?: { topicName: string; standard: string }[];
   classId?: string;
+  onOpenLibrary?: () => void;
 }
 
 export function LessonPlanGenerator({ 
@@ -54,9 +56,11 @@ export function LessonPlanGenerator({
   onOpenChange, 
   topic, 
   relatedTopics = [],
-  classId 
+  classId,
+  onOpenLibrary
 }: LessonPlanGeneratorProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { pushToSisterApp } = usePushToSisterApp();
   const [isGenerating, setIsGenerating] = useState(false);
   const [lessonPlan, setLessonPlan] = useState<LessonPlan | null>(null);
@@ -65,6 +69,7 @@ export function LessonPlanGenerator({
   const [isPushingToSisterApp, setIsPushingToSisterApp] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingContentIndex, setEditingContentIndex] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Edit handlers
   const updateSlideTitle = (newTitle: string) => {
@@ -116,6 +121,50 @@ export function LessonPlanGenerator({
   const updateObjective = (newObjective: string) => {
     if (!lessonPlan) return;
     setLessonPlan({ ...lessonPlan, objective: newObjective });
+  };
+
+  const saveLessonPlan = async () => {
+    if (!lessonPlan || !user) {
+      toast({
+        title: 'Cannot save',
+        description: 'Please log in to save lesson plans.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('lesson_plans').insert({
+        teacher_id: user.id,
+        title: lessonPlan.title,
+        standard: lessonPlan.standard,
+        topic_name: lessonPlan.topicName,
+        subject: topic?.subject || null,
+        objective: lessonPlan.objective,
+        duration: lessonPlan.duration,
+        slides: lessonPlan.slides as unknown as Record<string, unknown>[],
+        recommended_worksheets: lessonPlan.recommendedWorksheets as unknown as Record<string, unknown>[],
+        class_id: classId || null,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Lesson plan saved!',
+        description: 'You can find it in your Lesson Plan Library.',
+      });
+    } catch (error) {
+      console.error('Error saving lesson plan:', error);
+      toast({
+        title: 'Failed to save',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
   };
 
   const generateLessonPlan = async () => {
@@ -763,13 +812,21 @@ export function LessonPlanGenerator({
 
               {/* Actions */}
               <div className="flex flex-wrap gap-2 pt-2">
-                <Button onClick={downloadAsPowerPoint} className="flex-1 min-w-[140px]">
+                <Button onClick={saveLessonPlan} disabled={isSaving} variant="default" className="flex-1 min-w-[140px]">
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save to Library
+                </Button>
+                <Button onClick={downloadAsPowerPoint} variant="outline" className="flex-1 min-w-[140px]">
                   <FileType className="h-4 w-4 mr-2" />
-                  Download PowerPoint
+                  PowerPoint
                 </Button>
                 <Button onClick={downloadAsPDF} variant="outline" className="flex-1 min-w-[140px]">
                   <Download className="h-4 w-4 mr-2" />
-                  Download PDF
+                  PDF
                 </Button>
                 <Button 
                   onClick={pushToSisterApps} 
@@ -789,6 +846,18 @@ export function LessonPlanGenerator({
                     </>
                   )}
                 </Button>
+                {onOpenLibrary && (
+                  <Button
+                    onClick={() => {
+                      onOpenLibrary();
+                    }}
+                    variant="ghost"
+                    className="min-w-[120px]"
+                  >
+                    <Library className="h-4 w-4 mr-2" />
+                    View Library
+                  </Button>
+                )}
                 <Button 
                   onClick={() => {
                     setLessonPlan(null);
