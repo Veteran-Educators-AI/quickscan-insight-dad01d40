@@ -17,6 +17,7 @@ import { ClassStudentSelector, useClassStudents } from '@/components/scan/ClassS
 import { ScanClassStudentPicker, useStudentName } from '@/components/scan/ScanClassStudentPicker';
 import { ScanQuestionSelector } from '@/components/scan/ScanQuestionSelector';
 import { SaveForLaterTab } from '@/components/scan/SaveForLaterTab';
+import { SyncStatusIndicator } from '@/components/scan/SyncStatusIndicator';
 import { useAnalyzeStudentWork } from '@/hooks/useAnalyzeStudentWork';
 import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
 import { usePendingScans } from '@/hooks/usePendingScans';
@@ -71,7 +72,7 @@ export default function Scan() {
   const { analyze, compareWithSolution, isAnalyzing, isComparing, error, result, rawAnalysis, comparisonResult } = useAnalyzeStudentWork();
   const batch = useBatchAnalysis();
   const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans();
-  const { saveResults, saveMultiQuestionResults, isSaving } = useSaveAnalysisResults();
+  const { saveResults, saveMultiQuestionResults, isSaving, syncStatus, resetSyncStatus } = useSaveAnalysisResults();
   const { scanImageForQR, isScanning: isQRScanning, scanResult: qrScanResult, clearResult: clearQRResult } = useQRCodeScanner();
   const { identifyStudent, isIdentifying, identificationResult, clearResult: clearIdentification } = useStudentIdentification();
   
@@ -533,6 +534,7 @@ export default function Scan() {
     setAutoIdentifiedStudent(null);
     clearQRResult();
     clearIdentification();
+    resetSyncStatus();
   };
 
   // Handle analyzing a saved scan with multiple questions
@@ -1213,6 +1215,11 @@ export default function Scan() {
                         topicName={result.problemIdentified}
                       />
                       
+                      {/* Sync Status Indicator - shown after save */}
+                      {resultsSaved && (
+                        <SyncStatusIndicator status={syncStatus} className="mt-2" />
+                      )}
+                      
                       <SaveAnalyticsConfirmDialog
                         open={showSaveConfirm}
                         onOpenChange={setShowSaveConfirm}
@@ -1281,6 +1288,11 @@ export default function Scan() {
                         studentId={currentStudentId}
                         classId={singleScanClassId}
                       />
+                      
+                      {/* Sync Status Indicator - shown after save */}
+                      {resultsSaved && (
+                        <SyncStatusIndicator status={syncStatus} className="mt-2" />
+                      )}
                       
                       <SaveAnalyticsConfirmDialog
                         open={showSaveConfirm}

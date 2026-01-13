@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 import { usePushStudentData } from './usePushStudentData';
 import { usePushToSisterApp } from './usePushToSisterApp';
+import type { SyncStatus } from '@/components/scan/SyncStatusIndicator';
 
 interface RubricScore {
   criterion: string;
@@ -42,6 +43,17 @@ export function useSaveAnalysisResults() {
   const { pushData } = usePushStudentData();
   const { pushToSisterApp } = usePushToSisterApp();
   const [isSaving, setIsSaving] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
+    sisterAppSync: 'idle',
+    webhookSync: 'idle',
+  });
+
+  const resetSyncStatus = useCallback(() => {
+    setSyncStatus({
+      sisterAppSync: 'idle',
+      webhookSync: 'idle',
+    });
+  }, []);
 
   const saveResults = async (params: SaveAnalysisParams): Promise<string | null> => {
     if (!user) {
@@ -165,24 +177,46 @@ export function useSaveAnalysisResults() {
       }
 
       // 6. Push data to webhook (generic webhook integration)
-      pushData({
-        eventType: 'scan_analysis',
-        studentId: params.studentId,
-        studentName: params.studentName || 'Unknown Student',
-        classId: params.classId,
-        className: params.className,
-        data: {
-          attemptId: attempt.id,
-          topicName: params.topicName,
-          topicId: params.topicId,
-          totalScore: params.result.totalScore,
-          grade: finalGrade,
-          gradeJustification: params.result.gradeJustification,
-          misconceptions: params.result.misconceptions,
-          rubricScores: params.result.rubricScores,
-          feedback: params.result.feedback,
-        },
-      });
+      // Check webhook settings
+      const { data: webhookSettings } = await supabase
+        .from('settings')
+        .select('integration_webhook_enabled, integration_webhook_url')
+        .eq('teacher_id', user.id)
+        .single();
+
+      if (webhookSettings?.integration_webhook_enabled && webhookSettings?.integration_webhook_url) {
+        setSyncStatus(prev => ({ ...prev, webhookSync: 'syncing' }));
+        try {
+          await pushData({
+            eventType: 'scan_analysis',
+            studentId: params.studentId,
+            studentName: params.studentName || 'Unknown Student',
+            classId: params.classId,
+            className: params.className,
+            data: {
+              attemptId: attempt.id,
+              topicName: params.topicName,
+              topicId: params.topicId,
+              totalScore: params.result.totalScore,
+              grade: finalGrade,
+              gradeJustification: params.result.gradeJustification,
+              misconceptions: params.result.misconceptions,
+              rubricScores: params.result.rubricScores,
+              feedback: params.result.feedback,
+            },
+          });
+          setSyncStatus(prev => ({ ...prev, webhookSync: 'success' }));
+        } catch (webhookError) {
+          console.error('Webhook push error:', webhookError);
+          setSyncStatus(prev => ({ 
+            ...prev, 
+            webhookSync: 'failed',
+            webhookError: webhookError instanceof Error ? webhookError.message : 'Webhook failed'
+          }));
+        }
+      } else {
+        setSyncStatus(prev => ({ ...prev, webhookSync: 'disabled' }));
+      }
 
       // 7. Push to sister app (automatic sync) - check settings first
       if (params.classId) {
@@ -193,10 +227,12 @@ export function useSaveAnalysisResults() {
           .single();
 
         if (settings?.sister_app_sync_enabled) {
+          setSyncStatus(prev => ({ ...prev, sisterAppSync: 'syncing' }));
+          
           const xpMultiplier = settings.sister_app_xp_multiplier || 0.5;
           const coinMultiplier = settings.sister_app_coin_multiplier || 0.25;
           
-          pushToSisterApp({
+          const sisterAppResult = await pushToSisterApp({
             class_id: params.classId,
             title: `Grade: ${params.topicName || 'Assessment'}`,
             description: `${params.studentName || 'Student'} scored ${finalGrade}% - ${params.result.feedback}`,
@@ -208,7 +244,25 @@ export function useSaveAnalysisResults() {
             grade: finalGrade,
             topic_name: params.topicName,
           });
+
+          if (sisterAppResult.success) {
+            setSyncStatus(prev => ({ 
+              ...prev, 
+              sisterAppSync: 'success',
+              lastSyncTime: new Date()
+            }));
+          } else {
+            setSyncStatus(prev => ({ 
+              ...prev, 
+              sisterAppSync: 'failed',
+              sisterAppError: sisterAppResult.error || 'Sync to Scholar AI failed'
+            }));
+          }
+        } else {
+          setSyncStatus(prev => ({ ...prev, sisterAppSync: 'disabled' }));
         }
+      } else {
+        setSyncStatus(prev => ({ ...prev, sisterAppSync: 'disabled' }));
       }
 
       return attempt.id;
@@ -297,5 +351,7 @@ export function useSaveAnalysisResults() {
     saveResults,
     saveMultiQuestionResults,
     isSaving,
+    syncStatus,
+    resetSyncStatus,
   };
 }
