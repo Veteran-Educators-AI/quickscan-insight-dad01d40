@@ -7,6 +7,7 @@ import {
   TrendingUp, 
   AlertTriangle,
   ChevronRight,
+  Presentation,
   Plus,
   BarChart3,
   GraduationCap,
@@ -18,6 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AppLayout } from '@/components/layout/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { LessonPlanGenerator } from '@/components/questions/LessonPlanGenerator';
 
 interface DashboardStats {
   classCount: number;
@@ -37,6 +39,7 @@ export default function Dashboard() {
     unreadComments: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [showLessonGenerator, setShowLessonGenerator] = useState(false);
 
   useEffect(() => {
     async function fetchStats() {
@@ -114,7 +117,7 @@ export default function Dashboard() {
   const quickActions = [
     { label: 'Create Class', href: '/classes/new', icon: Users, color: 'bg-primary/10 text-primary' },
     { label: 'New Assessment', href: '/questions', icon: ClipboardList, color: 'bg-accent/10 text-accent' },
-    { label: 'Create Question', href: '/questions/new', icon: Plus, color: 'bg-secondary/50 text-secondary-foreground' },
+    { label: 'Make a Lesson', href: null, icon: Presentation, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300', onClick: () => setShowLessonGenerator(true) },
     { label: 'Start Scanning', href: '/scan', icon: Camera, color: 'bg-warning/10 text-warning' },
     { label: 'View Reports', href: '/reports', icon: BarChart3, color: 'bg-success/10 text-success' },
   ];
@@ -165,19 +168,31 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-slide-up">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 animate-slide-up">
           {quickActions.map((action) => {
             const Icon = action.icon;
+            const content = (
+              <Card className="hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer h-full">
+                <CardContent className="p-4 flex flex-col items-center text-center gap-3">
+                  <div className={`p-3 rounded-xl ${action.color}`}>
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <span className="font-medium text-sm">{action.label}</span>
+                </CardContent>
+              </Card>
+            );
+
+            if (action.onClick) {
+              return (
+                <div key={action.label} onClick={action.onClick}>
+                  {content}
+                </div>
+              );
+            }
+
             return (
-              <Link key={action.href} to={action.href}>
-                <Card className="hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer h-full">
-                  <CardContent className="p-4 flex flex-col items-center text-center gap-3">
-                    <div className={`p-3 rounded-xl ${action.color}`}>
-                      <Icon className="h-6 w-6" />
-                    </div>
-                    <span className="font-medium text-sm">{action.label}</span>
-                  </CardContent>
-                </Card>
+              <Link key={action.href} to={action.href!}>
+                {content}
               </Link>
             );
           })}
@@ -308,6 +323,13 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         )}
+
+        {/* Lesson Plan Generator Dialog */}
+        <LessonPlanGenerator
+          open={showLessonGenerator}
+          onOpenChange={setShowLessonGenerator}
+          topic={{ topicName: 'Custom Lesson', standard: 'G-CO', subject: 'Geometry' }}
+        />
       </div>
     </AppLayout>
   );
