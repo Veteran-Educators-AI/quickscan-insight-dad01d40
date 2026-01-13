@@ -236,55 +236,67 @@ serve(async (req) => {
     // Build the analysis prompt based on assessment mode
     const isAIMode = assessmentMode === 'ai';
     
-    // NYS Regents scoring guide context
+    // NYS Regents scoring guide context - CONCEPT-BASED GRADING
     const regentsContext = `
-NYS REGENTS SCORING GUIDELINES:
-The New York State Regents Examinations use a standards-based scoring approach. When evaluating student work:
+NYS REGENTS SCORING GUIDELINES - CONCEPT-BASED UNDERSTANDING EVALUATION:
+The New York State Regents Examinations use a standards-based scoring approach. 
+CRITICAL: Grade based on CONCEPTUAL UNDERSTANDING demonstrated through coherent work.
+
+HOW TO EVALUATE UNDERSTANDING:
+1. Count the number of CONCEPTS the student demonstrates understanding of
+2. Look for COHERENT WORK that shows logical thinking, even if basic
+3. Understanding must be JUSTIFIED with work shown - not just answers
+4. More concepts understood = higher grade
+5. Even BASIC understanding with coherent work deserves recognition (65+)
 
 SCORE 4 (Exceeding Standards - Grade 90-100):
-- Complete and correct solution with clear, logical reasoning
-- All mathematical procedures are correctly applied
+- Complete mastery of ALL relevant concepts
+- Clear, logical reasoning throughout
+- All mathematical procedures correctly applied
 - Work is well-organized and clearly communicated
-- No computational or conceptual errors
+- Multiple concepts demonstrated with full understanding
 
 SCORE 3 (Meeting Standards - Grade 80-89):
-- Substantially correct solution with minor errors
-- Mathematical reasoning is sound with small gaps
-- Work shows understanding of the core concepts
-- May have minor computational errors that don't affect the approach
+- Solid understanding of MOST concepts
+- Mathematical reasoning is sound with minor gaps
+- Work shows clear understanding of core concepts
+- May have minor computational errors that don't affect conceptual understanding
 
 SCORE 2 (Approaching Standards - Grade 70-79):
-- Partial understanding demonstrated
-- Some correct mathematical procedures but with significant gaps
-- May reach incorrect conclusion due to errors in reasoning
-- Shows effort but incomplete mastery
+- Understanding of SOME concepts demonstrated
+- Partial but coherent work showing logical thinking
+- Some correct procedures with gaps in understanding
+- Student shows they grasp key ideas even if execution is flawed
 
-SCORE 1 (Limited Understanding - Grade 65-69):
-- Minimal understanding of the mathematical concepts
-- Limited correct work shown
-- Major errors in approach or computation
-- Some relevant mathematical work attempted
-- ANY work that shows even limited understanding deserves at least 65
+SCORE 1 (Basic Understanding Shown - Grade 65-69):
+- Shows SOME understanding of at least ONE concept
+- ANY coherent work that demonstrates logical thinking
+- Even basic/simple work that shows student tried and understood something
+- Relevant mathematical work attempted with ANY understanding
+- IMPORTANT: If student shows even LIMITED understanding, they MUST get 65+
 
-SCORE 0 (No Understanding Demonstrated - Grade 55):
-- ONLY assign this if there is absolutely NO correct mathematical work
-- Completely incorrect approach with no relevant work
-- Blank or completely irrelevant response
-- No understanding whatsoever demonstrated
-- This should be RARE - if the student attempted anything relevant, use Score 1 (65) instead
+SCORE 0 (Absolutely No Understanding - Grade 55):
+- ONLY for COMPLETELY BLANK responses
+- ONLY if there is ZERO relevant work shown
+- ONLY if student wrote nothing related to the problem
+- THIS SHOULD BE EXTREMELY RARE
+- If ANY understanding is shown AT ALL, use Score 1 (65) instead
 
 CRITICAL GRADING RULES:
-- NEVER give a grade of 0 - the minimum is always 55
-- Work that shows ANY understanding (even limited) MUST receive at least 65
-- If a student made an honest attempt with some relevant work, minimum grade is 65
-- Reserve grades below 65 ONLY for blank/completely irrelevant responses
+- MINIMUM GRADE IS 55 - never give 0
+- ANY understanding (even basic/limited) = minimum 65
+- Look for CONCEPTS understood, not just correct answers
+- Coherent work showing thought process = understanding
+- More concepts understood with justification = higher grade
+- 55 is ONLY for completely blank or completely irrelevant responses
+- When in doubt, if student attempted anything relevant → give 65
 
-GRADE CONVERSION (55-100 Scale):
-- Score 4 → 90-100 (Exceeding)
-- Score 3 → 80-89 (Meeting)
-- Score 2 → 70-79 (Approaching)
-- Score 1 → 65-69 (Limited Understanding - minimum for any real attempt)
-- Score 0 → 55 (absolute minimum - ONLY if completely no understanding shown)
+CONCEPT-BASED GRADE CONVERSION (55-100 Scale):
+- Score 4 → 90-100 (Full conceptual mastery)
+- Score 3 → 80-89 (Strong understanding of most concepts)
+- Score 2 → 70-79 (Partial understanding, some concepts grasped)
+- Score 1 → 65-69 (Basic/limited understanding - ANY effort with understanding gets 65+)
+- Score 0 → 55 (ONLY for blank/no work at all - VERY RARE)
 `;
 
     // Custom rubric context if provided
@@ -375,21 +387,35 @@ Identify the problem being solved, its related NYS standard, and evaluate the st
       });
     }
 
-    userPromptText += `\n\nProvide your analysis in the following structure:
+    userPromptText += `\n\nIMPORTANT - CONCEPT-BASED GRADING:
+1. Identify ALL concepts the student demonstrates understanding of
+2. Look for COHERENT work that shows logical thinking (even if basic)
+3. ANY understanding shown = minimum grade of 65
+4. 55 is ONLY for completely blank/no work at all
+5. More concepts understood with coherent justification = higher grade
+
+Provide your analysis in the following structure:
 - OCR Text: (extracted handwritten content)
 - Problem Identified: (what problem the student is solving)
 - NYS Standard: (the most relevant NYS standard code and name, e.g., "A.REI.B.4 - Solving Quadratic Equations")${isAIMode ? '\n- Correct Solution: (your step-by-step solution to the problem)' : ''}
-- Approach Analysis: (evaluation of their method against NYS expectations)
+- Concepts Demonstrated: (LIST each concept the student shows understanding of, even basic ones)
+- Coherent Work Shown: (YES or NO - does the student show logical thinking/work, even if simple?)
+- Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND, not just errors)
 - Is Correct: (YES or NO - is the final answer mathematically correct?)
-- Regents Score: (0, 1, 2, 3, or 4 based on NYS Regents rubric)
-- Regents Score Justification: (why this Regents score was assigned based on the rubric)
+- Regents Score: (0, 1, 2, 3, or 4 - remember: ANY understanding = Score 1 minimum)
+- Regents Score Justification: (why this score - focus on concepts understood)
 - Rubric Scores: (if teacher rubric provided, score each criterion)
 - Misconceptions: (any errors or misunderstandings identified, with NYS standard references)
 - Total Score: (points earned / total possible from teacher rubric)
-- Standards Met: (YES or NO - does work meet the minimum standard requirements?)
-- Grade: (55-100 scale: Score 4=90-100, Score 3=80-89, Score 2=65-79, Score 1=55-64, Score 0=55)
-- Grade Justification: (2-3 sentences explaining the grade, explicitly referencing NYS standards and what the student needs to meet proficiency)
-- Feedback: (constructive suggestions referencing specific NYS standards the student should focus on)`;
+- Standards Met: (YES or NO - does work show ANY understanding of the standards?)
+- Grade: (55-100 scale based on concepts understood:
+    • 90-100 = Full mastery of all concepts
+    • 80-89 = Strong understanding of most concepts  
+    • 70-79 = Partial understanding, some concepts grasped
+    • 65-69 = Basic/limited understanding shown (DEFAULT if ANY work with understanding)
+    • 55 = ONLY if completely blank or NO understanding whatsoever)
+- Grade Justification: (explain what concepts the student understands and how the grade reflects their understanding level)
+- Feedback: (constructive suggestions referencing specific concepts to strengthen)`;
 
     // Build messages for Lovable AI
     // If additionalImages provided, include all pages as a multi-page paper
@@ -623,28 +649,43 @@ interface PageTypeResult {
 }
 
 async function detectPageTypeFromImage(imageBase64: string, apiKey: string): Promise<PageTypeResult> {
-  const prompt = `Analyze this image of student work to determine if this is a NEW PAPER or a CONTINUATION of a previous page.
+  const prompt = `CRITICAL TASK: Analyze this image of student work to determine if this is a NEW PAPER (first page) or a CONTINUATION of a previous page.
 
-Look for:
-1. QUESTION NUMBERS: Find any numbered questions visible (e.g., "1.", "2.", "3." or "#1", "#2", "Question 1", etc.)
-2. If question #1 is visible, this is a NEW PAPER (first page)
-3. If the visible questions start with a number OTHER than 1 (e.g., starts at 3, 4, 5), this is a CONTINUATION page (back side or next page)
-4. Look for page indicators like "Page 2", "Side B", "Back", "(continued)", etc.
+STEP 1 - SCAN FOR NUMBERS: Look CAREFULLY at the entire page for ANY numbers that indicate question/problem ordering:
+- Look for "1.", "2.", "3." etc. at the start of problems
+- Look for "#1", "#2", "Q1", "Q2", "Problem 1", "Question 1", etc.
+- Look for circled numbers, boxed numbers, or numbers in margins
+- Look for numbers labeling different sections or parts (Part 1, Part A, Section 1)
+
+STEP 2 - DETERMINE PAGE TYPE:
+- If you see question/problem #1 ANYWHERE on the page → This is a NEW PAPER (the main/first page)
+- If the LOWEST number you see is 2, 3, 4, 5, or higher → This is a CONTINUATION (back side or additional page)
+- Numbers starting from 1 = NEW PAPER that should receive the main grade
+- Numbers NOT starting from 1 = CONTINUATION of previous work, should be combined with previous page
+
+STEP 3 - LOOK FOR OTHER INDICATORS:
+- "Page 2", "Side B", "Back", "(continued)", "cont'd" → CONTINUATION
+- "Page 1", "Front", "Name:", student info at top → NEW PAPER
+- Fresh worksheet header, printed questions → NEW PAPER
+- Continuation of handwritten work without question 1 → CONTINUATION
 
 Respond in this exact JSON format (no markdown, just raw JSON):
 {
   "question_numbers_found": [1, 2, 3],
   "first_question_number": 1,
+  "lowest_question_number": 1,
   "is_new_paper": true,
   "is_continuation": false,
-  "page_indicators": ["Page 1", "Front"],
-  "confidence": "high"
+  "page_indicators": ["Page 1", "Front", "Name line visible"],
+  "confidence": "high",
+  "reasoning": "Question 1 is visible at the top of the page"
 }
 
-RULES:
-- If Question 1 is present, is_new_paper = true, is_continuation = false
-- If Question 1 is NOT present but other questions are, is_new_paper = false, is_continuation = true
-- If no question numbers found, assume is_new_paper = true (benefit of doubt)`;
+ABSOLUTE RULES:
+- If Question/Problem #1 is present → is_new_paper = true, is_continuation = false (THIS IS THE MAIN GRADEABLE PAGE)
+- If lowest question number is 2 or higher → is_new_paper = false, is_continuation = true (combine with previous page)
+- If no question numbers found at all, assume is_new_paper = true (benefit of doubt - grade as main page)
+- Single student work ALWAYS starts from question 1 - if it doesn't, it's a continuation!`;
 
   const messages = [
     { role: 'system', content: 'You are an expert at analyzing scanned student worksheets to identify question numbering patterns.' },
@@ -665,19 +706,44 @@ RULES:
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       
-      const questionNumbers = (parsed.question_numbers_found || []).map((n: any) => Number(n)).filter((n: number) => !isNaN(n));
-      const firstNum = parsed.first_question_number ? Number(parsed.first_question_number) : (questionNumbers.length > 0 ? Math.min(...questionNumbers) : null);
+      const questionNumbers = (parsed.question_numbers_found || []).map((n: any) => Number(n)).filter((n: number) => !isNaN(n) && n > 0);
       
-      // Determine if new paper based on presence of question 1
-      const hasQuestion1 = questionNumbers.includes(1) || firstNum === 1;
-      const isNewPaper = parsed.is_new_paper ?? hasQuestion1 ?? true;
-      const isContinuation = parsed.is_continuation ?? (!hasQuestion1 && questionNumbers.length > 0);
+      // Get the lowest question number - this is KEY for determining page type
+      const lowestNum = parsed.lowest_question_number 
+        ? Number(parsed.lowest_question_number) 
+        : (questionNumbers.length > 0 ? Math.min(...questionNumbers) : null);
+      
+      // CRITICAL LOGIC: If lowest number is 1 = new paper, if > 1 = continuation
+      // Single student work starts from 1. If not starting from 1, it's a continuation.
+      const hasQuestion1 = questionNumbers.includes(1) || lowestNum === 1;
+      const startsFromHigherNumber = lowestNum !== null && lowestNum > 1;
+      
+      // Explicit detection based on lowest question number
+      let isNewPaper: boolean;
+      let isContinuation: boolean;
+      
+      if (startsFromHigherNumber) {
+        // If lowest visible question is 2, 3, 4, etc. - this is definitely a continuation
+        isNewPaper = false;
+        isContinuation = true;
+        console.log(`Page detected as CONTINUATION: lowest question number is ${lowestNum}`);
+      } else if (hasQuestion1) {
+        // If question 1 is visible - this is the main paper
+        isNewPaper = true;
+        isContinuation = false;
+        console.log('Page detected as NEW PAPER: question 1 is visible');
+      } else {
+        // No question numbers found - default to AI's guess or assume new paper
+        isNewPaper = parsed.is_new_paper ?? true;
+        isContinuation = parsed.is_continuation ?? false;
+        console.log('Page type uncertain, no clear question numbers - defaulting to new paper');
+      }
       
       return {
-        isNewPaper: isNewPaper && !isContinuation,
-        isContinuation: isContinuation,
-        detectedQuestionNumbers: questionNumbers,
-        firstQuestionNumber: firstNum,
+        isNewPaper,
+        isContinuation,
+        detectedQuestionNumbers: questionNumbers.sort((a: number, b: number) => a - b),
+        firstQuestionNumber: lowestNum,
         confidence: parsed.confidence || 'medium',
         rawExtraction: content,
       };
@@ -686,7 +752,7 @@ RULES:
     console.error('Failed to parse page type response:', e);
   }
 
-  // Default: assume new paper
+  // Default: assume new paper (benefit of doubt - grade it)
   return {
     isNewPaper: true,
     isContinuation: false,
@@ -917,6 +983,8 @@ interface ParsedResult {
   ocrText: string;
   problemIdentified: string;
   nysStandard: string;
+  conceptsDemonstrated: string[];
+  coherentWorkShown: boolean;
   approachAnalysis: string;
   rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
   misconceptions: string[];
@@ -933,6 +1001,8 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     ocrText: '',
     problemIdentified: '',
     nysStandard: '',
+    conceptsDemonstrated: [],
+    coherentWorkShown: false,
     approachAnalysis: '',
     rubricScores: [],
     misconceptions: [],
@@ -944,15 +1014,29 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     feedback: '',
   };
 
-  const ocrMatch = text.match(/OCR Text[:\s]*([^]*?)(?=Problem Identified|NYS Standard|Approach Analysis|$)/i);
+  const ocrMatch = text.match(/OCR Text[:\s]*([^]*?)(?=Problem Identified|NYS Standard|Concepts Demonstrated|Approach Analysis|$)/i);
   if (ocrMatch) result.ocrText = ocrMatch[1].trim();
 
-  const problemMatch = text.match(/Problem Identified[:\s]*([^]*?)(?=NYS Standard|Approach Analysis|Rubric Scores|$)/i);
+  const problemMatch = text.match(/Problem Identified[:\s]*([^]*?)(?=NYS Standard|Concepts Demonstrated|Approach Analysis|Rubric Scores|$)/i);
   if (problemMatch) result.problemIdentified = problemMatch[1].trim();
 
   // Parse NYS Standard
-  const standardMatch = text.match(/NYS Standard[:\s]*([^]*?)(?=Correct Solution|Approach Analysis|$)/i);
+  const standardMatch = text.match(/NYS Standard[:\s]*([^]*?)(?=Correct Solution|Concepts Demonstrated|Approach Analysis|$)/i);
   if (standardMatch) result.nysStandard = standardMatch[1].trim();
+
+  // Parse Concepts Demonstrated - KEY for concept-based grading
+  const conceptsMatch = text.match(/Concepts Demonstrated[:\s]*([^]*?)(?=Coherent Work|Approach Analysis|Is Correct|$)/i);
+  if (conceptsMatch) {
+    const conceptsText = conceptsMatch[1].trim();
+    result.conceptsDemonstrated = conceptsText
+      .split(/[-•\n,;]/)
+      .map(c => c.trim())
+      .filter(c => c.length > 2 && !c.match(/^(none|n\/a|no concepts?)$/i));
+  }
+
+  // Parse Coherent Work Shown
+  const coherentMatch = text.match(/Coherent Work Shown[:\s]*(YES|NO)/i);
+  result.coherentWorkShown = coherentMatch ? coherentMatch[1].toUpperCase() === 'YES' : false;
 
   const approachMatch = text.match(/Approach Analysis[:\s]*([^]*?)(?=Is Correct|Regents Score|Rubric Scores|Misconceptions|$)/i);
   if (approachMatch) result.approachAnalysis = approachMatch[1].trim();
@@ -984,71 +1068,101 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
       : 0;
   }
 
-  // Parse grade (55-100 scale) based on Regents score if available
+  // Parse grade (55-100 scale) based on CONCEPT UNDERSTANDING
   const gradeMatch = text.match(/Grade[:\s]*(\d+)/i);
   const standardsMetMatch = text.match(/Standards Met[:\s]*(YES|NO)/i);
   const standardsMet = standardsMetMatch ? standardsMetMatch[1].toUpperCase() === 'YES' : true;
   
-  // VERY lenient check for any work - if we're analyzing an image, assume there's work
-  // unless the text explicitly indicates blank/no work
+  // CONCEPT-BASED UNDERSTANDING CHECK
+  // Look for ANY evidence of understanding - this is the KEY determination
   const textLower = text.toLowerCase();
-  const explicitlyBlank = textLower.includes('blank response') || 
-                          textLower.includes('no work shown') ||
-                          textLower.includes('completely empty') ||
-                          textLower.includes('no mathematical work') ||
-                          textLower.includes('nothing written') ||
-                          (textLower.includes('no understanding') && result.regentsScore === 0);
   
-  // If the AI is analyzing student work, they almost always have SOME work
-  // Only mark as no work if explicitly stated as blank
-  const hasAnyWork = !explicitlyBlank || 
-                     result.ocrText.trim().length > 5 || 
-                     result.approachAnalysis.toLowerCase().includes('attempt') ||
-                     result.approachAnalysis.toLowerCase().includes('work') ||
-                     result.approachAnalysis.toLowerCase().includes('show') ||
-                     result.approachAnalysis.toLowerCase().includes('wrote') ||
-                     result.approachAnalysis.toLowerCase().includes('student') ||
-                     result.totalScore.earned > 0 ||
-                     result.regentsScore >= 1;
+  // Check if EXPLICITLY marked as blank/no work
+  const explicitlyBlank = (textLower.includes('blank response') || 
+                          textLower.includes('completely blank') ||
+                          textLower.includes('completely empty') ||
+                          textLower.includes('nothing written') ||
+                          textLower.includes('no response')) &&
+                          !textLower.includes('some') &&
+                          !textLower.includes('attempt');
+  
+  // Check for ANY understanding indicators
+  const hasConceptsDemo = result.conceptsDemonstrated.length > 0;
+  const hasCoherentWork = result.coherentWorkShown;
+  const hasOcrContent = result.ocrText.trim().length > 10;
+  const hasPositiveRegents = result.regentsScore >= 1;
+  const hasPositiveScore = result.totalScore.earned > 0;
+  
+  // Look for understanding keywords in the analysis
+  const showsUnderstanding = textLower.includes('understand') ||
+                             textLower.includes('demonstrates') ||
+                             textLower.includes('shows') ||
+                             textLower.includes('attempt') ||
+                             textLower.includes('tried') ||
+                             textLower.includes('effort') ||
+                             textLower.includes('basic') ||
+                             textLower.includes('some') ||
+                             textLower.includes('partial') ||
+                             textLower.includes('limited') ||
+                             textLower.includes('correct') ||
+                             textLower.includes('concept');
+  
+  // CRITICAL: If ANY understanding is shown, minimum is 65
+  // Only give 55 if COMPLETELY blank with NO understanding whatsoever
+  const hasAnyUnderstanding = !explicitlyBlank && (
+    hasConceptsDemo ||
+    hasCoherentWork ||
+    hasOcrContent ||
+    hasPositiveRegents ||
+    hasPositiveScore ||
+    showsUnderstanding ||
+    standardsMet
+  );
+  
+  console.log(`Grade determination - Concepts: ${result.conceptsDemonstrated.length}, Coherent: ${hasCoherentWork}, Understanding: ${hasAnyUnderstanding}, Blank: ${explicitlyBlank}`);
   
   if (gradeMatch) {
     const parsedGrade = parseInt(gradeMatch[1]);
-    // CRITICAL: Never allow grade of 0 - enforce minimum floors
-    if (parsedGrade === 0 || parsedGrade < gradeFloor) {
-      // If AI returned 0 or below floor, apply appropriate floor
-      result.grade = hasAnyWork ? gradeFloorWithEffort : gradeFloor;
-    } else if (hasAnyWork && parsedGrade < gradeFloorWithEffort) {
-      // Has work but grade below effort floor - bump up
-      result.grade = gradeFloorWithEffort;
+    // CRITICAL: If ANY understanding, minimum is 65
+    if (hasAnyUnderstanding) {
+      // Student shows understanding - enforce minimum of 65
+      result.grade = Math.max(gradeFloorWithEffort, Math.min(100, parsedGrade));
+    } else if (parsedGrade < gradeFloor) {
+      // No understanding AND grade below floor - apply absolute minimum
+      result.grade = gradeFloor;
     } else {
       result.grade = Math.min(100, parsedGrade);
     }
   } else if (result.regentsScore >= 0) {
-    // Convert Regents score to grade if no explicit grade given
-    // Use teacher's configured floors for Score 1 and Score 0
+    // Convert Regents score to grade based on concept understanding
+    // More concepts = higher in the range
+    const conceptBonus = Math.min(result.conceptsDemonstrated.length * 2, 5);
+    
     const regentsToGrade: Record<number, number> = {
-      4: 95,  // Exceeding
-      3: 85,  // Meeting
-      2: 75,  // Approaching
-      1: Math.max(gradeFloorWithEffort, 67),  // Limited understanding - slightly above floor
-      0: hasAnyWork ? gradeFloorWithEffort : gradeFloor,  // Even score 0 with work gets effort floor
+      4: 95,  // Full mastery
+      3: 85,  // Strong understanding
+      2: 75,  // Partial understanding
+      1: gradeFloorWithEffort + 2,  // Basic understanding - slightly above floor
+      0: hasAnyUnderstanding ? gradeFloorWithEffort : gradeFloor,  // Understanding gets floor, blank gets minimum
     };
-    result.grade = regentsToGrade[result.regentsScore] ?? (hasAnyWork ? gradeFloorWithEffort : gradeFloor);
+    result.grade = Math.min(100, (regentsToGrade[result.regentsScore] ?? gradeFloorWithEffort) + conceptBonus);
   } else if (result.totalScore.percentage > 0) {
-    // Fallback: convert percentage to grade scale above the effort floor
+    // Fallback: convert percentage but ensure minimum based on understanding
     const scaledGrade = Math.round(gradeFloorWithEffort + (result.totalScore.percentage / 100) * (100 - gradeFloorWithEffort));
-    result.grade = Math.max(gradeFloorWithEffort, scaledGrade);
-  } else if (hasAnyWork) {
-    // If any work was shown but no score parsed, use effort floor
+    result.grade = hasAnyUnderstanding ? Math.max(gradeFloorWithEffort, scaledGrade) : Math.max(gradeFloor, scaledGrade);
+  } else if (hasAnyUnderstanding) {
+    // Has understanding but no score parsed - default to effort floor
     result.grade = gradeFloorWithEffort;
   }
 
-  // FINAL SAFEGUARD: Absolute enforcement of grade floors
-  // This catches any edge cases where the grade might still be too low
-  if (hasAnyWork) {
+  // FINAL SAFEGUARD: Absolute enforcement of grade floors based on understanding
+  // ANY understanding = minimum 65, ONLY completely blank = 55
+  if (hasAnyUnderstanding) {
     result.grade = Math.max(gradeFloorWithEffort, result.grade);
   }
   result.grade = Math.max(gradeFloor, result.grade);
+  
+  console.log(`Final grade: ${result.grade} (Understanding: ${hasAnyUnderstanding})`);
 
   // Parse grade justification
   const justificationMatch = text.match(/Grade Justification[:\s]*([^]*?)(?=Feedback|$)/i);
