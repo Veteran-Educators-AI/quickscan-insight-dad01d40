@@ -1,8 +1,9 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { X, SwitchCamera, Volume2, VolumeX, QrCode, Check, Users, Pause, Play } from 'lucide-react';
+import { X, SwitchCamera, Volume2, VolumeX, QrCode, Check, Users, Pause, Play, UserX, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
 import { parseStudentQRCode } from '@/components/print/StudentQRCode';
@@ -50,9 +51,33 @@ export function ContinuousQRScanner({
   const [scannedStudents, setScannedStudents] = useState<ScannedStudent[]>([]);
   const [lastDetectedCode, setLastDetectedCode] = useState<string | null>(null);
   const [scanFeedback, setScanFeedback] = useState<{ message: string; type: 'success' | 'duplicate' | 'unknown' } | null>(null);
+  const [activeTab, setActiveTab] = useState<'scanned' | 'absent'>('scanned');
   
   // Track scanned student IDs to avoid duplicates
   const scannedIdsRef = useRef<Set<string>>(new Set());
+  
+  // Get absent students (those in roster but not scanned)
+  const absentStudents = studentRoster.filter(
+    student => !scannedIdsRef.current.has(student.id)
+  );
+  
+  // Mark a student as absent (add to scanned list with absent flag)
+  const markStudentAbsent = useCallback((studentId: string) => {
+    const student = studentRoster.find(s => s.id === studentId);
+    if (student && !scannedIdsRef.current.has(studentId)) {
+      scannedIdsRef.current.add(studentId);
+      const newScanned: ScannedStudent = {
+        studentId,
+        studentName: `${student.first_name} ${student.last_name}`,
+        scannedAt: new Date(),
+        type: 'student-only',
+      };
+      setScannedStudents(prev => [newScanned, ...prev]);
+      if (soundEnabled) {
+        playNotificationSound('success');
+      }
+    }
+  }, [studentRoster, soundEnabled]);
 
   const startCamera = useCallback(async () => {
     setError(null);
@@ -270,8 +295,6 @@ export function ContinuousQRScanner({
 
   if (!isOpen) return null;
 
-  const unscannedCount = studentRoster.length - scannedStudents.length;
-
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
       {/* Header controls */}
@@ -396,66 +419,116 @@ export function ContinuousQRScanner({
         )}
       </div>
 
-      {/* Scanned students list */}
+      {/* Scanned/Absent students panel */}
       <div className="bg-background border-t">
-        <div className="p-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Check className="h-5 w-5 text-green-500" />
-            <span className="font-medium">Scanned: {scannedStudents.length}</span>
-            {unscannedCount > 0 && (
-              <span className="text-muted-foreground text-sm">({unscannedCount} remaining)</span>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsPaused(!isPaused)}
-            >
-              {isPaused ? <Play className="h-4 w-4 mr-1" /> : <Pause className="h-4 w-4 mr-1" />}
-              {isPaused ? 'Resume' : 'Pause'}
-            </Button>
-            {scannedStudents.length > 0 && (
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'scanned' | 'absent')} className="w-full">
+          <div className="px-3 pt-2 flex items-center justify-between">
+            <TabsList className="grid grid-cols-2 w-auto">
+              <TabsTrigger value="scanned" className="flex items-center gap-1.5 text-xs px-3">
+                <UserCheck className="h-3.5 w-3.5" />
+                Scanned ({scannedStudents.length})
+              </TabsTrigger>
+              <TabsTrigger value="absent" className="flex items-center gap-1.5 text-xs px-3">
+                <UserX className="h-3.5 w-3.5" />
+                Absent ({absentStudents.length})
+              </TabsTrigger>
+            </TabsList>
+            
+            <div className="flex gap-1">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={clearScanned}
+                onClick={() => setIsPaused(!isPaused)}
+                className="h-8 px-2"
               >
-                Clear All
+                {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
               </Button>
-            )}
-            <Button
-              size="sm"
-              onClick={handleClose}
-            >
-              Done ({scannedStudents.length})
-            </Button>
-          </div>
-        </div>
-
-        {scannedStudents.length > 0 && (
-          <ScrollArea className="h-32 border-t">
-            <div className="p-2 space-y-1">
-              {scannedStudents.map((student, index) => (
-                <div 
-                  key={`${student.studentId}-${index}`}
-                  className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-md text-sm"
+              {scannedStudents.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearScanned}
+                  className="h-8 px-2 text-xs"
                 >
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-500" />
-                    <span className="font-medium">{student.studentName}</span>
-                    {student.questionId && (
-                      <Badge variant="outline" className="text-xs">Q: {student.questionId.slice(0, 8)}...</Badge>
-                    )}
-                  </div>
-                  <span className="text-muted-foreground text-xs">
-                    {student.scannedAt.toLocaleTimeString()}
-                  </span>
-                </div>
-              ))}
+                  Clear
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={handleClose}
+                className="h-8"
+              >
+                Done ({scannedStudents.length})
+              </Button>
             </div>
-          </ScrollArea>
-        )}
+          </div>
+
+          <TabsContent value="scanned" className="mt-0">
+            <ScrollArea className="h-36">
+              <div className="p-2 space-y-1">
+                {scannedStudents.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-6">
+                    <QrCode className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No students scanned yet</p>
+                    <p className="text-xs">Point camera at student QR codes</p>
+                  </div>
+                ) : (
+                  scannedStudents.map((student, index) => (
+                    <div 
+                      key={`${student.studentId}-${index}`}
+                      className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-md text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-green-500" />
+                        <span className="font-medium">{student.studentName}</span>
+                        {student.questionId && (
+                          <Badge variant="outline" className="text-xs">Q: {student.questionId.slice(0, 8)}...</Badge>
+                        )}
+                      </div>
+                      <span className="text-muted-foreground text-xs">
+                        {student.scannedAt.toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="absent" className="mt-0">
+            <ScrollArea className="h-36">
+              <div className="p-2 space-y-1">
+                {absentStudents.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-6">
+                    <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">All students scanned!</p>
+                    <p className="text-xs">No absent students</p>
+                  </div>
+                ) : (
+                  absentStudents.map((student) => (
+                    <div 
+                      key={student.id}
+                      className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-md text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <UserX className="h-4 w-4 text-red-500" />
+                        <span className="font-medium">{student.first_name} {student.last_name}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => markStudentAbsent(student.id)}
+                        className="h-7 text-xs"
+                      >
+                        Mark Present
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Hidden canvas for frame processing */}
