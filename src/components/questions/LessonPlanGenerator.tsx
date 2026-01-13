@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType, Pencil, Check, Plus, Trash2, X, Save, Library } from 'lucide-react';
+import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType, Pencil, Check, Plus, Trash2, X, Save, Library, ArrowUp, ArrowDown, Layers } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
@@ -122,6 +122,48 @@ export function LessonPlanGenerator({
     if (!lessonPlan) return;
     setLessonPlan({ ...lessonPlan, objective: newObjective });
   };
+
+  const updateSlideType = (newType: LessonSlide['slideType']) => {
+    if (!lessonPlan) return;
+    const updatedSlides = [...lessonPlan.slides];
+    updatedSlides[currentSlide] = { ...updatedSlides[currentSlide], slideType: newType };
+    setLessonPlan({ ...lessonPlan, slides: updatedSlides });
+  };
+
+  const moveSlideUp = () => {
+    if (!lessonPlan || currentSlide === 0) return;
+    const updatedSlides = [...lessonPlan.slides];
+    const temp = updatedSlides[currentSlide];
+    updatedSlides[currentSlide] = updatedSlides[currentSlide - 1];
+    updatedSlides[currentSlide - 1] = temp;
+    // Update slide numbers
+    updatedSlides[currentSlide].slideNumber = currentSlide + 1;
+    updatedSlides[currentSlide - 1].slideNumber = currentSlide;
+    setLessonPlan({ ...lessonPlan, slides: updatedSlides });
+    setCurrentSlide(currentSlide - 1);
+  };
+
+  const moveSlideDown = () => {
+    if (!lessonPlan || currentSlide === lessonPlan.slides.length - 1) return;
+    const updatedSlides = [...lessonPlan.slides];
+    const temp = updatedSlides[currentSlide];
+    updatedSlides[currentSlide] = updatedSlides[currentSlide + 1];
+    updatedSlides[currentSlide + 1] = temp;
+    // Update slide numbers
+    updatedSlides[currentSlide].slideNumber = currentSlide + 1;
+    updatedSlides[currentSlide + 1].slideNumber = currentSlide + 2;
+    setLessonPlan({ ...lessonPlan, slides: updatedSlides });
+    setCurrentSlide(currentSlide + 1);
+  };
+
+  const slideTypes: { value: LessonSlide['slideType']; label: string }[] = [
+    { value: 'title', label: 'Title' },
+    { value: 'objective', label: 'Objective' },
+    { value: 'instruction', label: 'Instruction' },
+    { value: 'example', label: 'Example' },
+    { value: 'practice', label: 'Practice' },
+    { value: 'summary', label: 'Summary' },
+  ];
 
   const saveLessonPlan = async () => {
     if (!lessonPlan || !user) {
@@ -652,12 +694,57 @@ export function LessonPlanGenerator({
                 <Card className={`${getSlideTypeColor(currentSlideData.slideType)} min-h-[300px]`}>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <Badge variant="secondary" className="capitalize">
-                        {currentSlideData.slideType}
-                      </Badge>
-                      <span className="text-sm opacity-75">
-                        Slide {currentSlide + 1} of {lessonPlan.slides.length}
-                      </span>
+                      {isEditing ? (
+                        <div className="flex items-center gap-2">
+                          <Layers className="h-4 w-4 opacity-75" />
+                          <Select
+                            value={currentSlideData.slideType}
+                            onValueChange={(value) => updateSlideType(value as LessonSlide['slideType'])}
+                          >
+                            <SelectTrigger className="w-[130px] h-8 bg-white/20 border-white/30 text-inherit">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {slideTypes.map((type) => (
+                                <SelectItem key={type.value} value={type.value}>
+                                  {type.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <Badge variant="secondary" className="capitalize">
+                          {currentSlideData.slideType}
+                        </Badge>
+                      )}
+                      <div className="flex items-center gap-2">
+                        {isEditing && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-inherit hover:bg-white/20"
+                              onClick={moveSlideUp}
+                              disabled={currentSlide === 0}
+                            >
+                              <ArrowUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-inherit hover:bg-white/20"
+                              onClick={moveSlideDown}
+                              disabled={currentSlide === lessonPlan.slides.length - 1}
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                        <span className="text-sm opacity-75">
+                          Slide {currentSlide + 1} of {lessonPlan.slides.length}
+                        </span>
+                      </div>
                     </div>
                     {isEditing ? (
                       <Input
