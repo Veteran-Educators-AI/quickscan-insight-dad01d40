@@ -1,4 +1,5 @@
 import { StudentQRCode } from './StudentQRCode';
+import { StudentOnlyQRCode } from './StudentOnlyQRCode';
 import { cleanTextForPrint } from '@/lib/mathRenderer';
 
 interface Student {
@@ -41,15 +42,24 @@ export function PrintableWorksheet({
         boxSizing: 'border-box',
       }}
     >
-      {/* Header */}
+      {/* Header with Student QR Code */}
       <div className="flex items-start justify-between border-b-2 border-black pb-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ margin: 0 }}>{assessmentName}</h1>
-          <div className="mt-2 text-lg">
-            <p style={{ margin: '0.25rem 0' }}><strong>Name:</strong> {student.first_name} {student.last_name}</p>
-            {student.student_id && (
-              <p style={{ margin: '0.25rem 0' }}><strong>Student ID:</strong> {student.student_id}</p>
-            )}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+          {/* Student Identification QR Code */}
+          {showQRCodes && (
+            <div style={{ flexShrink: 0, textAlign: 'center' }}>
+              <StudentOnlyQRCode studentId={student.id} size={64} />
+              <p style={{ fontSize: '0.65rem', color: '#666', marginTop: '0.25rem' }}>Student ID</p>
+            </div>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold" style={{ margin: 0 }}>{assessmentName}</h1>
+            <div className="mt-2 text-lg">
+              <p style={{ margin: '0.25rem 0' }}><strong>Name:</strong> {student.first_name} {student.last_name}</p>
+              {student.student_id && (
+                <p style={{ margin: '0.25rem 0' }}><strong>Student ID:</strong> {student.student_id}</p>
+              )}
+            </div>
           </div>
         </div>
         <div className="text-right text-sm" style={{ color: '#666' }}>

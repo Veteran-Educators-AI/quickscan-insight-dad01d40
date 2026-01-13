@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { handleApiError } from '@/lib/apiErrorHandler';
 import jsQR from 'jsqr';
 import { parseStudentQRCode } from '@/components/print/StudentQRCode';
+import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
 
 interface RubricStep {
   step_number: number;
@@ -38,7 +39,7 @@ export interface Student {
 export interface IdentificationResult {
   qrCodeDetected: boolean;
   qrCodeContent: string | null;
-  parsedQRCode?: { studentId: string; questionId: string } | null;
+  parsedQRCode?: { studentId: string; questionId?: string; type?: 'student-only' | 'student-question' } | null;
   handwrittenName: string | null;
   matchedStudentId: string | null;
   matchedStudentName: string | null;
@@ -177,8 +178,8 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     setCurrentIndex(-1);
   }, []);
 
-  // Local QR code scanning function
-  const scanQRCodeFromImage = async (imageDataUrl: string): Promise<{ studentId: string; questionId: string } | null> => {
+  // Local QR code scanning function - supports both student-only and student+question QR codes
+  const scanQRCodeFromImage = async (imageDataUrl: string): Promise<{ studentId: string; questionId?: string; type: 'student-only' | 'student-question' } | null> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
@@ -208,9 +209,17 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
             const code = jsQR(imageData.data, region.w, region.h);
             
             if (code) {
+              // Try unified parser first (handles both v1 and v2)
+              const unified = parseAnyStudentQRCode(code.data);
+              if (unified) {
+                resolve(unified);
+                return;
+              }
+              
+              // Fallback to legacy parser
               const parsed = parseStudentQRCode(code.data);
               if (parsed) {
-                resolve(parsed);
+                resolve({ ...parsed, type: 'student-question' });
                 return;
               }
             }
