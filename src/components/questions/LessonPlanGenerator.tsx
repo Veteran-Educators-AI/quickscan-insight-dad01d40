@@ -858,34 +858,59 @@ export function LessonPlanGenerator({
       const clipartItems = slideClipart[slideIndex] || [];
       
       clipartItems.forEach(item => {
-        const svg = getClipartSvg(item.clipartId);
-        if (!svg) return;
-        
         // Pass custom x/y coordinates to getClipartPosition
         const pos = getClipartPosition(item.position, item.size, item.x, item.y);
         
-        // Add a colored shape as a placeholder (pptxgenjs doesn't support inline SVG directly)
-        // We'll add a shape with the clipart styling
-        pptSlide.addShape('rect', {
-          x: pos.x,
-          y: pos.y,
-          w: pos.w,
-          h: pos.h,
-          fill: { color: colors.bg, transparency: 80 },
-          line: { color: colors.bg, width: 2 },
-        });
-        
-        // Add a label below for what the clipart represents
-        const clipartName = item.clipartId.charAt(0).toUpperCase() + item.clipartId.slice(1).replace(/-/g, ' ');
-        pptSlide.addText(clipartName, {
-          x: pos.x,
-          y: pos.y + pos.h + 0.05,
-          w: pos.w,
-          h: 0.2,
-          fontSize: 7,
-          color: colors.bg,
-          align: 'center',
-        });
+        // Check if this is an AI-generated image
+        if (item.isGenerated && item.imageUrl) {
+          // Add AI-generated image directly
+          try {
+            pptSlide.addImage({
+              data: item.imageUrl, // base64 data URL
+              x: pos.x,
+              y: pos.y,
+              w: pos.w * 1.5, // Make AI images slightly larger
+              h: pos.h * 1.5,
+            });
+          } catch (error) {
+            console.error('Failed to add AI image to slide:', error);
+            // Fallback to placeholder
+            pptSlide.addShape('rect', {
+              x: pos.x,
+              y: pos.y,
+              w: pos.w,
+              h: pos.h,
+              fill: { color: colors.bg, transparency: 80 },
+              line: { color: colors.bg, width: 2 },
+            });
+          }
+        } else {
+          // Standard SVG clipart - use shape placeholder
+          const svg = getClipartSvg(item.clipartId);
+          if (!svg) return;
+          
+          // Add a colored shape as a placeholder (pptxgenjs doesn't support inline SVG directly)
+          pptSlide.addShape('rect', {
+            x: pos.x,
+            y: pos.y,
+            w: pos.w,
+            h: pos.h,
+            fill: { color: colors.bg, transparency: 80 },
+            line: { color: colors.bg, width: 2 },
+          });
+          
+          // Add a label below for what the clipart represents
+          const clipartName = item.clipartId.charAt(0).toUpperCase() + item.clipartId.slice(1).replace(/-/g, ' ');
+          pptSlide.addText(clipartName, {
+            x: pos.x,
+            y: pos.y + pos.h + 0.05,
+            w: pos.w,
+            h: 0.2,
+            fontSize: 7,
+            color: colors.bg,
+            align: 'center',
+          });
+        }
       });
     };
 

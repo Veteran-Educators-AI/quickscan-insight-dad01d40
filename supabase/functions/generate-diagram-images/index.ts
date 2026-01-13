@@ -156,7 +156,37 @@ serve(async (req) => {
   }
 
   try {
-    const { questions, useNanoBanana } = await req.json() as {
+    const body = await req.json();
+    
+    // Support single clipart generation
+    if (body.prompt && body.style === 'clipart') {
+      console.log('Generating single clipart image...');
+      
+      const clipartPrompt = `Create a simple, clean clipart-style icon. ${body.prompt}. 
+Requirements:
+- Simple flat vector-style illustration
+- Clean lines, minimal detail
+- Suitable for presentations and educational materials
+- Single object, centered composition
+- Professional and friendly style`;
+
+      const imageUrl = await generateImageWithNanoBanana(clipartPrompt);
+      
+      if (imageUrl) {
+        return new Response(
+          JSON.stringify({ imageUrl }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } else {
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate clipart' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Existing batch question image generation
+    const { questions, useNanoBanana } = body as {
       questions: QuestionWithPrompt[];
       useNanoBanana?: boolean;
     };

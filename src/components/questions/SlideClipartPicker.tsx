@@ -4,7 +4,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Image, X, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Image, X, Trash2, Sparkles, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface ClipartItem {
   id: string;
@@ -12,6 +15,9 @@ export interface ClipartItem {
   category: string;
   svg: string;
   color?: string;
+  // For AI-generated images
+  imageUrl?: string;
+  isGenerated?: boolean;
 }
 
 export interface SlideClipart {
@@ -21,6 +27,9 @@ export interface SlideClipart {
   // Custom x/y position as percentage (0-100)
   x?: number;
   y?: number;
+  // For AI-generated images
+  imageUrl?: string;
+  isGenerated?: boolean;
 }
 
 // Math-themed clipart library using SVG
@@ -213,6 +222,7 @@ const clipartLibrary: ClipartItem[] = [
 ];
 
 const categories = [
+  { id: 'ai-generate', label: '✨ AI' },
   { id: 'shapes', label: 'Shapes' },
   { id: 'symbols', label: 'Symbols' },
   { id: 'tools', label: 'Tools' },
@@ -233,11 +243,14 @@ interface SlideClipartPickerProps {
 }
 
 export function SlideClipartPicker({ slideClipart, onClipartChange, disabled }: SlideClipartPickerProps) {
-  const [selectedCategory, setSelectedCategory] = useState('shapes');
+  const [selectedCategory, setSelectedCategory] = useState('ai-generate');
   const [isOpen, setIsOpen] = useState(false);
   const [pendingSize, setPendingSize] = useState<SlideClipart['size']>('medium');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedImages, setGeneratedImages] = useState<ClipartItem[]>([]);
 
-  const addClipart = (clipartId: string) => {
+  const addClipart = (clipartId: string, imageUrl?: string, isGenerated?: boolean) => {
     // Add new clipart at center position (will be draggable)
     const newClipart: SlideClipart = {
       clipartId,
@@ -245,6 +258,8 @@ export function SlideClipartPicker({ slideClipart, onClipartChange, disabled }: 
       size: pendingSize,
       x: 75, // Default to right side
       y: 25, // Default to top area
+      imageUrl,
+      isGenerated,
     };
     onClipartChange([...slideClipart, newClipart]);
   };
@@ -265,7 +280,52 @@ export function SlideClipartPicker({ slideClipart, onClipartChange, disabled }: 
     onClipartChange(updated);
   };
 
-  const getClipartById = (id: string) => clipartLibrary.find(c => c.id === id);
+  const getClipartById = (id: string) => {
+    // Check generated images first
+    const generated = generatedImages.find(c => c.id === id);
+    if (generated) return generated;
+    return clipartLibrary.find(c => c.id === id);
+  };
+
+  const generateAIClipart = async () => {
+    if (!aiPrompt.trim()) {
+      toast.error('Please enter a description for the clipart');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+        body: {
+          prompt: `Create a simple, clean clipart icon suitable for a PowerPoint presentation: ${aiPrompt}. Make it a simple vector-style illustration with clean lines, suitable for educational materials. Use a transparent or white background. The image should be iconic and easy to recognize at small sizes.`,
+          style: 'clipart',
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.imageUrl) {
+        const newClipart: ClipartItem = {
+          id: `ai-${Date.now()}`,
+          name: aiPrompt.slice(0, 20) + (aiPrompt.length > 20 ? '...' : ''),
+          category: 'ai-generated',
+          svg: '',
+          imageUrl: data.imageUrl,
+          isGenerated: true,
+        };
+        setGeneratedImages(prev => [...prev, newClipart]);
+        toast.success('Clipart generated! Click to add it to your slide.');
+        setAiPrompt('');
+      } else {
+        throw new Error('No image returned');
+      }
+    } catch (error) {
+      console.error('Error generating clipart:', error);
+      toast.error('Failed to generate clipart. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -303,10 +363,12 @@ export function SlideClipartPicker({ slideClipart, onClipartChange, disabled }: 
               <div className="flex flex-wrap gap-1">
                 {slideClipart.map((item, index) => {
                   const clipart = getClipartById(item.clipartId);
+                  const displayName = item.isGenerated ? item.clipartId.replace('ai-', 'AI ') : clipart?.name;
                   return (
                     <div key={index} className="flex items-center gap-1">
                       <Badge variant="outline" className="gap-1 pr-1">
-                        <span className="text-xs">{clipart?.name}</span>
+                        {item.isGenerated && <Sparkles className="h-3 w-3 text-amber-500" />}
+                        <span className="text-xs">{displayName}</span>
                         <div className="flex items-center gap-0.5 ml-1">
                           {sizes.map((s) => (
                             <button
@@ -358,15 +420,85 @@ export function SlideClipartPicker({ slideClipart, onClipartChange, disabled }: 
 
           {/* Category tabs */}
           <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
-            <TabsList className="w-full h-8">
+            <TabsList className="w-full h-8 overflow-x-auto">
               {categories.map((cat) => (
-                <TabsTrigger key={cat.id} value={cat.id} className="text-xs px-2 py-1">
+                <TabsTrigger key={cat.id} value={cat.id} className="text-xs px-1.5 py-1">
                   {cat.label}
                 </TabsTrigger>
               ))}
             </TabsList>
 
-            {categories.map((cat) => (
+            {/* AI Generate Tab */}
+            <TabsContent value="ai-generate" className="mt-2">
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Describe clipart (e.g., 'happy student', 'math equation')"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !isGenerating && generateAIClipart()}
+                    disabled={isGenerating}
+                    className="text-xs h-8"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={generateAIClipart}
+                    disabled={isGenerating || !aiPrompt.trim()}
+                    className="h-8 px-3"
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                
+                {/* Generated images */}
+                {generatedImages.length > 0 && (
+                  <ScrollArea className="h-24">
+                    <div className="grid grid-cols-4 gap-2">
+                      {generatedImages.map((clipart) => {
+                        const isAdded = slideClipart.some(c => c.clipartId === clipart.id);
+                        return (
+                          <button
+                            key={clipart.id}
+                            onClick={() => addClipart(clipart.id, clipart.imageUrl, true)}
+                            className={`p-1 rounded border hover:bg-muted transition-colors relative ${
+                              isAdded ? 'ring-1 ring-primary/50 bg-primary/5' : ''
+                            }`}
+                            title={clipart.name}
+                          >
+                            <img
+                              src={clipart.imageUrl}
+                              alt={clipart.name}
+                              className="w-12 h-12 object-contain rounded"
+                            />
+                            {isAdded && (
+                              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[8px] rounded-full w-3 h-3 flex items-center justify-center">
+                                ✓
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                )}
+                
+                {generatedImages.length === 0 && (
+                  <div className="h-20 flex items-center justify-center text-xs text-muted-foreground border rounded-md border-dashed">
+                    <div className="text-center">
+                      <Sparkles className="h-6 w-6 mx-auto mb-1 opacity-40" />
+                      <p>Generate custom clipart with AI</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Standard category tabs */}
+            {categories.filter(cat => cat.id !== 'ai-generate').map((cat) => (
               <TabsContent key={cat.id} value={cat.id} className="mt-2">
                 <ScrollArea className="h-32">
                   <div className="grid grid-cols-5 gap-2">
