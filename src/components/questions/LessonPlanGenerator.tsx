@@ -16,6 +16,7 @@ import { useAuth } from '@/lib/auth';
 import jsPDF from 'jspdf';
 import pptxgen from 'pptxgenjs';
 import { StudentHandoutDialog, type HandoutOptions } from './StudentHandoutDialog';
+import { SlideClipartPicker, getClipartSvg, getClipartPosition, type SlideClipart } from './SlideClipartPicker';
 
 interface LessonSlide {
   slideNumber: number;
@@ -23,6 +24,7 @@ interface LessonSlide {
   content: string[];
   speakerNotes: string;
   slideType: 'title' | 'objective' | 'instruction' | 'example' | 'practice' | 'summary';
+  clipart?: SlideClipart[];
 }
 
 interface LessonPlan {
@@ -97,6 +99,7 @@ export function LessonPlanGenerator({
   const [showHandoutDialog, setShowHandoutDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
+  const [slideClipart, setSlideClipart] = useState<Record<number, SlideClipart[]>>({});
 
   // Load existing lesson plan if ID is provided
   useEffect(() => {
@@ -150,8 +153,17 @@ export function LessonPlanGenerator({
       setLessonPlan(null);
       setCurrentSlide(0);
       setIsEditing(false);
+      setSlideClipart({});
     }
   }, [open]);
+
+  // Update clipart for a specific slide
+  const updateSlideClipart = (slideIndex: number, clipart: SlideClipart[]) => {
+    setSlideClipart(prev => ({
+      ...prev,
+      [slideIndex]: clipart
+    }));
+  };
 
   // Edit handlers
   const updateSlideTitle = (newTitle: string) => {
@@ -819,8 +831,43 @@ export function LessonPlanGenerator({
       });
     };
 
+    // Helper function to add user clipart to a slide
+    const addUserClipart = (pptSlide: any, slideIndex: number, colors: { bg: string; text: string }) => {
+      const clipartItems = slideClipart[slideIndex] || [];
+      
+      clipartItems.forEach(item => {
+        const svg = getClipartSvg(item.clipartId);
+        if (!svg) return;
+        
+        const pos = getClipartPosition(item.position, item.size);
+        
+        // Add a colored shape as a placeholder (pptxgenjs doesn't support inline SVG directly)
+        // We'll add a shape with the clipart styling
+        pptSlide.addShape('rect', {
+          x: pos.x,
+          y: pos.y,
+          w: pos.w,
+          h: pos.h,
+          fill: { color: colors.bg, transparency: 80 },
+          line: { color: colors.bg, width: 2 },
+        });
+        
+        // Add a label below for what the clipart represents
+        const clipartName = item.clipartId.charAt(0).toUpperCase() + item.clipartId.slice(1).replace(/-/g, ' ');
+        pptSlide.addText(clipartName, {
+          x: pos.x,
+          y: pos.y + pos.h + 0.05,
+          w: pos.w,
+          h: 0.2,
+          fontSize: 7,
+          color: colors.bg,
+          align: 'center',
+        });
+      });
+    };
+
     // Helper to split content into multiple slides if needed
-    const createContentSlides = (slide: typeof lessonPlan.slides[0]) => {
+    const createContentSlides = (slide: typeof lessonPlan.slides[0], slideIndex: number) => {
       const colors = slideColors[slide.slideType] || { bg: 'E5E7EB', text: '1F2937' };
       const contentStartY = 1.7;
       const maxBulletsPerSlide = 5; // Maximum bullets per slide to prevent overflow
@@ -839,8 +886,8 @@ export function LessonPlanGenerator({
         const pptSlide = pptx.addSlide();
         addSlideBackground(pptSlide, colors);
         addSlideDecoration(pptSlide, slide.slideType, colors);
+        addUserClipart(pptSlide, slideIndex, colors);
         
-        // Slide type badge
         pptSlide.addText(slide.slideType.toUpperCase(), {
           x: slideMargin,
           y: 0.25,
@@ -922,6 +969,10 @@ export function LessonPlanGenerator({
           const pptSlide = pptx.addSlide();
           addSlideBackground(pptSlide, colors);
           addSlideDecoration(pptSlide, slide.slideType, colors);
+          // Only add clipart to first chunk of split slides
+          if (chunkIndex === 0) {
+            addUserClipart(pptSlide, slideIndex, colors);
+          }
           
           // Slide type badge with continuation indicator
           const badgeText = chunkIndex > 0 
@@ -1088,8 +1139,8 @@ export function LessonPlanGenerator({
     });
 
     // Content slides - using the helper that handles splitting
-    lessonPlan.slides.forEach((slide) => {
-      createContentSlides(slide);
+    lessonPlan.slides.forEach((slide, slideIndex) => {
+      createContentSlides(slide, slideIndex);
     });
 
     // Recommended worksheets slide with proper margins
@@ -1390,6 +1441,11 @@ export function LessonPlanGenerator({
                             >
                               <ArrowDown className="h-4 w-4" />
                             </Button>
+                            <div className="w-px h-5 bg-white/30 mx-1" />
+                            <SlideClipartPicker
+                              slideClipart={slideClipart[currentSlide] || []}
+                              onClipartChange={(clipart) => updateSlideClipart(currentSlide, clipart)}
+                            />
                           </div>
                         )}
                         <span className="text-sm opacity-75">
@@ -1456,6 +1512,21 @@ export function LessonPlanGenerator({
                         <Plus className="h-4 w-4 mr-1" />
                         Add bullet point
                       </Button>
+                    )}
+                    {/* Clipart preview */}
+                    {(slideClipart[currentSlide]?.length > 0) && (
+                      <div className="mt-3 flex items-center gap-2 flex-wrap">
+                        <span className="text-xs opacity-60">Clipart:</span>
+                        {slideClipart[currentSlide].map((item, idx) => (
+                          <Badge 
+                            key={idx} 
+                            variant="secondary" 
+                            className="text-[10px] py-0.5 bg-white/20 text-inherit border-white/30"
+                          >
+                            {item.clipartId.replace(/-/g, ' ')} ({item.position})
+                          </Badge>
+                        ))}
+                      </div>
                     )}
                   </CardContent>
                 </Card>
