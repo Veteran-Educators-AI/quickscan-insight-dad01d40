@@ -163,7 +163,7 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const { imageBase64, solutionBase64, questionId, rubricSteps, identifyOnly, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric } = await req.json();
+    const { imageBase64, solutionBase64, questionId, rubricSteps, identifyOnly, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric, gradeFloor: customGradeFloor, gradeFloorWithEffort: customGradeFloorWithEffort } = await req.json();
     
     // Ensure teacherId matches authenticated user
     const effectiveTeacherId = teacherId || authenticatedUserId;
@@ -399,8 +399,29 @@ Identify the problem being solved, its related NYS standard, and evaluate the st
 
     console.log('Analysis complete');
 
-    // Parse the structured response
-    const result = parseAnalysisResult(analysisText, rubricSteps);
+    // Get teacher's grade floor settings if available
+    let gradeFloor = customGradeFloor || 55;
+    let gradeFloorWithEffort = customGradeFloorWithEffort || 65;
+    
+    if (effectiveTeacherId && supabase && !customGradeFloor) {
+      try {
+        const { data: settingsData } = await supabase
+          .from('settings')
+          .select('grade_floor, grade_floor_with_effort')
+          .eq('teacher_id', effectiveTeacherId)
+          .maybeSingle();
+        
+        if (settingsData) {
+          gradeFloor = settingsData.grade_floor ?? 55;
+          gradeFloorWithEffort = settingsData.grade_floor_with_effort ?? 65;
+        }
+      } catch (settingsError) {
+        console.error('Error fetching grade floor settings:', settingsError);
+      }
+    }
+
+    // Parse the structured response with grade floor settings
+    const result = parseAnalysisResult(analysisText, rubricSteps, gradeFloor, gradeFloorWithEffort);
 
     // Send push notification to teacher if teacherId is provided
     if (teacherId && supabase) {
@@ -799,7 +820,7 @@ interface ParsedResult {
   feedback: string;
 }
 
-function parseAnalysisResult(text: string, rubricSteps?: any[]): ParsedResult {
+function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: number = 55, gradeFloorWithEffort: number = 65): ParsedResult {
   const result: ParsedResult = {
     ocrText: '',
     problemIdentified: '',
@@ -810,7 +831,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[]): ParsedResult {
     totalScore: { earned: 0, possible: 0, percentage: 0 },
     regentsScore: 0,
     regentsScoreJustification: '',
-    grade: 55,
+    grade: gradeFloor, // Use teacher's configured floor
     gradeJustification: '',
     feedback: '',
   };
@@ -870,39 +891,39 @@ function parseAnalysisResult(text: string, rubricSteps?: any[]): ParsedResult {
   
   if (gradeMatch) {
     const parsedGrade = parseInt(gradeMatch[1]);
-    // Enforce minimum of 65 if any work was shown, otherwise minimum 55
+    // Enforce minimum using teacher's configured grade floors
     if (hasAnyWork) {
-      result.grade = Math.max(65, Math.min(100, parsedGrade));
+      result.grade = Math.max(gradeFloorWithEffort, Math.min(100, parsedGrade));
     } else {
-      result.grade = Math.max(55, Math.min(100, parsedGrade));
+      result.grade = Math.max(gradeFloor, Math.min(100, parsedGrade));
     }
   } else if (result.regentsScore > 0) {
     // Convert Regents score to grade if no explicit grade given
-    // Updated: Score 1 = 65 (minimum for any understanding shown)
+    // Use teacher's configured floors for Score 1 and Score 0
     const regentsToGrade: Record<number, number> = {
       4: 95,  // Exceeding
       3: 85,  // Meeting
       2: 75,  // Approaching
-      1: 65,  // Limited understanding (minimum for any real attempt)
-      0: 55,  // No understanding (only for blank/completely wrong)
+      1: Math.max(gradeFloorWithEffort, 65),  // Limited understanding (use configured floor)
+      0: gradeFloor,  // No understanding (use configured minimum)
     };
-    result.grade = regentsToGrade[result.regentsScore] || (hasAnyWork ? 65 : 55);
+    result.grade = regentsToGrade[result.regentsScore] || (hasAnyWork ? gradeFloorWithEffort : gradeFloor);
   } else if (result.totalScore.percentage > 0) {
-    // Fallback: convert percentage to 65-100 scale (never below 65 if points earned)
-    result.grade = Math.max(65, Math.round(65 + (result.totalScore.percentage / 100) * 35));
+    // Fallback: convert percentage to grade scale above the effort floor
+    result.grade = Math.max(gradeFloorWithEffort, Math.round(gradeFloorWithEffort + (result.totalScore.percentage / 100) * (100 - gradeFloorWithEffort)));
   } else if (hasAnyWork) {
-    // If any work was shown but no score parsed, minimum is 65
-    result.grade = 65;
+    // If any work was shown but no score parsed, use effort floor
+    result.grade = gradeFloorWithEffort;
   }
 
-  // Final safeguard: ensure minimum grade rules are enforced
-  // Work showing any understanding = minimum 65
-  // Only completely blank/irrelevant = 55
-  if (hasAnyWork && result.grade < 65) {
-    result.grade = 65;
+  // Final safeguard: ensure minimum grade rules are enforced using teacher's settings
+  // Work showing any understanding = use configured effort floor
+  // Only completely blank/irrelevant = use configured minimum floor
+  if (hasAnyWork && result.grade < gradeFloorWithEffort) {
+    result.grade = gradeFloorWithEffort;
   }
-  if (result.grade < 55) {
-    result.grade = 55;
+  if (result.grade < gradeFloor) {
+    result.grade = gradeFloor;
   }
 
   // Parse grade justification

@@ -938,6 +938,8 @@ export type Database = {
           ai_hourly_limit: number | null
           analysis_provider: string | null
           created_at: string
+          grade_floor: number | null
+          grade_floor_with_effort: number | null
           grading_scale: Json | null
           id: string
           integration_webhook_enabled: boolean | null
@@ -962,6 +964,8 @@ export type Database = {
           ai_hourly_limit?: number | null
           analysis_provider?: string | null
           created_at?: string
+          grade_floor?: number | null
+          grade_floor_with_effort?: number | null
           grading_scale?: Json | null
           id?: string
           integration_webhook_enabled?: boolean | null
@@ -986,6 +990,8 @@ export type Database = {
           ai_hourly_limit?: number | null
           analysis_provider?: string | null
           created_at?: string
+          grade_floor?: number | null
+          grade_floor_with_effort?: number | null
           grading_scale?: Json | null
           id?: string
           integration_webhook_enabled?: boolean | null

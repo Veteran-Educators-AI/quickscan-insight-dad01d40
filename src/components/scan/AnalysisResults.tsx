@@ -14,6 +14,7 @@ import {
 import { AIWorkDetector } from './AIWorkDetector';
 import { GradeOverrideDialog } from './GradeOverrideDialog';
 import { RemediationActions } from './RemediationActions';
+import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 
 interface RubricScore {
   criterion: string;
@@ -75,6 +76,8 @@ export function AnalysisResults({
   topicName = null,
 }: AnalysisResultsProps) {
   const [overriddenGrade, setOverriddenGrade] = useState<{ grade: number; justification: string } | null>(null);
+  const { gradeFloor, gradeFloorWithEffort, calculateGrade } = useGradeFloorSettings();
+  
   const getScoreColor = (percentage: number) => {
     if (percentage >= 80) return 'text-green-600';
     if (percentage >= 60) return 'text-yellow-600';
@@ -123,16 +126,17 @@ export function AnalysisResults({
     onGradeOverride?.(newGrade, newJustification);
   };
 
-  // Calculate grade with minimum 65 for any work showing understanding, 55 absolute minimum
+  // Calculate grade using teacher's grade floor settings
   const hasAnyPoints = result.totalScore.earned > 0;
   const hasAnyWork = result.ocrText?.trim().length > 10 || hasAnyPoints;
   
-  // If work shows any understanding, minimum grade is 65
-  // Only completely blank/irrelevant work gets 55
-  const minGrade = hasAnyWork ? 65 : 55;
-  const calculatedGrade = hasAnyPoints 
-    ? Math.max(minGrade, Math.round(65 + (result.totalScore.percentage / 100) * 35))
-    : minGrade;
+  // Use teacher-configured grade floors
+  const minGrade = hasAnyWork ? gradeFloorWithEffort : gradeFloor;
+  const calculatedGrade = calculateGrade(
+    result.totalScore.percentage, 
+    hasAnyWork, 
+    result.regentsScore
+  );
   const aiGrade = result.grade ?? calculatedGrade;
   const grade = overriddenGrade?.grade ?? Math.max(minGrade, aiGrade);
   const gradeJustification = overriddenGrade?.justification ?? result.gradeJustification;
@@ -199,10 +203,10 @@ export function AnalysisResults({
           {/* Progress Bar */}
           <div className="mb-4">
             <div className="flex justify-between mb-1">
-              <span className="text-xs text-muted-foreground">Grade Scale (55-100)</span>
+              <span className="text-xs text-muted-foreground">Grade Scale ({gradeFloor}-100)</span>
               <span className="text-xs text-muted-foreground">{grade}/100</span>
             </div>
-            <Progress value={(grade - 55) / 45 * 100} className="h-2" />
+            <Progress value={(grade - gradeFloor) / (100 - gradeFloor) * 100} className="h-2" />
           </div>
 
           {/* Regents Score Justification */}
