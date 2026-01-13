@@ -177,14 +177,14 @@ export function TwoFactorSettings() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-900">
-                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg border">
+                <Shield className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <p className="font-medium text-amber-800 dark:text-amber-200">
-                    Two-factor authentication required
+                  <p className="font-medium">
+                    Two-factor authentication is not enabled
                   </p>
-                  <p className="text-sm text-amber-700 dark:text-amber-300">
-                    Please set up 2FA to continue using the application
+                  <p className="text-sm text-muted-foreground">
+                    Add an extra layer of security to protect your account
                   </p>
                 </div>
               </div>
