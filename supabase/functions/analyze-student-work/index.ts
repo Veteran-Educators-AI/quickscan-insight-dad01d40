@@ -1068,6 +1068,10 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
       : 0;
   }
 
+  // Parse grade justification EARLY so it's available for mastery detection
+  const justificationMatch = text.match(/Grade Justification[:\s]*([^]*?)(?=Feedback|$)/i);
+  if (justificationMatch) result.gradeJustification = justificationMatch[1].trim();
+
   // Parse grade (55-100 scale) based on CONCEPT UNDERSTANDING
   const gradeMatch = text.match(/Grade[:\s]*(\d+)/i);
   const standardsMetMatch = text.match(/Standards Met[:\s]*(YES|NO)/i);
@@ -1107,6 +1111,50 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
                              textLower.includes('correct') ||
                              textLower.includes('concept');
   
+  // *** CRITICAL: Check for FULL MASTERY / PERFECT SCORE indicators ***
+  // If the justification says the student met full standards, got everything correct, etc. -> 100
+  const fullMasteryIndicators = [
+    'complete and correct',
+    'complete mastery',
+    'full mastery',
+    'all concepts',
+    'all problems correct',
+    'complete understanding',
+    'complete solutions',
+    'correct solutions for all',
+    'no discernible error',
+    'no errors',
+    'no computational error',
+    'no conceptual error',
+    'highest standards',
+    'meeting the highest',
+    'meets the highest',
+    'exceeding standards',
+    'exceeds standards',
+    'perfect score',
+    'perfectly correct',
+    'all correct',
+    'fully correct',
+    'accurately understanding',
+    'complete and accurate',
+    'well-organized',
+    'correctly applied formulas',
+    'correctly executed',
+    'proficiency in',
+    'demonstrates proficiency',
+  ];
+  
+  const hasPerfectIndicators = fullMasteryIndicators.some(indicator => textLower.includes(indicator));
+  
+  // Check the grade justification and regents justification specifically for mastery signals
+  const justificationText = (result.gradeJustification + ' ' + result.regentsScoreJustification).toLowerCase();
+  const justificationHasMastery = fullMasteryIndicators.some(indicator => justificationText.includes(indicator));
+  
+  // If justification explicitly says student met full standards / complete correct work -> override to 100
+  const shouldGetPerfectScore = hasPerfectIndicators || justificationHasMastery;
+  
+  console.log(`Grade determination - Concepts: ${result.conceptsDemonstrated.length}, Coherent: ${hasCoherentWork}, Understanding: ${showsUnderstanding}, Blank: ${explicitlyBlank}, PerfectIndicators: ${shouldGetPerfectScore}`);
+  
   // CRITICAL: If ANY understanding is shown, minimum is 65
   // Only give 55 if COMPLETELY blank with NO understanding whatsoever
   const hasAnyUnderstanding = !explicitlyBlank && (
@@ -1119,9 +1167,11 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     standardsMet
   );
   
-  console.log(`Grade determination - Concepts: ${result.conceptsDemonstrated.length}, Coherent: ${hasCoherentWork}, Understanding: ${hasAnyUnderstanding}, Blank: ${explicitlyBlank}`);
-  
-  if (gradeMatch) {
+  // *** PERFECT SCORE OVERRIDE: If analysis indicates full mastery, give 100 ***
+  if (shouldGetPerfectScore && hasAnyUnderstanding) {
+    result.grade = 100;
+    console.log('Full mastery detected in analysis - assigning grade 100');
+  } else if (gradeMatch) {
     const parsedGrade = parseInt(gradeMatch[1]);
     // CRITICAL: If ANY understanding, minimum is 65
     if (hasAnyUnderstanding) {
@@ -1156,17 +1206,17 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   }
 
   // FINAL SAFEGUARD: Absolute enforcement of grade floors based on understanding
-  // ANY understanding = minimum 65, ONLY completely blank = 55
-  if (hasAnyUnderstanding) {
+  // Perfect score override takes priority
+  if (shouldGetPerfectScore && hasAnyUnderstanding) {
+    result.grade = 100;
+  } else if (hasAnyUnderstanding) {
     result.grade = Math.max(gradeFloorWithEffort, result.grade);
   }
   result.grade = Math.max(gradeFloor, result.grade);
   
-  console.log(`Final grade: ${result.grade} (Understanding: ${hasAnyUnderstanding})`);
+  console.log(`Final grade: ${result.grade} (Understanding: ${hasAnyUnderstanding}, Perfect: ${shouldGetPerfectScore})`);
 
-  // Parse grade justification
-  const justificationMatch = text.match(/Grade Justification[:\s]*([^]*?)(?=Feedback|$)/i);
-  if (justificationMatch) result.gradeJustification = justificationMatch[1].trim();
+  // Grade justification already parsed above for mastery detection
 
   const feedbackMatch = text.match(/Feedback[:\s]*([^]*?)$/i);
   if (feedbackMatch) result.feedback = feedbackMatch[1].trim();
