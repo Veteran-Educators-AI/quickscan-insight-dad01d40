@@ -52,6 +52,8 @@ async function sendLowRegentsAlert(params: {
   teacherName: string;
   threshold: number;
   feedback?: string;
+  parentEmail?: string;
+  sendToParent?: boolean;
 }) {
   try {
     const response = await supabase.functions.invoke('send-low-regents-alert', {
@@ -60,7 +62,7 @@ async function sendLowRegentsAlert(params: {
     if (response.error) {
       console.error('Failed to send low Regents alert:', response.error);
     } else {
-      console.log('Low Regents alert sent successfully');
+      console.log('Low Regents alert sent successfully:', response.data);
     }
   } catch (error) {
     console.error('Error sending low Regents alert:', error);
@@ -203,12 +205,13 @@ export function useSaveAnalysisResults() {
         if (params.result.regentsScore !== undefined && params.result.regentsScore !== null) {
           const { data: alertSettings } = await supabase
             .from('settings')
-            .select('low_regents_alerts_enabled, low_regents_threshold')
+            .select('low_regents_alerts_enabled, low_regents_threshold, low_regents_parent_alerts_enabled')
             .eq('teacher_id', user.id)
             .single();
 
           const alertsEnabled = alertSettings?.low_regents_alerts_enabled ?? true;
           const threshold = alertSettings?.low_regents_threshold ?? 2;
+          const parentAlertsEnabled = alertSettings?.low_regents_parent_alerts_enabled ?? true;
 
           if (alertsEnabled && params.result.regentsScore < threshold) {
             // Get teacher profile for email
@@ -217,6 +220,18 @@ export function useSaveAnalysisResults() {
               .select('email, full_name')
               .eq('id', user.id)
               .single();
+
+            // Get student's parent email if parent alerts are enabled
+            let parentEmail: string | undefined;
+            if (parentAlertsEnabled) {
+              const { data: studentData } = await supabase
+                .from('students')
+                .select('parent_email')
+                .eq('id', params.studentId)
+                .single();
+              
+              parentEmail = studentData?.parent_email || undefined;
+            }
 
             if (teacherProfile?.email) {
               // Send alert in background - don't await
@@ -231,6 +246,8 @@ export function useSaveAnalysisResults() {
                 teacherName: teacherProfile.full_name || 'Teacher',
                 threshold,
                 feedback: params.result.feedback,
+                parentEmail,
+                sendToParent: parentAlertsEnabled && !!parentEmail,
               });
             }
           }
