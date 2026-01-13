@@ -289,8 +289,36 @@ export function IntegrationSettings() {
   const handleDisconnectDrive = async () => {
     setIsDisconnectingDrive(true);
     try {
-      // Sign out and sign back in to remove Google OAuth tokens
-      // This effectively disconnects Google Drive by removing the provider token
+      // Clear stored Google Drive tokens
+      localStorage.removeItem('google_drive_access_token');
+      localStorage.removeItem('google_drive_token_expiry');
+      localStorage.removeItem('google-drive-auto-sync-config');
+      
+      // Try to unlink Google identity from account
+      // Note: This requires the user to have another identity (email/password) to fall back to
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser?.identities && currentUser.identities.length > 1) {
+          const googleIdentity = currentUser.identities.find(i => i.provider === 'google');
+          if (googleIdentity) {
+            await supabase.auth.unlinkIdentity(googleIdentity);
+            toast({
+              title: "Google Drive disconnected",
+              description: "Google has been unlinked from your account.",
+            });
+            // Refresh connection status
+            await checkDriveConnection();
+            setShowDisconnectDriveDialog(false);
+            setIsDisconnectingDrive(false);
+            return;
+          }
+        }
+      } catch (unlinkError) {
+        console.log('Could not unlink identity, falling back to sign out:', unlinkError);
+      }
+      
+      // Fallback: Sign out to fully remove Google OAuth tokens
+      // This is needed if user only has Google identity (no email/password)
       await supabase.auth.signOut();
       toast({
         title: "Google Drive disconnected",
@@ -578,30 +606,52 @@ export function IntegrationSettings() {
               <Alert>
                 <AlertDescription>
                   <strong>Connect your Google account</strong> to import scanned documents directly from Google Drive and enable auto-sync features.
-                  {user && (
-                    <p className="mt-2 text-xs">
-                      <strong>Note:</strong> If you have 2FA enabled, you'll need to complete verification after signing in with Google. This is a one-time security step.
-                    </p>
-                  )}
                 </AlertDescription>
               </Alert>
               <Button
                 onClick={async () => {
-                  const { error } = await supabase.auth.signInWithOAuth({
-                    provider: 'google',
-                    options: {
-                      redirectTo: window.location.origin + '/settings',
-                      scopes: 'https://www.googleapis.com/auth/drive.readonly',
-                      queryParams: {
-                        access_type: 'offline',
-                        prompt: 'consent',
+                  try {
+                    // Use linkIdentity to add Google to existing account without replacing session
+                    // This prevents sign-in loops especially when MFA is enabled
+                    const { error } = await supabase.auth.linkIdentity({
+                      provider: 'google',
+                      options: {
+                        redirectTo: window.location.origin + '/settings',
+                        scopes: 'https://www.googleapis.com/auth/drive.readonly',
+                        queryParams: {
+                          access_type: 'offline',
+                          prompt: 'consent',
+                        },
                       },
-                    },
-                  });
-                  if (error) {
+                    });
+                    if (error) {
+                      // If linkIdentity fails (e.g., identity already linked or user signed in with Google),
+                      // fall back to re-authorizing with OAuth to get Drive scopes
+                      if (error.message?.includes('already linked') || error.message?.includes('Identity is already linked')) {
+                        // User already has Google linked, just need to re-authorize for Drive scope
+                        const { error: oauthError } = await supabase.auth.signInWithOAuth({
+                          provider: 'google',
+                          options: {
+                            redirectTo: window.location.origin + '/settings',
+                            scopes: 'https://www.googleapis.com/auth/drive.readonly',
+                            queryParams: {
+                              access_type: 'offline',
+                              prompt: 'consent',
+                            },
+                          },
+                        });
+                        if (oauthError) {
+                          throw oauthError;
+                        }
+                      } else {
+                        throw error;
+                      }
+                    }
+                  } catch (error: any) {
+                    console.error('Google Drive connection error:', error);
                     toast({
                       title: "Connection failed",
-                      description: error.message,
+                      description: error.message || "Failed to connect Google Drive. Please try again.",
                       variant: "destructive",
                     });
                   }
