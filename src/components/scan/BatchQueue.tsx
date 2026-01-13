@@ -1,4 +1,4 @@
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw } from 'lucide-react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +30,8 @@ interface BatchQueueProps {
   students: Student[];
   onRemove: (id: string) => void;
   onAssignStudent: (itemId: string, studentId: string, studentName: string) => void;
+  onLinkContinuation?: (continuationId: string, primaryId: string) => void;
+  onUnlinkContinuation?: (continuationId: string) => void;
   currentIndex: number;
   isProcessing: boolean;
   isIdentifying: boolean;
@@ -64,11 +66,16 @@ export function BatchQueue({
   items, 
   students, 
   onRemove, 
-  onAssignStudent, 
+  onAssignStudent,
+  onLinkContinuation,
+  onUnlinkContinuation,
   currentIndex, 
   isProcessing,
   isIdentifying,
 }: BatchQueueProps) {
+
+  // Get primary pages (not continuations)
+  const primaryPages = items.filter(i => i.pageType !== 'continuation');
 
   const getStatusIcon = (status: BatchItem['status']) => {
     if (status === 'completed') return <CheckCircle2 className="h-4 w-4 text-green-600" />;
@@ -133,14 +140,64 @@ export function BatchQueue({
         </div>
         <ScrollArea className="max-h-[400px]">
           <div className="divide-y">
-            {items.map((item, index) => (
+            {items.map((item, index) => {
+              const isPrimary = item.pageType === 'new' || !item.pageType;
+              const isContinuation = item.pageType === 'continuation';
+              const continuationCount = item.continuationPages?.length || 0;
+              const linkedPrimary = isContinuation && item.continuationOf 
+                ? items.find(i => i.id === item.continuationOf) 
+                : null;
+
+              return (
               <div 
                 key={item.id}
                 className={`flex items-center gap-3 p-3 ${
                   item.status === 'analyzing' ? 'bg-primary/5' : 
-                  item.status === 'identifying' ? 'bg-amber-50 dark:bg-amber-950/20' : ''
+                  item.status === 'identifying' ? 'bg-amber-50 dark:bg-amber-950/20' :
+                  isContinuation ? 'bg-muted/30 border-l-4 border-l-blue-400 ml-2' : ''
                 }`}
               >
+                {/* Page type indicator */}
+                {isContinuation && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1 text-blue-600">
+                          <Link className="h-4 w-4" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          Continuation of: {linkedPrimary?.studentName || 'previous paper'}
+                          <br />
+                          Will be graded together as one paper
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                
+                {/* Multi-page indicator for primary pages */}
+                {isPrimary && continuationCount > 0 && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1">
+                          <FileStack className="h-4 w-4 text-blue-600" />
+                          <span className="text-xs text-blue-600 font-medium">+{continuationCount}</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          Multi-page paper: {continuationCount + 1} pages total
+                          <br />
+                          Will be graded as one combined paper
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
                 {/* Thumbnail */}
                 <div className="relative h-12 w-12 rounded-md overflow-hidden bg-muted shrink-0">
                   <img 
@@ -322,7 +379,8 @@ export function BatchQueue({
                   </Button>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </ScrollArea>
       </CardContent>
