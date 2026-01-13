@@ -42,6 +42,29 @@ const tourSteps: Step[] = [
   },
   {
     target: '[data-tour="nav-questions"]',
+    title: '🎓 AI Lesson Plans (NEW!)',
+    content: (
+      <div className="text-left space-y-2">
+        <p><strong>Generate complete PowerPoint-style lesson plans!</strong></p>
+        <p className="text-sm text-muted-foreground">
+          <strong>Features:</strong>
+        </p>
+        <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+          <li>Standards-aligned slide content</li>
+          <li>Speaker notes with teaching tips</li>
+          <li>Worked examples with solutions</li>
+          <li>Recommended practice worksheets</li>
+          <li>Push to sister apps for gamification</li>
+        </ul>
+        <p className="text-xs text-muted-foreground mt-1">
+          Select a topic and click "Create Lesson Plan" to get started!
+        </p>
+      </div>
+    ),
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tour="nav-questions"]',
     title: '🔀 Diagnostic Forms (Anti-Copy)',
     content: (
       <div className="text-left space-y-2">
