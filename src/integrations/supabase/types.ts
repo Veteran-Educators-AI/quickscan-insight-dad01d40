@@ -423,8 +423,11 @@ export type Database = {
           grade: number
           grade_justification: string | null
           id: string
+          nys_standard: string | null
           raw_score_earned: number | null
           raw_score_possible: number | null
+          regents_justification: string | null
+          regents_score: number | null
           student_id: string
           teacher_id: string
           topic_id: string | null
@@ -436,8 +439,11 @@ export type Database = {
           grade: number
           grade_justification?: string | null
           id?: string
+          nys_standard?: string | null
           raw_score_earned?: number | null
           raw_score_possible?: number | null
+          regents_justification?: string | null
+          regents_score?: number | null
           student_id: string
           teacher_id: string
           topic_id?: string | null
@@ -449,8 +455,11 @@ export type Database = {
           grade?: number
           grade_justification?: string | null
           id?: string
+          nys_standard?: string | null
           raw_score_earned?: number | null
           raw_score_possible?: number | null
+          regents_justification?: string | null
+          regents_score?: number | null
           student_id?: string
           teacher_id?: string
           topic_id?: string | null

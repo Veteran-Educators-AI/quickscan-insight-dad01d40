@@ -23,6 +23,9 @@ interface AnalysisResult {
   grade?: number;
   gradeJustification?: string;
   feedback: string;
+  nysStandard?: string;
+  regentsScore?: number;
+  regentsScoreJustification?: string;
 }
 
 interface SaveAnalysisParams {
@@ -160,6 +163,9 @@ export function useSaveAnalysisResults() {
             raw_score_possible: params.result.totalScore.possible,
             attempt_id: attempt.id,
             teacher_id: user.id,
+            regents_score: params.result.regentsScore ?? null,
+            nys_standard: params.result.nysStandard ?? null,
+            regents_justification: params.result.regentsScoreJustification ?? null,
           });
 
         if (gradeHistoryError) {
