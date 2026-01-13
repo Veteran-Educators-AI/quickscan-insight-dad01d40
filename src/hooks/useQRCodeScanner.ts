@@ -1,8 +1,16 @@
 import { useState, useCallback } from 'react';
 import jsQR from 'jsqr';
 import { parseStudentQRCode } from '@/components/print/StudentQRCode';
+import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
 
 interface QRScanResult {
+  studentId: string;
+  questionId?: string;
+  type: 'student-only' | 'student-question';
+}
+
+// Legacy result type for backward compatibility
+interface LegacyQRScanResult {
   studentId: string;
   questionId: string;
 }
@@ -11,17 +19,18 @@ export function useQRCodeScanner() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<QRScanResult | null>(null);
 
+  /**
+   * Scans an image for any type of student QR code (student-only or student+question)
+   */
   const scanImageForQR = useCallback(async (imageDataUrl: string): Promise<QRScanResult | null> => {
     setIsScanning(true);
     setScanResult(null);
 
     try {
-      // Create an image element to load the data URL
       const img = new Image();
       
       const result = await new Promise<QRScanResult | null>((resolve) => {
         img.onload = () => {
-          // Create a canvas to get image data
           const canvas = document.createElement('canvas');
           canvas.width = img.width;
           canvas.height = img.height;
@@ -37,12 +46,14 @@ export function useQRCodeScanner() {
           // Try scanning different regions of the image
           // QR codes are typically in corners or along edges
           const regions = [
-            // Top-left corner
+            // Top-left corner (where student QR typically is)
             { x: 0, y: 0, w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
             // Top-right corner
             { x: Math.max(0, img.width - 300), y: 0, w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
             // Bottom-left corner
             { x: 0, y: Math.max(0, img.height - 300), w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
+            // Left edge (for worksheet question QRs)
+            { x: 0, y: 0, w: Math.min(150, img.width / 4), h: img.height },
             // Full image (fallback)
             { x: 0, y: 0, w: img.width, h: img.height },
           ];
@@ -52,9 +63,20 @@ export function useQRCodeScanner() {
             const code = jsQR(imageData.data, region.w, region.h);
             
             if (code) {
-              const parsed = parseStudentQRCode(code.data);
+              // Try the new unified parser first (handles both v1 and v2)
+              const parsed = parseAnyStudentQRCode(code.data);
               if (parsed) {
                 resolve(parsed);
+                return;
+              }
+              
+              // Fallback to legacy parser for old v1 codes
+              const legacyParsed = parseStudentQRCode(code.data);
+              if (legacyParsed) {
+                resolve({
+                  ...legacyParsed,
+                  type: 'student-question',
+                });
                 return;
               }
             }
@@ -80,12 +102,27 @@ export function useQRCodeScanner() {
     }
   }, []);
 
+  /**
+   * Legacy method for backward compatibility - only returns results with questionId
+   */
+  const scanImageForStudentQuestionQR = useCallback(async (imageDataUrl: string): Promise<LegacyQRScanResult | null> => {
+    const result = await scanImageForQR(imageDataUrl);
+    if (result && result.type === 'student-question' && result.questionId) {
+      return {
+        studentId: result.studentId,
+        questionId: result.questionId,
+      };
+    }
+    return null;
+  }, [scanImageForQR]);
+
   const clearResult = useCallback(() => {
     setScanResult(null);
   }, []);
 
   return {
     scanImageForQR,
+    scanImageForStudentQuestionQR,
     isScanning,
     scanResult,
     clearResult,

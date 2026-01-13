@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil, QrCode } from 'lucide-react';
+import { StudentOnlyQRCode } from '@/components/print/StudentOnlyQRCode';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -542,6 +543,12 @@ export default function ClassDetail() {
                       />
                     </TableHead>
                     <TableHead className="w-12 text-center">#</TableHead>
+                    <TableHead className="w-16 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <QrCode className="h-3.5 w-3.5" />
+                        <span className="text-xs">QR</span>
+                      </div>
+                    </TableHead>
                     <TableHead>
                       <div className="flex items-center gap-2">
                         <span>Name</span>
@@ -588,6 +595,11 @@ export default function ClassDetail() {
                       </TableCell>
                       <TableCell className="text-center text-muted-foreground font-mono text-sm">
                         {index + 1}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex justify-center">
+                          <StudentOnlyQRCode studentId={student.id} size={36} />
+                        </div>
                       </TableCell>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">

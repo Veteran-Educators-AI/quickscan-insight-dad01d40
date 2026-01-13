@@ -84,8 +84,8 @@ export default function Scan() {
   const [resultsSaved, setResultsSaved] = useState(false);
   const [multiQuestionResults, setMultiQuestionResults] = useState<Record<string, any>>({});
   
-  // QR code detection state
-  const [detectedQR, setDetectedQR] = useState<{ studentId: string; questionId: string } | null>(null);
+  // QR code detection state - now supports student-only QR codes
+  const [detectedQR, setDetectedQR] = useState<{ studentId: string; questionId?: string; type: 'student-only' | 'student-question' } | null>(null);
   
   // Auto-identified student state
   const [autoIdentifiedStudent, setAutoIdentifiedStudent] = useState<{
@@ -169,10 +169,18 @@ export default function Scan() {
       if (qrResult) {
         setDetectedQR(qrResult);
         setSingleScanStudentId(qrResult.studentId);
-        setSelectedQuestionIds([qrResult.questionId]);
-        toast.success('QR code detected! Student and question auto-identified.', {
-          icon: <QrCode className="h-4 w-4" />,
-        });
+        
+        // Only set question ID if it's a student+question QR code
+        if (qrResult.type === 'student-question' && qrResult.questionId) {
+          setSelectedQuestionIds([qrResult.questionId]);
+          toast.success('QR code detected! Student and question auto-identified.', {
+            icon: <QrCode className="h-4 w-4" />,
+          });
+        } else {
+          toast.success('Student QR code detected! Student auto-identified.', {
+            icon: <QrCode className="h-4 w-4" />,
+          });
+        }
         setScanState('choose-method');
       } else {
         setDetectedQR(null);
