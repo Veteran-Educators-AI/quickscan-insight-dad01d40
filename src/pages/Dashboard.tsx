@@ -12,7 +12,9 @@ import {
   BarChart3,
   GraduationCap,
   School,
-  MessageSquare
+  MessageSquare,
+  Clock,
+  FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +23,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { LessonPlanGenerator } from '@/components/questions/LessonPlanGenerator';
 import { LessonTopicSelector, type PresentationTheme } from '@/components/questions/LessonTopicSelector';
+import { format } from 'date-fns';
 
 interface DashboardStats {
   classCount: number;
@@ -28,6 +31,15 @@ interface DashboardStats {
   questionCount: number;
   recentAttempts: number;
   unreadComments: number;
+}
+
+interface RecentLessonPlan {
+  id: string;
+  title: string;
+  topic_name: string;
+  standard: string;
+  subject: string | null;
+  created_at: string;
 }
 
 export default function Dashboard() {
@@ -44,6 +56,8 @@ export default function Dashboard() {
   const [showLessonGenerator, setShowLessonGenerator] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<{ topicName: string; standard: string; subject: string } | null>(null);
   const [selectedTheme, setSelectedTheme] = useState<PresentationTheme | null>(null);
+  const [recentLessons, setRecentLessons] = useState<RecentLessonPlan[]>([]);
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchStats() {
@@ -101,6 +115,15 @@ export default function Dashboard() {
           }
         }
 
+        // Fetch recent lesson plans
+        const { data: lessons } = await supabase
+          .from('lesson_plans')
+          .select('id, title, topic_name, standard, subject, created_at')
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        setRecentLessons(lessons || []);
+
         setStats({
           classCount: classCount || 0,
           studentCount,
@@ -122,6 +145,17 @@ export default function Dashboard() {
     setSelectedTopic(topic);
     setSelectedTheme(theme);
     setShowTopicSelector(false);
+    setShowLessonGenerator(true);
+  };
+
+  const handleOpenExistingLesson = (lesson: RecentLessonPlan) => {
+    setSelectedLessonId(lesson.id);
+    setSelectedTopic({
+      topicName: lesson.topic_name,
+      standard: lesson.standard,
+      subject: lesson.subject || 'Geometry'
+    });
+    setSelectedTheme(null);
     setShowLessonGenerator(true);
   };
 
@@ -238,34 +272,59 @@ export default function Dashboard() {
 
         {/* Main Content Grid */}
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Recent Activity */}
+          {/* Recent Lesson Plans */}
           <Card className="animate-slide-up" style={{ animationDelay: '100ms' }}>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-lg">Recent Activity</CardTitle>
-                <CardDescription>Latest scans and assessments</CardDescription>
+                <CardTitle className="text-lg">Recent Lesson Plans</CardTitle>
+                <CardDescription>Quickly access your latest lessons</CardDescription>
               </div>
-              <Link to="/reports">
-                <Button variant="ghost" size="sm">
-                  View All <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </Link>
+              <Button variant="ghost" size="sm" onClick={() => setShowTopicSelector(true)}>
+                <Plus className="h-4 w-4 mr-1" /> New
+              </Button>
             </CardHeader>
             <CardContent>
-              {stats.recentAttempts === 0 ? (
+              {recentLessons.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Camera className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No scans yet</p>
-                  <p className="text-sm">Start by scanning student work</p>
-                  <Link to="/scan" className="mt-4 inline-block">
-                    <Button variant="outline" size="sm">
-                      <Camera className="h-4 w-4 mr-2" />
-                      Start Scanning
-                    </Button>
-                  </Link>
+                  <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No lesson plans yet</p>
+                  <p className="text-sm">Create your first lesson plan</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-4"
+                    onClick={() => setShowTopicSelector(true)}
+                  >
+                    <Presentation className="h-4 w-4 mr-2" />
+                    Make a Lesson
+                  </Button>
                 </div>
               ) : (
-                <p className="text-muted-foreground">Recent scans will appear here</p>
+                <div className="space-y-2">
+                  {recentLessons.map((lesson) => (
+                    <div
+                      key={lesson.id}
+                      onClick={() => handleOpenExistingLesson(lesson)}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="p-2 rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 shrink-0">
+                          <Presentation className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{lesson.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {lesson.standard} • {lesson.topic_name}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                        <Clock className="h-3 w-3" />
+                        {format(new Date(lesson.created_at), 'MMM d')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -345,9 +404,15 @@ export default function Dashboard() {
         {/* Lesson Plan Generator Dialog */}
         <LessonPlanGenerator
           open={showLessonGenerator}
-          onOpenChange={setShowLessonGenerator}
+          onOpenChange={(open) => {
+            setShowLessonGenerator(open);
+            if (!open) {
+              setSelectedLessonId(null);
+            }
+          }}
           topic={selectedTopic}
           presentationTheme={selectedTheme}
+          existingLessonId={selectedLessonId}
         />
       </div>
     </AppLayout>

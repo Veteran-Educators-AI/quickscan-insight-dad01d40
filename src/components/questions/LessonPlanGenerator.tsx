@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,6 +71,7 @@ interface LessonPlanGeneratorProps {
   classId?: string;
   onOpenLibrary?: () => void;
   presentationTheme?: PresentationTheme | null;
+  existingLessonId?: string | null;
 }
 
 export function LessonPlanGenerator({ 
@@ -80,7 +81,8 @@ export function LessonPlanGenerator({
   relatedTopics = [],
   classId,
   onOpenLibrary,
-  presentationTheme
+  presentationTheme,
+  existingLessonId
 }: LessonPlanGeneratorProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -94,6 +96,62 @@ export function LessonPlanGenerator({
   const [editingContentIndex, setEditingContentIndex] = useState<number | null>(null);
   const [showHandoutDialog, setShowHandoutDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingExisting, setIsLoadingExisting] = useState(false);
+
+  // Load existing lesson plan if ID is provided
+  useEffect(() => {
+    async function loadExistingLesson() {
+      if (!open || !existingLessonId) return;
+      
+      setIsLoadingExisting(true);
+      try {
+        const { data, error } = await supabase
+          .from('lesson_plans')
+          .select('*')
+          .eq('id', existingLessonId)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          const slides = (data.slides as unknown as LessonSlide[]) || [];
+          const recommendedWorksheets = (data.recommended_worksheets as unknown as { topicName: string; standard: string; difficulty: string }[]) || [];
+          
+          setLessonPlan({
+            title: data.title,
+            standard: data.standard,
+            topicName: data.topic_name,
+            objective: data.objective,
+            duration: data.duration,
+            slides,
+            recommendedWorksheets
+          });
+          setLessonDuration(data.duration);
+          setCurrentSlide(0);
+        }
+      } catch (error) {
+        console.error('Error loading lesson plan:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load lesson plan",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoadingExisting(false);
+      }
+    }
+
+    loadExistingLesson();
+  }, [open, existingLessonId, toast]);
+
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setLessonPlan(null);
+      setCurrentSlide(0);
+      setIsEditing(false);
+    }
+  }, [open]);
 
   // Edit handlers
   const updateSlideTitle = (newTitle: string) => {
