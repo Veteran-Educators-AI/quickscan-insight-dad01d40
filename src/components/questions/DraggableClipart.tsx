@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { X, Sparkles } from 'lucide-react';
 import { getClipartLibrary, type SlideClipart } from './SlideClipartPicker';
 
 interface DraggableClipartProps {
@@ -31,6 +31,9 @@ export function DraggableClipart({
   // Get initial position
   const x = item.x ?? 75;
   const y = item.y ?? 25;
+  
+  // Check if this is an AI-generated image
+  const isGenerated = item.isGenerated && item.imageUrl;
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!isEditing || !containerRef.current) return;
@@ -103,7 +106,8 @@ export function DraggableClipart({
     document.addEventListener('touchend', handleTouchEnd);
   }, [isEditing, containerRef, index, onPositionChange, size]);
 
-  if (!clipart) return null;
+  // If not generated and no clipart found, skip
+  if (!isGenerated && !clipart) return null;
 
   return (
     <div
@@ -121,11 +125,23 @@ export function DraggableClipart({
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
     >
-      <div
-        className="w-full h-full text-white/80"
-        style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
-        dangerouslySetInnerHTML={{ __html: clipart.svg }}
-      />
+      {isGenerated ? (
+        <div className="relative w-full h-full">
+          <img
+            src={item.imageUrl}
+            alt="AI Generated clipart"
+            className="w-full h-full object-contain rounded"
+            style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
+          />
+          <Sparkles className="absolute -bottom-1 -left-1 w-3 h-3 text-amber-400" />
+        </div>
+      ) : (
+        <div
+          className="w-full h-full text-white/80"
+          style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
+          dangerouslySetInnerHTML={{ __html: clipart!.svg }}
+        />
+      )}
       {isEditing && (
         <button
           onClick={(e) => {
