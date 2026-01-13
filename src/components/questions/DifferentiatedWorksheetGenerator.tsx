@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer } from 'lucide-react';
+import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes } from 'lucide-react';
 import { QuestionPreviewPanel } from './QuestionPreviewPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -79,6 +79,9 @@ interface GeneratedQuestion {
   difficulty: string;
   advancementLevel: AdvancementLevel;
   hint?: string;
+  svg?: string;
+  imageUrl?: string;
+  imagePrompt?: string;
 }
 
 interface DifferentiatedWorksheetGeneratorProps {
@@ -143,6 +146,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [formCount, setFormCount] = useState(diagnosticMode ? '4' : '1');
   const [includeHints, setIncludeHints] = useState(false);
   const [useAdaptiveDifficulty, setUseAdaptiveDifficulty] = useState(true);
+  const [includeGeometry, setIncludeGeometry] = useState(false);
+  const [useAIImages, setUseAIImages] = useState(false);
   
   // Topics from standards menu selection
   const [customTopics, setCustomTopics] = useState<{ topicName: string; standard: string }[]>([]);
@@ -444,7 +449,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       for (const form of formsToGenerate) {
         for (const level of levelsWithStudents) {
           const cacheKey = `${form}-${level}`;
-          setGenerationStatus(`Generating Form ${form} questions for Level ${level}...`);
+          setGenerationStatus(`Generating Form ${form} questions for Level ${level}${includeGeometry ? ' with shapes' : ''}...`);
           
           // Generate warm-up questions for this form
           let warmUpQuestions: GeneratedQuestion[] = [];
@@ -468,6 +473,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 formVariation: form,
                 formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
                 includeHints,
+                includeGeometry,
+                useAIImages,
               },
             });
             warmUpQuestions = warmUpData?.questions || [];
@@ -497,6 +504,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               formVariation: form,
               formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
               includeHints,
+              includeGeometry,
+              useAIImages,
             },
           });
           
@@ -605,6 +614,24 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 yPosition += 5;
               });
 
+              // Add geometry diagram if available for warm-up
+              const warmUpImage = question.imageUrl || question.svg;
+              if (warmUpImage && includeGeometry) {
+                try {
+                  if (yPosition > pageHeight - 55) {
+                    pdf.addPage();
+                    yPosition = margin;
+                  }
+                  const imgWidth = 40; // smaller for warm-up
+                  const imgHeight = 40;
+                  yPosition += 3;
+                  pdf.addImage(warmUpImage, 'PNG', margin + 5, yPosition, imgWidth, imgHeight);
+                  yPosition += imgHeight + 3;
+                } catch (imgError) {
+                  console.error('Error adding warm-up image to PDF:', imgError);
+                }
+              }
+
               // Add hint if available
               if (question.hint && includeHints) {
                 yPosition += 2;
@@ -670,6 +697,30 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               pdf.text(line, margin + 5, yPosition);
               yPosition += 5;
             });
+
+            // Add geometry diagram if available
+            const imageSource = question.imageUrl || question.svg;
+            if (imageSource && includeGeometry) {
+              try {
+                // Check if we need a new page for the image
+                if (yPosition > pageHeight - 70) {
+                  pdf.addPage();
+                  yPosition = margin;
+                }
+                
+                // Add the image to the PDF
+                const imgWidth = 50; // mm
+                const imgHeight = 50; // mm
+                const imgX = margin + 5;
+                
+                yPosition += 3;
+                pdf.addImage(imageSource, 'PNG', imgX, yPosition, imgWidth, imgHeight);
+                yPosition += imgHeight + 5;
+              } catch (imgError) {
+                console.error('Error adding image to PDF:', imgError);
+                // Continue without the image
+              }
+            }
 
             // Add hint if available
             if (question.hint && includeHints) {
@@ -1304,6 +1355,61 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               </p>
             </div>
           </div>
+
+          {/* Include Geometry Shapes Option */}
+          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Shapes className="h-5 w-5 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="includeGeometry" className="text-sm font-medium text-blue-900 cursor-pointer flex items-center gap-2">
+                  Include Geometry Shapes
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-sm">
+                          Generate visual diagrams for geometry questions including triangles, circles, angles, 
+                          coordinate planes, and 3D shapes. Makes worksheets more engaging and visual.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </Label>
+                <p className="text-xs text-blue-700 mt-0.5">
+                  Add visual diagrams for geometry-related questions
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="includeGeometry"
+              checked={includeGeometry}
+              onCheckedChange={setIncludeGeometry}
+            />
+          </div>
+
+          {includeGeometry && (
+            <div className="ml-6 p-3 bg-cyan-50 border border-cyan-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <Label htmlFor="useAIImages" className="text-sm font-medium text-cyan-900 cursor-pointer">
+                    Use AI-Generated Images
+                  </Label>
+                  <p className="text-xs text-cyan-700 mt-0.5">
+                    Generate realistic images instead of simple SVG diagrams (takes longer but looks better)
+                  </p>
+                </div>
+                <Switch
+                  id="useAIImages"
+                  checked={useAIImages}
+                  onCheckedChange={setUseAIImages}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Adaptive Difficulty Option */}
           <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
