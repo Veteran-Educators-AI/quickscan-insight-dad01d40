@@ -165,6 +165,37 @@ export function LessonPlanGenerator({
     { value: 'summary', label: 'Summary' },
   ];
 
+  const addNewSlide = () => {
+    if (!lessonPlan) return;
+    const newSlide: LessonSlide = {
+      slideNumber: lessonPlan.slides.length + 1,
+      title: 'New Slide',
+      content: ['Add your content here'],
+      speakerNotes: '',
+      slideType: 'instruction',
+    };
+    const updatedSlides = [
+      ...lessonPlan.slides.slice(0, currentSlide + 1),
+      newSlide,
+      ...lessonPlan.slides.slice(currentSlide + 1).map((s, i) => ({
+        ...s,
+        slideNumber: currentSlide + 3 + i,
+      })),
+    ];
+    setLessonPlan({ ...lessonPlan, slides: updatedSlides });
+    setCurrentSlide(currentSlide + 1);
+  };
+
+  const deleteCurrentSlide = () => {
+    if (!lessonPlan || lessonPlan.slides.length <= 1) return;
+    const updatedSlides = lessonPlan.slides
+      .filter((_, i) => i !== currentSlide)
+      .map((s, i) => ({ ...s, slideNumber: i + 1 }));
+    setLessonPlan({ ...lessonPlan, slides: updatedSlides });
+    setCurrentSlide(Math.max(0, currentSlide - 1));
+    setEditingContentIndex(null);
+  };
+
   const saveLessonPlan = async () => {
     if (!lessonPlan || !user) {
       toast({
@@ -725,8 +756,29 @@ export function LessonPlanGenerator({
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-inherit hover:bg-white/20"
+                              onClick={addNewSlide}
+                              title="Add slide after current"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-inherit hover:bg-white/20 hover:text-red-200"
+                              onClick={deleteCurrentSlide}
+                              disabled={lessonPlan.slides.length <= 1}
+                              title="Delete current slide"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <div className="w-px h-5 bg-white/30 mx-1" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-inherit hover:bg-white/20"
                               onClick={moveSlideUp}
                               disabled={currentSlide === 0}
+                              title="Move slide up"
                             >
                               <ArrowUp className="h-4 w-4" />
                             </Button>
@@ -736,6 +788,7 @@ export function LessonPlanGenerator({
                               className="h-7 w-7 text-inherit hover:bg-white/20"
                               onClick={moveSlideDown}
                               disabled={currentSlide === lessonPlan.slides.length - 1}
+                              title="Move slide down"
                             >
                               <ArrowDown className="h-4 w-4" />
                             </Button>
