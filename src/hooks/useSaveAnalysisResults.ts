@@ -41,6 +41,32 @@ interface SaveAnalysisParams {
   classId?: string;
 }
 
+async function sendLowRegentsAlert(params: {
+  studentId: string;
+  studentName: string;
+  regentsScore: number;
+  grade: number;
+  topicName: string;
+  nysStandard?: string;
+  teacherEmail: string;
+  teacherName: string;
+  threshold: number;
+  feedback?: string;
+}) {
+  try {
+    const response = await supabase.functions.invoke('send-low-regents-alert', {
+      body: params,
+    });
+    if (response.error) {
+      console.error('Failed to send low Regents alert:', response.error);
+    } else {
+      console.log('Low Regents alert sent successfully');
+    }
+  } catch (error) {
+    console.error('Error sending low Regents alert:', error);
+  }
+}
+
 export function useSaveAnalysisResults() {
   const { user } = useAuth();
   const { pushData } = usePushStudentData();
@@ -171,6 +197,43 @@ export function useSaveAnalysisResults() {
         if (gradeHistoryError) {
           console.error('Error saving grade history:', gradeHistoryError);
           // Don't throw - grade history is secondary
+        }
+
+        // Check if we need to send a low Regents score alert
+        if (params.result.regentsScore !== undefined && params.result.regentsScore !== null) {
+          const { data: alertSettings } = await supabase
+            .from('settings')
+            .select('low_regents_alerts_enabled, low_regents_threshold')
+            .eq('teacher_id', user.id)
+            .single();
+
+          const alertsEnabled = alertSettings?.low_regents_alerts_enabled ?? true;
+          const threshold = alertSettings?.low_regents_threshold ?? 2;
+
+          if (alertsEnabled && params.result.regentsScore < threshold) {
+            // Get teacher profile for email
+            const { data: teacherProfile } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', user.id)
+              .single();
+
+            if (teacherProfile?.email) {
+              // Send alert in background - don't await
+              sendLowRegentsAlert({
+                studentId: params.studentId,
+                studentName: params.studentName || 'Unknown Student',
+                regentsScore: params.result.regentsScore,
+                grade: finalGrade,
+                topicName: params.topicName,
+                nysStandard: params.result.nysStandard,
+                teacherEmail: teacherProfile.email,
+                teacherName: teacherProfile.full_name || 'Teacher',
+                threshold,
+                feedback: params.result.feedback,
+              });
+            }
+          }
         }
       }
 

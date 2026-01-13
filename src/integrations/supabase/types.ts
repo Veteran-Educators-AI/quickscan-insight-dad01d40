@@ -944,6 +944,8 @@ export type Database = {
           integration_webhook_url: string | null
           level_a_notifications: boolean | null
           level_drop_notifications: boolean | null
+          low_regents_alerts_enabled: boolean | null
+          low_regents_threshold: number | null
           parent_ai_notifications: boolean | null
           sister_app_coin_multiplier: number | null
           sister_app_sync_enabled: boolean | null
@@ -965,6 +967,8 @@ export type Database = {
           integration_webhook_url?: string | null
           level_a_notifications?: boolean | null
           level_drop_notifications?: boolean | null
+          low_regents_alerts_enabled?: boolean | null
+          low_regents_threshold?: number | null
           parent_ai_notifications?: boolean | null
           sister_app_coin_multiplier?: number | null
           sister_app_sync_enabled?: boolean | null
@@ -986,6 +990,8 @@ export type Database = {
           integration_webhook_url?: string | null
           level_a_notifications?: boolean | null
           level_drop_notifications?: boolean | null
+          low_regents_alerts_enabled?: boolean | null
+          low_regents_threshold?: number | null
           parent_ai_notifications?: boolean | null
           sister_app_coin_multiplier?: number | null
           sister_app_sync_enabled?: boolean | null

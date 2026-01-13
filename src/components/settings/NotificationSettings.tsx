@@ -3,8 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useNativePushNotifications } from '@/hooks/useNativePushNotifications';
+import { LowRegentsAlertSettings } from './LowRegentsAlertSettings';
 import { toast } from 'sonner';
-
 export function NotificationSettings() {
   // Web push notifications
   const {
@@ -68,54 +68,58 @@ export function NotificationSettings() {
   // Show native notification settings when running on native platform
   if (isNative) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Smartphone className="h-5 w-5" />
-            Push Notifications
-          </CardTitle>
-          <CardDescription>
-            Get notified when student work has been analyzed.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">
-                {isNativeRegistered ? 'Notifications enabled' : 'Notifications disabled'}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {isNativeRegistered
-                  ? "You'll receive push notifications on this device."
-                  : 'Enable to receive push notifications on this device.'}
-              </p>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Smartphone className="h-5 w-5" />
+              Push Notifications
+            </CardTitle>
+            <CardDescription>
+              Get notified when student work has been analyzed.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">
+                  {isNativeRegistered ? 'Notifications enabled' : 'Notifications disabled'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {isNativeRegistered
+                    ? "You'll receive push notifications on this device."
+                    : 'Enable to receive push notifications on this device.'}
+                </p>
+              </div>
+              <Button
+                onClick={handleNativeToggle}
+                disabled={isNativeLoading}
+                variant={isNativeRegistered ? 'outline' : 'default'}
+              >
+                {isNativeLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isNativeRegistered ? (
+                  <>
+                    <BellOff className="h-4 w-4 mr-2" />
+                    Disable
+                  </>
+                ) : (
+                  <>
+                    <Bell className="h-4 w-4 mr-2" />
+                    Enable
+                  </>
+                )}
+              </Button>
             </div>
-            <Button
-              onClick={handleNativeToggle}
-              disabled={isNativeLoading}
-              variant={isNativeRegistered ? 'outline' : 'default'}
-            >
-              {isNativeLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : isNativeRegistered ? (
-                <>
-                  <BellOff className="h-4 w-4 mr-2" />
-                  Disable
-                </>
-              ) : (
-                <>
-                  <Bell className="h-4 w-4 mr-2" />
-                  Enable
-                </>
-              )}
-            </Button>
-          </div>
 
-          {nativeError && (
-            <p className="text-sm text-destructive">{nativeError}</p>
-          )}
-        </CardContent>
-      </Card>
+            {nativeError && (
+              <p className="text-sm text-destructive">{nativeError}</p>
+            )}
+          </CardContent>
+        </Card>
+        
+        <LowRegentsAlertSettings />
+      </div>
     );
   }
 
@@ -137,60 +141,64 @@ export function NotificationSettings() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bell className="h-5 w-5" />
-          Push Notifications
-        </CardTitle>
-        <CardDescription>
-          Get notified when student work has been analyzed.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium">
-              {isWebSubscribed ? 'Notifications enabled' : 'Notifications disabled'}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {isWebSubscribed
-                ? "You'll receive alerts when student work analysis is complete."
-                : 'Enable to receive alerts for analyzed student work.'}
-            </p>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Push Notifications
+          </CardTitle>
+          <CardDescription>
+            Get notified when student work has been analyzed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">
+                {isWebSubscribed ? 'Notifications enabled' : 'Notifications disabled'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {isWebSubscribed
+                  ? "You'll receive alerts when student work analysis is complete."
+                  : 'Enable to receive alerts for analyzed student work.'}
+              </p>
+            </div>
+            <Button
+              onClick={handleWebToggle}
+              disabled={isWebLoading}
+              variant={isWebSubscribed ? 'outline' : 'default'}
+            >
+              {isWebLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isWebSubscribed ? (
+                <>
+                  <BellOff className="h-4 w-4 mr-2" />
+                  Disable
+                </>
+              ) : (
+                <>
+                  <Bell className="h-4 w-4 mr-2" />
+                  Enable
+                </>
+              )}
+            </Button>
           </div>
-          <Button
-            onClick={handleWebToggle}
-            disabled={isWebLoading}
-            variant={isWebSubscribed ? 'outline' : 'default'}
-          >
-            {isWebLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : isWebSubscribed ? (
-              <>
-                <BellOff className="h-4 w-4 mr-2" />
-                Disable
-              </>
-            ) : (
-              <>
-                <Bell className="h-4 w-4 mr-2" />
-                Enable
-              </>
-            )}
-          </Button>
-        </div>
 
-        {webPermission === 'denied' && (
-          <p className="text-sm text-destructive">
-            Notifications are blocked in your browser. To enable them, click the lock icon in your
-            browser's address bar and allow notifications.
-          </p>
-        )}
+          {webPermission === 'denied' && (
+            <p className="text-sm text-destructive">
+              Notifications are blocked in your browser. To enable them, click the lock icon in your
+              browser's address bar and allow notifications.
+            </p>
+          )}
 
-        {webError && (
-          <p className="text-sm text-destructive">{webError}</p>
-        )}
-      </CardContent>
-    </Card>
+          {webError && (
+            <p className="text-sm text-destructive">{webError}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <LowRegentsAlertSettings />
+    </div>
   );
 }
