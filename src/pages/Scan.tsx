@@ -875,20 +875,64 @@ export default function Scan() {
                               </>
                             )}
                           </div>
-                          <Badge 
-                            variant="secondary" 
-                            className={
-                              autoIdentifiedStudent.confidence === 'high'
-                                ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400'
-                                : autoIdentifiedStudent.confidence === 'medium'
-                                ? 'bg-blue-500/20 text-blue-600 dark:text-blue-300'
-                                : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
-                            }
-                          >
-                            {autoIdentifiedStudent.confidence === 'high' ? 'High confidence' 
-                              : autoIdentifiedStudent.confidence === 'medium' ? 'Verify match'
-                              : 'Manual select'}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={async () => {
+                                if (!finalImage || !singleScanClassId || singleScanStudents.length === 0) {
+                                  toast.error('Cannot re-identify without an image and class selected');
+                                  return;
+                                }
+                                setAutoIdentifiedStudent(null);
+                                setSingleScanStudentId(null);
+                                toast.info('Re-analyzing handwritten name...', {
+                                  icon: <RotateCcw className="h-4 w-4" />,
+                                });
+                                const identResult = await identifyStudent(finalImage, singleScanStudents);
+                                if (identResult?.matchedStudentId) {
+                                  setAutoIdentifiedStudent({
+                                    studentId: identResult.matchedStudentId,
+                                    studentName: identResult.matchedStudentName || 'Unknown',
+                                    confidence: identResult.confidence,
+                                    handwrittenName: identResult.handwrittenName,
+                                  });
+                                  setSingleScanStudentId(identResult.matchedStudentId);
+                                  if (identResult.matchedQuestionId) {
+                                    setSelectedQuestionIds([identResult.matchedQuestionId]);
+                                  }
+                                } else if (identResult?.handwrittenName) {
+                                  setAutoIdentifiedStudent({
+                                    studentId: '',
+                                    studentName: identResult.handwrittenName,
+                                    confidence: 'none',
+                                    handwrittenName: identResult.handwrittenName,
+                                  });
+                                } else {
+                                  toast.warning('Could not identify student from the scan');
+                                }
+                              }}
+                              disabled={isIdentifying}
+                              className="text-xs"
+                            >
+                              <RotateCcw className={`h-3.5 w-3.5 mr-1 ${isIdentifying ? 'animate-spin' : ''}`} />
+                              Re-identify
+                            </Button>
+                            <Badge 
+                              variant="secondary" 
+                              className={
+                                autoIdentifiedStudent.confidence === 'high'
+                                  ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400'
+                                  : autoIdentifiedStudent.confidence === 'medium'
+                                  ? 'bg-blue-500/20 text-blue-600 dark:text-blue-300'
+                                  : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                              }
+                            >
+                              {autoIdentifiedStudent.confidence === 'high' ? 'High confidence' 
+                                : autoIdentifiedStudent.confidence === 'medium' ? 'Verify match'
+                                : 'Manual select'}
+                            </Badge>
+                          </div>
                         </div>
                         {autoIdentifiedStudent.confidence !== 'high' && (
                           <div className="mt-2 pt-2 border-t border-dashed">
