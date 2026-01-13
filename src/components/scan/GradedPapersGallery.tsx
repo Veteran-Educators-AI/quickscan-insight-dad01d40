@@ -257,17 +257,7 @@ export function GradedPapersGallery({
                   {/* Score Card */}
                   <Card className={`${getGradeBgColor(calculateItemGrade(selectedItem))}`}>
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="text-center">
-                          <span className="text-xs text-muted-foreground block">Raw Score</span>
-                          <span className={`text-2xl font-bold ${getScoreTextColor(selectedItem.result.totalScore.percentage)}`}>
-                            {selectedItem.result.totalScore.earned}/{selectedItem.result.totalScore.possible}
-                          </span>
-                          <span className="text-sm text-muted-foreground ml-1">
-                            ({selectedItem.result.totalScore.percentage}%)
-                          </span>
-                        </div>
-                        <Separator orientation="vertical" className="h-12" />
+                      <div className="flex items-center justify-center gap-8">
                         <div className="text-center">
                           <span className="text-xs text-muted-foreground block">Grade</span>
                           <span className={`text-4xl font-bold ${getGradeColor(calculateItemGrade(selectedItem))}`}>
