@@ -241,30 +241,38 @@ SCORE 3 (Meeting Standards - Grade 80-89):
 - Work shows understanding of the core concepts
 - May have minor computational errors that don't affect the approach
 
-SCORE 2 (Approaching Standards - Grade 65-79):
+SCORE 2 (Approaching Standards - Grade 70-79):
 - Partial understanding demonstrated
 - Some correct mathematical procedures but with significant gaps
 - May reach incorrect conclusion due to errors in reasoning
 - Shows effort but incomplete mastery
 
-SCORE 1 (Partially Meeting Standards - Grade 55-64):
+SCORE 1 (Limited Understanding - Grade 65-69):
 - Minimal understanding of the mathematical concepts
 - Limited correct work shown
 - Major errors in approach or computation
 - Some relevant mathematical work attempted
+- ANY work that shows even limited understanding deserves at least 65
 
-SCORE 0 (Not Meeting Standards - Grade below 55):
-- No correct mathematical work
-- Completely incorrect approach
-- Blank or irrelevant response
-- No understanding demonstrated
+SCORE 0 (No Understanding Demonstrated - Grade 55):
+- ONLY assign this if there is absolutely NO correct mathematical work
+- Completely incorrect approach with no relevant work
+- Blank or completely irrelevant response
+- No understanding whatsoever demonstrated
+- This should be RARE - if the student attempted anything relevant, use Score 1 (65) instead
+
+CRITICAL GRADING RULES:
+- NEVER give a grade of 0 - the minimum is always 55
+- Work that shows ANY understanding (even limited) MUST receive at least 65
+- If a student made an honest attempt with some relevant work, minimum grade is 65
+- Reserve grades below 65 ONLY for blank/completely irrelevant responses
 
 GRADE CONVERSION (55-100 Scale):
 - Score 4 → 90-100 (Exceeding)
 - Score 3 → 80-89 (Meeting)
-- Score 2 → 65-79 (Approaching)
-- Score 1 → 55-64 (Partially Meeting)
-- Score 0 → 55 (absolute minimum - only if completely no understanding shown)
+- Score 2 → 70-79 (Approaching)
+- Score 1 → 65-69 (Limited Understanding - minimum for any real attempt)
+- Score 0 → 55 (absolute minimum - ONLY if completely no understanding shown)
 `;
 
     // Custom rubric context if provided
@@ -852,30 +860,49 @@ function parseAnalysisResult(text: string, rubricSteps?: any[]): ParsedResult {
   const standardsMetMatch = text.match(/Standards Met[:\s]*(YES|NO)/i);
   const standardsMet = standardsMetMatch ? standardsMetMatch[1].toUpperCase() === 'YES' : true;
   
+  // Check if student showed any understanding (any work attempted)
+  const hasAnyWork = result.ocrText.trim().length > 10 || 
+                     result.approachAnalysis.toLowerCase().includes('attempt') ||
+                     result.approachAnalysis.toLowerCase().includes('work') ||
+                     result.approachAnalysis.toLowerCase().includes('show') ||
+                     result.totalScore.earned > 0 ||
+                     result.regentsScore >= 1;
+  
   if (gradeMatch) {
     const parsedGrade = parseInt(gradeMatch[1]);
-    result.grade = Math.max(55, Math.min(100, parsedGrade));
+    // Enforce minimum of 65 if any work was shown, otherwise minimum 55
+    if (hasAnyWork) {
+      result.grade = Math.max(65, Math.min(100, parsedGrade));
+    } else {
+      result.grade = Math.max(55, Math.min(100, parsedGrade));
+    }
   } else if (result.regentsScore > 0) {
     // Convert Regents score to grade if no explicit grade given
+    // Updated: Score 1 = 65 (minimum for any understanding shown)
     const regentsToGrade: Record<number, number> = {
       4: 95,  // Exceeding
       3: 85,  // Meeting
-      2: 72,  // Approaching
-      1: 60,  // Partially meeting
-      0: 55,  // Not meeting
+      2: 75,  // Approaching
+      1: 65,  // Limited understanding (minimum for any real attempt)
+      0: 55,  // No understanding (only for blank/completely wrong)
     };
-    result.grade = regentsToGrade[result.regentsScore] || 55;
+    result.grade = regentsToGrade[result.regentsScore] || (hasAnyWork ? 65 : 55);
   } else if (result.totalScore.percentage > 0) {
-    // Fallback: convert percentage to 55-100 scale
-    const baseGrade = result.totalScore.percentage > 0 ? 60 : 55;
-    result.grade = Math.round(baseGrade + (result.totalScore.percentage / 100) * (100 - baseGrade));
+    // Fallback: convert percentage to 65-100 scale (never below 65 if points earned)
+    result.grade = Math.max(65, Math.round(65 + (result.totalScore.percentage / 100) * 35));
+  } else if (hasAnyWork) {
+    // If any work was shown but no score parsed, minimum is 65
+    result.grade = 65;
   }
 
-  // Ensure minimum grade of 55 unless standards explicitly not met
-  if (!standardsMet && result.grade < 60) {
+  // Final safeguard: ensure minimum grade rules are enforced
+  // Work showing any understanding = minimum 65
+  // Only completely blank/irrelevant = 55
+  if (hasAnyWork && result.grade < 65) {
+    result.grade = 65;
+  }
+  if (result.grade < 55) {
     result.grade = 55;
-  } else if (standardsMet && result.grade < 60) {
-    result.grade = 60; // At least partially meeting if any standards met
   }
 
   // Parse grade justification

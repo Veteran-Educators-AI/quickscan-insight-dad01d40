@@ -109,13 +109,14 @@ export function StudentWorkDetailDialog({
     return 'None';
   };
 
-  // Calculate grade with minimum 55
+  // Calculate grade with minimum 65 for any work showing understanding
   const hasAnyPoints = result.totalScore.earned > 0;
-  const baseGrade = hasAnyPoints ? 60 : 55;
+  const hasAnyWork = result.ocrText?.trim().length > 10 || hasAnyPoints;
+  const minGrade = hasAnyWork ? 65 : 55;
   const calculatedGrade = hasAnyPoints 
-    ? Math.round(baseGrade + (result.totalScore.percentage / 100) * (100 - baseGrade))
-    : 55;
-  const grade = result.grade ?? calculatedGrade;
+    ? Math.max(minGrade, Math.round(65 + (result.totalScore.percentage / 100) * 35))
+    : minGrade;
+  const grade = result.grade ? Math.max(minGrade, result.grade) : calculatedGrade;
 
   return (
     <>

@@ -123,14 +123,18 @@ export function AnalysisResults({
     onGradeOverride?.(newGrade, newJustification);
   };
 
-  // Calculate grade with minimum 55, but only 55 if no points earned
+  // Calculate grade with minimum 65 for any work showing understanding, 55 absolute minimum
   const hasAnyPoints = result.totalScore.earned > 0;
-  const baseGrade = hasAnyPoints ? 60 : 55;
+  const hasAnyWork = result.ocrText?.trim().length > 10 || hasAnyPoints;
+  
+  // If work shows any understanding, minimum grade is 65
+  // Only completely blank/irrelevant work gets 55
+  const minGrade = hasAnyWork ? 65 : 55;
   const calculatedGrade = hasAnyPoints 
-    ? Math.round(baseGrade + (result.totalScore.percentage / 100) * (100 - baseGrade))
-    : 55;
+    ? Math.max(minGrade, Math.round(65 + (result.totalScore.percentage / 100) * 35))
+    : minGrade;
   const aiGrade = result.grade ?? calculatedGrade;
-  const grade = overriddenGrade?.grade ?? aiGrade;
+  const grade = overriddenGrade?.grade ?? Math.max(minGrade, aiGrade);
   const gradeJustification = overriddenGrade?.justification ?? result.gradeJustification;
   const isOverridden = overriddenGrade !== null;
   const gradeBadge = getGradeBadge(grade);
