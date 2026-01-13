@@ -676,6 +676,42 @@ export type Database = {
           },
         ]
       }
+      nycologic_presentations: {
+        Row: {
+          created_at: string
+          id: string
+          is_favorite: boolean
+          slides: Json
+          subtitle: string | null
+          teacher_id: string
+          title: string
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_favorite?: boolean
+          slides?: Json
+          subtitle?: string | null
+          teacher_id: string
+          title: string
+          topic: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_favorite?: boolean
+          slides?: Json
+          subtitle?: string | null
+          teacher_id?: string
+          title?: string
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pending_scans: {
         Row: {
           class_id: string | null
