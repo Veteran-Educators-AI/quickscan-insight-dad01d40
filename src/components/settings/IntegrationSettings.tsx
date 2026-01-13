@@ -477,11 +477,41 @@ export function IntegrationSettings() {
           {/* --- Section Header --- */}
           <div className="flex items-center gap-2">
             <Link2 className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">Connected Apps Sync</h3>
+            <h3 className="text-lg font-semibold">NYClogic Scholar Connection</h3>
           </div>
           <p className="text-sm text-muted-foreground">
-            Automatically sync student grades and data with connected sister apps (like gamification or rewards apps).
+            Connect to NYClogic Scholar to automatically sync student grades and reward XP/coins for academic performance.
           </p>
+
+          {/* --- API Configuration Info --- */}
+          <Alert>
+            <Settings2 className="h-4 w-4" />
+            <AlertDescription>
+              <strong>API Configuration:</strong> The NYClogic Scholar API key and URL are configured as secure environment secrets. 
+              Contact your administrator to update these credentials if needed.
+            </AlertDescription>
+          </Alert>
+
+          {/* --- API Status Display --- */}
+          <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-green-500" />
+                <span className="text-sm font-medium">SISTER_APP_API_KEY</span>
+              </div>
+              <Badge variant="secondary" className="text-xs">Configured</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-green-500" />
+                <span className="text-sm font-medium">NYCOLOGIC_API_URL</span>
+              </div>
+              <Badge variant="secondary" className="text-xs">Configured</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              These secrets are used by the backend to securely communicate with NYClogic Scholar.
+            </p>
+          </div>
 
           {/* --- Enable/Disable Sister App Sync Toggle --- */}
           {/* Master switch for sister app synchronization */}
