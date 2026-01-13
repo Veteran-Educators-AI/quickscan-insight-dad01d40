@@ -209,6 +209,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     questions: Record<string, { warmUp: GeneratedQuestion[], main: GeneratedQuestion[] }>;
   } | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  
+  // Selective regeneration state
+  const [regeneratingKey, setRegeneratingKey] = useState<string | null>(null);
+  const [selectedRegenerateKeys, setSelectedRegenerateKeys] = useState<Set<string>>(new Set());
 
   // Load presets from localStorage on mount
   useEffect(() => {
@@ -920,7 +924,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       for (const form of formsToGenerate) {
         for (const level of levelsWithStudents) {
           const cacheKey = `${form}-${level}`;
-          setGenerationStatus(`Generating Form ${form} questions for Level ${level}...`);
+          setGenerationStatus(`Generating Form ${form} questions for Level ${level}${includeGeometry ? ' with shapes' : ''}...`);
 
           let warmUpQuestions: GeneratedQuestion[] = [];
           if (parseInt(warmUpCount) > 0) {
@@ -942,6 +946,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 formVariation: form,
                 formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
                 includeHints,
+                includeGeometry,
+                useAIImages,
               },
             });
             warmUpQuestions = warmUpData?.questions || [];
@@ -969,6 +975,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               formVariation: form,
               formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
               includeHints,
+              includeGeometry,
+              useAIImages,
             },
           });
 
@@ -1000,6 +1008,119 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     }
   };
 
+  // Regenerate specific form/level combinations
+  const regenerateSelectedQuestions = async (keysToRegenerate?: string[]) => {
+    if (!previewData) return;
+    
+    const keys = keysToRegenerate || Array.from(selectedRegenerateKeys);
+    if (keys.length === 0) {
+      toast({
+        title: 'No worksheets selected',
+        description: 'Please select at least one form/level to regenerate.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerationProgress(0);
+    
+    try {
+      const newQuestions = { ...previewData.questions };
+      let completed = 0;
+      
+      for (const key of keys) {
+        const [form, level] = key.split('-');
+        setRegeneratingKey(key);
+        setGenerationStatus(`Regenerating Form ${form} Level ${level}${includeGeometry ? ' with shapes' : ''}...`);
+
+        let warmUpQuestions: GeneratedQuestion[] = [];
+        if (parseInt(warmUpCount) > 0) {
+          const warmUpTopicsPayload = selectedTopics.length > 0
+            ? selectedTopics.map(t => ({
+                topicName: t,
+                standard: customTopics.find(ct => ct.topicName === t)?.standard || '',
+                subject: 'Mathematics',
+                category: 'Warm-Up',
+              }))
+            : [{ topicName: 'General Math', standard: '', subject: 'Mathematics', category: 'Warm-Up' }];
+
+          const { data: warmUpData } = await supabase.functions.invoke('generate-worksheet-questions', {
+            body: {
+              topics: warmUpTopicsPayload,
+              questionCount: parseInt(warmUpCount),
+              difficultyLevels: [warmUpDifficulty],
+              worksheetMode: 'warmup',
+              formVariation: form,
+              formSeed: Date.now() + form.charCodeAt(0) * 1000 + level.charCodeAt(0), // New seed for variation
+              includeHints,
+              includeGeometry,
+              useAIImages,
+            },
+          });
+          warmUpQuestions = warmUpData?.questions || [];
+        }
+
+        const mainTopicsPayload = selectedTopics.length > 0
+          ? selectedTopics.map(t => ({
+              topicName: t,
+              standard: customTopics.find(ct => ct.topicName === t)?.standard || '',
+              subject: 'Mathematics',
+              category: 'Differentiated Practice',
+            }))
+          : [{ topicName: 'General Math', standard: '', subject: 'Mathematics', category: 'Differentiated Practice' }];
+
+        const { data } = await supabase.functions.invoke('generate-worksheet-questions', {
+          body: {
+            topics: mainTopicsPayload,
+            questionCount: parseInt(questionCount),
+            difficultyLevels: level === 'A' || level === 'B'
+              ? ['hard', 'challenging']
+              : level === 'C' || level === 'D'
+              ? ['medium', 'hard']
+              : ['easy', 'super-easy', 'medium'],
+            worksheetMode: 'diagnostic',
+            formVariation: form,
+            formSeed: Date.now() + form.charCodeAt(0) * 1000 + level.charCodeAt(0), // New seed for variation
+            includeHints,
+            includeGeometry,
+            useAIImages,
+          },
+        });
+
+        newQuestions[key] = {
+          warmUp: warmUpQuestions,
+          main: data?.questions || [],
+        };
+
+        completed++;
+        setGenerationProgress((completed / keys.length) * 100);
+      }
+
+      setPreviewData({
+        ...previewData,
+        questions: newQuestions,
+      });
+      
+      setSelectedRegenerateKeys(new Set());
+      toast({
+        title: 'Worksheets regenerated',
+        description: `Successfully regenerated ${keys.length} form/level combination${keys.length !== 1 ? 's' : ''}.`,
+      });
+    } catch (error) {
+      console.error('Error regenerating questions:', error);
+      toast({
+        title: 'Regeneration failed',
+        description: 'Could not regenerate questions.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+      setGenerationProgress(0);
+      setRegeneratingKey(null);
+    }
+  };
+
   // Render preview worksheet for a student
   const renderStudentPreview = (student: StudentWithDiagnostic, index: number) => {
     if (!previewData) return null;
@@ -1021,10 +1142,13 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
     const topicsLabel = selectedTopics.length > 0 ? selectedTopics.join(', ') : 'Math Practice';
 
+    const isSelected = selectedRegenerateKeys.has(cacheKey);
+    const isRegenerating = regeneratingKey === cacheKey;
+
     return (
       <div
         key={student.id}
-        className="bg-white border rounded-lg shadow-sm mb-4"
+        className={`bg-white border rounded-lg shadow-sm mb-4 relative ${isSelected ? 'ring-2 ring-purple-500' : ''} ${isRegenerating ? 'opacity-50' : ''}`}
         style={{
           width: '8.5in',
           minHeight: '11in',
@@ -1032,9 +1156,54 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           pageBreakAfter: 'always',
         }}
       >
+        {/* Regenerate selection checkbox */}
+        <div className="absolute top-2 left-2 z-10 flex items-center gap-2">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={(checked) => {
+              const newSet = new Set(selectedRegenerateKeys);
+              if (checked) {
+                newSet.add(cacheKey);
+              } else {
+                newSet.delete(cacheKey);
+              }
+              setSelectedRegenerateKeys(newSet);
+            }}
+            disabled={isGenerating}
+          />
+          <span className="text-xs text-muted-foreground">Select to regenerate</span>
+        </div>
+
+        {/* Quick regenerate button */}
+        <div className="absolute top-2 right-2 z-10">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => regenerateSelectedQuestions([cacheKey])}
+                  disabled={isGenerating}
+                  className="h-8"
+                >
+                  {isRegenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  <span className="ml-1">Regenerate</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Generate new questions for Form {assignedForm} Level {student.recommendedLevel}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
         {/* Header */}
         <div
-          className={`rounded-lg p-3 mb-4 ${
+          className={`rounded-lg p-3 mb-4 mt-8 ${
             student.recommendedLevel === 'A' ? 'bg-green-100' :
             student.recommendedLevel === 'B' ? 'bg-emerald-100' :
             student.recommendedLevel === 'C' ? 'bg-yellow-100' :
@@ -1073,6 +1242,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               {questions.warmUp.map((q, idx) => (
                 <div key={idx} className="p-2 border rounded bg-gray-50">
                   <p className="text-sm font-medium">W{idx + 1}. {q.question}</p>
+                  {/* Show geometry shapes in preview */}
+                  {(q.imageUrl || q.svg) && includeGeometry && (
+                    <div className="mt-2 flex justify-center">
+                      <img 
+                        src={q.imageUrl || q.svg} 
+                        alt="Geometry diagram" 
+                        className="max-w-[150px] max-h-[150px] border rounded"
+                      />
+                    </div>
+                  )}
                   {q.hint && includeHints && (
                     <p className="text-xs text-muted-foreground mt-1 italic">Hint: {q.hint}</p>
                   )}
@@ -1092,6 +1271,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               {questions.main.map((q, idx) => (
                 <div key={idx} className="p-3 border rounded">
                   <p className="text-sm font-medium">{idx + 1}. {q.question}</p>
+                  {/* Show geometry shapes in preview */}
+                  {(q.imageUrl || q.svg) && includeGeometry && (
+                    <div className="mt-2 flex justify-center">
+                      <img 
+                        src={q.imageUrl || q.svg} 
+                        alt="Geometry diagram" 
+                        className="max-w-[180px] max-h-[180px] border rounded"
+                      />
+                    </div>
+                  )}
                   {q.hint && includeHints && (
                     <p className="text-xs text-muted-foreground mt-1 italic">Hint: {q.hint}</p>
                   )}
@@ -1746,17 +1935,56 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
       {/* Preview Modal */}
       {showPreview && previewData && (
-        <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <Dialog open={showPreview} onOpenChange={(open) => {
+          if (!open) {
+            setSelectedRegenerateKeys(new Set());
+          }
+          setShowPreview(open);
+        }}>
           <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col p-0">
             {/* Preview Header */}
-            <div className="flex items-center justify-between p-4 border-b bg-muted/50">
+            <div className="flex items-center justify-between p-4 border-b bg-muted/50 flex-wrap gap-2">
               <div className="flex items-center gap-4">
                 <h2 className="text-lg font-semibold">Print Preview</h2>
                 <Badge variant="secondary">
                   {previewData.students.length} worksheet{previewData.students.length !== 1 ? 's' : ''}
                 </Badge>
+                <Badge variant="outline">
+                  {Object.keys(previewData.questions).length} unique form/level combinations
+                </Badge>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Batch regenerate controls */}
+                {selectedRegenerateKeys.size > 0 && (
+                  <>
+                    <Badge variant="default" className="bg-purple-600">
+                      {selectedRegenerateKeys.size} selected
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedRegenerateKeys(new Set())}
+                      disabled={isGenerating}
+                    >
+                      Clear
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => regenerateSelectedQuestions()}
+                      disabled={isGenerating}
+                      className="bg-amber-600 hover:bg-amber-700"
+                    >
+                      {isGenerating ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 mr-1" />
+                      )}
+                      Regenerate Selected
+                    </Button>
+                    <Separator orientation="vertical" className="h-6" />
+                  </>
+                )}
+                
                 {/* Zoom controls */}
                 <Button
                   variant="outline"
@@ -1779,7 +2007,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowPreview(false)}
+                  onClick={() => {
+                    setSelectedRegenerateKeys(new Set());
+                    setShowPreview(false);
+                  }}
                 >
                   <X className="h-4 w-4 mr-1" />
                   Close
@@ -1791,12 +2022,24 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                     setShowPreview(false);
                     generateDifferentiatedWorksheets();
                   }}
+                  disabled={isGenerating}
                 >
                   <Printer className="h-4 w-4 mr-1" />
                   Generate PDF
                 </Button>
               </div>
             </div>
+
+            {/* Regeneration progress */}
+            {isGenerating && regeneratingKey && (
+              <div className="px-4 py-2 bg-amber-50 border-b border-amber-200">
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="text-amber-700">{generationStatus}</span>
+                  <span className="font-medium text-amber-900">{Math.round(generationProgress)}%</span>
+                </div>
+                <Progress value={generationProgress} className="h-2" />
+              </div>
+            )}
 
             {/* Preview Content */}
             <ScrollArea className="flex-1 p-4 bg-gray-200">
