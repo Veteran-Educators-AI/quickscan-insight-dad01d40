@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { 
   Loader2, Library, Search, Star, StarOff, Trash2, FileType, 
-  Download, Calendar, Clock, BookOpen, Filter, Send
+  Download, Calendar, Clock, BookOpen, Filter, Send, Sparkles
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +18,7 @@ import jsPDF from 'jspdf';
 import pptxgen from 'pptxgenjs';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { format } from 'date-fns';
+import { NycologicPresentationBuilder } from '@/components/presentation/NycologicPresentationBuilder';
 
 interface LessonSlide {
   slideNumber: number;
@@ -64,6 +65,7 @@ export function LessonPlanLibrary({ open, onOpenChange, onSelectPlan }: LessonPl
   const [filterFavorites, setFilterFavorites] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<SavedLessonPlan | null>(null);
   const [isPushingToSisterApp, setIsPushingToSisterApp] = useState(false);
+  const [showNycologicBuilder, setShowNycologicBuilder] = useState(false);
 
   useEffect(() => {
     if (open && user) {
@@ -554,6 +556,13 @@ export function LessonPlanLibrary({ open, onOpenChange, onSelectPlan }: LessonPl
                     PDF
                   </Button>
                   <Button
+                    onClick={() => setShowNycologicBuilder(true)}
+                    className="flex-1 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Nycologic
+                  </Button>
+                  <Button
                     onClick={() => pushToSisterApps(selectedPlan)}
                     disabled={isPushingToSisterApp || !selectedPlan.class_id}
                     variant="secondary"
@@ -578,6 +587,17 @@ export function LessonPlanLibrary({ open, onOpenChange, onSelectPlan }: LessonPl
                     </Button>
                   )}
                 </div>
+
+                {/* Nycologic Presentation Builder */}
+                <NycologicPresentationBuilder
+                  open={showNycologicBuilder}
+                  onOpenChange={setShowNycologicBuilder}
+                  topic={{
+                    topicName: selectedPlan.topic_name,
+                    standard: selectedPlan.standard,
+                    subject: selectedPlan.subject || undefined,
+                  }}
+                />
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center text-muted-foreground">

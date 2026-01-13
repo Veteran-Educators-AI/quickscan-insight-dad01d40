@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -73,7 +73,7 @@ export default function Scan() {
   const [showStudentPicker, setShowStudentPicker] = useState(false);
   const { students: singleScanStudents } = useClassStudents(singleScanClassId);
 
-  const { analyze, compareWithSolution, isAnalyzing, isComparing, error, result, rawAnalysis, comparisonResult } = useAnalyzeStudentWork();
+  const { analyze, compareWithSolution, cancelAnalysis, isAnalyzing, isComparing, error, result, rawAnalysis, comparisonResult } = useAnalyzeStudentWork();
   const batch = useBatchAnalysis();
   const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans();
   const { saveResults, saveMultiQuestionResults, isSaving, syncStatus, resetSyncStatus } = useSaveAnalysisResults();
@@ -1083,10 +1083,25 @@ export default function Scan() {
                   {isAnalyzing ? (
                     <Card>
                       <CardContent className="p-8">
-                        <div className="text-center">
-                          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
-                          <p className="font-medium">Analyzing with AI...</p>
-                          <p className="text-sm text-muted-foreground">Running OCR and auto-grading</p>
+                        <div className="text-center space-y-4">
+                          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+                          <div>
+                            <p className="font-medium">Analyzing with AI...</p>
+                            <p className="text-sm text-muted-foreground">Running OCR and auto-grading</p>
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              cancelAnalysis();
+                              toast.info('Analysis cancelled');
+                              setScanState('choose-method');
+                            }}
+                            className="gap-2"
+                          >
+                            <XCircle className="h-4 w-4" />
+                            Cancel Analysis
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
