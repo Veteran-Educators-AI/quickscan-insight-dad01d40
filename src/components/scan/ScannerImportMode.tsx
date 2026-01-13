@@ -2,7 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { 
   Upload, Loader2, RotateCcw, RotateCw, ArrowUp, ArrowDown, 
   Trash2, Check, Layers, FileImage, Wand2, GripVertical,
-  ZoomIn, ZoomOut, Eye, FolderOpen, RefreshCw, Settings2, Cloud
+  ZoomIn, ZoomOut, Eye, FolderOpen, RefreshCw, Settings2, Cloud,
+  Zap, Pause, Play
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +18,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { resizeImage, blobToBase64, applyPhotocopyFilter } from '@/lib/imageUtils';
 import { GoogleDriveImport } from './GoogleDriveImport';
+import { GoogleDriveAutoSyncConfig } from './GoogleDriveAutoSyncConfig';
+import { useGoogleDriveAutoSync, SyncedFile } from '@/hooks/useGoogleDriveAutoSync';
 
 interface ScanPage {
   id: string;
@@ -183,6 +186,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [driveImportOpen, setDriveImportOpen] = useState(false);
+  const [autoSyncConfigOpen, setAutoSyncConfigOpen] = useState(false);
   const [settings, setSettings] = useState({
     autoRotate: true,
     applyPhotocopyFilter: true,
@@ -194,13 +198,26 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const [folderHandle, setFolderHandle] = useState<FileSystemDirectoryHandle | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Google Drive Auto-Sync
+  const {
+    config: autoSyncConfig,
+    isSyncing,
+    lastSyncTime,
+    configureSync,
+    startAutoSync,
+    stopAutoSync,
+    disableSync,
+    manualSync,
+    isAutoSyncActive,
+  } = useGoogleDriveAutoSync();
 
   // Check if File System Access API is available
   useEffect(() => {
     setFolderWatchSupported('showDirectoryPicker' in window);
   }, []);
 
-  const processImage = async (
+  const processImage = useCallback(async (
     file: File,
     index: number,
     total: number
@@ -245,7 +262,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
       isProcessing: false,
       detectedOrientation,
     };
-  };
+  }, [settings.applyPhotocopyFilter, settings.autoRotate]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -483,6 +500,70 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
     }
   };
 
+  // Handle auto-synced files from Google Drive
+  const handleAutoSyncFiles = useCallback(async (syncedFiles: SyncedFile[]) => {
+    if (syncedFiles.length === 0) return;
+    
+    setIsProcessing(true);
+    setProcessProgress(0);
+    
+    toast.info(`Auto-importing ${syncedFiles.length} new scans from Drive...`);
+    
+    try {
+      const newPages: ScanPage[] = [];
+      
+      // Sort by name
+      const sortedFiles = settings.autoOrder 
+        ? [...syncedFiles].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+        : syncedFiles;
+      
+      for (let i = 0; i < sortedFiles.length; i++) {
+        const { blob, name } = sortedFiles[i];
+        const file = new File([blob], name, { type: blob.type });
+        const page = await processImage(file, i, sortedFiles.length);
+        newPages.push(page);
+      }
+      
+      setPages(prev => {
+        const existingCount = prev.length;
+        return [
+          ...prev,
+          ...newPages.map((p, i) => ({ ...p, order: existingCount + i + 1 }))
+        ];
+      });
+      
+      const autoRotatedCount = newPages.filter(p => p.autoRotated).length;
+      toast.success(`Auto-imported ${newPages.length} pages${autoRotatedCount > 0 ? ` (${autoRotatedCount} auto-rotated)` : ''}`);
+    } catch (error) {
+      console.error('Error processing auto-sync files:', error);
+      toast.error('Error processing auto-synced files');
+    } finally {
+      setIsProcessing(false);
+      setProcessProgress(0);
+    }
+  }, [settings.autoOrder, processImage]);
+
+  // Handle auto-sync folder configuration
+  const handleConfigureAutoSync = (folderId: string, folderName: string, intervalSeconds: number) => {
+    configureSync(folderId, folderName, intervalSeconds);
+    setAutoSyncConfigOpen(false);
+    // Start auto-sync with the callback
+    setTimeout(() => {
+      startAutoSync(handleAutoSyncFiles);
+    }, 100);
+  };
+
+  // Toggle auto-sync on/off
+  const handleToggleAutoSync = () => {
+    if (isAutoSyncActive) {
+      stopAutoSync();
+    } else if (autoSyncConfig?.enabled) {
+      startAutoSync(handleAutoSyncFiles);
+    } else {
+      setAutoSyncConfigOpen(true);
+    }
+  };
+
   const handleConfirmPages = () => {
     if (pages.length === 0) {
       toast.error('No pages to process');
@@ -581,6 +662,34 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               <Cloud className="h-4 w-4 mr-2" />
               Google Drive
             </Button>
+
+            {/* Auto-Sync Button */}
+            {autoSyncConfig?.folderId ? (
+              <Button
+                variant={isAutoSyncActive ? "default" : "outline"}
+                onClick={handleToggleAutoSync}
+                disabled={isProcessing || isSyncing}
+                className={cn(isAutoSyncActive && "bg-green-600 hover:bg-green-700")}
+              >
+                {isSyncing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : isAutoSyncActive ? (
+                  <Pause className="h-4 w-4 mr-2" />
+                ) : (
+                  <Play className="h-4 w-4 mr-2" />
+                )}
+                {isAutoSyncActive ? 'Syncing...' : 'Start Sync'}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => setAutoSyncConfigOpen(true)}
+                disabled={isProcessing}
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Auto-Sync
+              </Button>
+            )}
             
             {folderWatchSupported && (
               <>
@@ -614,6 +723,43 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               </>
             )}
           </div>
+
+          {/* Auto-Sync Status */}
+          {autoSyncConfig?.folderId && (
+            <div className={cn(
+              "flex items-center justify-between text-sm p-2 rounded",
+              isAutoSyncActive ? "bg-green-500/10" : "bg-muted/50"
+            )}>
+              <div className="flex items-center gap-2">
+                <Zap className={cn("h-4 w-4", isAutoSyncActive ? "text-green-600" : "text-muted-foreground")} />
+                <span>
+                  Auto-sync: <strong>{autoSyncConfig.folderName}</strong>
+                  {lastSyncTime && (
+                    <span className="text-muted-foreground ml-2">
+                      (Last: {lastSyncTime.toLocaleTimeString()})
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={manualSync}
+                  disabled={isSyncing}
+                >
+                  <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAutoSyncConfigOpen(true)}
+                >
+                  <Settings2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
 
           {watchingFolder && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground bg-green-500/10 p-2 rounded">
@@ -860,6 +1006,26 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
           <GoogleDriveImport 
             onFilesSelected={handleDriveFilesImported}
             onClose={() => setDriveImportOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Google Drive Auto-Sync Config Dialog */}
+      <Dialog open={autoSyncConfigOpen} onOpenChange={setAutoSyncConfigOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Configure Auto-Sync
+            </DialogTitle>
+            <DialogDescription>
+              Select a Google Drive folder to automatically import new scans
+            </DialogDescription>
+          </DialogHeader>
+          <GoogleDriveAutoSyncConfig
+            onFolderSelected={handleConfigureAutoSync}
+            onClose={() => setAutoSyncConfigOpen(false)}
+            currentFolderId={autoSyncConfig?.folderId}
           />
         </DialogContent>
       </Dialog>
