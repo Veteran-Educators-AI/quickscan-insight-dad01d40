@@ -182,22 +182,6 @@ export function AnalysisResults({
                 {gradeBadge.label}
               </Badge>
             </div>
-
-            {/* Raw Score */}
-            <div className="flex flex-col items-center">
-              <span className="text-xs font-medium text-muted-foreground mb-1">Raw Score</span>
-              <div className="w-16 h-16 rounded-full border-4 border-muted flex items-center justify-center">
-                <div className="text-center">
-                  <span className={`text-lg font-bold ${getScoreColor(result.totalScore.percentage)}`}>
-                    {result.totalScore.earned}
-                  </span>
-                  <span className="text-xs text-muted-foreground">/{result.totalScore.possible}</span>
-                </div>
-              </div>
-              <span className={`text-xs font-medium mt-1 ${getScoreColor(result.totalScore.percentage)}`}>
-                {result.totalScore.percentage}%
-              </span>
-            </div>
           </div>
 
           {/* NYS Standard Badge */}
