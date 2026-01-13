@@ -29,68 +29,80 @@ export function useQRCodeScanner() {
     try {
       const img = new Image();
       
-      const result = await new Promise<QRScanResult | null>((resolve) => {
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          
-          if (!ctx) {
-            resolve(null);
-            return;
-          }
-
-          ctx.drawImage(img, 0, 0);
-          
-          // Try scanning different regions of the image
-          // QR codes are typically in corners or along edges
-          const regions = [
-            // Top-left corner (where student QR typically is)
-            { x: 0, y: 0, w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
-            // Top-right corner
-            { x: Math.max(0, img.width - 300), y: 0, w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
-            // Bottom-left corner
-            { x: 0, y: Math.max(0, img.height - 300), w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
-            // Left edge (for worksheet question QRs)
-            { x: 0, y: 0, w: Math.min(150, img.width / 4), h: img.height },
-            // Full image (fallback)
-            { x: 0, y: 0, w: img.width, h: img.height },
-          ];
-
-          for (const region of regions) {
-            const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
-            const code = jsQR(imageData.data, region.w, region.h);
+      // Add a timeout to prevent blocking the UI - QR scan should be fast
+      const timeoutMs = 3000; // 3 second max
+      
+      const result = await Promise.race([
+        new Promise<QRScanResult | null>((resolve) => {
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
             
-            if (code) {
-              // Try the new unified parser first (handles both v1 and v2)
-              const parsed = parseAnyStudentQRCode(code.data);
-              if (parsed) {
-                resolve(parsed);
-                return;
-              }
+            if (!ctx) {
+              resolve(null);
+              return;
+            }
+
+            ctx.drawImage(img, 0, 0);
+            
+            // Try scanning different regions of the image
+            // QR codes are typically in corners or along edges
+            const regions = [
+              // Top-left corner (where student QR typically is)
+              { x: 0, y: 0, w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
+              // Top-right corner
+              { x: Math.max(0, img.width - 300), y: 0, w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
+              // Bottom-left corner
+              { x: 0, y: Math.max(0, img.height - 300), w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
+              // Left edge (for worksheet question QRs)
+              { x: 0, y: 0, w: Math.min(150, img.width / 4), h: img.height },
+              // Full image (fallback)
+              { x: 0, y: 0, w: img.width, h: img.height },
+            ];
+
+            for (const region of regions) {
+              const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
+              const code = jsQR(imageData.data, region.w, region.h);
               
-              // Fallback to legacy parser for old v1 codes
-              const legacyParsed = parseStudentQRCode(code.data);
-              if (legacyParsed) {
-                resolve({
-                  ...legacyParsed,
-                  type: 'student-question',
-                });
-                return;
+              if (code) {
+                // Try the new unified parser first (handles both v1 and v2)
+                const parsed = parseAnyStudentQRCode(code.data);
+                if (parsed) {
+                  resolve(parsed);
+                  return;
+                }
+                
+                // Fallback to legacy parser for old v1 codes
+                const legacyParsed = parseStudentQRCode(code.data);
+                if (legacyParsed) {
+                  resolve({
+                    ...legacyParsed,
+                    type: 'student-question',
+                  });
+                  return;
+                }
               }
             }
-          }
 
-          resolve(null);
-        };
+            resolve(null);
+          };
 
-        img.onerror = () => {
-          resolve(null);
-        };
+          img.onerror = () => {
+            resolve(null);
+          };
 
-        img.src = imageDataUrl;
-      });
+          img.src = imageDataUrl;
+        }),
+        // Timeout promise - return null after timeout (no QR found quickly)
+        new Promise<null>((resolve) => {
+          setTimeout(() => {
+            console.log('QR scan timed out - proceeding without QR');
+            resolve(null);
+          }, timeoutMs);
+        }),
+      ]);
 
       setScanResult(result);
       return result;

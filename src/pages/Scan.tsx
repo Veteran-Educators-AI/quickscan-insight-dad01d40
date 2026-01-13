@@ -166,8 +166,10 @@ export default function Scan() {
       setCapturedImage(null);
       setAutoIdentifiedStudent(null);
       
-      // Try to detect QR code first (fast local scan)
-      toast.info('Scanning for QR codes...');
+      // Move to choose-method state immediately so user can see their image
+      setScanState('choose-method');
+      
+      // Try to detect QR code in the background (fast local scan with timeout)
       const qrResult = await scanImageForQR(finalImageDataUrl);
       
       if (qrResult) {
@@ -185,16 +187,11 @@ export default function Scan() {
             icon: <QrCode className="h-4 w-4" />,
           });
         }
-        setScanState('choose-method');
       } else {
         setDetectedQR(null);
         
         // No QR code found - try learned corrections first, then AI-based name recognition
         if (singleScanClassId && singleScanStudents.length > 0) {
-          toast.info('Identifying student from handwritten name...', {
-            icon: <UserCheck className="h-4 w-4" />,
-          });
-          
           const identResult = await identifyStudent(finalImageDataUrl, singleScanStudents);
           
           // Check if we have a learned correction for this handwritten name
@@ -235,9 +232,6 @@ export default function Scan() {
             });
           }
         }
-        
-        setScanState('choose-method');
-        toast.success('Image uploaded! Choose analysis method.');
       }
     }
   }, [scanMode, batch, selectedClassId, singleScanClassId, students, singleScanStudents, scanImageForQR, identifyStudent, findLearnedMatch]);
