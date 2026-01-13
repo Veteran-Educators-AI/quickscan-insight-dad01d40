@@ -831,7 +831,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     totalScore: { earned: 0, possible: 0, percentage: 0 },
     regentsScore: 0,
     regentsScoreJustification: '',
-    grade: gradeFloor, // Use teacher's configured floor
+    grade: gradeFloorWithEffort, // Default to effort floor - most scans have SOME work
     gradeJustification: '',
     feedback: '',
   };
@@ -881,50 +881,66 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   const standardsMetMatch = text.match(/Standards Met[:\s]*(YES|NO)/i);
   const standardsMet = standardsMetMatch ? standardsMetMatch[1].toUpperCase() === 'YES' : true;
   
-  // Check if student showed any understanding (any work attempted)
-  const hasAnyWork = result.ocrText.trim().length > 10 || 
+  // VERY lenient check for any work - if we're analyzing an image, assume there's work
+  // unless the text explicitly indicates blank/no work
+  const textLower = text.toLowerCase();
+  const explicitlyBlank = textLower.includes('blank response') || 
+                          textLower.includes('no work shown') ||
+                          textLower.includes('completely empty') ||
+                          textLower.includes('no mathematical work') ||
+                          textLower.includes('nothing written') ||
+                          (textLower.includes('no understanding') && result.regentsScore === 0);
+  
+  // If the AI is analyzing student work, they almost always have SOME work
+  // Only mark as no work if explicitly stated as blank
+  const hasAnyWork = !explicitlyBlank || 
+                     result.ocrText.trim().length > 5 || 
                      result.approachAnalysis.toLowerCase().includes('attempt') ||
                      result.approachAnalysis.toLowerCase().includes('work') ||
                      result.approachAnalysis.toLowerCase().includes('show') ||
+                     result.approachAnalysis.toLowerCase().includes('wrote') ||
+                     result.approachAnalysis.toLowerCase().includes('student') ||
                      result.totalScore.earned > 0 ||
                      result.regentsScore >= 1;
   
   if (gradeMatch) {
     const parsedGrade = parseInt(gradeMatch[1]);
-    // Enforce minimum using teacher's configured grade floors
-    if (hasAnyWork) {
-      result.grade = Math.max(gradeFloorWithEffort, Math.min(100, parsedGrade));
+    // CRITICAL: Never allow grade of 0 - enforce minimum floors
+    if (parsedGrade === 0 || parsedGrade < gradeFloor) {
+      // If AI returned 0 or below floor, apply appropriate floor
+      result.grade = hasAnyWork ? gradeFloorWithEffort : gradeFloor;
+    } else if (hasAnyWork && parsedGrade < gradeFloorWithEffort) {
+      // Has work but grade below effort floor - bump up
+      result.grade = gradeFloorWithEffort;
     } else {
-      result.grade = Math.max(gradeFloor, Math.min(100, parsedGrade));
+      result.grade = Math.min(100, parsedGrade);
     }
-  } else if (result.regentsScore > 0) {
+  } else if (result.regentsScore >= 0) {
     // Convert Regents score to grade if no explicit grade given
     // Use teacher's configured floors for Score 1 and Score 0
     const regentsToGrade: Record<number, number> = {
       4: 95,  // Exceeding
       3: 85,  // Meeting
       2: 75,  // Approaching
-      1: Math.max(gradeFloorWithEffort, 65),  // Limited understanding (use configured floor)
-      0: gradeFloor,  // No understanding (use configured minimum)
+      1: Math.max(gradeFloorWithEffort, 67),  // Limited understanding - slightly above floor
+      0: hasAnyWork ? gradeFloorWithEffort : gradeFloor,  // Even score 0 with work gets effort floor
     };
-    result.grade = regentsToGrade[result.regentsScore] || (hasAnyWork ? gradeFloorWithEffort : gradeFloor);
+    result.grade = regentsToGrade[result.regentsScore] ?? (hasAnyWork ? gradeFloorWithEffort : gradeFloor);
   } else if (result.totalScore.percentage > 0) {
     // Fallback: convert percentage to grade scale above the effort floor
-    result.grade = Math.max(gradeFloorWithEffort, Math.round(gradeFloorWithEffort + (result.totalScore.percentage / 100) * (100 - gradeFloorWithEffort)));
+    const scaledGrade = Math.round(gradeFloorWithEffort + (result.totalScore.percentage / 100) * (100 - gradeFloorWithEffort));
+    result.grade = Math.max(gradeFloorWithEffort, scaledGrade);
   } else if (hasAnyWork) {
     // If any work was shown but no score parsed, use effort floor
     result.grade = gradeFloorWithEffort;
   }
 
-  // Final safeguard: ensure minimum grade rules are enforced using teacher's settings
-  // Work showing any understanding = use configured effort floor
-  // Only completely blank/irrelevant = use configured minimum floor
-  if (hasAnyWork && result.grade < gradeFloorWithEffort) {
-    result.grade = gradeFloorWithEffort;
+  // FINAL SAFEGUARD: Absolute enforcement of grade floors
+  // This catches any edge cases where the grade might still be too low
+  if (hasAnyWork) {
+    result.grade = Math.max(gradeFloorWithEffort, result.grade);
   }
-  if (result.grade < gradeFloor) {
-    result.grade = gradeFloor;
-  }
+  result.grade = Math.max(gradeFloor, result.grade);
 
   // Parse grade justification
   const justificationMatch = text.match(/Grade Justification[:\s]*([^]*?)(?=Feedback|$)/i);
