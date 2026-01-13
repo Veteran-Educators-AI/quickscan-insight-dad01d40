@@ -68,6 +68,7 @@ interface UseAnalyzeStudentWorkReturn {
     solutionImage: string,
     rubricSteps?: RubricStep[]
   ) => Promise<ComparisonResult | null>;
+  cancelAnalysis: () => void;
   isAnalyzing: boolean;
   isComparing: boolean;
   error: string | null;
@@ -85,6 +86,7 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
   const [rawAnalysis, setRawAnalysis] = useState<string | null>(null);
   const [customRubric, setCustomRubric] = useState<CustomRubric | null>(null);
+  const [isCancelled, setIsCancelled] = useState(false);
 
   // Load custom rubric from localStorage
   useEffect(() => {
@@ -97,6 +99,13 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
       }
     }
   }, []);
+
+  const cancelAnalysis = () => {
+    setIsCancelled(true);
+    setIsAnalyzing(false);
+    setIsComparing(false);
+    setError('Analysis cancelled');
+  };
 
   const analyze = async (
     imageDataUrl: string, 
@@ -112,6 +121,7 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
     setError(null);
     setResult(null);
     setRawAnalysis(null);
+    setIsCancelled(false);
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke('analyze-student-work', {
@@ -129,6 +139,11 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
         },
       });
 
+      // Check if cancelled before processing result
+      if (isCancelled) {
+        return null;
+      }
+
       if (fnError) {
         handleApiError(fnError, 'Analysis');
         return null;
@@ -140,6 +155,11 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
 
       if (!data?.success || !data?.analysis) {
         throw new Error('Invalid response from analysis');
+      }
+
+      // Check again if cancelled
+      if (isCancelled) {
+        return null;
       }
 
       setResult(data.analysis);
@@ -199,5 +219,5 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
     }
   };
 
-  return { analyze, compareWithSolution, isAnalyzing, isComparing, error, result, comparisonResult, rawAnalysis };
+  return { analyze, compareWithSolution, cancelAnalysis, isAnalyzing, isComparing, error, result, comparisonResult, rawAnalysis };
 }
