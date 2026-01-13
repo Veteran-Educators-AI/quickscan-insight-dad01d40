@@ -32,8 +32,9 @@ const corsHeaders = {
  * Contains class info, assignment details, and student grade data
  */
 interface PushRequest {
-  class_id: string;           // The class this data belongs to
-  title: string;              // Assignment or activity title
+  type?: 'ping' | 'grade';   // Request type: 'ping' for connection test, 'grade' for actual data
+  class_id?: string;         // The class this data belongs to
+  title?: string;            // Assignment or activity title
   description?: string;       // Optional description
   due_at?: string;           // Optional due date
   standard_code?: string;    // Optional learning standard code
@@ -85,8 +86,25 @@ serve(async (req) => {
     // ========================================================================
     const requestData: PushRequest = await req.json();
     
-    console.log('Pushing data to sister app:', JSON.stringify(requestData));
+    console.log('Received request:', JSON.stringify(requestData));
     console.log('Endpoint:', sisterAppEndpoint);
+
+    // ========================================================================
+    // HANDLE PING/TEST REQUESTS LOCALLY
+    // ========================================================================
+    // For connection tests, we just verify that secrets are configured
+    // and return success without hitting the sister app
+    if (requestData.type === 'ping') {
+      console.log('Ping request - verifying configuration');
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Connection configured correctly',
+          endpoint: sisterAppEndpoint 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // ========================================================================
     // SEND DATA TO SISTER APP

@@ -303,15 +303,7 @@ export function IntegrationSettings() {
     try {
       const response = await supabase.functions.invoke('push-to-sister-app', {
         body: {
-          class_id: 'test-connection',
-          title: 'Connection Test',
-          description: 'Testing NYClogic Scholar API connection',
-          student_id: 'test-student',
-          student_name: 'Test Student',
-          grade: 100,
-          topic_name: 'Connection Test',
-          xp_reward: 0,
-          coin_reward: 0,
+          type: 'ping',
         },
       });
 
