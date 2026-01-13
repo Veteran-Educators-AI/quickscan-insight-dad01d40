@@ -4,7 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Image, X, Check, Trash2 } from 'lucide-react';
+import { Image, X, Trash2 } from 'lucide-react';
 
 export interface ClipartItem {
   id: string;
@@ -16,8 +16,11 @@ export interface ClipartItem {
 
 export interface SlideClipart {
   clipartId: string;
-  position: 'top-right' | 'bottom-right' | 'bottom-left' | 'center-right';
+  position: 'top-right' | 'bottom-right' | 'bottom-left' | 'center-right' | 'custom';
   size: 'small' | 'medium' | 'large';
+  // Custom x/y position as percentage (0-100)
+  x?: number;
+  y?: number;
 }
 
 // Math-themed clipart library using SVG
@@ -217,13 +220,6 @@ const categories = [
   { id: 'decorative', label: 'Decorative' },
 ];
 
-const positions = [
-  { id: 'top-right' as const, label: 'Top Right' },
-  { id: 'bottom-right' as const, label: 'Bottom Right' },
-  { id: 'bottom-left' as const, label: 'Bottom Left' },
-  { id: 'center-right' as const, label: 'Center Right' },
-];
-
 const sizes = [
   { id: 'small' as const, label: 'S', width: 0.6 },
   { id: 'medium' as const, label: 'M', width: 0.9 },
@@ -239,26 +235,34 @@ interface SlideClipartPickerProps {
 export function SlideClipartPicker({ slideClipart, onClipartChange, disabled }: SlideClipartPickerProps) {
   const [selectedCategory, setSelectedCategory] = useState('shapes');
   const [isOpen, setIsOpen] = useState(false);
-  const [pendingPosition, setPendingPosition] = useState<SlideClipart['position']>('top-right');
   const [pendingSize, setPendingSize] = useState<SlideClipart['size']>('medium');
 
   const addClipart = (clipartId: string) => {
-    // Check if position already has clipart
-    const existingIndex = slideClipart.findIndex(c => c.position === pendingPosition);
-    
-    if (existingIndex >= 0) {
-      // Replace existing
-      const updated = [...slideClipart];
-      updated[existingIndex] = { clipartId, position: pendingPosition, size: pendingSize };
-      onClipartChange(updated);
-    } else {
-      // Add new
-      onClipartChange([...slideClipart, { clipartId, position: pendingPosition, size: pendingSize }]);
-    }
+    // Add new clipart at center position (will be draggable)
+    const newClipart: SlideClipart = {
+      clipartId,
+      position: 'custom',
+      size: pendingSize,
+      x: 75, // Default to right side
+      y: 25, // Default to top area
+    };
+    onClipartChange([...slideClipart, newClipart]);
   };
 
-  const removeClipart = (position: SlideClipart['position']) => {
-    onClipartChange(slideClipart.filter(c => c.position !== position));
+  const removeClipart = (index: number) => {
+    onClipartChange(slideClipart.filter((_, i) => i !== index));
+  };
+
+  const updateClipartPosition = (index: number, x: number, y: number) => {
+    const updated = [...slideClipart];
+    updated[index] = { ...updated[index], position: 'custom', x, y };
+    onClipartChange(updated);
+  };
+
+  const updateClipartSize = (index: number, size: SlideClipart['size']) => {
+    const updated = [...slideClipart];
+    updated[index] = { ...updated[index], size };
+    onClipartChange(updated);
   };
 
   const getClipartById = (id: string) => clipartLibrary.find(c => c.id === id);
@@ -295,64 +299,60 @@ export function SlideClipartPicker({ slideClipart, onClipartChange, disabled }: 
           {/* Current clipart on slide */}
           {slideClipart.length > 0 && (
             <div className="border rounded-md p-2 space-y-1">
-              <p className="text-xs text-muted-foreground">On this slide:</p>
+              <p className="text-xs text-muted-foreground">On this slide (drag to reposition):</p>
               <div className="flex flex-wrap gap-1">
-                {slideClipart.map((item) => {
+                {slideClipart.map((item, index) => {
                   const clipart = getClipartById(item.clipartId);
                   return (
-                    <Badge key={item.position} variant="outline" className="gap-1 pr-1">
-                      <span className="text-xs">{clipart?.name}</span>
-                      <span className="text-[10px] opacity-60">({item.position})</span>
-                      <button
-                        onClick={() => removeClipart(item.position)}
-                        className="ml-1 hover:text-destructive"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
+                    <div key={index} className="flex items-center gap-1">
+                      <Badge variant="outline" className="gap-1 pr-1">
+                        <span className="text-xs">{clipart?.name}</span>
+                        <div className="flex items-center gap-0.5 ml-1">
+                          {sizes.map((s) => (
+                            <button
+                              key={s.id}
+                              onClick={() => updateClipartSize(index, s.id)}
+                              className={`text-[9px] w-4 h-4 rounded ${
+                                item.size === s.id
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-muted hover:bg-muted/80'
+                              }`}
+                            >
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => removeClipart(index)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    </div>
                   );
                 })}
               </div>
             </div>
           )}
 
-          {/* Position and size selection */}
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-xs text-muted-foreground mb-1 block">Position</label>
-              <div className="flex flex-wrap gap-1">
-                {positions.map((pos) => (
-                  <button
-                    key={pos.id}
-                    onClick={() => setPendingPosition(pos.id)}
-                    className={`text-xs px-2 py-1 rounded border transition-colors ${
-                      pendingPosition === pos.id
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'hover:bg-muted'
-                    }`}
-                  >
-                    {pos.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Size</label>
-              <div className="flex gap-1">
-                {sizes.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setPendingSize(s.id)}
-                    className={`text-xs w-7 h-7 rounded border transition-colors ${
-                      pendingSize === s.id
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'hover:bg-muted'
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
+          {/* Size selection for new clipart */}
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Size for new clipart</label>
+            <div className="flex gap-1">
+              {sizes.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setPendingSize(s.id)}
+                  className={`text-xs w-7 h-7 rounded border transition-colors ${
+                    pendingSize === s.id
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'hover:bg-muted'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -373,15 +373,13 @@ export function SlideClipartPicker({ slideClipart, onClipartChange, disabled }: 
                     {clipartLibrary
                       .filter((c) => c.category === cat.id)
                       .map((clipart) => {
-                        const isSelected = slideClipart.some(
-                          (c) => c.clipartId === clipart.id && c.position === pendingPosition
-                        );
+                        const isAdded = slideClipart.some(c => c.clipartId === clipart.id);
                         return (
                           <button
                             key={clipart.id}
                             onClick={() => addClipart(clipart.id)}
                             className={`p-2 rounded border hover:bg-muted transition-colors relative ${
-                              isSelected ? 'ring-2 ring-primary bg-primary/10' : ''
+                              isAdded ? 'ring-1 ring-primary/50 bg-primary/5' : ''
                             }`}
                             title={clipart.name}
                           >
@@ -389,8 +387,10 @@ export function SlideClipartPicker({ slideClipart, onClipartChange, disabled }: 
                               className="w-8 h-8 text-foreground"
                               dangerouslySetInnerHTML={{ __html: clipart.svg }}
                             />
-                            {isSelected && (
-                              <Check className="absolute top-0.5 right-0.5 h-3 w-3 text-primary" />
+                            {isAdded && (
+                              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[8px] rounded-full w-3 h-3 flex items-center justify-center">
+                                ✓
+                              </span>
                             )}
                           </button>
                         );
@@ -402,7 +402,7 @@ export function SlideClipartPicker({ slideClipart, onClipartChange, disabled }: 
           </Tabs>
 
           <p className="text-[10px] text-muted-foreground text-center">
-            Click an icon to add it at the selected position
+            Click to add • Drag on slide to reposition
           </p>
         </div>
       </PopoverContent>
@@ -410,26 +410,45 @@ export function SlideClipartPicker({ slideClipart, onClipartChange, disabled }: 
   );
 }
 
-// Export helper function to get clipart SVG for PowerPoint
-export function getClipartSvg(clipartId: string): string | null {
-  const clipart = clipartLibrary.find((c) => c.id === clipartId);
+// Helper functions for PowerPoint export
+export const getClipartSvg = (clipartId: string): string | null => {
+  const clipart = clipartLibrary.find(c => c.id === clipartId);
   return clipart?.svg || null;
-}
+};
 
-// Export position coordinates for PowerPoint placement
-export function getClipartPosition(position: SlideClipart['position'], size: SlideClipart['size']): { x: number; y: number; w: number; h: number } {
+export const getClipartPosition = (
+  position: SlideClipart['position'],
+  size: SlideClipart['size'],
+  customX?: number,
+  customY?: number
+): { x: number; y: number; w: number; h: number } => {
   const sizeMap = { small: 0.6, medium: 0.9, large: 1.2 };
-  const s = sizeMap[size];
+  const dimension = sizeMap[size];
   
-  const positionMap: Record<SlideClipart['position'], { x: number; y: number }> = {
-    'top-right': { x: 8.8 - s, y: 0.5 },
-    'bottom-right': { x: 8.8 - s, y: 4.5 - s },
-    'bottom-left': { x: 0.5, y: 4.5 - s },
-    'center-right': { x: 8.8 - s, y: 2.2 },
+  // If custom position, use percentage-based coordinates
+  if (position === 'custom' && customX !== undefined && customY !== undefined) {
+    // Convert percentage to PowerPoint inches (assuming 10" x 7.5" slide)
+    const slideWidth = 10;
+    const slideHeight = 7.5;
+    return {
+      x: (customX / 100) * slideWidth - dimension / 2,
+      y: (customY / 100) * slideHeight - dimension / 2,
+      w: dimension,
+      h: dimension,
+    };
+  }
+  
+  // Preset positions
+  const positions: Record<string, { x: number; y: number }> = {
+    'top-right': { x: 8.5 - dimension, y: 0.5 },
+    'bottom-right': { x: 8.5 - dimension, y: 6.5 - dimension },
+    'bottom-left': { x: 0.5, y: 6.5 - dimension },
+    'center-right': { x: 8.5 - dimension, y: 3.25 - dimension / 2 },
   };
-  
-  const pos = positionMap[position];
-  return { x: pos.x, y: pos.y, w: s, h: s };
-}
 
-export { clipartLibrary };
+  const pos = positions[position] || positions['top-right'];
+  return { ...pos, w: dimension, h: dimension };
+};
+
+// Export clipart library for external use
+export const getClipartLibrary = () => clipartLibrary;
