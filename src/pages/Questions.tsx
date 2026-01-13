@@ -82,12 +82,7 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
     setShowDifferentiatedGenerator(true);
   };
 
-  const openRegularMode = () => {
-    const topicsArray = getAllTopicsArray();
-    setInitialTopicsForGenerator(topicsArray);
-    setDiagnosticMode(false);
-    setShowDifferentiatedGenerator(true);
-  };
+  // Remove openRegularMode since we only use diagnostic mode now
 
   const openLessonPlanGenerator = () => {
     // Open topic selector to let user choose from NYS standards
@@ -428,29 +423,6 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                   </span>
                 )}
               </div>
-              <Button 
-                onClick={openRegularMode}
-                className="bg-purple-600 hover:bg-purple-700"
-              >
-                <Sparkles className="h-4 w-4 mr-2" />
-                Differentiated Worksheets
-                {(selectedTopics.size > 0 || worksheetQuestions.length > 0) && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge variant="secondary" className="ml-2 bg-white/20 text-white cursor-help">
-                        {getAllTopicsArray().length}
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-xs">
-                        {selectedTopics.size > 0 && `${selectedTopics.size} selected`}
-                        {selectedTopics.size > 0 && worksheetQuestions.length > 0 && ' + '}
-                        {worksheetQuestions.length > 0 && `${worksheetQuestions.length} in worksheet`}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </Button>
               <Button 
                 onClick={openLessonPlanGenerator}
                 data-tour="create-lesson"
