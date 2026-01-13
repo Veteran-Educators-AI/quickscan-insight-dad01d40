@@ -605,15 +605,15 @@ export function IntegrationSettings() {
             <div className="space-y-4">
               <Alert>
                 <AlertDescription>
-                  <strong>Connect your Google account</strong> to import scanned documents directly from Google Drive and enable auto-sync features.
+                  <strong>Note:</strong> Google Drive integration requires re-signing in with your Google account to grant Drive access permissions. You'll be redirected back to this page after authorization.
                 </AlertDescription>
               </Alert>
               <Button
                 onClick={async () => {
                   try {
-                    // Use linkIdentity to add Google to existing account without replacing session
-                    // This prevents sign-in loops especially when MFA is enabled
-                    const { error } = await supabase.auth.linkIdentity({
+                    // Use signInWithOAuth to re-authenticate with Google including Drive scopes
+                    // This will redirect the user to Google's OAuth flow
+                    const { error } = await supabase.auth.signInWithOAuth({
                       provider: 'google',
                       options: {
                         redirectTo: window.location.origin + '/settings',
@@ -625,27 +625,7 @@ export function IntegrationSettings() {
                       },
                     });
                     if (error) {
-                      // If linkIdentity fails (e.g., identity already linked or user signed in with Google),
-                      // fall back to re-authorizing with OAuth to get Drive scopes
-                      if (error.message?.includes('already linked') || error.message?.includes('Identity is already linked')) {
-                        // User already has Google linked, just need to re-authorize for Drive scope
-                        const { error: oauthError } = await supabase.auth.signInWithOAuth({
-                          provider: 'google',
-                          options: {
-                            redirectTo: window.location.origin + '/settings',
-                            scopes: 'https://www.googleapis.com/auth/drive.readonly',
-                            queryParams: {
-                              access_type: 'offline',
-                              prompt: 'consent',
-                            },
-                          },
-                        });
-                        if (oauthError) {
-                          throw oauthError;
-                        }
-                      } else {
-                        throw error;
-                      }
+                      throw error;
                     }
                   } catch (error: any) {
                     console.error('Google Drive connection error:', error);
