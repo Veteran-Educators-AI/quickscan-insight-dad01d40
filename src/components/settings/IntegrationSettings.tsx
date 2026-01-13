@@ -533,7 +533,8 @@ export function IntegrationSettings() {
               </Alert>
               <Button
                 onClick={async () => {
-                  const { error } = await supabase.auth.signInWithOAuth({
+                  // Use linkIdentity to add Google OAuth to existing account without re-authenticating
+                  const { error } = await supabase.auth.linkIdentity({
                     provider: 'google',
                     options: {
                       redirectTo: window.location.origin + '/settings',
