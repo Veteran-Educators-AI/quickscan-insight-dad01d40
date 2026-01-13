@@ -39,6 +39,26 @@ interface LessonPlan {
   }[];
 }
 
+interface PresentationTheme {
+  id: string;
+  name: string;
+  colors: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    text: string;
+  };
+  slideColors: {
+    title: { bg: string; text: string };
+    objective: { bg: string; text: string };
+    instruction: { bg: string; text: string };
+    example: { bg: string; text: string };
+    practice: { bg: string; text: string };
+    summary: { bg: string; text: string };
+  };
+}
+
 interface LessonPlanGeneratorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -50,6 +70,7 @@ interface LessonPlanGeneratorProps {
   relatedTopics?: { topicName: string; standard: string }[];
   classId?: string;
   onOpenLibrary?: () => void;
+  presentationTheme?: PresentationTheme | null;
 }
 
 export function LessonPlanGenerator({ 
@@ -58,7 +79,8 @@ export function LessonPlanGenerator({
   topic, 
   relatedTopics = [],
   classId,
-  onOpenLibrary
+  onOpenLibrary,
+  presentationTheme
 }: LessonPlanGeneratorProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -639,8 +661,8 @@ export function LessonPlanGenerator({
     pptx.title = lessonPlan.title;
     pptx.subject = `Lesson on ${lessonPlan.topicName}`;
     
-    // Define slide type colors (matching the UI)
-    const slideColors: Record<string, { bg: string; text: string }> = {
+    // Use theme colors if provided, otherwise fall back to defaults
+    const defaultSlideColors: Record<string, { bg: string; text: string }> = {
       title: { bg: '3B82F6', text: 'FFFFFF' },
       objective: { bg: '3B82F6', text: 'FFFFFF' },
       instruction: { bg: '10B981', text: 'FFFFFF' },
@@ -649,31 +671,51 @@ export function LessonPlanGenerator({
       summary: { bg: 'F43F5E', text: 'FFFFFF' },
     };
 
-    // Title slide
+    const slideColors = presentationTheme?.slideColors || defaultSlideColors;
+    const themeColors = presentationTheme?.colors || { primary: '3B82F6', text: '1F2937', background: 'FFFFFF' };
+
+    // Title slide with theme background
     const titleSlide = pptx.addSlide();
+    if (presentationTheme) {
+      titleSlide.addShape('rect', {
+        x: 0,
+        y: 0,
+        w: '100%',
+        h: '100%',
+        fill: { color: themeColors.background },
+      });
+      // Add decorative accent bar
+      titleSlide.addShape('rect', {
+        x: 0,
+        y: 0,
+        w: '100%',
+        h: 0.3,
+        fill: { type: 'solid', color: themeColors.primary },
+      });
+    }
     titleSlide.addText(lessonPlan.title, {
       x: 0.5,
-      y: 2,
+      y: 1.8,
       w: 9,
       h: 1.5,
-      fontSize: 36,
+      fontSize: 40,
       bold: true,
-      color: '1F2937',
+      color: themeColors.text,
       align: 'center',
       valign: 'middle',
     });
     titleSlide.addText(`Standard: ${lessonPlan.standard}`, {
       x: 0.5,
-      y: 3.5,
+      y: 3.4,
       w: 9,
       h: 0.5,
       fontSize: 18,
-      color: '6B7280',
+      color: themeColors.primary,
       align: 'center',
     });
     titleSlide.addText(`Duration: ${lessonPlan.duration}`, {
       x: 0.5,
-      y: 4,
+      y: 3.9,
       w: 9,
       h: 0.5,
       fontSize: 16,
@@ -707,46 +749,73 @@ export function LessonPlanGenerator({
       const colors = slideColors[slide.slideType] || { bg: 'E5E7EB', text: '1F2937' };
       const pptSlide = pptx.addSlide();
       
+      // Add themed background
+      if (presentationTheme) {
+        pptSlide.addShape('rect', {
+          x: 0,
+          y: 0,
+          w: '100%',
+          h: '100%',
+          fill: { color: themeColors.background },
+        });
+        // Add colorful accent bar at top based on slide type
+        pptSlide.addShape('rect', {
+          x: 0,
+          y: 0,
+          w: '100%',
+          h: 0.15,
+          fill: { type: 'solid', color: colors.bg },
+        });
+        // Add gradient sidebar accent
+        pptSlide.addShape('rect', {
+          x: 0,
+          y: 0,
+          w: 0.08,
+          h: '100%',
+          fill: { type: 'solid', color: colors.bg },
+        });
+      }
+      
       // Slide type badge
       pptSlide.addText(slide.slideType.toUpperCase(), {
         x: 0.5,
         y: 0.3,
-        w: 1.5,
-        h: 0.35,
-        fontSize: 10,
+        w: 1.8,
+        h: 0.4,
+        fontSize: 11,
         bold: true,
-        color: 'FFFFFF',
+        color: colors.text,
         fill: { color: colors.bg },
         align: 'center',
         valign: 'middle',
       });
 
-      // Slide title
+      // Slide title with theme color
       pptSlide.addText(slide.title, {
         x: 0.5,
-        y: 0.8,
+        y: 0.85,
         w: 9,
         h: 0.7,
-        fontSize: 28,
+        fontSize: 30,
         bold: true,
-        color: '1F2937',
+        color: presentationTheme ? themeColors.text : '1F2937',
       });
 
       // Content bullets
       const bulletPoints = slide.content.map((item) => ({
         text: item,
-        options: { bullet: true, indentLevel: 0 },
+        options: { bullet: { type: 'bullet' as const, color: colors.bg }, indentLevel: 0 },
       }));
 
       pptSlide.addText(bulletPoints, {
         x: 0.5,
-        y: 1.6,
+        y: 1.7,
         w: 9,
         h: 3.5,
         fontSize: 18,
-        color: '374151',
+        color: presentationTheme ? themeColors.text : '374151',
         valign: 'top',
-        lineSpacing: 28,
+        lineSpacing: 30,
       });
 
       // Speaker notes
