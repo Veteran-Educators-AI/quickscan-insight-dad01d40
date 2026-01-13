@@ -719,6 +719,14 @@ export function LessonPlanGenerator({
     pptx.title = lessonPlan.title;
     pptx.subject = `Lesson on ${lessonPlan.topicName}`;
     
+    // Slide dimensions and margins (in inches)
+    const slideMargin = 0.5;
+    const contentWidth = 9; // 10" slide width - margins
+    const maxContentY = 4.8; // Maximum Y position before needing new slide
+    const titleHeight = 0.7;
+    const bulletLineHeight = 0.35; // Approximate height per bullet line at fontSize 16
+    const maxCharsPerLine = 85; // Max characters per line at fontSize 16
+    
     // Use theme colors if provided, otherwise fall back to defaults
     const defaultSlideColors: Record<string, { bg: string; text: string }> = {
       title: { bg: '3B82F6', text: 'FFFFFF' },
@@ -732,82 +740,47 @@ export function LessonPlanGenerator({
     const slideColors = presentationTheme?.slideColors || defaultSlideColors;
     const themeColors = presentationTheme?.colors || { primary: '3B82F6', text: '1F2937', background: 'FFFFFF' };
 
-    // Title slide with theme background
-    const titleSlide = pptx.addSlide();
-    if (presentationTheme) {
-      titleSlide.addShape('rect', {
-        x: 0,
-        y: 0,
-        w: '100%',
-        h: '100%',
-        fill: { color: themeColors.background },
-      });
-      // Add decorative accent bar
-      titleSlide.addShape('rect', {
-        x: 0,
-        y: 0,
-        w: '100%',
-        h: 0.3,
-        fill: { type: 'solid', color: themeColors.primary },
-      });
-    }
-    titleSlide.addText(lessonPlan.title, {
-      x: 0.5,
-      y: 1.8,
-      w: 9,
-      h: 1.5,
-      fontSize: 40,
-      bold: true,
-      color: themeColors.text,
-      align: 'center',
-      valign: 'middle',
-    });
-    titleSlide.addText(`Standard: ${lessonPlan.standard}`, {
-      x: 0.5,
-      y: 3.4,
-      w: 9,
-      h: 0.5,
-      fontSize: 18,
-      color: themeColors.primary,
-      align: 'center',
-    });
-    titleSlide.addText(`Duration: ${lessonPlan.duration}`, {
-      x: 0.5,
-      y: 3.9,
-      w: 9,
-      h: 0.5,
-      fontSize: 16,
-      color: '6B7280',
-      align: 'center',
-    });
+    // Helper function to estimate lines needed for text
+    const estimateLines = (text: string, maxChars: number): number => {
+      return Math.ceil(text.length / maxChars);
+    };
 
-    // Objective slide
-    const objectiveSlide = pptx.addSlide();
-    objectiveSlide.addText('Learning Objective', {
-      x: 0.5,
-      y: 0.5,
-      w: 9,
-      h: 0.8,
-      fontSize: 28,
-      bold: true,
-      color: '1F2937',
-    });
-    objectiveSlide.addText(lessonPlan.objective, {
-      x: 0.5,
-      y: 1.5,
-      w: 9,
-      h: 3,
-      fontSize: 20,
-      color: '374151',
-      valign: 'top',
-    });
+    // Helper function to add decorative elements (shapes/clipart)
+    const addSlideDecoration = (pptSlide: any, slideType: string, colors: { bg: string; text: string }) => {
+      // Add corner accent shape based on slide type
+      const shapeConfigs: Record<string, { shape: string; x: number; y: number; w: number; h: number; rotate?: number }> = {
+        title: { shape: 'diamond', x: 8.8, y: 0.2, w: 0.6, h: 0.6 },
+        objective: { shape: 'ellipse', x: 9.0, y: 4.8, w: 0.5, h: 0.5 },
+        instruction: { shape: 'rect', x: 9.1, y: 0.15, w: 0.4, h: 0.4, rotate: 45 },
+        example: { shape: 'triangle', x: 8.9, y: 4.7, w: 0.5, h: 0.5 },
+        practice: { shape: 'ellipse', x: 0.15, y: 4.8, w: 0.4, h: 0.4 },
+        summary: { shape: 'diamond', x: 9.0, y: 4.7, w: 0.5, h: 0.5 },
+      };
 
-    // Content slides
-    lessonPlan.slides.forEach((slide) => {
-      const colors = slideColors[slide.slideType] || { bg: 'E5E7EB', text: '1F2937' };
-      const pptSlide = pptx.addSlide();
+      const config = shapeConfigs[slideType] || shapeConfigs.instruction;
       
-      // Add themed background
+      // Add main decorative shape
+      pptSlide.addShape(config.shape as any, {
+        x: config.x,
+        y: config.y,
+        w: config.w,
+        h: config.h,
+        fill: { color: colors.bg, transparency: 30 },
+        rotate: config.rotate || 0,
+      });
+
+      // Add smaller accent shape
+      pptSlide.addShape('ellipse', {
+        x: config.x - 0.3,
+        y: config.y + 0.15,
+        w: 0.2,
+        h: 0.2,
+        fill: { color: colors.bg, transparency: 50 },
+      });
+    };
+
+    // Helper function to add themed background and borders
+    const addSlideBackground = (pptSlide: any, colors: { bg: string; text: string }) => {
       if (presentationTheme) {
         pptSlide.addShape('rect', {
           x: 0,
@@ -816,83 +789,324 @@ export function LessonPlanGenerator({
           h: '100%',
           fill: { color: themeColors.background },
         });
-        // Add colorful accent bar at top based on slide type
-        pptSlide.addShape('rect', {
-          x: 0,
-          y: 0,
-          w: '100%',
-          h: 0.15,
-          fill: { type: 'solid', color: colors.bg },
-        });
-        // Add gradient sidebar accent
-        pptSlide.addShape('rect', {
-          x: 0,
-          y: 0,
-          w: 0.08,
-          h: '100%',
-          fill: { type: 'solid', color: colors.bg },
-        });
       }
       
-      // Slide type badge
-      pptSlide.addText(slide.slideType.toUpperCase(), {
-        x: 0.5,
-        y: 0.3,
-        w: 1.8,
-        h: 0.4,
-        fontSize: 11,
-        bold: true,
-        color: colors.text,
-        fill: { color: colors.bg },
-        align: 'center',
-        valign: 'middle',
+      // Add top accent bar
+      pptSlide.addShape('rect', {
+        x: 0,
+        y: 0,
+        w: '100%',
+        h: 0.12,
+        fill: { type: 'solid', color: colors.bg },
+      });
+      
+      // Add left sidebar accent
+      pptSlide.addShape('rect', {
+        x: 0,
+        y: 0,
+        w: 0.06,
+        h: '100%',
+        fill: { type: 'solid', color: colors.bg },
       });
 
-      // Slide title with theme color
-      pptSlide.addText(slide.title, {
-        x: 0.5,
-        y: 0.85,
-        w: 9,
-        h: 0.7,
-        fontSize: 30,
-        bold: true,
-        color: presentationTheme ? themeColors.text : '1F2937',
+      // Add bottom border line for visual containment
+      pptSlide.addShape('rect', {
+        x: slideMargin,
+        y: 5.2,
+        w: contentWidth,
+        h: 0.02,
+        fill: { type: 'solid', color: colors.bg, transparency: 60 },
+      });
+    };
+
+    // Helper to split content into multiple slides if needed
+    const createContentSlides = (slide: typeof lessonPlan.slides[0]) => {
+      const colors = slideColors[slide.slideType] || { bg: 'E5E7EB', text: '1F2937' };
+      const contentStartY = 1.7;
+      const maxBulletsPerSlide = 5; // Maximum bullets per slide to prevent overflow
+      
+      // Calculate total lines needed
+      let totalLines = 0;
+      slide.content.forEach(item => {
+        totalLines += estimateLines(item, maxCharsPerLine);
       });
 
-      // Content bullets
-      const bulletPoints = slide.content.map((item) => ({
-        text: item,
-        options: { bullet: { type: 'bullet' as const, color: colors.bg }, indentLevel: 0 },
-      }));
+      // Determine if we need to split
+      const needsSplit = slide.content.length > maxBulletsPerSlide || totalLines > 12;
+      
+      if (!needsSplit) {
+        // Single slide - existing behavior with proper margins
+        const pptSlide = pptx.addSlide();
+        addSlideBackground(pptSlide, colors);
+        addSlideDecoration(pptSlide, slide.slideType, colors);
+        
+        // Slide type badge
+        pptSlide.addText(slide.slideType.toUpperCase(), {
+          x: slideMargin,
+          y: 0.25,
+          w: 1.6,
+          h: 0.35,
+          fontSize: 10,
+          bold: true,
+          color: colors.text,
+          fill: { color: colors.bg },
+          align: 'center',
+          valign: 'middle',
+        });
 
-      pptSlide.addText(bulletPoints, {
-        x: 0.5,
-        y: 1.7,
-        w: 9,
-        h: 3.5,
-        fontSize: 18,
-        color: presentationTheme ? themeColors.text : '374151',
-        valign: 'top',
-        lineSpacing: 30,
-      });
+        // Slide title with proper width constraint
+        pptSlide.addText(slide.title, {
+          x: slideMargin,
+          y: 0.75,
+          w: contentWidth,
+          h: titleHeight,
+          fontSize: 26,
+          bold: true,
+          color: presentationTheme ? themeColors.text : '1F2937',
+          wrap: true,
+        });
 
-      // Speaker notes
-      if (slide.speakerNotes) {
-        pptSlide.addNotes(slide.speakerNotes);
+        // Content bullets with proper margins and smaller font for better fit
+        const bulletPoints = slide.content.map((item) => ({
+          text: item,
+          options: { 
+            bullet: { type: 'bullet' as const, color: colors.bg }, 
+            indentLevel: 0,
+            breakLine: true,
+          },
+        }));
+
+        pptSlide.addText(bulletPoints, {
+          x: slideMargin,
+          y: contentStartY,
+          w: contentWidth,
+          h: 3.3,
+          fontSize: 16,
+          color: presentationTheme ? themeColors.text : '374151',
+          valign: 'top',
+          lineSpacing: 26,
+          wrap: true,
+        });
+
+        // Speaker notes
+        if (slide.speakerNotes) {
+          pptSlide.addNotes(slide.speakerNotes);
+        }
+      } else {
+        // Split into multiple slides
+        const chunks: string[][] = [];
+        let currentChunk: string[] = [];
+        let currentLines = 0;
+
+        slide.content.forEach(item => {
+          const itemLines = estimateLines(item, maxCharsPerLine);
+          
+          if (currentChunk.length >= maxBulletsPerSlide || currentLines + itemLines > 10) {
+            if (currentChunk.length > 0) {
+              chunks.push(currentChunk);
+            }
+            currentChunk = [item];
+            currentLines = itemLines;
+          } else {
+            currentChunk.push(item);
+            currentLines += itemLines;
+          }
+        });
+        
+        if (currentChunk.length > 0) {
+          chunks.push(currentChunk);
+        }
+
+        // Create a slide for each chunk
+        chunks.forEach((chunk, chunkIndex) => {
+          const pptSlide = pptx.addSlide();
+          addSlideBackground(pptSlide, colors);
+          addSlideDecoration(pptSlide, slide.slideType, colors);
+          
+          // Slide type badge with continuation indicator
+          const badgeText = chunkIndex > 0 
+            ? `${slide.slideType.toUpperCase()} (cont.)`
+            : slide.slideType.toUpperCase();
+          
+          pptSlide.addText(badgeText, {
+            x: slideMargin,
+            y: 0.25,
+            w: chunkIndex > 0 ? 2.0 : 1.6,
+            h: 0.35,
+            fontSize: 10,
+            bold: true,
+            color: colors.text,
+            fill: { color: colors.bg },
+            align: 'center',
+            valign: 'middle',
+          });
+
+          // Slide title (same on all continuation slides)
+          const titleSuffix = chunkIndex > 0 ? ` (${chunkIndex + 1}/${chunks.length})` : '';
+          pptSlide.addText(slide.title + titleSuffix, {
+            x: slideMargin,
+            y: 0.75,
+            w: contentWidth,
+            h: titleHeight,
+            fontSize: 26,
+            bold: true,
+            color: presentationTheme ? themeColors.text : '1F2937',
+            wrap: true,
+          });
+
+          // Content bullets for this chunk
+          const bulletPoints = chunk.map((item) => ({
+            text: item,
+            options: { 
+              bullet: { type: 'bullet' as const, color: colors.bg }, 
+              indentLevel: 0,
+              breakLine: true,
+            },
+          }));
+
+          pptSlide.addText(bulletPoints, {
+            x: slideMargin,
+            y: contentStartY,
+            w: contentWidth,
+            h: 3.3,
+            fontSize: 16,
+            color: presentationTheme ? themeColors.text : '374151',
+            valign: 'top',
+            lineSpacing: 26,
+            wrap: true,
+          });
+
+          // Speaker notes only on first slide of split
+          if (chunkIndex === 0 && slide.speakerNotes) {
+            pptSlide.addNotes(slide.speakerNotes);
+          } else if (chunkIndex > 0) {
+            pptSlide.addNotes(`Continuation of: ${slide.title}`);
+          }
+        });
       }
+    };
+
+    // Title slide with theme background
+    const titleSlide = pptx.addSlide();
+    const titleColors = slideColors.title || { bg: '3B82F6', text: 'FFFFFF' };
+    
+    if (presentationTheme) {
+      titleSlide.addShape('rect', {
+        x: 0,
+        y: 0,
+        w: '100%',
+        h: '100%',
+        fill: { color: themeColors.background },
+      });
+    }
+    
+    // Decorative accent bar at top
+    titleSlide.addShape('rect', {
+      x: 0,
+      y: 0,
+      w: '100%',
+      h: 0.25,
+      fill: { type: 'solid', color: themeColors.primary },
     });
 
-    // Recommended worksheets slide
+    // Decorative corner shapes for title slide
+    titleSlide.addShape('diamond', {
+      x: 0.3,
+      y: 0.5,
+      w: 0.5,
+      h: 0.5,
+      fill: { color: themeColors.primary, transparency: 40 },
+    });
+    titleSlide.addShape('ellipse', {
+      x: 9.2,
+      y: 4.6,
+      w: 0.4,
+      h: 0.4,
+      fill: { color: themeColors.primary, transparency: 40 },
+    });
+
+    // Main title with proper margins
+    titleSlide.addText(lessonPlan.title, {
+      x: slideMargin,
+      y: 1.6,
+      w: contentWidth,
+      h: 1.2,
+      fontSize: 36,
+      bold: true,
+      color: themeColors.text,
+      align: 'center',
+      valign: 'middle',
+      wrap: true,
+    });
+    
+    titleSlide.addText(`Standard: ${lessonPlan.standard}`, {
+      x: slideMargin,
+      y: 3.0,
+      w: contentWidth,
+      h: 0.5,
+      fontSize: 18,
+      color: themeColors.primary,
+      align: 'center',
+    });
+    
+    titleSlide.addText(`Duration: ${lessonPlan.duration}`, {
+      x: slideMargin,
+      y: 3.5,
+      w: contentWidth,
+      h: 0.5,
+      fontSize: 16,
+      color: '6B7280',
+      align: 'center',
+    });
+
+    // Objective slide with proper margins
+    const objectiveSlide = pptx.addSlide();
+    const objColors = slideColors.objective || { bg: '3B82F6', text: 'FFFFFF' };
+    addSlideBackground(objectiveSlide, objColors);
+    addSlideDecoration(objectiveSlide, 'objective', objColors);
+    
+    objectiveSlide.addText('Learning Objective', {
+      x: slideMargin,
+      y: 0.5,
+      w: contentWidth,
+      h: 0.8,
+      fontSize: 28,
+      bold: true,
+      color: presentationTheme ? themeColors.text : '1F2937',
+    });
+    
+    objectiveSlide.addText(lessonPlan.objective, {
+      x: slideMargin,
+      y: 1.5,
+      w: contentWidth,
+      h: 3.3,
+      fontSize: 18,
+      color: presentationTheme ? themeColors.text : '374151',
+      valign: 'top',
+      wrap: true,
+      lineSpacing: 28,
+    });
+
+    // Content slides - using the helper that handles splitting
+    lessonPlan.slides.forEach((slide) => {
+      createContentSlides(slide);
+    });
+
+    // Recommended worksheets slide with proper margins
     if (lessonPlan.recommendedWorksheets.length > 0) {
       const worksheetSlide = pptx.addSlide();
+      const summaryColors = slideColors.summary || { bg: 'F43F5E', text: 'FFFFFF' };
+      addSlideBackground(worksheetSlide, summaryColors);
+      addSlideDecoration(worksheetSlide, 'summary', summaryColors);
+      
       worksheetSlide.addText('Recommended Practice Worksheets', {
-        x: 0.5,
+        x: slideMargin,
         y: 0.5,
-        w: 9,
+        w: contentWidth,
         h: 0.8,
-        fontSize: 28,
+        fontSize: 26,
         bold: true,
-        color: '1F2937',
+        color: presentationTheme ? themeColors.text : '1F2937',
       });
 
       const worksheetBullets = lessonPlan.recommendedWorksheets.map((ws) => ({
@@ -901,14 +1115,15 @@ export function LessonPlanGenerator({
       }));
 
       worksheetSlide.addText(worksheetBullets, {
-        x: 0.5,
+        x: slideMargin,
         y: 1.5,
-        w: 9,
-        h: 3.5,
-        fontSize: 18,
-        color: '374151',
+        w: contentWidth,
+        h: 3.3,
+        fontSize: 16,
+        color: presentationTheme ? themeColors.text : '374151',
         valign: 'top',
-        lineSpacing: 28,
+        lineSpacing: 26,
+        wrap: true,
       });
     }
 
@@ -917,7 +1132,7 @@ export function LessonPlanGenerator({
 
     toast({
       title: 'PowerPoint downloaded',
-      description: 'Your lesson plan has been saved as a .pptx file.',
+      description: 'Your lesson plan has been saved as a .pptx file with proper margins and decorative shapes.',
     });
   };
 
