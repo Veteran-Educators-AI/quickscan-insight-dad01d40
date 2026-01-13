@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Camera, X, SwitchCamera, Upload, Layers, Check } from 'lucide-react';
+import { Camera, X, SwitchCamera, Upload, Layers, Check, Grid, Trash2, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
 interface CameraModalProps {
@@ -23,6 +24,8 @@ export function CameraModal({ isOpen, onClose, onCapture, batchMode = false, onB
   const [isCapturing, setIsCapturing] = useState(false);
   const [batchImages, setBatchImages] = useState<string[]>([]);
   const [showThumbnail, setShowThumbnail] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
   // Track mounted state to prevent state updates after unmount
   useEffect(() => {
@@ -188,8 +191,14 @@ export function CameraModal({ isOpen, onClose, onCapture, batchMode = false, onB
     }
     stopCamera();
     setBatchImages([]);
+    setShowGallery(false);
     onClose();
   }, [batchImages, onBatchComplete, stopCamera, onClose]);
+
+  const removeImage = useCallback((index: number) => {
+    setBatchImages(prev => prev.filter((_, i) => i !== index));
+    setSelectedImageIndex(null);
+  }, []);
 
   const removeLastImage = useCallback(() => {
     setBatchImages(prev => prev.slice(0, -1));
@@ -202,30 +211,169 @@ export function CameraModal({ isOpen, onClose, onCapture, batchMode = false, onB
   const handleClose = useCallback(() => {
     stopCamera();
     setBatchImages([]);
+    setShowGallery(false);
+    setSelectedImageIndex(null);
     onClose();
   }, [stopCamera, onClose]);
+
+  const toggleGallery = useCallback(() => {
+    setShowGallery(prev => !prev);
+    setSelectedImageIndex(null);
+  }, []);
 
   // Reset batch images when modal closes
   useEffect(() => {
     if (!isOpen) {
       setBatchImages([]);
+      setShowGallery(false);
+      setSelectedImageIndex(null);
     }
   }, [isOpen]);
 
   // Start camera when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !showGallery) {
       startCamera(facingMode);
-    } else {
+    } else if (!isOpen) {
       stopCamera();
     }
 
     return () => {
       stopCamera();
     };
-  }, [isOpen, facingMode, startCamera, stopCamera]);
+  }, [isOpen, facingMode, startCamera, stopCamera, showGallery]);
 
   if (!isOpen) return null;
+
+  // Gallery view
+  if (showGallery) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <button
+            onClick={toggleGallery}
+            className="flex items-center gap-2 text-foreground hover:text-foreground/80 transition-colors"
+          >
+            <ChevronLeft className="h-5 w-5" />
+            Back to Camera
+          </button>
+          <span className="text-sm text-muted-foreground">
+            {batchImages.length} photo{batchImages.length !== 1 ? 's' : ''}
+          </span>
+          <button
+            onClick={handleClose}
+            className="p-2 rounded-full hover:bg-muted transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Selected image preview */}
+        {selectedImageIndex !== null && (
+          <div className="fixed inset-0 z-60 bg-black/90 flex flex-col">
+            <div className="flex items-center justify-between p-4">
+              <button
+                onClick={() => setSelectedImageIndex(null)}
+                className="flex items-center gap-2 text-white hover:text-white/80 transition-colors"
+              >
+                <ChevronLeft className="h-5 w-5" />
+                Back
+              </button>
+              <span className="text-white text-sm">
+                Photo {selectedImageIndex + 1} of {batchImages.length}
+              </span>
+              <button
+                onClick={() => removeImage(selectedImageIndex)}
+                className="p-2 rounded-full bg-red-500/80 text-white hover:bg-red-600 transition-colors"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 flex items-center justify-center p-4">
+              <img
+                src={batchImages[selectedImageIndex]}
+                alt={`Captured photo ${selectedImageIndex + 1}`}
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Gallery grid */}
+        <ScrollArea className="flex-1 h-[calc(100vh-140px)]">
+          {batchImages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+              <Camera className="h-12 w-12 mb-4 opacity-50" />
+              <p>No photos captured yet</p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={toggleGallery}
+              >
+                Go back to capture
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-1 p-1">
+              {batchImages.map((image, index) => (
+                <div
+                  key={index}
+                  className="relative aspect-[3/4] group cursor-pointer"
+                  onClick={() => setSelectedImageIndex(index)}
+                >
+                  <img
+                    src={image}
+                    alt={`Captured photo ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                  
+                  {/* Photo number badge */}
+                  <div className="absolute top-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+                    {index + 1}
+                  </div>
+                  
+                  {/* Delete button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeImage(index);
+                    }}
+                    className="absolute top-1 right-1 p-1.5 rounded-full bg-red-500/80 text-white opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+
+        {/* Bottom actions */}
+        <div className="p-4 border-t bg-background">
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={toggleGallery}
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              Continue Capturing
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={handleBatchDone}
+              disabled={batchImages.length === 0}
+            >
+              <Check className="h-4 w-4 mr-2" />
+              Done ({batchImages.length})
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black">
@@ -254,6 +402,20 @@ export function CameraModal({ isOpen, onClose, onCapture, batchMode = false, onB
       >
         <SwitchCamera className="h-6 w-6" />
       </button>
+
+      {/* Gallery button (batch mode only) */}
+      {batchMode && batchImages.length > 0 && (
+        <button
+          onClick={toggleGallery}
+          className="absolute top-4 right-20 z-30 p-3 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+          aria-label="View gallery"
+        >
+          <Grid className="h-6 w-6" />
+          <Badge className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs px-1.5 min-w-[20px] h-5">
+            {batchImages.length}
+          </Badge>
+        </button>
+      )}
 
       {/* Video preview */}
       <div className="absolute inset-0 flex items-center justify-center">
@@ -343,7 +505,10 @@ export function CameraModal({ isOpen, onClose, onCapture, batchMode = false, onB
 
       {/* Batch mode thumbnail preview */}
       {batchMode && batchImages.length > 0 && (
-        <div className="absolute bottom-32 left-4 z-30 flex items-end gap-2">
+        <div 
+          className="absolute bottom-32 left-4 z-30 flex items-end gap-2 cursor-pointer"
+          onClick={toggleGallery}
+        >
           {/* Thumbnail of last captured image */}
           <div 
             className={cn(
