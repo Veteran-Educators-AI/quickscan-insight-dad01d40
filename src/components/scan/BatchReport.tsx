@@ -1,10 +1,11 @@
-import { Download, Users, TrendingUp, AlertTriangle, BarChart3 } from 'lucide-react';
+import { useState } from 'react';
+import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
 import { BatchItem, BatchSummary } from '@/hooks/useBatchAnalysis';
+import { StudentWorkDetailDialog } from './StudentWorkDetailDialog';
 import {
   Table,
   TableBody,
@@ -21,6 +22,7 @@ interface BatchReportProps {
 }
 
 export function BatchReport({ items, summary, onExport }: BatchReportProps) {
+  const [selectedStudent, setSelectedStudent] = useState<BatchItem | null>(null);
   const completedItems = items.filter(item => item.status === 'completed' && item.result);
 
   const getScoreColor = (pct: number) => {
@@ -44,7 +46,7 @@ export function BatchReport({ items, summary, onExport }: BatchReportProps) {
         <div>
           <h2 className="text-xl font-bold">Class Grading Report</h2>
           <p className="text-sm text-muted-foreground">
-            {summary.totalStudents} papers analyzed
+            {summary.totalStudents} papers analyzed • Click any row to view details
           </p>
         </div>
         <Button onClick={onExport} variant="outline">
@@ -163,7 +165,13 @@ export function BatchReport({ items, summary, onExport }: BatchReportProps) {
       {/* Individual Results Table */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Individual Results</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            Individual Results
+            <Badge variant="outline" className="ml-2 text-xs">
+              <Eye className="h-3 w-3 mr-1" />
+              Click to view details
+            </Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -173,11 +181,16 @@ export function BatchReport({ items, summary, onExport }: BatchReportProps) {
                 <TableHead className="text-center">Score</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
                 <TableHead className="hidden md:table-cell">Feedback</TableHead>
+                <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {completedItems.map((item) => (
-                <TableRow key={item.id}>
+                <TableRow 
+                  key={item.id}
+                  className="cursor-pointer hover:bg-accent/50 transition-colors"
+                  onClick={() => setSelectedStudent(item)}
+                >
                   <TableCell className="font-medium">{item.studentName}</TableCell>
                   <TableCell className="text-center">
                     <span className={`font-semibold ${getScoreColor(item.result!.totalScore.percentage)}`}>
@@ -195,12 +208,35 @@ export function BatchReport({ items, summary, onExport }: BatchReportProps) {
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-xs truncate">
                     {item.result!.feedback || 'No feedback'}
                   </TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedStudent(item);
+                      }}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Student Work Detail Dialog */}
+      {selectedStudent && selectedStudent.result && (
+        <StudentWorkDetailDialog
+          open={!!selectedStudent}
+          onOpenChange={(open) => !open && setSelectedStudent(null)}
+          studentName={selectedStudent.studentName}
+          imageUrl={selectedStudent.imageDataUrl}
+          result={selectedStudent.result}
+        />
+      )}
     </div>
   );
 }
