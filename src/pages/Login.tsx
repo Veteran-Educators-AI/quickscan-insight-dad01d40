@@ -137,32 +137,11 @@ export default function Login() {
       <div className="w-full max-w-md animate-fade-in">
         {/* Logo with pulsating brain and thinking waves */}
         <div className="text-center mb-8">
-          <div className="relative inline-block">
-            {/* Floating particles - in outer container */}
-            <div className="brain-particle" />
-            <div className="brain-particle" />
-            <div className="brain-particle" />
-            <div className="brain-particle" />
-            <div className="brain-particle" />
-            <div className="brain-particle" />
-            <div className="brain-particle" />
-            <div className="brain-particle" />
-            
-            {/* Logo container with waves centered on logo */}
-            <div className="relative inline-flex items-center justify-center">
-              {/* Thinking wave rings - now centered on logo */}
-              <div className="thinking-wave" />
-              <div className="thinking-wave" />
-              <div className="thinking-wave" />
-              <div className="thinking-wave" />
-              
-              <img 
-              src={nycologicLogo} 
-                alt="NYClogic Ai" 
-                className="h-44 w-auto mx-auto mb-2 animate-brain-pulse relative z-10"
-              />
-            </div>
-          </div>
+          <img 
+            src={nycologicLogo} 
+            alt="NYClogic Ai" 
+            className="h-44 w-auto mx-auto mb-2"
+          />
           <h1 className="text-5xl md:text-6xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Darker Grotesque', sans-serif" }}>
             NYClogic <span className="text-primary">Ai</span>
           </h1>
