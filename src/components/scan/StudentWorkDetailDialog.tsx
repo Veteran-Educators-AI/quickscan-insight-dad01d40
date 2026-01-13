@@ -23,6 +23,7 @@ import {
   FileText,
   X
 } from 'lucide-react';
+import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 
 interface RubricScore {
   criterion: string;
@@ -64,6 +65,7 @@ export function StudentWorkDetailDialog({
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [showImageFullscreen, setShowImageFullscreen] = useState(false);
+  const { gradeFloor, gradeFloorWithEffort, calculateGrade } = useGradeFloorSettings();
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));
@@ -109,13 +111,15 @@ export function StudentWorkDetailDialog({
     return 'None';
   };
 
-  // Calculate grade with minimum 65 for any work showing understanding
+  // Calculate grade using teacher's grade floor settings
   const hasAnyPoints = result.totalScore.earned > 0;
   const hasAnyWork = result.ocrText?.trim().length > 10 || hasAnyPoints;
-  const minGrade = hasAnyWork ? 65 : 55;
-  const calculatedGrade = hasAnyPoints 
-    ? Math.max(minGrade, Math.round(65 + (result.totalScore.percentage / 100) * 35))
-    : minGrade;
+  const minGrade = hasAnyWork ? gradeFloorWithEffort : gradeFloor;
+  const calculatedGrade = calculateGrade(
+    result.totalScore.percentage, 
+    hasAnyWork, 
+    result.regentsScore
+  );
   const grade = result.grade ? Math.max(minGrade, result.grade) : calculatedGrade;
 
   return (
