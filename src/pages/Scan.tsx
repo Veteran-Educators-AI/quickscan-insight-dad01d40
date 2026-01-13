@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,6 +23,7 @@ import { usePendingScans } from '@/hooks/usePendingScans';
 import { useSaveAnalysisResults } from '@/hooks/useSaveAnalysisResults';
 import { useQRCodeScanner } from '@/hooks/useQRCodeScanner';
 import { useStudentIdentification } from '@/hooks/useStudentIdentification';
+import { useNameCorrections } from '@/hooks/useNameCorrections';
 import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
 import { MultiStudentScanner } from '@/components/scan/MultiStudentScanner';
 import { ScannerImportMode } from '@/components/scan/ScannerImportMode';
@@ -89,9 +90,25 @@ export default function Scan() {
   const [autoIdentifiedStudent, setAutoIdentifiedStudent] = useState<{
     studentId: string;
     studentName: string;
-    confidence: 'high' | 'medium' | 'low' | 'none';
+    confidence: 'learned' | 'high' | 'medium' | 'low' | 'none';
     handwrittenName?: string | null;
   } | null>(null);
+  
+  // Name corrections for learning from teacher corrections
+  const { 
+    corrections, 
+    fetchCorrections, 
+    saveCorrection, 
+    findLearnedMatch,
+    isSaving: isSavingCorrection 
+  } = useNameCorrections(singleScanClassId);
+  
+  // Fetch corrections when class changes
+  useEffect(() => {
+    if (singleScanClassId) {
+      fetchCorrections();
+    }
+  }, [singleScanClassId, fetchCorrections]);
   
   // Get student name for display
   const currentStudentId = detectedQR?.studentId || singleScanStudentId || analyzingScanStudentId;
@@ -159,7 +176,7 @@ export default function Scan() {
       } else {
         setDetectedQR(null);
         
-        // No QR code found - try AI-based name recognition if class is selected
+        // No QR code found - try learned corrections first, then AI-based name recognition
         if (singleScanClassId && singleScanStudents.length > 0) {
           toast.info('Identifying student from handwritten name...', {
             icon: <UserCheck className="h-4 w-4" />,
@@ -167,7 +184,22 @@ export default function Scan() {
           
           const identResult = await identifyStudent(finalImageDataUrl, singleScanStudents);
           
-          if (identResult?.matchedStudentId) {
+          // Check if we have a learned correction for this handwritten name
+          const learnedMatch = findLearnedMatch(identResult?.handwrittenName, singleScanStudents);
+          
+          if (learnedMatch) {
+            // Use learned correction (highest confidence)
+            setAutoIdentifiedStudent({
+              studentId: learnedMatch.studentId,
+              studentName: learnedMatch.studentName,
+              confidence: 'learned',
+              handwrittenName: identResult?.handwrittenName,
+            });
+            setSingleScanStudentId(learnedMatch.studentId);
+            toast.success('Student identified from learned correction!', {
+              icon: <GraduationCap className="h-4 w-4" />,
+            });
+          } else if (identResult?.matchedStudentId) {
             setAutoIdentifiedStudent({
               studentId: identResult.matchedStudentId,
               studentName: identResult.matchedStudentName || 'Unknown',
@@ -195,7 +227,7 @@ export default function Scan() {
         toast.success('Image uploaded! Choose analysis method.');
       }
     }
-  }, [scanMode, batch, selectedClassId, singleScanClassId, students, singleScanStudents, scanImageForQR, identifyStudent]);
+  }, [scanMode, batch, selectedClassId, singleScanClassId, students, singleScanStudents, scanImageForQR, identifyStudent, findLearnedMatch]);
 
   const handleSolutionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -833,37 +865,55 @@ export default function Scan() {
 
                   {/* AI Name Recognition Banner */}
                   {!detectedQR && autoIdentifiedStudent && (
-                    <Card className={autoIdentifiedStudent.confidence === 'high' || autoIdentifiedStudent.confidence === 'medium'
-                      ? "border-blue-500/50 bg-blue-500/10"
-                      : "border-amber-500/50 bg-amber-500/10"
+                    <Card className={
+                      autoIdentifiedStudent.confidence === 'learned'
+                        ? "border-green-500/50 bg-green-500/10"
+                        : autoIdentifiedStudent.confidence === 'high' || autoIdentifiedStudent.confidence === 'medium'
+                        ? "border-blue-500/50 bg-blue-500/10"
+                        : "border-amber-500/50 bg-amber-500/10"
                     }>
                       <CardContent className="p-3">
                         <div className="flex items-center gap-3">
                           <div className={`p-2 rounded-full ${
-                            autoIdentifiedStudent.confidence === 'high' || autoIdentifiedStudent.confidence === 'medium'
+                            autoIdentifiedStudent.confidence === 'learned'
+                              ? 'bg-green-500/20'
+                              : autoIdentifiedStudent.confidence === 'high' || autoIdentifiedStudent.confidence === 'medium'
                               ? 'bg-blue-500/20'
                               : 'bg-amber-500/20'
                           }`}>
-                            <UserCheck className={`h-5 w-5 ${
-                              autoIdentifiedStudent.confidence === 'high' || autoIdentifiedStudent.confidence === 'medium'
-                                ? 'text-blue-600'
-                                : 'text-amber-600'
-                            }`} />
+                            {autoIdentifiedStudent.confidence === 'learned' ? (
+                              <GraduationCap className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <UserCheck className={`h-5 w-5 ${
+                                autoIdentifiedStudent.confidence === 'high' || autoIdentifiedStudent.confidence === 'medium'
+                                  ? 'text-blue-600'
+                                  : 'text-amber-600'
+                              }`} />
+                            )}
                           </div>
                           <div className="flex-1">
                             {autoIdentifiedStudent.studentId ? (
                               <>
                                 <p className={`font-medium ${
-                                  autoIdentifiedStudent.confidence === 'high'
+                                  autoIdentifiedStudent.confidence === 'learned'
+                                    ? 'text-green-700 dark:text-green-400'
+                                    : autoIdentifiedStudent.confidence === 'high'
                                     ? 'text-blue-700 dark:text-blue-400'
                                     : autoIdentifiedStudent.confidence === 'medium'
                                     ? 'text-blue-600 dark:text-blue-300'
                                     : 'text-amber-700 dark:text-amber-400'
                                 }`}>
-                                  {autoIdentifiedStudent.confidence === 'high' ? 'Student Identified!' : 'Possible Match Found'}
+                                  {autoIdentifiedStudent.confidence === 'learned' 
+                                    ? 'Learned Match!' 
+                                    : autoIdentifiedStudent.confidence === 'high' 
+                                    ? 'Student Identified!' 
+                                    : 'Possible Match Found'}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  Matched "{autoIdentifiedStudent.handwrittenName}" → <strong>{autoIdentifiedStudent.studentName}</strong>
+                                  {autoIdentifiedStudent.confidence === 'learned' 
+                                    ? <>Matched "{autoIdentifiedStudent.handwrittenName}" → <strong>{autoIdentifiedStudent.studentName}</strong> (from your corrections)</>
+                                    : <>Matched "{autoIdentifiedStudent.handwrittenName}" → <strong>{autoIdentifiedStudent.studentName}</strong></>
+                                  }
                                 </p>
                               </>
                             ) : (
@@ -890,7 +940,19 @@ export default function Scan() {
                                   icon: <RotateCcw className="h-4 w-4" />,
                                 });
                                 const identResult = await identifyStudent(finalImage, singleScanStudents);
-                                if (identResult?.matchedStudentId) {
+                                
+                                // Check learned corrections again
+                                const learnedMatch = findLearnedMatch(identResult?.handwrittenName, singleScanStudents);
+                                
+                                if (learnedMatch) {
+                                  setAutoIdentifiedStudent({
+                                    studentId: learnedMatch.studentId,
+                                    studentName: learnedMatch.studentName,
+                                    confidence: 'learned',
+                                    handwrittenName: identResult?.handwrittenName,
+                                  });
+                                  setSingleScanStudentId(learnedMatch.studentId);
+                                } else if (identResult?.matchedStudentId) {
                                   setAutoIdentifiedStudent({
                                     studentId: identResult.matchedStudentId,
                                     studentName: identResult.matchedStudentName || 'Unknown',
@@ -921,23 +983,26 @@ export default function Scan() {
                             <Badge 
                               variant="secondary" 
                               className={
-                                autoIdentifiedStudent.confidence === 'high'
+                                autoIdentifiedStudent.confidence === 'learned'
+                                  ? 'bg-green-500/20 text-green-700 dark:text-green-400'
+                                  : autoIdentifiedStudent.confidence === 'high'
                                   ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400'
                                   : autoIdentifiedStudent.confidence === 'medium'
                                   ? 'bg-blue-500/20 text-blue-600 dark:text-blue-300'
                                   : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
                               }
                             >
-                              {autoIdentifiedStudent.confidence === 'high' ? 'High confidence' 
+                              {autoIdentifiedStudent.confidence === 'learned' ? 'Learned'
+                                : autoIdentifiedStudent.confidence === 'high' ? 'High confidence' 
                                 : autoIdentifiedStudent.confidence === 'medium' ? 'Verify match'
                                 : 'Manual select'}
                             </Badge>
                           </div>
                         </div>
-                        {autoIdentifiedStudent.confidence !== 'high' && (
+                        {autoIdentifiedStudent.confidence !== 'high' && autoIdentifiedStudent.confidence !== 'learned' && (
                           <div className="mt-2 pt-2 border-t border-dashed">
                             <p className="text-xs text-muted-foreground">
-                              Please verify the student selection is correct before proceeding
+                              Please verify the student selection is correct before proceeding. Your correction will improve future matches.
                             </p>
                           </div>
                         )}
@@ -1244,14 +1309,35 @@ export default function Scan() {
                           selectedClassId={singleScanClassId}
                           selectedStudentId={singleScanStudentId || currentStudentId}
                           onClassChange={setSingleScanClassId}
-                          onStudentChange={(id) => {
+                          onStudentChange={async (id) => {
+                            const previousStudentId = singleScanStudentId || autoIdentifiedStudent?.studentId;
                             setSingleScanStudentId(id);
+                            
                             if (id) {
+                              // Check if this is a correction (AI identified a different student or no student)
+                              const isCorrection = autoIdentifiedStudent?.handwrittenName && 
+                                autoIdentifiedStudent.confidence !== 'learned' &&
+                                id !== previousStudentId;
+                              
+                              if (isCorrection) {
+                                // Save the correction for learning
+                                await saveCorrection(autoIdentifiedStudent.handwrittenName!, id);
+                              }
+                              
                               setShowStudentPicker(false);
-                              toast.success('Student associated. You can now save analytics.');
+                              toast.success(isCorrection 
+                                ? 'Student corrected & saved for future matching!' 
+                                : 'Student associated. You can now save analytics.'
+                              );
                             }
                           }}
                         />
+                        {autoIdentifiedStudent?.handwrittenName && (
+                          <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
+                            <GraduationCap className="h-3.5 w-3.5 inline mr-1" />
+                            Selecting a different student will teach the system to recognize "{autoIdentifiedStudent.handwrittenName}" correctly next time.
+                          </p>
+                        )}
                       </div>
                     </DialogContent>
                   </Dialog>

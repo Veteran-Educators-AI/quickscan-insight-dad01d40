@@ -543,6 +543,64 @@ export type Database = {
           },
         ]
       }
+      name_corrections: {
+        Row: {
+          class_id: string
+          correct_student_id: string
+          created_at: string
+          handwritten_name: string
+          id: string
+          normalized_name: string
+          teacher_id: string
+          times_used: number
+          updated_at: string
+        }
+        Insert: {
+          class_id: string
+          correct_student_id: string
+          created_at?: string
+          handwritten_name: string
+          id?: string
+          normalized_name: string
+          teacher_id: string
+          times_used?: number
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string
+          correct_student_id?: string
+          created_at?: string
+          handwritten_name?: string
+          id?: string
+          normalized_name?: string
+          teacher_id?: string
+          times_used?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "name_corrections_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "name_corrections_correct_student_id_fkey"
+            columns: ["correct_student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "name_corrections_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_scans: {
         Row: {
           class_id: string | null
