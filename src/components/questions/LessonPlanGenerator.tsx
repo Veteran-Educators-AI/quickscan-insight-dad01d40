@@ -980,7 +980,7 @@ export function LessonPlanGenerator({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Presentation className="h-5 w-5" />
@@ -991,121 +991,121 @@ export function LessonPlanGenerator({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {!lessonPlan ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <label className="text-sm font-medium mb-2 block">Lesson Duration</label>
-                  <Select value={lessonDuration} onValueChange={setLessonDuration}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30 minutes">30 minutes</SelectItem>
-                      <SelectItem value="45 minutes">45 minutes</SelectItem>
-                      <SelectItem value="60 minutes">60 minutes</SelectItem>
-                      <SelectItem value="90 minutes">90 minutes (block)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {topic && (
-                <Card className="bg-muted/50">
-                  <CardContent className="pt-4">
-                    <div className="flex items-start gap-3">
-                      <BookOpen className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium">{topic.topicName}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Standard: {topic.standard} {topic.subject && `• ${topic.subject}`}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              <Button
-                onClick={generateLessonPlan}
-                disabled={!topic || isGenerating}
-                className="w-full"
-                size="lg"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating Lesson Plan...
-                  </>
-                ) : (
-                  <>
-                    <Presentation className="h-4 w-4 mr-2" />
-                    Generate Lesson Plan
-                  </>
-                )}
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Lesson header with edit toggle */}
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  {isEditing ? (
-                    <Input
-                      value={lessonPlan.title}
-                      onChange={(e) => updateLessonTitle(e.target.value)}
-                      className="text-lg font-bold mb-2"
-                    />
-                  ) : (
-                    <h3 className="text-lg font-bold">{lessonPlan.title}</h3>
-                  )}
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline">{lessonPlan.standard}</Badge>
-                    <Badge variant="secondary" className="gap-1">
-                      <Clock className="h-3 w-3" />
-                      {lessonPlan.duration}
-                    </Badge>
+        <ScrollArea className="flex-1 pr-4">
+          <div className="space-y-3">
+            {!lessonPlan ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <label className="text-sm font-medium mb-1 block">Lesson Duration</label>
+                    <Select value={lessonDuration} onValueChange={setLessonDuration}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="30 minutes">30 minutes</SelectItem>
+                        <SelectItem value="45 minutes">45 minutes</SelectItem>
+                        <SelectItem value="60 minutes">60 minutes</SelectItem>
+                        <SelectItem value="90 minutes">90 minutes (block)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  {isEditing ? (
-                    <Textarea
-                      value={lessonPlan.objective}
-                      onChange={(e) => updateObjective(e.target.value)}
-                      className="text-sm mt-2"
-                      rows={2}
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-2">{lessonPlan.objective}</p>
-                  )}
                 </div>
+
+                {topic && (
+                  <Card className="bg-muted/50">
+                    <CardContent className="py-3">
+                      <div className="flex items-start gap-3">
+                        <BookOpen className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium">{topic.topicName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Standard: {topic.standard} {topic.subject && `• ${topic.subject}`}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <Button
-                  variant={isEditing ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setIsEditing(!isEditing);
-                    setEditingContentIndex(null);
-                  }}
-                  className="ml-2"
+                  onClick={generateLessonPlan}
+                  disabled={!topic || isGenerating}
+                  className="w-full"
                 >
-                  {isEditing ? (
+                  {isGenerating ? (
                     <>
-                      <Check className="h-4 w-4 mr-1" />
-                      Done
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating Lesson Plan...
                     </>
                   ) : (
                     <>
-                      <Pencil className="h-4 w-4 mr-1" />
-                      Edit
+                      <Presentation className="h-4 w-4 mr-2" />
+                      Generate Lesson Plan
                     </>
                   )}
                 </Button>
               </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Lesson header with edit toggle */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    {isEditing ? (
+                      <Input
+                        value={lessonPlan.title}
+                        onChange={(e) => updateLessonTitle(e.target.value)}
+                        className="text-base font-bold mb-1 h-8"
+                      />
+                    ) : (
+                      <h3 className="text-base font-bold truncate">{lessonPlan.title}</h3>
+                    )}
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="text-xs">{lessonPlan.standard}</Badge>
+                      <Badge variant="secondary" className="gap-1 text-xs">
+                        <Clock className="h-3 w-3" />
+                        {lessonPlan.duration}
+                      </Badge>
+                    </div>
+                    {isEditing ? (
+                      <Textarea
+                        value={lessonPlan.objective}
+                        onChange={(e) => updateObjective(e.target.value)}
+                        className="text-sm mt-1"
+                        rows={2}
+                      />
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{lessonPlan.objective}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant={isEditing ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setIsEditing(!isEditing);
+                      setEditingContentIndex(null);
+                    }}
+                    className="flex-shrink-0 h-7 px-2 text-xs"
+                  >
+                    {isEditing ? (
+                      <>
+                        <Check className="h-3 w-3 mr-1" />
+                        Done
+                      </>
+                    ) : (
+                      <>
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Edit
+                      </>
+                    )}
+                  </Button>
+                </div>
 
-              <Separator />
+                <Separator />
 
-              {/* Slide viewer */}
-              {currentSlideData && (
-                <Card className={`${getSlideTypeColor(currentSlideData.slideType)} min-h-[300px]`}>
+                {/* Slide viewer */}
+                {currentSlideData && (
+                  <Card className={`${getSlideTypeColor(currentSlideData.slideType)} min-h-[180px]`}>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       {isEditing ? (
@@ -1286,120 +1286,116 @@ export function LessonPlanGenerator({
                 </Button>
               </div>
 
-              {/* Speaker notes */}
-              <Card className="bg-muted/50">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Speaker Notes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isEditing ? (
-                    <Textarea
-                      value={currentSlideData?.speakerNotes || ''}
-                      onChange={(e) => updateSpeakerNotes(e.target.value)}
-                      placeholder="Add speaker notes for this slide..."
-                      className="text-sm"
-                      rows={3}
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {currentSlideData?.speakerNotes || 'No speaker notes for this slide.'}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Recommended worksheets */}
-              {lessonPlan.recommendedWorksheets.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Printer className="h-4 w-4" />
-                      Recommended Worksheets (Aligned to Standards)
+                {/* Speaker notes - collapsible */}
+                <Card className="bg-muted/50">
+                  <CardHeader className="py-2 px-3">
+                    <CardTitle className="text-xs flex items-center gap-2">
+                      <FileText className="h-3 w-3" />
+                      Speaker Notes
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {lessonPlan.recommendedWorksheets.map((worksheet, index) => (
-                        <Badge key={index} variant="outline" className="py-1.5">
-                          {worksheet.topicName}
-                          <span className="ml-1 text-muted-foreground">({worksheet.standard})</span>
-                          <span className="ml-1 text-xs opacity-75">• {worksheet.difficulty}</span>
-                        </Badge>
-                      ))}
-                    </div>
+                  <CardContent className="py-2 px-3">
+                    {isEditing ? (
+                      <Textarea
+                        value={currentSlideData?.speakerNotes || ''}
+                        onChange={(e) => updateSpeakerNotes(e.target.value)}
+                        placeholder="Add speaker notes for this slide..."
+                        className="text-xs"
+                        rows={2}
+                      />
+                    ) : (
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {currentSlideData?.speakerNotes || 'No speaker notes for this slide.'}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
-              )}
 
-              {/* Actions */}
-              <div className="flex flex-wrap gap-2 pt-2">
-                <Button onClick={saveLessonPlan} disabled={isSaving} variant="default" className="flex-1 min-w-[140px]">
-                  {isSaving ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  Save to Library
-                </Button>
-                <Button onClick={downloadAsPowerPoint} variant="outline" className="flex-1 min-w-[140px]">
-                  <FileType className="h-4 w-4 mr-2" />
-                  PowerPoint
-                </Button>
-                <Button onClick={downloadAsPDF} variant="outline" className="flex-1 min-w-[140px]">
-                  <Download className="h-4 w-4 mr-2" />
-                  PDF
-                </Button>
-                <Button onClick={() => setShowHandoutDialog(true)} variant="outline" className="flex-1 min-w-[140px]">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Student Handout
-                </Button>
-                <Button 
-                  onClick={pushToSisterApps} 
-                  disabled={isPushingToSisterApp || !classId}
-                  variant="secondary"
-                  className="flex-1 min-w-[140px]"
-                >
-                  {isPushingToSisterApp ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Pushing...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Push to Sister Apps
-                    </>
-                  )}
-                </Button>
-                {onOpenLibrary && (
-                  <Button
-                    onClick={() => {
-                      onOpenLibrary();
-                    }}
-                    variant="ghost"
-                    className="min-w-[120px]"
-                  >
-                    <Library className="h-4 w-4 mr-2" />
-                    View Library
-                  </Button>
+                {/* Recommended worksheets - compact */}
+                {lessonPlan.recommendedWorksheets.length > 0 && (
+                  <Card>
+                    <CardHeader className="py-2 px-3">
+                      <CardTitle className="text-xs flex items-center gap-2">
+                        <Printer className="h-3 w-3" />
+                        Recommended Worksheets
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="py-2 px-3">
+                      <div className="flex flex-wrap gap-1">
+                        {lessonPlan.recommendedWorksheets.map((worksheet, index) => (
+                          <Badge key={index} variant="outline" className="text-xs py-0.5">
+                            {worksheet.topicName}
+                            <span className="ml-1 opacity-75">• {worksheet.difficulty}</span>
+                          </Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
-                <Button 
-                  onClick={() => {
-                    setLessonPlan(null);
-                    setCurrentSlide(0);
-                  }} 
-                  variant="ghost"
-                  className="min-w-[120px]"
-                >
-                  Generate New
-                </Button>
-              </div>
+
+                {/* Actions - compact grid layout */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5 pt-2">
+                  <Button onClick={saveLessonPlan} disabled={isSaving} variant="default" size="sm" className="h-8 px-2 text-xs">
+                    {isSaving ? (
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <Save className="h-3 w-3 mr-1" />
+                    )}
+                    Save
+                  </Button>
+                  <Button onClick={downloadAsPowerPoint} variant="outline" size="sm" className="h-8 px-2 text-xs">
+                    <FileType className="h-3 w-3 mr-1" />
+                    PPTX
+                  </Button>
+                  <Button onClick={downloadAsPDF} variant="outline" size="sm" className="h-8 px-2 text-xs">
+                    <Download className="h-3 w-3 mr-1" />
+                    PDF
+                  </Button>
+                  <Button onClick={() => setShowHandoutDialog(true)} variant="outline" size="sm" className="h-8 px-2 text-xs">
+                    <FileSpreadsheet className="h-3 w-3 mr-1" />
+                    Handout
+                  </Button>
+                  <Button 
+                    onClick={pushToSisterApps} 
+                    disabled={isPushingToSisterApp || !classId}
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                  >
+                    {isPushingToSisterApp ? (
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <Send className="h-3 w-3 mr-1" />
+                    )}
+                    Push
+                  </Button>
+                  {onOpenLibrary && (
+                    <Button
+                      onClick={() => onOpenLibrary()}
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                    >
+                      <Library className="h-3 w-3 mr-1" />
+                      Library
+                    </Button>
+                  )}
+                  <Button 
+                    onClick={() => {
+                      setLessonPlan(null);
+                      setCurrentSlide(0);
+                    }} 
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                  >
+                    New
+                  </Button>
+                </div>
             </div>
           )}
-        </div>
+          </div>
+        </ScrollArea>
 
         {/* Student Handout Customization Dialog */}
         {lessonPlan && (
