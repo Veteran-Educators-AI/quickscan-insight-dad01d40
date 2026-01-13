@@ -32,6 +32,9 @@ interface AnalysisResult {
   grade?: number;
   gradeJustification?: string;
   feedback: string;
+  nysStandard?: string;
+  regentsScore?: number;
+  regentsScoreJustification?: string;
 }
 
 interface RemediationQuestion {
@@ -85,11 +88,34 @@ export function AnalysisResults({
     return 'text-orange-600';
   };
 
+  const getGradeBgColor = (grade: number) => {
+    if (grade >= 90) return 'bg-green-100 dark:bg-green-900/30';
+    if (grade >= 80) return 'bg-blue-100 dark:bg-blue-900/30';
+    if (grade >= 70) return 'bg-yellow-100 dark:bg-yellow-900/30';
+    return 'bg-orange-100 dark:bg-orange-900/30';
+  };
+
   const getGradeBadge = (grade: number) => {
     if (grade >= 90) return { label: 'Exceeds Standards', variant: 'default' as const };
     if (grade >= 80) return { label: 'Meets Standards', variant: 'secondary' as const };
     if (grade >= 70) return { label: 'Approaching Standards', variant: 'outline' as const };
     return { label: 'Below Standards', variant: 'destructive' as const };
+  };
+
+  const getRegentsScoreColor = (score: number) => {
+    if (score >= 4) return 'bg-green-500 text-white';
+    if (score >= 3) return 'bg-blue-500 text-white';
+    if (score >= 2) return 'bg-yellow-500 text-white';
+    if (score >= 1) return 'bg-orange-500 text-white';
+    return 'bg-red-500 text-white';
+  };
+
+  const getRegentsScoreLabel = (score: number) => {
+    if (score >= 4) return 'Thorough Understanding';
+    if (score >= 3) return 'Adequate Understanding';
+    if (score >= 2) return 'Partial Understanding';
+    if (score >= 1) return 'Limited Understanding';
+    return 'No Understanding';
   };
 
   const handleGradeOverride = (newGrade: number, newJustification: string) => {
@@ -111,43 +137,77 @@ export function AnalysisResults({
 
   return (
     <div className="space-y-4">
-      {/* Grade Summary */}
-      <Card className={isOverridden ? 'border-primary' : ''}>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center justify-between text-lg">
-            <div className="flex items-center gap-2">
-              <span>Analysis Results</span>
-              {isOverridden && (
-                <Badge variant="outline" className="text-xs">Teacher Override</Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={gradeBadge.variant}>{gradeBadge.label}</Badge>
-              <GradeOverrideDialog
-                currentGrade={grade}
-                currentJustification={gradeJustification}
-                onOverride={handleGradeOverride}
-                disabled={isSaving}
-              />
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Grade Display */}
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <div className="flex justify-between mb-1">
-                <span className="text-sm text-muted-foreground">Grade (55-100 scale)</span>
-                <span className={`font-bold ${getGradeColor(grade)}`}>
-                  {grade}
+      {/* Prominent Score Display */}
+      <Card className={`${isOverridden ? 'border-primary' : 'border-2'}`}>
+        <CardContent className="p-6">
+          {/* Main Score Row */}
+          <div className="flex items-center justify-between gap-4 mb-4">
+            {/* Regents Score Badge */}
+            {result.regentsScore !== undefined && (
+              <div className="flex flex-col items-center">
+                <span className="text-xs font-medium text-muted-foreground mb-1">NYS Regents</span>
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center ${getRegentsScoreColor(result.regentsScore)}`}>
+                  <span className="text-2xl font-bold">{result.regentsScore}</span>
+                </div>
+                <span className="text-xs font-medium mt-1 text-center max-w-20">
+                  {getRegentsScoreLabel(result.regentsScore)}
                 </span>
               </div>
-              <Progress value={(grade - 55) / 45 * 100} className="h-3" />
+            )}
+
+            {/* Grade Display */}
+            <div className={`flex-1 text-center rounded-lg p-4 ${getGradeBgColor(grade)}`}>
+              <span className="text-xs font-medium text-muted-foreground block mb-1">Final Grade</span>
+              <div className={`text-5xl font-bold ${getGradeColor(grade)}`}>
+                {grade}
+              </div>
+              <Badge variant={gradeBadge.variant} className="mt-2">
+                {gradeBadge.label}
+              </Badge>
             </div>
-            <div className={`text-3xl font-bold ${getGradeColor(grade)}`}>
-              {grade}
+
+            {/* Raw Score */}
+            <div className="flex flex-col items-center">
+              <span className="text-xs font-medium text-muted-foreground mb-1">Raw Score</span>
+              <div className="w-16 h-16 rounded-full border-4 border-muted flex items-center justify-center">
+                <div className="text-center">
+                  <span className={`text-lg font-bold ${getScoreColor(result.totalScore.percentage)}`}>
+                    {result.totalScore.earned}
+                  </span>
+                  <span className="text-xs text-muted-foreground">/{result.totalScore.possible}</span>
+                </div>
+              </div>
+              <span className={`text-xs font-medium mt-1 ${getScoreColor(result.totalScore.percentage)}`}>
+                {result.totalScore.percentage}%
+              </span>
             </div>
           </div>
+
+          {/* NYS Standard Badge */}
+          {result.nysStandard && (
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/20 border-purple-300 text-purple-700 dark:text-purple-300">
+                📐 {result.nysStandard}
+              </Badge>
+            </div>
+          )}
+
+          {/* Progress Bar */}
+          <div className="mb-4">
+            <div className="flex justify-between mb-1">
+              <span className="text-xs text-muted-foreground">Grade Scale (55-100)</span>
+              <span className="text-xs text-muted-foreground">{grade}/100</span>
+            </div>
+            <Progress value={(grade - 55) / 45 * 100} className="h-2" />
+          </div>
+
+          {/* Regents Score Justification */}
+          {result.regentsScoreJustification && (
+            <div className="bg-muted/50 rounded-md p-3 mb-3">
+              <p className="text-xs font-medium text-muted-foreground mb-1">NYS Regents Scoring Rationale</p>
+              <p className="text-sm">{result.regentsScoreJustification}</p>
+            </div>
+          )}
 
           {/* Grade Justification */}
           {result.gradeJustification && (
@@ -157,18 +217,19 @@ export function AnalysisResults({
             </div>
           )}
 
-          <Separator />
-
-          {/* Raw Score */}
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <div className="flex justify-between mb-1">
-                <span className="text-sm text-muted-foreground">Raw Score</span>
-                <span className={`font-medium ${getScoreColor(result.totalScore.percentage)}`}>
-                  {result.totalScore.earned} / {result.totalScore.possible} ({result.totalScore.percentage}%)
-                </span>
-              </div>
+          {/* Override indicator and button */}
+          <div className="flex items-center justify-between mt-4 pt-4 border-t">
+            <div className="flex items-center gap-2">
+              {isOverridden && (
+                <Badge variant="outline" className="text-xs bg-primary/10">Teacher Override Applied</Badge>
+              )}
             </div>
+            <GradeOverrideDialog
+              currentGrade={grade}
+              currentJustification={gradeJustification}
+              onOverride={handleGradeOverride}
+              disabled={isSaving}
+            />
           </div>
         </CardContent>
       </Card>
