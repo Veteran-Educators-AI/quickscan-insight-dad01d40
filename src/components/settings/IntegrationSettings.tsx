@@ -30,14 +30,24 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { Loader2, Webhook, TestTube, CheckCircle2, AlertCircle, Link2, Cloud, Folder, RefreshCw, Settings2 } from "lucide-react";
+import { Loader2, Webhook, TestTube, CheckCircle2, AlertCircle, Link2, Cloud, Folder, RefreshCw, Settings2, Unplug } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { useGoogleDrive } from "@/hooks/useGoogleDrive";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { GoogleDriveAutoSyncConfig } from "@/components/scan/GoogleDriveAutoSyncConfig";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function IntegrationSettings() {
   // ============================================================================
@@ -86,6 +96,8 @@ export function IntegrationSettings() {
   const [driveChecked, setDriveChecked] = useState(false);
   const [showAutoSyncConfig, setShowAutoSyncConfig] = useState(false);
   const [autoSyncFolder, setAutoSyncFolder] = useState<{ id: string; name: string; interval: number } | null>(null);
+  const [showDisconnectDriveDialog, setShowDisconnectDriveDialog] = useState(false);
+  const [isDisconnectingDrive, setIsDisconnectingDrive] = useState(false);
 
   // ============================================================================
   // LOAD SETTINGS ON COMPONENT MOUNT
@@ -272,8 +284,32 @@ export function IntegrationSettings() {
   };
 
   // ============================================================================
-  // LOADING STATE UI
+  // DISCONNECT GOOGLE DRIVE
   // ============================================================================
+  const handleDisconnectDrive = async () => {
+    setIsDisconnectingDrive(true);
+    try {
+      // Sign out and sign back in to remove Google OAuth tokens
+      // This effectively disconnects Google Drive by removing the provider token
+      await supabase.auth.signOut();
+      toast({
+        title: "Google Drive disconnected",
+        description: "You've been signed out. Please sign back in to continue.",
+      });
+      // User will be redirected to login
+    } catch (error: any) {
+      console.error('Error disconnecting Google Drive:', error);
+      toast({
+        title: "Disconnect failed",
+        description: error.message || "Failed to disconnect Google Drive.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDisconnectingDrive(false);
+      setShowDisconnectDriveDialog(false);
+    }
+  };
+
   // Show a spinner while we're loading settings from the database
   if (isLoading) {
     return (
@@ -517,9 +553,22 @@ export function IntegrationSettings() {
               </div>
             </div>
             {driveChecked && (
-              <Badge variant={driveConnected ? 'default' : 'secondary'} className={driveConnected ? 'bg-green-600' : ''}>
-                {driveConnected ? 'Connected' : 'Not Connected'}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {driveConnected && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setShowDisconnectDriveDialog(true)}
+                  >
+                    <Unplug className="h-4 w-4 mr-1" />
+                    Disconnect
+                  </Button>
+                )}
+                <Badge variant={driveConnected ? 'default' : 'secondary'} className={driveConnected ? 'bg-green-600' : ''}>
+                  {driveConnected ? 'Connected' : 'Not Connected'}
+                </Badge>
+              </div>
             )}
           </div>
 
@@ -629,6 +678,36 @@ export function IntegrationSettings() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Google Drive Disconnect Confirmation Dialog */}
+      <AlertDialog open={showDisconnectDriveDialog} onOpenChange={setShowDisconnectDriveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect Google Drive?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will sign you out to remove Google Drive access. You'll need to sign back in to continue using the app, 
+              and can reconnect Google Drive anytime from settings.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDisconnectingDrive}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDisconnectDrive}
+              disabled={isDisconnectingDrive}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDisconnectingDrive ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Disconnecting...
+                </>
+              ) : (
+                'Disconnect'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
