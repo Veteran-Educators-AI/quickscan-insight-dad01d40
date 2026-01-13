@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType, Pencil, Check, Plus, Trash2, X, Save, Library, ArrowUp, ArrowDown, Layers } from 'lucide-react';
+import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType, Pencil, Check, Plus, Trash2, X, Save, Library, ArrowUp, ArrowDown, Layers, FileSpreadsheet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
@@ -370,6 +370,246 @@ export function LessonPlanGenerator({
     toast({
       title: 'PDF downloaded',
       description: 'Your lesson plan has been saved as a PDF.',
+    });
+  };
+
+  // Helper function to create fill-in-the-blank text
+  const createFillInBlank = (text: string): { display: string; answers: string[] } => {
+    const words = text.split(' ');
+    const answers: string[] = [];
+    
+    // Find important words (longer words, likely key terms)
+    const importantWords = words.filter((word, index) => {
+      const cleanWord = word.replace(/[.,!?;:'"()]/g, '');
+      return cleanWord.length >= 5 && 
+             !['which', 'where', 'there', 'these', 'those', 'would', 'could', 'should', 'about', 'after', 'before', 'between', 'through'].includes(cleanWord.toLowerCase());
+    });
+    
+    // Select up to 2 words to blank out per sentence
+    const wordsToBlank = importantWords.slice(0, Math.min(2, importantWords.length));
+    
+    const display = words.map(word => {
+      const cleanWord = word.replace(/[.,!?;:'"()]/g, '');
+      if (wordsToBlank.includes(word)) {
+        answers.push(cleanWord);
+        const punctuation = word.replace(cleanWord, '');
+        return '_'.repeat(Math.max(8, cleanWord.length)) + punctuation;
+      }
+      return word;
+    }).join(' ');
+    
+    return { display, answers };
+  };
+
+  const downloadStudentHandout = () => {
+    if (!lessonPlan) return;
+
+    const pdf = new jsPDF();
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 20;
+    const contentWidth = pageWidth - 2 * margin;
+    let yPosition = margin;
+
+    // Header
+    pdf.setFontSize(18);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Student Notes', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 10;
+    
+    pdf.setFontSize(14);
+    pdf.text(lessonPlan.title, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 8;
+    
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`Standard: ${lessonPlan.standard}`, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 12;
+
+    // Name and date line
+    pdf.setFontSize(11);
+    pdf.text('Name: _______________________________', margin, yPosition);
+    pdf.text('Date: ________________', pageWidth - margin - 50, yPosition);
+    yPosition += 10;
+
+    // Objective (fill in the blank)
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Learning Objective:', margin, yPosition);
+    yPosition += 7;
+    pdf.setFont('helvetica', 'normal');
+    const objectiveBlank = createFillInBlank(lessonPlan.objective);
+    const objectiveLines = pdf.splitTextToSize(objectiveBlank.display, contentWidth);
+    pdf.text(objectiveLines, margin, yPosition);
+    yPosition += objectiveLines.length * 6 + 8;
+
+    // Answer key collection
+    const allAnswers: { section: string; answers: string[] }[] = [];
+    if (objectiveBlank.answers.length > 0) {
+      allAnswers.push({ section: 'Objective', answers: objectiveBlank.answers });
+    }
+
+    // Process instruction and example slides for notes
+    const noteSlides = lessonPlan.slides.filter(s => 
+      ['instruction', 'example', 'objective'].includes(s.slideType)
+    );
+
+    noteSlides.forEach((slide, slideIndex) => {
+      if (yPosition > pageHeight - 50) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+
+      // Section header
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`${slideIndex + 1}. ${slide.title}`, margin, yPosition);
+      yPosition += 8;
+
+      const slideAnswers: string[] = [];
+
+      // Fill-in-the-blank notes
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      slide.content.forEach((item, itemIndex) => {
+        if (yPosition > pageHeight - 30) {
+          pdf.addPage();
+          yPosition = margin;
+        }
+
+        const blankVersion = createFillInBlank(item);
+        slideAnswers.push(...blankVersion.answers);
+        
+        const lines = pdf.splitTextToSize(`• ${blankVersion.display}`, contentWidth - 5);
+        pdf.text(lines, margin + 5, yPosition);
+        yPosition += lines.length * 5 + 4;
+      });
+
+      if (slideAnswers.length > 0) {
+        allAnswers.push({ section: slide.title, answers: slideAnswers });
+      }
+
+      yPosition += 5;
+    });
+
+    // Practice problems section
+    const practiceSlides = lessonPlan.slides.filter(s => s.slideType === 'practice');
+    
+    if (practiceSlides.length > 0) {
+      if (yPosition > pageHeight - 60) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Practice Problems', margin, yPosition);
+      yPosition += 10;
+
+      practiceSlides.forEach((slide, index) => {
+        if (yPosition > pageHeight - 40) {
+          pdf.addPage();
+          yPosition = margin;
+        }
+
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`Practice ${index + 1}: ${slide.title}`, margin, yPosition);
+        yPosition += 7;
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        slide.content.forEach((item, i) => {
+          if (yPosition > pageHeight - 25) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+
+          const lines = pdf.splitTextToSize(`${i + 1}. ${item}`, contentWidth - 10);
+          pdf.text(lines, margin + 5, yPosition);
+          yPosition += lines.length * 5 + 3;
+          
+          // Add work space
+          yPosition += 15;
+          pdf.setDrawColor(200, 200, 200);
+          pdf.line(margin + 10, yPosition, pageWidth - margin, yPosition);
+          yPosition += 8;
+        });
+
+        yPosition += 5;
+      });
+    }
+
+    // Summary section with blanks
+    const summarySlides = lessonPlan.slides.filter(s => s.slideType === 'summary');
+    
+    if (summarySlides.length > 0) {
+      if (yPosition > pageHeight - 60) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Key Takeaways', margin, yPosition);
+      yPosition += 10;
+
+      summarySlides.forEach(slide => {
+        const summaryAnswers: string[] = [];
+        
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        slide.content.forEach(item => {
+          if (yPosition > pageHeight - 25) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+
+          const blankVersion = createFillInBlank(item);
+          summaryAnswers.push(...blankVersion.answers);
+          
+          const lines = pdf.splitTextToSize(`✓ ${blankVersion.display}`, contentWidth);
+          pdf.text(lines, margin, yPosition);
+          yPosition += lines.length * 5 + 4;
+        });
+
+        if (summaryAnswers.length > 0) {
+          allAnswers.push({ section: 'Key Takeaways', answers: summaryAnswers });
+        }
+      });
+    }
+
+    // Answer key page (for teacher)
+    pdf.addPage();
+    yPosition = margin;
+    
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('ANSWER KEY (Teacher Copy)', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 12;
+
+    pdf.setFontSize(10);
+    allAnswers.forEach(section => {
+      if (yPosition > pageHeight - 20) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(section.section + ':', margin, yPosition);
+      yPosition += 6;
+
+      pdf.setFont('helvetica', 'normal');
+      const answersText = section.answers.join(', ');
+      const answerLines = pdf.splitTextToSize(answersText, contentWidth - 10);
+      pdf.text(answerLines, margin + 5, yPosition);
+      yPosition += answerLines.length * 5 + 6;
+    });
+
+    pdf.save(`${lessonPlan.title.replace(/\s+/g, '_')}_Student_Handout.pdf`);
+    
+    toast({
+      title: 'Student handout downloaded',
+      description: 'Fill-in-the-blank notes with answer key included.',
     });
   };
 
@@ -968,6 +1208,10 @@ export function LessonPlanGenerator({
                 <Button onClick={downloadAsPDF} variant="outline" className="flex-1 min-w-[140px]">
                   <Download className="h-4 w-4 mr-2" />
                   PDF
+                </Button>
+                <Button onClick={downloadStudentHandout} variant="outline" className="flex-1 min-w-[140px]">
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Student Handout
                 </Button>
                 <Button 
                   onClick={pushToSisterApps} 
