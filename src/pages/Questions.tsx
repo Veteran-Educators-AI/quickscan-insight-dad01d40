@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { NYS_SUBJECTS, searchTopics, type JMAPTopic, type TopicCategory } from '@/data/nysTopics';
 import { WorksheetBuilder, type WorksheetQuestion } from '@/components/questions/WorksheetBuilder';
 import { DifferentiatedWorksheetGenerator } from '@/components/questions/DifferentiatedWorksheetGenerator';
+import { LessonPlanGenerator } from '@/components/questions/LessonPlanGenerator';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Questions() {
@@ -25,6 +26,8 @@ export default function Questions() {
 const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(false);
   const [diagnosticMode, setDiagnosticMode] = useState(false);
   const [initialTopicsForGenerator, setInitialTopicsForGenerator] = useState<{ topicName: string; standard: string }[]>([]);
+  const [showLessonGenerator, setShowLessonGenerator] = useState(false);
+  const [selectedLessonTopic, setSelectedLessonTopic] = useState<{ topicName: string; standard: string; subject?: string } | null>(null);
 
   // Get selected topics as array for passing to generator
   const getSelectedTopicsArray = () => {
@@ -79,6 +82,26 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
     setInitialTopicsForGenerator(topicsArray);
     setDiagnosticMode(false);
     setShowDifferentiatedGenerator(true);
+  };
+
+  const openLessonPlanGenerator = () => {
+    const topicsArray = getAllTopicsArray();
+    if (topicsArray.length === 0) {
+      toast({
+        title: 'No topics selected',
+        description: 'Please select at least one topic to create a lesson plan.',
+      });
+      return;
+    }
+    // Use the first selected topic for the lesson plan
+    const firstTopic = topicsArray[0];
+    const currentSubjectData = NYS_SUBJECTS.find(s => s.id === selectedSubject);
+    setSelectedLessonTopic({
+      topicName: firstTopic.topicName,
+      standard: firstTopic.standard,
+      subject: currentSubjectData?.name,
+    });
+    setShowLessonGenerator(true);
   };
 
   // Get current subject data
@@ -427,6 +450,19 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                   </Tooltip>
                 )}
               </Button>
+              <Button 
+                onClick={openLessonPlanGenerator}
+                data-tour="create-lesson"
+                className="bg-amber-600 hover:bg-amber-700"
+              >
+                <Presentation className="h-4 w-4 mr-2" />
+                Create Lesson Plan
+                {(selectedTopics.size > 0 || worksheetQuestions.length > 0) && (
+                  <Badge variant="secondary" className="ml-2 bg-white/20 text-white">
+                    {getAllTopicsArray().length}
+                  </Badge>
+                )}
+              </Button>
             </TooltipProvider>
           </div>
         </div>
@@ -671,6 +707,19 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
         }}
         diagnosticMode={diagnosticMode}
         initialTopics={initialTopicsForGenerator}
+      />
+
+      {/* Lesson Plan Generator Modal */}
+      <LessonPlanGenerator
+        open={showLessonGenerator}
+        onOpenChange={(open) => {
+          setShowLessonGenerator(open);
+          if (!open) {
+            setSelectedLessonTopic(null);
+          }
+        }}
+        topic={selectedLessonTopic}
+        relatedTopics={getAllTopicsArray()}
       />
     </AppLayout>
   );

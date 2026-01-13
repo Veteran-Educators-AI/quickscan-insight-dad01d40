@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, QrCode, Square, Users, Eye, MessageCircle, Link2, ChevronRight } from 'lucide-react';
+import { Sparkles, QrCode, Square, Users, Eye, MessageCircle, Link2, ChevronRight, Presentation } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Increment this version when adding new features
-const CURRENT_VERSION = '1.6.0';
+const CURRENT_VERSION = '1.7.0';
 const STORAGE_KEY = 'scan-genius-last-seen-version';
 
 interface Update {
@@ -21,6 +21,23 @@ interface Update {
 }
 
 const updates: Update[] = [
+  {
+    version: '1.7.0',
+    date: 'January 2026',
+    title: 'AI Lesson Plan Generator',
+    features: [
+      {
+        icon: <Presentation className="h-5 w-5 text-primary" />,
+        title: 'PowerPoint-Style Lesson Plans',
+        description: 'Generate complete standards-aligned lesson plans with slides, examples, speaker notes, and recommended worksheets.',
+      },
+      {
+        icon: <Link2 className="h-5 w-5 text-primary" />,
+        title: 'Push Lessons to Sister Apps',
+        description: 'Share lesson plans with connected apps to assign gamified practice activities for students.',
+      },
+    ],
+  },
   {
     version: '1.6.0',
     date: 'January 2026',
