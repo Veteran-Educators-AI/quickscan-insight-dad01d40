@@ -14,10 +14,22 @@ import {
   School,
   MessageSquare,
   Clock,
-  FileText
+  FileText,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -58,6 +70,8 @@ export default function Dashboard() {
   const [selectedTheme, setSelectedTheme] = useState<PresentationTheme | null>(null);
   const [recentLessons, setRecentLessons] = useState<RecentLessonPlan[]>([]);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const [lessonToDelete, setLessonToDelete] = useState<RecentLessonPlan | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     async function fetchStats() {
@@ -157,6 +171,29 @@ export default function Dashboard() {
     });
     setSelectedTheme(null);
     setShowLessonGenerator(true);
+  };
+
+  const handleDeleteLesson = async () => {
+    if (!lessonToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('lesson_plans')
+        .delete()
+        .eq('id', lessonToDelete.id);
+
+      if (error) throw error;
+
+      setRecentLessons(prev => prev.filter(l => l.id !== lessonToDelete.id));
+      toast.success('Lesson plan deleted');
+    } catch (error) {
+      console.error('Error deleting lesson plan:', error);
+      toast.error('Failed to delete lesson plan');
+    } finally {
+      setIsDeleting(false);
+      setLessonToDelete(null);
+    }
   };
 
   const quickActions = [
@@ -304,10 +341,12 @@ export default function Dashboard() {
                   {recentLessons.map((lesson) => (
                     <div
                       key={lesson.id}
-                      onClick={() => handleOpenExistingLesson(lesson)}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors"
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors group"
                     >
-                      <div className="flex items-start gap-3 min-w-0">
+                      <div 
+                        onClick={() => handleOpenExistingLesson(lesson)}
+                        className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer"
+                      >
                         <div className="p-2 rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 shrink-0">
                           <Presentation className="h-4 w-4" />
                         </div>
@@ -318,9 +357,22 @@ export default function Dashboard() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
-                        <Clock className="h-3 w-3" />
-                        {format(new Date(lesson.created_at), 'MMM d')}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {format(new Date(lesson.created_at), 'MMM d')}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLessonToDelete(lesson);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -414,6 +466,28 @@ export default function Dashboard() {
           presentationTheme={selectedTheme}
           existingLessonId={selectedLessonId}
         />
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!lessonToDelete} onOpenChange={(open) => !open && setLessonToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Lesson Plan</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete "{lessonToDelete?.title}"? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeleteLesson}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );
