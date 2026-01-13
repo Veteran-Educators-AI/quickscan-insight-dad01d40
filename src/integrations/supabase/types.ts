@@ -496,6 +496,72 @@ export type Database = {
           },
         ]
       }
+      lesson_plans: {
+        Row: {
+          class_id: string | null
+          created_at: string
+          duration: string
+          id: string
+          is_favorite: boolean
+          objective: string
+          recommended_worksheets: Json
+          slides: Json
+          standard: string
+          subject: string | null
+          teacher_id: string
+          title: string
+          topic_name: string
+          updated_at: string
+        }
+        Insert: {
+          class_id?: string | null
+          created_at?: string
+          duration: string
+          id?: string
+          is_favorite?: boolean
+          objective: string
+          recommended_worksheets?: Json
+          slides?: Json
+          standard: string
+          subject?: string | null
+          teacher_id: string
+          title: string
+          topic_name: string
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string | null
+          created_at?: string
+          duration?: string
+          id?: string
+          is_favorite?: boolean
+          objective?: string
+          recommended_worksheets?: Json
+          slides?: Json
+          standard?: string
+          subject?: string | null
+          teacher_id?: string
+          title?: string
+          topic_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_plans_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_plans_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mfa_recovery_codes: {
         Row: {
           code_hash: string

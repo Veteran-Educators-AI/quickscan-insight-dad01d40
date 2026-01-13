@@ -1108,6 +1108,153 @@ export const LOTE_TOPICS: TopicCategory[] = [
   },
 ];
 
+export const GOVERNMENT_TOPICS: TopicCategory[] = [
+  {
+    category: 'FOUNDATIONS OF GOVERNMENT',
+    topics: [
+      { name: 'Purposes of Government', standard: 'NYS.SS.9-12.CIV.1', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Types of Government', standard: 'NYS.SS.9-12.CIV.2', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Constitutional Principles', standard: 'NYS.SS.9-12.CIV.3', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Federalism', standard: 'NYS.SS.9-12.CIV.4', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Separation of Powers', standard: 'NYS.SS.9-12.CIV.5', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Checks and Balances', standard: 'NYS.SS.9-12.CIV.6', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+  {
+    category: 'LEGISLATIVE BRANCH',
+    topics: [
+      { name: 'Structure of Congress', standard: 'NYS.SS.9-12.CIV.7', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Powers of Congress', standard: 'NYS.SS.9-12.CIV.8', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'How a Bill Becomes Law', standard: 'NYS.SS.9-12.CIV.9', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Congressional Committees', standard: 'NYS.SS.9-12.CIV.10', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Representation and Redistricting', standard: 'NYS.SS.9-12.CIV.11', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+  {
+    category: 'EXECUTIVE BRANCH',
+    topics: [
+      { name: 'Presidential Powers', standard: 'NYS.SS.9-12.CIV.12', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Executive Orders', standard: 'NYS.SS.9-12.CIV.13', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'The Cabinet and Federal Agencies', standard: 'NYS.SS.9-12.CIV.14', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Presidential Succession', standard: 'NYS.SS.9-12.CIV.15', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Electoral College', standard: 'NYS.SS.9-12.CIV.16', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+  {
+    category: 'JUDICIAL BRANCH',
+    topics: [
+      { name: 'Structure of Federal Courts', standard: 'NYS.SS.9-12.CIV.17', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Supreme Court Powers', standard: 'NYS.SS.9-12.CIV.18', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Judicial Review', standard: 'NYS.SS.9-12.CIV.19', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Landmark Supreme Court Cases', standard: 'NYS.SS.9-12.CIV.20', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Rights of the Accused', standard: 'NYS.SS.9-12.CIV.21', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+  {
+    category: 'RIGHTS AND RESPONSIBILITIES',
+    topics: [
+      { name: 'Bill of Rights', standard: 'NYS.SS.9-12.CIV.22', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Civil Liberties', standard: 'NYS.SS.9-12.CIV.23', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Civil Rights', standard: 'NYS.SS.9-12.CIV.24', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Citizenship and Naturalization', standard: 'NYS.SS.9-12.CIV.25', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Civic Participation', standard: 'NYS.SS.9-12.CIV.26', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+  {
+    category: 'POLITICAL PROCESS',
+    topics: [
+      { name: 'Political Parties', standard: 'NYS.SS.9-12.CIV.27', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Elections and Voting', standard: 'NYS.SS.9-12.CIV.28', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Interest Groups and Lobbying', standard: 'NYS.SS.9-12.CIV.29', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Media and Public Opinion', standard: 'NYS.SS.9-12.CIV.30', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Campaign Finance', standard: 'NYS.SS.9-12.CIV.31', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+];
+
+export const ECONOMICS_TOPICS: TopicCategory[] = [
+  {
+    category: 'BASIC ECONOMIC CONCEPTS',
+    topics: [
+      { name: 'Scarcity and Choice', standard: 'NYS.SS.9-12.ECO.1', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Opportunity Cost', standard: 'NYS.SS.9-12.ECO.2', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Factors of Production', standard: 'NYS.SS.9-12.ECO.3', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Economic Systems', standard: 'NYS.SS.9-12.ECO.4', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Circular Flow Model', standard: 'NYS.SS.9-12.ECO.5', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+  {
+    category: 'SUPPLY AND DEMAND',
+    topics: [
+      { name: 'Law of Demand', standard: 'NYS.SS.9-12.ECO.6', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Law of Supply', standard: 'NYS.SS.9-12.ECO.7', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Market Equilibrium', standard: 'NYS.SS.9-12.ECO.8', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Price Elasticity', standard: 'NYS.SS.9-12.ECO.9', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Shifts in Supply and Demand', standard: 'NYS.SS.9-12.ECO.10', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+  {
+    category: 'MARKET STRUCTURES',
+    topics: [
+      { name: 'Perfect Competition', standard: 'NYS.SS.9-12.ECO.11', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Monopoly', standard: 'NYS.SS.9-12.ECO.12', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Oligopoly', standard: 'NYS.SS.9-12.ECO.13', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Monopolistic Competition', standard: 'NYS.SS.9-12.ECO.14', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Market Failures', standard: 'NYS.SS.9-12.ECO.15', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+  {
+    category: 'MACROECONOMICS',
+    topics: [
+      { name: 'Gross Domestic Product (GDP)', standard: 'NYS.SS.9-12.ECO.16', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Inflation and Deflation', standard: 'NYS.SS.9-12.ECO.17', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Unemployment', standard: 'NYS.SS.9-12.ECO.18', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Business Cycle', standard: 'NYS.SS.9-12.ECO.19', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Economic Indicators', standard: 'NYS.SS.9-12.ECO.20', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+  {
+    category: 'MONEY AND BANKING',
+    topics: [
+      { name: 'Functions of Money', standard: 'NYS.SS.9-12.ECO.21', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Federal Reserve System', standard: 'NYS.SS.9-12.ECO.22', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Monetary Policy', standard: 'NYS.SS.9-12.ECO.23', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Interest Rates', standard: 'NYS.SS.9-12.ECO.24', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Banking System', standard: 'NYS.SS.9-12.ECO.25', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+  {
+    category: 'GOVERNMENT AND THE ECONOMY',
+    topics: [
+      { name: 'Fiscal Policy', standard: 'NYS.SS.9-12.ECO.26', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Taxation', standard: 'NYS.SS.9-12.ECO.27', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Government Spending', standard: 'NYS.SS.9-12.ECO.28', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'National Debt', standard: 'NYS.SS.9-12.ECO.29', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Trade Policy', standard: 'NYS.SS.9-12.ECO.30', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+  {
+    category: 'INTERNATIONAL ECONOMICS',
+    topics: [
+      { name: 'International Trade', standard: 'NYS.SS.9-12.ECO.31', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Comparative Advantage', standard: 'NYS.SS.9-12.ECO.32', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Exchange Rates', standard: 'NYS.SS.9-12.ECO.33', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Trade Barriers', standard: 'NYS.SS.9-12.ECO.34', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Globalization', standard: 'NYS.SS.9-12.ECO.35', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+  {
+    category: 'PERSONAL FINANCE',
+    topics: [
+      { name: 'Budgeting', standard: 'NYS.SS.9-12.ECO.36', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Saving and Investing', standard: 'NYS.SS.9-12.ECO.37', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Credit and Debt', standard: 'NYS.SS.9-12.ECO.38', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Insurance', standard: 'NYS.SS.9-12.ECO.39', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+      { name: 'Consumer Rights', standard: 'NYS.SS.9-12.ECO.40', url: 'https://www.nysed.gov/curriculum-instruction/k-12-social-studies' },
+    ],
+  },
+];
+
 export const NYS_SUBJECTS: Subject[] = [
   {
     id: 'geometry',
@@ -1174,6 +1321,18 @@ export const NYS_SUBJECTS: Subject[] = [
     name: 'Languages Other Than English (LOTE)',
     shortName: 'LOTE',
     categories: LOTE_TOPICS,
+  },
+  {
+    id: 'government',
+    name: 'Government',
+    shortName: 'GOV',
+    categories: GOVERNMENT_TOPICS,
+  },
+  {
+    id: 'economics',
+    name: 'Economics',
+    shortName: 'ECON',
+    categories: ECONOMICS_TOPICS,
   },
 ];
 

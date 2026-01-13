@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import { NYS_SUBJECTS, searchTopics, type JMAPTopic, type TopicCategory } from '
 import { WorksheetBuilder, type WorksheetQuestion } from '@/components/questions/WorksheetBuilder';
 import { DifferentiatedWorksheetGenerator } from '@/components/questions/DifferentiatedWorksheetGenerator';
 import { LessonPlanGenerator } from '@/components/questions/LessonPlanGenerator';
+import { LessonPlanLibrary } from '@/components/questions/LessonPlanLibrary';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Questions() {
@@ -28,6 +29,7 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
   const [initialTopicsForGenerator, setInitialTopicsForGenerator] = useState<{ topicName: string; standard: string }[]>([]);
   const [showLessonGenerator, setShowLessonGenerator] = useState(false);
   const [selectedLessonTopic, setSelectedLessonTopic] = useState<{ topicName: string; standard: string; subject?: string } | null>(null);
+  const [showLessonLibrary, setShowLessonLibrary] = useState(false);
 
   // Get selected topics as array for passing to generator
   const getSelectedTopicsArray = () => {
@@ -720,6 +722,16 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
         }}
         topic={selectedLessonTopic}
         relatedTopics={getAllTopicsArray()}
+        onOpenLibrary={() => {
+          setShowLessonGenerator(false);
+          setShowLessonLibrary(true);
+        }}
+      />
+
+      {/* Lesson Plan Library Modal */}
+      <LessonPlanLibrary
+        open={showLessonLibrary}
+        onOpenChange={setShowLessonLibrary}
       />
     </AppLayout>
   );
