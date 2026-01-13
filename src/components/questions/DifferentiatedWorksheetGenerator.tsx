@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes } from 'lucide-react';
+import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw } from 'lucide-react';
 import { QuestionPreviewPanel } from './QuestionPreviewPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -1121,6 +1121,91 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     }
   };
 
+  // Regenerate a single question
+  const regenerateSingleQuestion = async (cacheKey: string, questionType: 'warmUp' | 'main', questionIndex: number) => {
+    if (!previewData) return;
+
+    const [form, level] = cacheKey.split('-');
+    setIsGenerating(true);
+    setRegeneratingKey(`${cacheKey}-${questionType}-${questionIndex}`);
+    setGenerationStatus(`Regenerating ${questionType === 'warmUp' ? 'warm-up' : 'practice'} question ${questionIndex + 1}...`);
+
+    try {
+      const topicsPayload = selectedTopics.length > 0
+        ? selectedTopics.map(t => ({
+            topicName: t,
+            standard: customTopics.find(ct => ct.topicName === t)?.standard || '',
+            subject: 'Mathematics',
+            category: questionType === 'warmUp' ? 'Warm-Up' : 'Differentiated Practice',
+          }))
+        : [{ topicName: 'General Math', standard: '', subject: 'Mathematics', category: questionType === 'warmUp' ? 'Warm-Up' : 'Differentiated Practice' }];
+
+      const difficultyLevels = questionType === 'warmUp'
+        ? [warmUpDifficulty]
+        : level === 'A' || level === 'B'
+        ? ['hard', 'challenging']
+        : level === 'C' || level === 'D'
+        ? ['medium', 'hard']
+        : ['easy', 'super-easy', 'medium'];
+
+      const { data } = await supabase.functions.invoke('generate-worksheet-questions', {
+        body: {
+          topics: topicsPayload,
+          questionCount: 1, // Only generate one question
+          difficultyLevels,
+          worksheetMode: questionType === 'warmUp' ? 'warmup' : 'diagnostic',
+          formVariation: form,
+          formSeed: Date.now(), // New seed for unique question
+          includeHints,
+          includeGeometry,
+          useAIImages,
+        },
+      });
+
+      if (data?.questions?.[0]) {
+        const newQuestion = {
+          ...data.questions[0],
+          questionNumber: questionIndex + 1,
+        };
+
+        const newQuestions = { ...previewData.questions };
+        const questionSet = { ...newQuestions[cacheKey] };
+        
+        if (questionType === 'warmUp') {
+          const updatedWarmUp = [...questionSet.warmUp];
+          updatedWarmUp[questionIndex] = newQuestion;
+          questionSet.warmUp = updatedWarmUp;
+        } else {
+          const updatedMain = [...questionSet.main];
+          updatedMain[questionIndex] = newQuestion;
+          questionSet.main = updatedMain;
+        }
+        
+        newQuestions[cacheKey] = questionSet;
+
+        setPreviewData({
+          ...previewData,
+          questions: newQuestions,
+        });
+
+        toast({
+          title: 'Question regenerated',
+          description: `New ${questionType === 'warmUp' ? 'warm-up' : 'practice'} question generated.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error regenerating question:', error);
+      toast({
+        title: 'Regeneration failed',
+        description: 'Could not regenerate question.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+      setRegeneratingKey(null);
+    }
+  };
+
   // Render preview worksheet for a student
   const renderStudentPreview = (student: StudentWithDiagnostic, index: number) => {
     if (!previewData) return null;
@@ -1239,24 +1324,51 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               🔥 Warm-Up Questions
             </h3>
             <div className="space-y-3">
-              {questions.warmUp.map((q, idx) => (
-                <div key={idx} className="p-2 border rounded bg-gray-50">
-                  <p className="text-sm font-medium">W{idx + 1}. {q.question}</p>
-                  {/* Show geometry shapes in preview */}
-                  {(q.imageUrl || q.svg) && includeGeometry && (
-                    <div className="mt-2 flex justify-center">
-                      <img 
-                        src={q.imageUrl || q.svg} 
-                        alt="Geometry diagram" 
-                        className="max-w-[150px] max-h-[150px] border rounded"
-                      />
+              {questions.warmUp.map((q, idx) => {
+                const isQuestionRegenerating = regeneratingKey === `${cacheKey}-warmUp-${idx}`;
+                return (
+                  <div key={idx} className={`p-2 border rounded bg-gray-50 relative group ${isQuestionRegenerating ? 'opacity-50' : ''}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium flex-1">W{idx + 1}. {q.question}</p>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                              onClick={() => regenerateSingleQuestion(cacheKey, 'warmUp', idx)}
+                              disabled={isGenerating}
+                            >
+                              {isQuestionRegenerating ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Regenerate this question</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
-                  )}
-                  {q.hint && includeHints && (
-                    <p className="text-xs text-muted-foreground mt-1 italic">Hint: {q.hint}</p>
-                  )}
-                </div>
-              ))}
+                    {/* Show geometry shapes in preview */}
+                    {(q.imageUrl || q.svg) && includeGeometry && (
+                      <div className="mt-2 flex justify-center">
+                        <img 
+                          src={q.imageUrl || q.svg} 
+                          alt="Geometry diagram" 
+                          className="max-w-[150px] max-h-[150px] border rounded"
+                        />
+                      </div>
+                    )}
+                    {q.hint && includeHints && (
+                      <p className="text-xs text-muted-foreground mt-1 italic">Hint: {q.hint}</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -1268,28 +1380,55 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               📝 Practice Questions
             </h3>
             <div className="space-y-4">
-              {questions.main.map((q, idx) => (
-                <div key={idx} className="p-3 border rounded">
-                  <p className="text-sm font-medium">{idx + 1}. {q.question}</p>
-                  {/* Show geometry shapes in preview */}
-                  {(q.imageUrl || q.svg) && includeGeometry && (
-                    <div className="mt-2 flex justify-center">
-                      <img 
-                        src={q.imageUrl || q.svg} 
-                        alt="Geometry diagram" 
-                        className="max-w-[180px] max-h-[180px] border rounded"
-                      />
+              {questions.main.map((q, idx) => {
+                const isQuestionRegenerating = regeneratingKey === `${cacheKey}-main-${idx}`;
+                return (
+                  <div key={idx} className={`p-3 border rounded relative group ${isQuestionRegenerating ? 'opacity-50' : ''}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium flex-1">{idx + 1}. {q.question}</p>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                              onClick={() => regenerateSingleQuestion(cacheKey, 'main', idx)}
+                              disabled={isGenerating}
+                            >
+                              {isQuestionRegenerating ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Regenerate this question</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
-                  )}
-                  {q.hint && includeHints && (
-                    <p className="text-xs text-muted-foreground mt-1 italic">Hint: {q.hint}</p>
-                  )}
-                  {/* Answer space */}
-                  <div className="mt-3 border-t pt-2">
-                    <div className="h-16 border border-dashed rounded bg-gray-50"></div>
+                    {/* Show geometry shapes in preview */}
+                    {(q.imageUrl || q.svg) && includeGeometry && (
+                      <div className="mt-2 flex justify-center">
+                        <img 
+                          src={q.imageUrl || q.svg} 
+                          alt="Geometry diagram" 
+                          className="max-w-[180px] max-h-[180px] border rounded"
+                        />
+                      </div>
+                    )}
+                    {q.hint && includeHints && (
+                      <p className="text-xs text-muted-foreground mt-1 italic">Hint: {q.hint}</p>
+                    )}
+                    {/* Answer space */}
+                    <div className="mt-3 border-t pt-2">
+                      <div className="h-16 border border-dashed rounded bg-gray-50"></div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
