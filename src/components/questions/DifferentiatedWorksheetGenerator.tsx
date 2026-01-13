@@ -1757,6 +1757,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="1">1 question</SelectItem>
+                  <SelectItem value="2">2 questions</SelectItem>
                   <SelectItem value="3">3 questions</SelectItem>
                   <SelectItem value="5">5 questions</SelectItem>
                   <SelectItem value="8">8 questions</SelectItem>

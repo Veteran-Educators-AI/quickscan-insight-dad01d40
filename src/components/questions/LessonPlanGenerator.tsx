@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType, Pencil, Check, Plus, Trash2, X, Save, Library, ArrowUp, ArrowDown, Layers, FileSpreadsheet } from 'lucide-react';
+import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType, Pencil, Check, Plus, Trash2, X, Save, Library, ArrowUp, ArrowDown, Layers, FileSpreadsheet, Move } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
@@ -16,7 +16,8 @@ import { useAuth } from '@/lib/auth';
 import jsPDF from 'jspdf';
 import pptxgen from 'pptxgenjs';
 import { StudentHandoutDialog, type HandoutOptions } from './StudentHandoutDialog';
-import { SlideClipartPicker, getClipartSvg, getClipartPosition, type SlideClipart } from './SlideClipartPicker';
+import { SlideClipartPicker, getClipartSvg, getClipartPosition, getClipartLibrary, type SlideClipart } from './SlideClipartPicker';
+import { DraggableClipart } from './DraggableClipart';
 
 interface LessonSlide {
   slideNumber: number;
@@ -157,12 +158,33 @@ export function LessonPlanGenerator({
     }
   }, [open]);
 
+  // Ref for the slide container (for draggable clipart)
+  const slideContainerRef = useRef<HTMLDivElement>(null);
+
   // Update clipart for a specific slide
   const updateSlideClipart = (slideIndex: number, clipart: SlideClipart[]) => {
     setSlideClipart(prev => ({
       ...prev,
       [slideIndex]: clipart
     }));
+  };
+
+  // Update clipart position
+  const updateClipartPosition = (slideIndex: number, clipartIndex: number, x: number, y: number) => {
+    setSlideClipart(prev => {
+      const currentClipart = prev[slideIndex] || [];
+      const updated = [...currentClipart];
+      updated[clipartIndex] = { ...updated[clipartIndex], position: 'custom', x, y };
+      return { ...prev, [slideIndex]: updated };
+    });
+  };
+
+  // Remove clipart by index
+  const removeClipartByIndex = (slideIndex: number, clipartIndex: number) => {
+    setSlideClipart(prev => {
+      const currentClipart = prev[slideIndex] || [];
+      return { ...prev, [slideIndex]: currentClipart.filter((_, i) => i !== clipartIndex) };
+    });
   };
 
   // Edit handlers
@@ -839,7 +861,8 @@ export function LessonPlanGenerator({
         const svg = getClipartSvg(item.clipartId);
         if (!svg) return;
         
-        const pos = getClipartPosition(item.position, item.size);
+        // Pass custom x/y coordinates to getClipartPosition
+        const pos = getClipartPosition(item.position, item.size, item.x, item.y);
         
         // Add a colored shape as a placeholder (pptxgenjs doesn't support inline SVG directly)
         // We'll add a shape with the clipart styling
@@ -1371,7 +1394,22 @@ export function LessonPlanGenerator({
 
                 {/* Slide viewer */}
                 {currentSlideData && (
-                  <Card className={`${getSlideTypeColor(currentSlideData.slideType)} min-h-[180px]`}>
+                  <Card 
+                    ref={slideContainerRef}
+                    className={`${getSlideTypeColor(currentSlideData.slideType)} min-h-[180px] relative overflow-hidden`}
+                  >
+                    {/* Draggable clipart overlays */}
+                    {(slideClipart[currentSlide]?.length > 0) && slideClipart[currentSlide].map((item, idx) => (
+                      <DraggableClipart
+                        key={`${item.clipartId}-${idx}`}
+                        item={item}
+                        index={idx}
+                        onPositionChange={(clipartIdx, x, y) => updateClipartPosition(currentSlide, clipartIdx, x, y)}
+                        onRemove={(clipartIdx) => removeClipartByIndex(currentSlide, clipartIdx)}
+                        containerRef={slideContainerRef}
+                        isEditing={isEditing}
+                      />
+                    ))}
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       {isEditing ? (
@@ -1513,19 +1551,11 @@ export function LessonPlanGenerator({
                         Add bullet point
                       </Button>
                     )}
-                    {/* Clipart preview */}
-                    {(slideClipart[currentSlide]?.length > 0) && (
-                      <div className="mt-3 flex items-center gap-2 flex-wrap">
-                        <span className="text-xs opacity-60">Clipart:</span>
-                        {slideClipart[currentSlide].map((item, idx) => (
-                          <Badge 
-                            key={idx} 
-                            variant="secondary" 
-                            className="text-[10px] py-0.5 bg-white/20 text-inherit border-white/30"
-                          >
-                            {item.clipartId.replace(/-/g, ' ')} ({item.position})
-                          </Badge>
-                        ))}
+                    {/* Clipart hint when editing */}
+                    {isEditing && (slideClipart[currentSlide]?.length > 0) && (
+                      <div className="mt-3 text-xs opacity-60 flex items-center gap-1">
+                        <Move className="h-3 w-3" />
+                        Drag clipart on slide to reposition • {slideClipart[currentSlide].length} item(s)
                       </div>
                     )}
                   </CardContent>
