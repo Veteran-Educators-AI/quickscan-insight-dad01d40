@@ -20,6 +20,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { LessonPlanGenerator } from '@/components/questions/LessonPlanGenerator';
+import { LessonTopicSelector, type PresentationTheme } from '@/components/questions/LessonTopicSelector';
 
 interface DashboardStats {
   classCount: number;
@@ -39,7 +40,10 @@ export default function Dashboard() {
     unreadComments: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [showTopicSelector, setShowTopicSelector] = useState(false);
   const [showLessonGenerator, setShowLessonGenerator] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<{ topicName: string; standard: string; subject: string } | null>(null);
+  const [selectedTheme, setSelectedTheme] = useState<PresentationTheme | null>(null);
 
   useEffect(() => {
     async function fetchStats() {
@@ -114,10 +118,17 @@ export default function Dashboard() {
     fetchStats();
   }, [user]);
 
+  const handleTopicSelected = (topic: { topicName: string; standard: string; subject: string }, theme: PresentationTheme) => {
+    setSelectedTopic(topic);
+    setSelectedTheme(theme);
+    setShowTopicSelector(false);
+    setShowLessonGenerator(true);
+  };
+
   const quickActions = [
     { label: 'Create Class', href: '/classes/new', icon: Users, color: 'bg-primary/10 text-primary' },
     { label: 'New Assessment', href: '/questions', icon: ClipboardList, color: 'bg-accent/10 text-accent' },
-    { label: 'Make a Lesson', href: null, icon: Presentation, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300', onClick: () => setShowLessonGenerator(true) },
+    { label: 'Make a Lesson', href: null, icon: Presentation, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300', onClick: () => setShowTopicSelector(true) },
     { label: 'Start Scanning', href: '/scan', icon: Camera, color: 'bg-warning/10 text-warning' },
     { label: 'View Reports', href: '/reports', icon: BarChart3, color: 'bg-success/10 text-success' },
   ];
@@ -324,11 +335,19 @@ export default function Dashboard() {
           </Card>
         )}
 
+        {/* Topic Selector Dialog */}
+        <LessonTopicSelector
+          open={showTopicSelector}
+          onOpenChange={setShowTopicSelector}
+          onSelect={handleTopicSelected}
+        />
+
         {/* Lesson Plan Generator Dialog */}
         <LessonPlanGenerator
           open={showLessonGenerator}
           onOpenChange={setShowLessonGenerator}
-          topic={{ topicName: 'Custom Lesson', standard: 'G-CO', subject: 'Geometry' }}
+          topic={selectedTopic}
+          presentationTheme={selectedTheme}
         />
       </div>
     </AppLayout>
