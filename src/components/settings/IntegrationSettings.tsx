@@ -91,6 +91,11 @@ export function IntegrationSettings() {
   // Stores the result of the last webhook test ('success' | 'error' | null)
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
 
+  // --- Sister App Test ---
+  const [isTestingSisterApp, setIsTestingSisterApp] = useState(false);
+  const [sisterAppTestResult, setSisterAppTestResult] = useState<'success' | 'error' | null>(null);
+  const [sisterAppTestMessage, setSisterAppTestMessage] = useState<string>("");
+
   // --- Google Drive Configuration ---
   const { connected: driveConnected, checkConnection: checkDriveConnection, loading: driveLoading } = useGoogleDrive();
   const [driveChecked, setDriveChecked] = useState(false);
@@ -280,6 +285,63 @@ export function IntegrationSettings() {
       });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  // ============================================================================
+  // TEST SISTER APP CONNECTION
+  // ============================================================================
+  /**
+   * Tests the connection to NYClogic Scholar by calling the push-to-sister-app
+   * edge function with a test payload.
+   */
+  const testSisterAppConnection = async () => {
+    setIsTestingSisterApp(true);
+    setSisterAppTestResult(null);
+    setSisterAppTestMessage("");
+
+    try {
+      const response = await supabase.functions.invoke('push-to-sister-app', {
+        body: {
+          class_id: 'test-connection',
+          title: 'Connection Test',
+          description: 'Testing NYClogic Scholar API connection',
+          student_id: 'test-student',
+          student_name: 'Test Student',
+          grade: 100,
+          topic_name: 'Connection Test',
+          xp_reward: 0,
+          coin_reward: 0,
+        },
+      });
+
+      if (response.error) {
+        setSisterAppTestResult('error');
+        setSisterAppTestMessage(response.error.message || 'Failed to connect');
+        toast({
+          title: "Connection failed",
+          description: response.error.message || "Could not connect to NYClogic Scholar.",
+          variant: "destructive",
+        });
+      } else {
+        setSisterAppTestResult('success');
+        setSisterAppTestMessage('Successfully connected to NYClogic Scholar!');
+        toast({
+          title: "Connection successful",
+          description: "NYClogic Scholar API is responding correctly.",
+        });
+      }
+    } catch (error: any) {
+      console.error('Sister app test error:', error);
+      setSisterAppTestResult('error');
+      setSisterAppTestMessage(error.message || 'Connection test failed');
+      toast({
+        title: "Connection failed",
+        description: error.message || "Could not connect to NYClogic Scholar.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTestingSisterApp(false);
     }
   };
 
@@ -511,6 +573,38 @@ export function IntegrationSettings() {
             <p className="text-xs text-muted-foreground mt-2">
               These secrets are used by the backend to securely communicate with NYClogic Scholar.
             </p>
+
+            {/* --- Test Connection Button --- */}
+            <div className="pt-2 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={testSisterAppConnection}
+                disabled={isTestingSisterApp}
+                className="w-full"
+              >
+                {isTestingSisterApp ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <TestTube className="h-4 w-4 mr-2" />
+                )}
+                Test Connection
+              </Button>
+            </div>
+
+            {/* --- Test Result Display --- */}
+            {sisterAppTestResult && (
+              <Alert variant={sisterAppTestResult === 'success' ? 'default' : 'destructive'} className="mt-2">
+                {sisterAppTestResult === 'success' ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <AlertCircle className="h-4 w-4" />
+                )}
+                <AlertDescription>
+                  {sisterAppTestMessage}
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
           {/* --- Enable/Disable Sister App Sync Toggle --- */}
