@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { CameraModal } from '@/components/scan/CameraModal';
+import { ContinuousQRScanner } from '@/components/scan/ContinuousQRScanner';
 import { ImagePreview } from '@/components/scan/ImagePreview';
 import { AnalysisResults } from '@/components/scan/AnalysisResults';
 import { BatchQueue } from '@/components/scan/BatchQueue';
@@ -120,6 +121,9 @@ export default function Scan() {
   
   // Multi-student grading mode
   const [showMultiStudentScanner, setShowMultiStudentScanner] = useState(false);
+  
+  // Continuous QR scanner mode
+  const [showContinuousQRScanner, setShowContinuousQRScanner] = useState(false);
   
   // Scanner import pages
   const [scannerImportPages, setScannerImportPages] = useState<{ dataUrl: string; order: number }[]>([]);
@@ -1461,7 +1465,7 @@ export default function Scan() {
                         </div>
 
                         {/* Multi-Student Tool */}
-                        <div className="pt-4 border-t">
+                        <div className="pt-4 border-t space-y-3">
                           <Button
                             variant="outline"
                             size="lg"
@@ -1472,11 +1476,28 @@ export default function Scan() {
                             <span className="font-semibold">MSG</span>
                             <span className="text-muted-foreground ml-2 text-sm">— Grade many students from one photo</span>
                           </Button>
+
+                          {/* Continuous QR Scanner */}
+                          {singleScanClassId && singleScanStudents.length > 0 && (
+                            <Button
+                              variant="outline"
+                              size="lg"
+                              className="w-full border-dashed border-2 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-950/20"
+                              onClick={() => setShowContinuousQRScanner(true)}
+                            >
+                              <ScanLine className="h-5 w-5 mr-2 text-green-600" />
+                              <span className="font-semibold text-green-700 dark:text-green-400">Bulk QR Scan</span>
+                              <span className="text-muted-foreground ml-2 text-sm">— Scan through a stack of papers</span>
+                            </Button>
+                          )}
                         </div>
 
                         <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
                           <p>💡 <strong>Tip:</strong> For best results, ensure good lighting and capture the full response</p>
                           <p>📱 QR codes on printed assessments will auto-detect student & question</p>
+                          {singleScanClassId && singleScanStudents.length > 0 && (
+                            <p>🔍 <strong>Bulk QR Scan:</strong> Point camera at QR codes to quickly identify papers</p>
+                          )}
                         </div>
                         </div>
                       </div>
@@ -1761,6 +1782,20 @@ export default function Scan() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Continuous QR Scanner */}
+      <ContinuousQRScanner
+        isOpen={showContinuousQRScanner}
+        onClose={() => setShowContinuousQRScanner(false)}
+        studentRoster={singleScanStudents}
+        onScanComplete={(scannedStudents) => {
+          if (scannedStudents.length > 0) {
+            toast.success(`Scanned ${scannedStudents.length} student papers!`, {
+              description: 'Students identified and ready for batch processing',
+            });
+          }
+        }}
+      />
     </>
   );
 }
