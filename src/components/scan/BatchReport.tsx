@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare } from 'lucide-react';
+import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { BatchItem, BatchSummary } from '@/hooks/useBatchAnalysis';
 import { StudentWorkDetailDialog } from './StudentWorkDetailDialog';
 import { StudentComparisonView } from './StudentComparisonView';
+import { GradedPapersGallery } from './GradedPapersGallery';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
@@ -21,12 +22,14 @@ interface BatchReportProps {
   items: BatchItem[];
   summary: BatchSummary;
   onExport: () => void;
+  onUpdateNotes?: (itemId: string, notes: string) => void;
 }
 
-export function BatchReport({ items, summary, onExport }: BatchReportProps) {
+export function BatchReport({ items, summary, onExport, onUpdateNotes }: BatchReportProps) {
   const [selectedStudent, setSelectedStudent] = useState<BatchItem | null>(null);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
   const [showComparison, setShowComparison] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
   const completedItems = items.filter(item => item.status === 'completed' && item.result);
 
   const toggleCompareSelection = (id: string, e: React.MouseEvent) => {
@@ -83,6 +86,10 @@ export function BatchReport({ items, summary, onExport }: BatchReportProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button onClick={() => setShowGallery(true)} variant="default">
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            View All Papers
+          </Button>
           {canCompare && (
             <Button onClick={() => setShowComparison(true)} variant="secondary">
               <GitCompare className="h-4 w-4 mr-2" />
@@ -315,6 +322,14 @@ export function BatchReport({ items, summary, onExport }: BatchReportProps) {
           result={selectedStudent.result}
         />
       )}
+
+      {/* Graded Papers Gallery */}
+      <GradedPapersGallery
+        open={showGallery}
+        onOpenChange={setShowGallery}
+        items={items}
+        onUpdateNotes={onUpdateNotes}
+      />
 
       {/* Student Comparison View */}
       {showComparison && comparisonStudents.length >= 2 && (
