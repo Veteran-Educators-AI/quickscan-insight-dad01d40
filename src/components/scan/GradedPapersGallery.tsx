@@ -260,9 +260,14 @@ export function GradedPapersGallery({
                       <div className="flex items-center justify-center gap-8">
                         <div className="text-center">
                           <span className="text-xs text-muted-foreground block">Grade</span>
-                          <span className={`text-4xl font-bold ${getGradeColor(calculateItemGrade(selectedItem))}`}>
-                            {calculateItemGrade(selectedItem)}
-                          </span>
+                          <div className="flex items-baseline justify-center gap-1">
+                            <span className={`text-4xl font-bold ${getGradeColor(calculateItemGrade(selectedItem))}`}>
+                              {calculateItemGrade(selectedItem)}
+                            </span>
+                            <span className="text-lg text-muted-foreground">
+                              ({selectedItem.result.totalScore.percentage}%)
+                            </span>
+                          </div>
                         </div>
                         {extendedResult.regentsScore !== undefined && (
                           <>
