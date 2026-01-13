@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { playSmartCaptureEffect } from '@/lib/cameraFeedback';
 
 interface CameraModalProps {
   isOpen: boolean;
@@ -152,6 +153,9 @@ export function CameraModal({ isOpen, onClose, onCapture, batchMode = false, onB
     if (!videoRef.current || !canvasRef.current || !isReady) return;
 
     setIsCapturing(true);
+    
+    // Play sound effect and haptic feedback
+    playSmartCaptureEffect();
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
