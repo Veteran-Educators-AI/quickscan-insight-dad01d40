@@ -1,5 +1,5 @@
-import { useRef, useState, useCallback } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage } from 'lucide-react';
+import { useRef, useState, useCallback, useEffect } from 'react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,6 +22,7 @@ import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
 import { usePendingScans } from '@/hooks/usePendingScans';
 import { useSaveAnalysisResults } from '@/hooks/useSaveAnalysisResults';
 import { useQRCodeScanner } from '@/hooks/useQRCodeScanner';
+import { useStudentIdentification } from '@/hooks/useStudentIdentification';
 import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
 import { MultiStudentScanner } from '@/components/scan/MultiStudentScanner';
 import { ScannerImportMode } from '@/components/scan/ScannerImportMode';
@@ -64,12 +65,14 @@ export default function Scan() {
   const [singleScanClassId, setSingleScanClassId] = useState<string | null>(null);
   const [singleScanStudentId, setSingleScanStudentId] = useState<string | null>(null);
   const [showStudentPicker, setShowStudentPicker] = useState(false);
+  const { students: singleScanStudents } = useClassStudents(singleScanClassId);
 
   const { analyze, compareWithSolution, isAnalyzing, isComparing, error, result, rawAnalysis, comparisonResult } = useAnalyzeStudentWork();
   const batch = useBatchAnalysis();
   const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans();
   const { saveResults, saveMultiQuestionResults, isSaving } = useSaveAnalysisResults();
   const { scanImageForQR, isScanning: isQRScanning, scanResult: qrScanResult, clearResult: clearQRResult } = useQRCodeScanner();
+  const { identifyStudent, isIdentifying, identificationResult, clearResult: clearIdentification } = useStudentIdentification();
   
   const [analyzingScanId, setAnalyzingScanId] = useState<string | null>(null);
   const [analyzingScanStudentId, setAnalyzingScanStudentId] = useState<string | null>(null);
@@ -81,6 +84,14 @@ export default function Scan() {
   
   // QR code detection state
   const [detectedQR, setDetectedQR] = useState<{ studentId: string; questionId: string } | null>(null);
+  
+  // Auto-identified student state
+  const [autoIdentifiedStudent, setAutoIdentifiedStudent] = useState<{
+    studentId: string;
+    studentName: string;
+    confidence: 'high' | 'medium' | 'low' | 'none';
+    handwrittenName?: string | null;
+  } | null>(null);
   
   // Get student name for display
   const currentStudentId = detectedQR?.studentId || singleScanStudentId || analyzingScanStudentId;
@@ -131,8 +142,9 @@ export default function Scan() {
     } else {
       setFinalImage(finalImageDataUrl);
       setCapturedImage(null);
+      setAutoIdentifiedStudent(null);
       
-      // Try to detect QR code
+      // Try to detect QR code first (fast local scan)
       toast.info('Scanning for QR codes...');
       const qrResult = await scanImageForQR(finalImageDataUrl);
       
@@ -143,14 +155,47 @@ export default function Scan() {
         toast.success('QR code detected! Student and question auto-identified.', {
           icon: <QrCode className="h-4 w-4" />,
         });
+        setScanState('choose-method');
       } else {
         setDetectedQR(null);
+        
+        // No QR code found - try AI-based name recognition if class is selected
+        if (singleScanClassId && singleScanStudents.length > 0) {
+          toast.info('Identifying student from handwritten name...', {
+            icon: <UserCheck className="h-4 w-4" />,
+          });
+          
+          const identResult = await identifyStudent(finalImageDataUrl, singleScanStudents);
+          
+          if (identResult?.matchedStudentId) {
+            setAutoIdentifiedStudent({
+              studentId: identResult.matchedStudentId,
+              studentName: identResult.matchedStudentName || 'Unknown',
+              confidence: identResult.confidence,
+              handwrittenName: identResult.handwrittenName,
+            });
+            setSingleScanStudentId(identResult.matchedStudentId);
+            
+            // Also set question ID if detected via QR
+            if (identResult.matchedQuestionId) {
+              setSelectedQuestionIds([identResult.matchedQuestionId]);
+            }
+          } else if (identResult?.handwrittenName) {
+            // Name detected but no match
+            setAutoIdentifiedStudent({
+              studentId: '',
+              studentName: identResult.handwrittenName,
+              confidence: 'none',
+              handwrittenName: identResult.handwrittenName,
+            });
+          }
+        }
+        
+        setScanState('choose-method');
+        toast.success('Image uploaded! Choose analysis method.');
       }
-      
-      setScanState('choose-method');
-      toast.success('Image uploaded! Choose analysis method.');
     }
-  }, [scanMode, batch, selectedClassId, students, scanImageForQR]);
+  }, [scanMode, batch, selectedClassId, singleScanClassId, students, singleScanStudents, scanImageForQR, identifyStudent]);
 
   const handleSolutionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -453,7 +498,9 @@ export default function Scan() {
     setResultsSaved(false);
     setShowStudentPicker(false);
     setDetectedQR(null);
+    setAutoIdentifiedStudent(null);
     clearQRResult();
+    clearIdentification();
   };
 
   // Handle analyzing a saved scan with multiple questions
@@ -779,6 +826,95 @@ export default function Scan() {
                           <Badge variant="secondary" className="bg-green-500/20 text-green-700 dark:text-green-400">
                             Auto-linked
                           </Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* AI Name Recognition Banner */}
+                  {!detectedQR && autoIdentifiedStudent && (
+                    <Card className={autoIdentifiedStudent.confidence === 'high' || autoIdentifiedStudent.confidence === 'medium'
+                      ? "border-blue-500/50 bg-blue-500/10"
+                      : "border-amber-500/50 bg-amber-500/10"
+                    }>
+                      <CardContent className="p-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-full ${
+                            autoIdentifiedStudent.confidence === 'high' || autoIdentifiedStudent.confidence === 'medium'
+                              ? 'bg-blue-500/20'
+                              : 'bg-amber-500/20'
+                          }`}>
+                            <UserCheck className={`h-5 w-5 ${
+                              autoIdentifiedStudent.confidence === 'high' || autoIdentifiedStudent.confidence === 'medium'
+                                ? 'text-blue-600'
+                                : 'text-amber-600'
+                            }`} />
+                          </div>
+                          <div className="flex-1">
+                            {autoIdentifiedStudent.studentId ? (
+                              <>
+                                <p className={`font-medium ${
+                                  autoIdentifiedStudent.confidence === 'high'
+                                    ? 'text-blue-700 dark:text-blue-400'
+                                    : autoIdentifiedStudent.confidence === 'medium'
+                                    ? 'text-blue-600 dark:text-blue-300'
+                                    : 'text-amber-700 dark:text-amber-400'
+                                }`}>
+                                  {autoIdentifiedStudent.confidence === 'high' ? 'Student Identified!' : 'Possible Match Found'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  Matched "{autoIdentifiedStudent.handwrittenName}" → <strong>{autoIdentifiedStudent.studentName}</strong>
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="font-medium text-amber-700 dark:text-amber-400">Name Detected</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Found "{autoIdentifiedStudent.handwrittenName}" but no matching student in roster
+                                </p>
+                              </>
+                            )}
+                          </div>
+                          <Badge 
+                            variant="secondary" 
+                            className={
+                              autoIdentifiedStudent.confidence === 'high'
+                                ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400'
+                                : autoIdentifiedStudent.confidence === 'medium'
+                                ? 'bg-blue-500/20 text-blue-600 dark:text-blue-300'
+                                : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                            }
+                          >
+                            {autoIdentifiedStudent.confidence === 'high' ? 'High confidence' 
+                              : autoIdentifiedStudent.confidence === 'medium' ? 'Verify match'
+                              : 'Manual select'}
+                          </Badge>
+                        </div>
+                        {autoIdentifiedStudent.confidence !== 'high' && (
+                          <div className="mt-2 pt-2 border-t border-dashed">
+                            <p className="text-xs text-muted-foreground">
+                              Please verify the student selection is correct before proceeding
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Identifying in progress */}
+                  {isIdentifying && (
+                    <Card className="border-primary/50 bg-primary/5">
+                      <CardContent className="p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-primary/20">
+                            <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-primary">Identifying Student...</p>
+                            <p className="text-sm text-muted-foreground">
+                              Analyzing handwritten name from the scan
+                            </p>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
