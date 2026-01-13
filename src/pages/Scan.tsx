@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,6 +27,7 @@ import { useQRCodeScanner } from '@/hooks/useQRCodeScanner';
 import { useQRScanSettings } from '@/hooks/useQRScanSettings';
 import { useStudentIdentification } from '@/hooks/useStudentIdentification';
 import { useNameCorrections } from '@/hooks/useNameCorrections';
+import { useCameraPermission } from '@/hooks/useCameraPermission';
 import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
 import { MultiStudentScanner } from '@/components/scan/MultiStudentScanner';
 import { ScannerImportMode } from '@/components/scan/ScannerImportMode';
@@ -129,6 +130,9 @@ export default function Scan() {
   
   // Scanner import pages
   const [scannerImportPages, setScannerImportPages] = useState<{ dataUrl: string; order: number }[]>([]);
+  
+  // Camera permission
+  const { status: cameraStatus, canUseCamera, requestPermission, error: cameraError, hasCamera } = useCameraPermission();
   
   // AI suggestions for manual scoring
   const [aiSuggestions, setAiSuggestions] = useState<{
@@ -1392,14 +1396,22 @@ export default function Scan() {
                     <CardContent className="p-0">
                       <div className="p-8 sm:p-12">
                         <div className="text-center space-y-6">
-                          <div className="w-24 h-24 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                            <Camera className="h-12 w-12 text-primary" />
+                          <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center ${cameraStatus === 'denied' ? 'bg-destructive/10' : 'bg-primary/10'}`}>
+                            {cameraStatus === 'denied' ? (
+                              <AlertTriangle className="h-12 w-12 text-destructive" />
+                            ) : (
+                              <Camera className="h-12 w-12 text-primary" />
+                            )}
                           </div>
 
                           <div>
-                            <h2 className="text-lg font-semibold mb-1">Ready to Scan</h2>
+                            <h2 className="text-lg font-semibold mb-1">
+                              {cameraStatus === 'denied' ? 'Camera Access Blocked' : 'Ready to Scan'}
+                            </h2>
                             <p className="text-sm text-muted-foreground">
-                              Take a photo of student work or upload an existing image
+                              {cameraStatus === 'denied' 
+                                ? 'Enable camera in browser settings or upload an image' 
+                                : 'Take a photo of student work or upload an existing image'}
                             </p>
                           </div>
 
@@ -1429,10 +1441,30 @@ export default function Scan() {
                                 variant="scan" 
                                 size="lg" 
                                 className="min-w-[180px]"
-                                onClick={() => setScanState('camera')}
+                                onClick={async () => {
+                                  if (cameraStatus === 'denied') {
+                                    toast.error('Camera access denied. Please enable it in your browser settings.', {
+                                      icon: <AlertTriangle className="h-4 w-4" />,
+                                      duration: 5000,
+                                    });
+                                    return;
+                                  }
+                                  if (!hasCamera) {
+                                    toast.error('No camera found on this device. Please upload an image instead.');
+                                    return;
+                                  }
+                                  if (cameraStatus === 'prompt') {
+                                    const granted = await requestPermission();
+                                    if (!granted) {
+                                      return;
+                                    }
+                                  }
+                                  setScanState('camera');
+                                }}
+                                disabled={!hasCamera}
                               >
                                 <Camera className="h-5 w-5 mr-2" />
-                                Open Camera
+                                {cameraStatus === 'denied' ? 'Camera Blocked' : 'Open Camera'}
                               </Button>
                               <Button 
                                 variant="outline" 
