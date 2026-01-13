@@ -19,7 +19,9 @@ import { cn } from '@/lib/utils';
 import { resizeImage, blobToBase64, applyPhotocopyFilter } from '@/lib/imageUtils';
 import { GoogleDriveImport } from './GoogleDriveImport';
 import { GoogleDriveAutoSyncConfig } from './GoogleDriveAutoSyncConfig';
+import { HotFolderAlert } from './HotFolderAlert';
 import { useGoogleDriveAutoSync, SyncedFile } from '@/hooks/useGoogleDriveAutoSync';
+import { playNotificationSound, isSoundEnabled } from '@/lib/notificationSound';
 
 interface ScanPage {
   id: string;
@@ -204,6 +206,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
     config: autoSyncConfig,
     isSyncing,
     lastSyncTime,
+    newFilesCount,
     configureSync,
     startAutoSync,
     stopAutoSync,
@@ -211,6 +214,10 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
     manualSync,
     isAutoSyncActive,
   } = useGoogleDriveAutoSync();
+
+  // Track new files for the hot folder alert
+  const [hotFolderNewFiles, setHotFolderNewFiles] = useState(0);
+  const [showHotFolderAlert, setShowHotFolderAlert] = useState(false);
 
   // Check if File System Access API is available
   useEffect(() => {
@@ -504,6 +511,14 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const handleAutoSyncFiles = useCallback(async (syncedFiles: SyncedFile[]) => {
     if (syncedFiles.length === 0) return;
     
+    // Show hot folder alert and play sound
+    setHotFolderNewFiles(prev => prev + syncedFiles.length);
+    setShowHotFolderAlert(true);
+    
+    if (isSoundEnabled()) {
+      playNotificationSound('success');
+    }
+    
     setIsProcessing(true);
     setProcessProgress(0);
     
@@ -587,6 +602,22 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
 
   return (
     <div className="space-y-4">
+      {/* Hot Folder Alert - shows when new scans are detected */}
+      {showHotFolderAlert && hotFolderNewFiles > 0 && (
+        <HotFolderAlert
+          newFilesCount={hotFolderNewFiles}
+          folderName={autoSyncConfig?.folderName}
+          onDismiss={() => {
+            setShowHotFolderAlert(false);
+            setHotFolderNewFiles(0);
+          }}
+          onViewFiles={() => {
+            setShowHotFolderAlert(false);
+            setHotFolderNewFiles(0);
+            // Scroll to page list (pages are already added)
+          }}
+        />
+      )}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
