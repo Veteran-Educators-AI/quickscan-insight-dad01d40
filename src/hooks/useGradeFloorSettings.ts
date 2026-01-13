@@ -61,27 +61,32 @@ export function useGradeFloorSettings() {
     regentsScore?: number
   ): number => {
     const { gradeFloor, gradeFloorWithEffort } = settings;
+    // CRITICAL: If there's any work, minimum is gradeFloorWithEffort (default 65)
+    // Only completely blank work gets gradeFloor (default 55)
     const minGrade = hasWork ? gradeFloorWithEffort : gradeFloor;
 
     // If regents score is available, use it for conversion
-    if (regentsScore !== undefined) {
+    if (regentsScore !== undefined && regentsScore >= 0) {
       const regentsToGrade: Record<number, number> = {
         4: 95,  // Exceeding
         3: 85,  // Meeting
         2: 75,  // Approaching
-        1: Math.max(gradeFloorWithEffort, 65),  // Limited understanding
-        0: gradeFloor,  // No understanding
+        1: Math.max(gradeFloorWithEffort, 67),  // Limited understanding - slightly above effort floor
+        0: hasWork ? gradeFloorWithEffort : gradeFloor,  // Even 0 with work gets effort floor
       };
-      return Math.max(minGrade, regentsToGrade[regentsScore] || minGrade);
+      const convertedGrade = regentsToGrade[regentsScore] ?? minGrade;
+      return Math.max(minGrade, convertedGrade);
     }
 
     // Calculate from percentage
     if (percentage > 0) {
       // Map percentage to grade range above the effort floor
-      const grade = Math.round(gradeFloorWithEffort + (percentage / 100) * (100 - gradeFloorWithEffort));
-      return Math.max(minGrade, grade);
+      const scaledGrade = Math.round(gradeFloorWithEffort + (percentage / 100) * (100 - gradeFloorWithEffort));
+      return Math.max(minGrade, scaledGrade);
     }
 
+    // No percentage but has work = effort floor
+    // No work at all = absolute floor
     return minGrade;
   };
 

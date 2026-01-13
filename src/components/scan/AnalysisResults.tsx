@@ -127,18 +127,27 @@ export function AnalysisResults({
   };
 
   // Calculate grade using teacher's grade floor settings
+  // VERY lenient check - if there's ANY content, consider it "work"
   const hasAnyPoints = result.totalScore.earned > 0;
-  const hasAnyWork = result.ocrText?.trim().length > 10 || hasAnyPoints;
+  const hasOcrContent = result.ocrText?.trim().length > 5;
+  const hasRegentsScore = (result.regentsScore ?? 0) >= 1;
+  const hasAnyWork = hasAnyPoints || hasOcrContent || hasRegentsScore;
   
-  // Use teacher-configured grade floors
+  // Use teacher-configured grade floors - enforce strictly
   const minGrade = hasAnyWork ? gradeFloorWithEffort : gradeFloor;
   const calculatedGrade = calculateGrade(
     result.totalScore.percentage, 
     hasAnyWork, 
     result.regentsScore
   );
+  
+  // Get AI grade, ensuring it respects the floor
   const aiGrade = result.grade ?? calculatedGrade;
-  const grade = overriddenGrade?.grade ?? Math.max(minGrade, aiGrade);
+  const flooredAiGrade = Math.max(minGrade, aiGrade);
+  
+  // Final grade: use override if present, otherwise use floored AI grade
+  // CRITICAL: Never show 0 - always apply minimum floor
+  const grade = overriddenGrade?.grade ?? Math.max(minGrade, flooredAiGrade);
   const gradeJustification = overriddenGrade?.justification ?? result.gradeJustification;
   const isOverridden = overriddenGrade !== null;
   const gradeBadge = getGradeBadge(grade);
