@@ -24,6 +24,7 @@ import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
 import { usePendingScans } from '@/hooks/usePendingScans';
 import { useSaveAnalysisResults } from '@/hooks/useSaveAnalysisResults';
 import { useQRCodeScanner } from '@/hooks/useQRCodeScanner';
+import { useQRScanSettings } from '@/hooks/useQRScanSettings';
 import { useStudentIdentification } from '@/hooks/useStudentIdentification';
 import { useNameCorrections } from '@/hooks/useNameCorrections';
 import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
@@ -75,6 +76,7 @@ export default function Scan() {
   const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans();
   const { saveResults, saveMultiQuestionResults, isSaving, syncStatus, resetSyncStatus } = useSaveAnalysisResults();
   const { scanImageForQR, isScanning: isQRScanning, scanResult: qrScanResult, clearResult: clearQRResult } = useQRCodeScanner();
+  const { settings: qrScanSettings } = useQRScanSettings();
   const { identifyStudent, isIdentifying, identificationResult, clearResult: clearIdentification } = useStudentIdentification();
   
   const [analyzingScanId, setAnalyzingScanId] = useState<string | null>(null);
@@ -169,72 +171,75 @@ export default function Scan() {
       // Move to choose-method state immediately so user can see their image
       setScanState('choose-method');
       
-      // Try to detect QR code in the background (fast local scan with timeout)
-      const qrResult = await scanImageForQR(finalImageDataUrl);
-      
-      if (qrResult) {
-        setDetectedQR(qrResult);
-        setSingleScanStudentId(qrResult.studentId);
+      // Only try QR detection if auto QR scanning is enabled
+      if (qrScanSettings.autoQRScanEnabled) {
+        // Try to detect QR code in the background (fast local scan with timeout)
+        const qrResult = await scanImageForQR(finalImageDataUrl);
         
-        // Only set question ID if it's a student+question QR code
-        if (qrResult.type === 'student-question' && qrResult.questionId) {
-          setSelectedQuestionIds([qrResult.questionId]);
-          toast.success('QR code detected! Student and question auto-identified.', {
-            icon: <QrCode className="h-4 w-4" />,
-          });
-        } else {
-          toast.success('Student QR code detected! Student auto-identified.', {
-            icon: <QrCode className="h-4 w-4" />,
-          });
-        }
-      } else {
-        setDetectedQR(null);
-        
-        // No QR code found - try learned corrections first, then AI-based name recognition
-        if (singleScanClassId && singleScanStudents.length > 0) {
-          const identResult = await identifyStudent(finalImageDataUrl, singleScanStudents);
+        if (qrResult) {
+          setDetectedQR(qrResult);
+          setSingleScanStudentId(qrResult.studentId);
           
-          // Check if we have a learned correction for this handwritten name
-          const learnedMatch = findLearnedMatch(identResult?.handwrittenName, singleScanStudents);
-          
-          if (learnedMatch) {
-            // Use learned correction (highest confidence)
-            setAutoIdentifiedStudent({
-              studentId: learnedMatch.studentId,
-              studentName: learnedMatch.studentName,
-              confidence: 'learned',
-              handwrittenName: identResult?.handwrittenName,
+          // Only set question ID if it's a student+question QR code
+          if (qrResult.type === 'student-question' && qrResult.questionId) {
+            setSelectedQuestionIds([qrResult.questionId]);
+            toast.success('QR code detected! Student and question auto-identified.', {
+              icon: <QrCode className="h-4 w-4" />,
             });
-            setSingleScanStudentId(learnedMatch.studentId);
-            toast.success('Student identified from learned correction!', {
-              icon: <GraduationCap className="h-4 w-4" />,
-            });
-          } else if (identResult?.matchedStudentId) {
-            setAutoIdentifiedStudent({
-              studentId: identResult.matchedStudentId,
-              studentName: identResult.matchedStudentName || 'Unknown',
-              confidence: identResult.confidence,
-              handwrittenName: identResult.handwrittenName,
-            });
-            setSingleScanStudentId(identResult.matchedStudentId);
-            
-            // Also set question ID if detected via QR
-            if (identResult.matchedQuestionId) {
-              setSelectedQuestionIds([identResult.matchedQuestionId]);
-            }
-          } else if (identResult?.handwrittenName) {
-            // Name detected but no match
-            setAutoIdentifiedStudent({
-              studentId: '',
-              studentName: identResult.handwrittenName,
-              confidence: 'none',
-              handwrittenName: identResult.handwrittenName,
+          } else {
+            toast.success('Student QR code detected! Student auto-identified.', {
+              icon: <QrCode className="h-4 w-4" />,
             });
           }
+          return; // QR found, no need for name identification
+        }
+      }
+      
+      // No QR code found (or QR scanning disabled) - try learned corrections first, then AI-based name recognition
+      setDetectedQR(null);
+      if (singleScanClassId && singleScanStudents.length > 0) {
+        const identResult = await identifyStudent(finalImageDataUrl, singleScanStudents);
+        
+        // Check if we have a learned correction for this handwritten name
+        const learnedMatch = findLearnedMatch(identResult?.handwrittenName, singleScanStudents);
+        
+        if (learnedMatch) {
+          // Use learned correction (highest confidence)
+          setAutoIdentifiedStudent({
+            studentId: learnedMatch.studentId,
+            studentName: learnedMatch.studentName,
+            confidence: 'learned',
+            handwrittenName: identResult?.handwrittenName,
+          });
+          setSingleScanStudentId(learnedMatch.studentId);
+          toast.success('Student identified from learned correction!', {
+            icon: <GraduationCap className="h-4 w-4" />,
+          });
+        } else if (identResult?.matchedStudentId) {
+          setAutoIdentifiedStudent({
+            studentId: identResult.matchedStudentId,
+            studentName: identResult.matchedStudentName || 'Unknown',
+            confidence: identResult.confidence,
+            handwrittenName: identResult.handwrittenName,
+          });
+          setSingleScanStudentId(identResult.matchedStudentId);
+          
+          // Also set question ID if detected via QR
+          if (identResult.matchedQuestionId) {
+            setSelectedQuestionIds([identResult.matchedQuestionId]);
+          }
+        } else if (identResult?.handwrittenName) {
+          // Name detected but no match
+          setAutoIdentifiedStudent({
+            studentId: '',
+            studentName: identResult.handwrittenName,
+            confidence: 'none',
+            handwrittenName: identResult.handwrittenName,
+          });
         }
       }
     }
-  }, [scanMode, batch, selectedClassId, singleScanClassId, students, singleScanStudents, scanImageForQR, identifyStudent, findLearnedMatch]);
+  }, [scanMode, batch, selectedClassId, singleScanClassId, students, singleScanStudents, scanImageForQR, identifyStudent, findLearnedMatch, qrScanSettings.autoQRScanEnabled]);
 
   const handleSolutionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

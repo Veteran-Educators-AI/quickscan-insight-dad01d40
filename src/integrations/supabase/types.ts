@@ -937,6 +937,7 @@ export type Database = {
           ai_detection_threshold: number | null
           ai_hourly_limit: number | null
           analysis_provider: string | null
+          auto_qr_scan_enabled: boolean | null
           created_at: string
           grade_floor: number | null
           grade_floor_with_effort: number | null
@@ -963,6 +964,7 @@ export type Database = {
           ai_detection_threshold?: number | null
           ai_hourly_limit?: number | null
           analysis_provider?: string | null
+          auto_qr_scan_enabled?: boolean | null
           created_at?: string
           grade_floor?: number | null
           grade_floor_with_effort?: number | null
@@ -989,6 +991,7 @@ export type Database = {
           ai_detection_threshold?: number | null
           ai_hourly_limit?: number | null
           analysis_provider?: string | null
+          auto_qr_scan_enabled?: boolean | null
           created_at?: string
           grade_floor?: number | null
           grade_floor_with_effort?: number | null
