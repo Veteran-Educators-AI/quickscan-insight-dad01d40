@@ -78,6 +78,14 @@ export function GradedPapersGallery({
     return 'text-orange-600';
   };
 
+  const getLetterGrade = (grade: number): string => {
+    if (grade >= 90) return 'A';
+    if (grade >= 80) return 'B';
+    if (grade >= 70) return 'C';
+    if (grade >= 65) return 'D';
+    return 'F';
+  };
+
   const getGradeBgColor = (grade: number) => {
     if (grade >= 90) return 'bg-green-100 dark:bg-green-900/30';
     if (grade >= 80) return 'bg-blue-100 dark:bg-blue-900/30';
@@ -260,9 +268,12 @@ export function GradedPapersGallery({
                       <div className="flex items-center justify-center gap-8">
                         <div className="text-center">
                           <span className="text-xs text-muted-foreground block">Grade</span>
-                          <div className="flex items-baseline justify-center gap-1">
+                          <div className="flex items-baseline justify-center gap-2">
                             <span className={`text-4xl font-bold ${getGradeColor(calculateItemGrade(selectedItem))}`}>
                               {calculateItemGrade(selectedItem)}
+                            </span>
+                            <span className={`text-2xl font-bold ${getGradeColor(calculateItemGrade(selectedItem))}`}>
+                              {getLetterGrade(calculateItemGrade(selectedItem))}
                             </span>
                             <span className="text-lg text-muted-foreground">
                               ({selectedItem.result.totalScore.percentage}%)
