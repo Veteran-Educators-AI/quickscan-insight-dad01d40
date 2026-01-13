@@ -6,11 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock } from 'lucide-react';
+import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import jsPDF from 'jspdf';
+import pptxgen from 'pptxgenjs';
 
 interface LessonSlide {
   slideNumber: number;
@@ -190,6 +191,171 @@ export function LessonPlanGenerator({
     toast({
       title: 'PDF downloaded',
       description: 'Your lesson plan has been saved as a PDF.',
+    });
+  };
+
+  const downloadAsPowerPoint = () => {
+    if (!lessonPlan) return;
+
+    const pptx = new pptxgen();
+    
+    // Set presentation properties
+    pptx.author = 'ScanGenius';
+    pptx.title = lessonPlan.title;
+    pptx.subject = `Lesson on ${lessonPlan.topicName}`;
+    
+    // Define slide type colors (matching the UI)
+    const slideColors: Record<string, { bg: string; text: string }> = {
+      title: { bg: '3B82F6', text: 'FFFFFF' },
+      objective: { bg: '3B82F6', text: 'FFFFFF' },
+      instruction: { bg: '10B981', text: 'FFFFFF' },
+      example: { bg: 'A855F7', text: 'FFFFFF' },
+      practice: { bg: 'F97316', text: 'FFFFFF' },
+      summary: { bg: 'F43F5E', text: 'FFFFFF' },
+    };
+
+    // Title slide
+    const titleSlide = pptx.addSlide();
+    titleSlide.addText(lessonPlan.title, {
+      x: 0.5,
+      y: 2,
+      w: 9,
+      h: 1.5,
+      fontSize: 36,
+      bold: true,
+      color: '1F2937',
+      align: 'center',
+      valign: 'middle',
+    });
+    titleSlide.addText(`Standard: ${lessonPlan.standard}`, {
+      x: 0.5,
+      y: 3.5,
+      w: 9,
+      h: 0.5,
+      fontSize: 18,
+      color: '6B7280',
+      align: 'center',
+    });
+    titleSlide.addText(`Duration: ${lessonPlan.duration}`, {
+      x: 0.5,
+      y: 4,
+      w: 9,
+      h: 0.5,
+      fontSize: 16,
+      color: '6B7280',
+      align: 'center',
+    });
+
+    // Objective slide
+    const objectiveSlide = pptx.addSlide();
+    objectiveSlide.addText('Learning Objective', {
+      x: 0.5,
+      y: 0.5,
+      w: 9,
+      h: 0.8,
+      fontSize: 28,
+      bold: true,
+      color: '1F2937',
+    });
+    objectiveSlide.addText(lessonPlan.objective, {
+      x: 0.5,
+      y: 1.5,
+      w: 9,
+      h: 3,
+      fontSize: 20,
+      color: '374151',
+      valign: 'top',
+    });
+
+    // Content slides
+    lessonPlan.slides.forEach((slide) => {
+      const colors = slideColors[slide.slideType] || { bg: 'E5E7EB', text: '1F2937' };
+      const pptSlide = pptx.addSlide();
+      
+      // Slide type badge
+      pptSlide.addText(slide.slideType.toUpperCase(), {
+        x: 0.5,
+        y: 0.3,
+        w: 1.5,
+        h: 0.35,
+        fontSize: 10,
+        bold: true,
+        color: 'FFFFFF',
+        fill: { color: colors.bg },
+        align: 'center',
+        valign: 'middle',
+      });
+
+      // Slide title
+      pptSlide.addText(slide.title, {
+        x: 0.5,
+        y: 0.8,
+        w: 9,
+        h: 0.7,
+        fontSize: 28,
+        bold: true,
+        color: '1F2937',
+      });
+
+      // Content bullets
+      const bulletPoints = slide.content.map((item) => ({
+        text: item,
+        options: { bullet: true, indentLevel: 0 },
+      }));
+
+      pptSlide.addText(bulletPoints, {
+        x: 0.5,
+        y: 1.6,
+        w: 9,
+        h: 3.5,
+        fontSize: 18,
+        color: '374151',
+        valign: 'top',
+        lineSpacing: 28,
+      });
+
+      // Speaker notes
+      if (slide.speakerNotes) {
+        pptSlide.addNotes(slide.speakerNotes);
+      }
+    });
+
+    // Recommended worksheets slide
+    if (lessonPlan.recommendedWorksheets.length > 0) {
+      const worksheetSlide = pptx.addSlide();
+      worksheetSlide.addText('Recommended Practice Worksheets', {
+        x: 0.5,
+        y: 0.5,
+        w: 9,
+        h: 0.8,
+        fontSize: 28,
+        bold: true,
+        color: '1F2937',
+      });
+
+      const worksheetBullets = lessonPlan.recommendedWorksheets.map((ws) => ({
+        text: `${ws.topicName} (${ws.standard}) - ${ws.difficulty}`,
+        options: { bullet: true, indentLevel: 0 },
+      }));
+
+      worksheetSlide.addText(worksheetBullets, {
+        x: 0.5,
+        y: 1.5,
+        w: 9,
+        h: 3.5,
+        fontSize: 18,
+        color: '374151',
+        valign: 'top',
+        lineSpacing: 28,
+      });
+    }
+
+    // Save the PowerPoint file
+    pptx.writeFile({ fileName: `${lessonPlan.title.replace(/\s+/g, '_')}_Lesson_Plan.pptx` });
+
+    toast({
+      title: 'PowerPoint downloaded',
+      description: 'Your lesson plan has been saved as a .pptx file.',
     });
   };
 
@@ -434,15 +600,20 @@ export function LessonPlanGenerator({
               )}
 
               {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button onClick={downloadAsPDF} variant="outline" className="flex-1">
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button onClick={downloadAsPowerPoint} className="flex-1 min-w-[140px]">
+                  <FileType className="h-4 w-4 mr-2" />
+                  Download PowerPoint
+                </Button>
+                <Button onClick={downloadAsPDF} variant="outline" className="flex-1 min-w-[140px]">
                   <Download className="h-4 w-4 mr-2" />
                   Download PDF
                 </Button>
                 <Button 
                   onClick={pushToSisterApps} 
                   disabled={isPushingToSisterApp || !classId}
-                  className="flex-1"
+                  variant="secondary"
+                  className="flex-1 min-w-[140px]"
                 >
                   {isPushingToSisterApp ? (
                     <>
@@ -462,6 +633,7 @@ export function LessonPlanGenerator({
                     setCurrentSlide(0);
                   }} 
                   variant="ghost"
+                  className="min-w-[120px]"
                 >
                   Generate New
                 </Button>
