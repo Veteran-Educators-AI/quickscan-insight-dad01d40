@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
@@ -16,13 +16,32 @@ interface RubricScore {
   feedback: string;
 }
 
+interface CustomRubric {
+  id: string;
+  name: string;
+  totalPoints: number;
+  passingThreshold: number;
+  criteria: {
+    id: string;
+    name: string;
+    weight: number;
+    description: string;
+    regentsAlignment: string;
+  }[];
+}
+
 interface AnalysisResult {
   ocrText: string;
   problemIdentified: string;
+  nysStandard?: string;
   approachAnalysis: string;
   rubricScores: RubricScore[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
+  regentsScore?: number;
+  regentsScoreJustification?: string;
+  grade?: number;
+  gradeJustification?: string;
   feedback: string;
 }
 
@@ -65,6 +84,19 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
   const [rawAnalysis, setRawAnalysis] = useState<string | null>(null);
+  const [customRubric, setCustomRubric] = useState<CustomRubric | null>(null);
+
+  // Load custom rubric from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('custom-grading-rubric');
+    if (saved) {
+      try {
+        setCustomRubric(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load custom rubric:', e);
+      }
+    }
+  }, []);
 
   const analyze = async (
     imageDataUrl: string, 
@@ -72,7 +104,9 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
     rubricSteps?: RubricStep[],
     studentName?: string,
     assessmentMode?: 'teacher' | 'ai',
-    promptText?: string
+    promptText?: string,
+    standardCode?: string,
+    topicName?: string
   ): Promise<AnalysisResult | null> => {
     setIsAnalyzing(true);
     setError(null);
@@ -87,8 +121,11 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
           rubricSteps,
           studentName,
           teacherId: user?.id,
-          assessmentMode: assessmentMode || 'teacher',
+          assessmentMode: assessmentMode || 'ai', // Default to AI mode for NYS standards alignment
           promptText,
+          standardCode,
+          topicName,
+          customRubric, // Pass custom rubric if available
         },
       });
 

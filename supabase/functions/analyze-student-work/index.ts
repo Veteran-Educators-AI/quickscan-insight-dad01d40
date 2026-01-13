@@ -163,7 +163,7 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const { imageBase64, solutionBase64, questionId, rubricSteps, identifyOnly, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode } = await req.json();
+    const { imageBase64, solutionBase64, questionId, rubricSteps, identifyOnly, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric } = await req.json();
     
     // Ensure teacherId matches authenticated user
     const effectiveTeacherId = teacherId || authenticatedUserId;
@@ -224,25 +224,95 @@ serve(async (req) => {
     // Build the analysis prompt based on assessment mode
     const isAIMode = assessmentMode === 'ai';
     
+    // NYS Regents scoring guide context
+    const regentsContext = `
+NYS REGENTS SCORING GUIDELINES:
+The New York State Regents Examinations use a standards-based scoring approach. When evaluating student work:
+
+SCORE 4 (Exceeding Standards - Grade 90-100):
+- Complete and correct solution with clear, logical reasoning
+- All mathematical procedures are correctly applied
+- Work is well-organized and clearly communicated
+- No computational or conceptual errors
+
+SCORE 3 (Meeting Standards - Grade 80-89):
+- Substantially correct solution with minor errors
+- Mathematical reasoning is sound with small gaps
+- Work shows understanding of the core concepts
+- May have minor computational errors that don't affect the approach
+
+SCORE 2 (Approaching Standards - Grade 65-79):
+- Partial understanding demonstrated
+- Some correct mathematical procedures but with significant gaps
+- May reach incorrect conclusion due to errors in reasoning
+- Shows effort but incomplete mastery
+
+SCORE 1 (Partially Meeting Standards - Grade 55-64):
+- Minimal understanding of the mathematical concepts
+- Limited correct work shown
+- Major errors in approach or computation
+- Some relevant mathematical work attempted
+
+SCORE 0 (Not Meeting Standards - Grade below 55):
+- No correct mathematical work
+- Completely incorrect approach
+- Blank or irrelevant response
+- No understanding demonstrated
+
+GRADE CONVERSION (55-100 Scale):
+- Score 4 → 90-100 (Exceeding)
+- Score 3 → 80-89 (Meeting)
+- Score 2 → 65-79 (Approaching)
+- Score 1 → 55-64 (Partially Meeting)
+- Score 0 → 55 (absolute minimum - only if completely no understanding shown)
+`;
+
+    // Custom rubric context if provided
+    const customRubricContext = customRubric ? `
+TEACHER'S CUSTOM RUBRIC (Calibrated to NYS Standards):
+${customRubric.criteria.map((c: { name: string; weight: number; description: string }, i: number) => 
+  `${i + 1}. ${c.name} (Weight: ${c.weight}%): ${c.description}`
+).join('\n')}
+
+Total Points: ${customRubric.totalPoints || 100}
+Passing Threshold: ${customRubric.passingThreshold || 65}%
+
+When scoring, apply both this custom rubric AND align to NYS Regents standards.
+` : '';
+
+    // Standard-specific context if provided
+    const standardContext = standardCode ? `
+SPECIFIC STANDARD BEING ASSESSED: ${standardCode}${topicName ? ` - ${topicName}` : ''}
+
+Evaluate the student's work specifically against this NYS standard. Consider:
+- Does the student demonstrate understanding of ${topicName || 'the standard'}?
+- Are the mathematical procedures aligned with what's expected for this standard?
+- What specific skills from this standard are demonstrated or missing?
+` : '';
+    
     let systemPrompt: string;
     let userPromptText: string;
 
     if (isAIMode) {
-      systemPrompt = `You are an expert math teacher and grader. Your task is to:
+      systemPrompt = `You are an expert NYS Regents mathematics teacher and grader with deep knowledge of New York State learning standards. Your task is to:
 1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions
-2. Identify the mathematical problem the student is solving
+2. Identify the mathematical problem the student is solving and which NYS standard it aligns with
 3. SOLVE THE PROBLEM YOURSELF to determine the correct answer and approach
-4. Compare the student's work against the correct solution
+4. Compare the student's work against the correct solution using NYS Regents scoring guidelines
 5. Determine if the student's answer is mathematically correct
 6. Identify any misconceptions or errors in the student's reasoning
-7. If rubric criteria are provided, score each step
-8. Provide constructive feedback
+7. Score using the NYS Regents 0-4 rubric and convert to 55-100 scale
+8. Provide constructive, standards-aligned feedback
 
-Be accurate, fair, and educational in your assessment. The key is to independently verify correctness.`;
+${regentsContext}
+${customRubricContext}
+${standardContext}
 
-      userPromptText = `Please analyze this student's handwritten math work.
+Be accurate, fair, and educational in your assessment. Always reference specific NYS standards when providing feedback.`;
 
-IMPORTANT: You must solve this problem yourself first to determine the correct answer, then evaluate the student's work.`;
+      userPromptText = `Please analyze this student's handwritten math work using NYS Regents scoring standards.
+
+IMPORTANT: You must solve this problem yourself first to determine the correct answer, then evaluate the student's work against NYS standards.`;
 
       if (promptText) {
         userPromptText += `\n\nThe problem statement is: ${promptText}`;
@@ -252,29 +322,34 @@ IMPORTANT: You must solve this problem yourself first to determine the correct a
 
 Steps to follow:
 1. Extract all text and mathematical content from the image (OCR)
-2. Identify the problem being solved
+2. Identify the problem being solved and its related NYS standard
 3. Solve the problem yourself to get the correct answer
 4. Compare the student's solution to your solution
-5. Determine if the student's final answer is correct`;
+5. Apply NYS Regents scoring rubric (0-4 scale)
+6. Convert to 55-100 grade scale`;
 
     } else {
-      systemPrompt = `You are an expert math teacher and grader. Your task is to:
+      systemPrompt = `You are an expert NYS Regents mathematics teacher and grader with deep knowledge of New York State learning standards. Your task is to:
 1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions
-2. Analyze the student's problem-solving approach and methodology
-3. If rubric criteria are provided, score each step
+2. Analyze the student's problem-solving approach using NYS Regents scoring guidelines
+3. Score using the NYS Regents 0-4 rubric and convert to 55-100 scale
 4. Identify any misconceptions or errors in the student's reasoning
-5. Provide constructive feedback
+5. Provide constructive, standards-aligned feedback
 
-Be accurate, fair, and educational in your assessment.`;
+${regentsContext}
+${customRubricContext}
+${standardContext}
 
-      userPromptText = `Please analyze this student's handwritten math work.
+Be accurate, fair, and educational in your assessment. Always reference specific NYS standards when providing feedback.`;
+
+      userPromptText = `Please analyze this student's handwritten math work using NYS Regents scoring standards.
 
 Extract all text and mathematical content you can see (OCR).
-Identify the problem being solved and evaluate the student's approach.`;
+Identify the problem being solved, its related NYS standard, and evaluate the student's approach.`;
     }
 
     if (rubricSteps && rubricSteps.length > 0) {
-      userPromptText += `\n\nScore against these rubric criteria:\n`;
+      userPromptText += `\n\nTeacher's Rubric Criteria (score each and align to NYS standards):\n`;
       rubricSteps.forEach((step: { step_number: number; description: string; points: number }, i: number) => {
         userPromptText += `${i + 1}. ${step.description} (${step.points} points)\n`;
       });
@@ -282,16 +357,19 @@ Identify the problem being solved and evaluate the student's approach.`;
 
     userPromptText += `\n\nProvide your analysis in the following structure:
 - OCR Text: (extracted handwritten content)
-- Problem Identified: (what problem the student is solving)${isAIMode ? '\n- Correct Solution: (your solution to the problem)' : ''}
-- Approach Analysis: (evaluation of their method)
+- Problem Identified: (what problem the student is solving)
+- NYS Standard: (the most relevant NYS standard code and name, e.g., "A.REI.B.4 - Solving Quadratic Equations")${isAIMode ? '\n- Correct Solution: (your step-by-step solution to the problem)' : ''}
+- Approach Analysis: (evaluation of their method against NYS expectations)
 - Is Correct: (YES or NO - is the final answer mathematically correct?)
-- Rubric Scores: (if rubric provided, score each criterion)
-- Misconceptions: (any errors or misunderstandings identified)
-- Total Score: (points earned / total possible)
-- Standards Met: (YES or NO - did the student meet at least one standard criterion in the rubric?)
-- Grade: (a number from 55 to 100. IMPORTANT: 55 is the absolute minimum grade, given ONLY if NO standards criteria are met. If at least one standard is partially met, grade should be 60+. Meeting standards = 80. Exceeding standards = 90-100. Partially meeting standards = 65-79.)
-- Grade Justification: (2-3 sentences explaining why this grade was assigned, referencing specific aspects of the student's work and which standards were or were not met)
-- Feedback: (constructive suggestions for improvement)`;
+- Regents Score: (0, 1, 2, 3, or 4 based on NYS Regents rubric)
+- Regents Score Justification: (why this Regents score was assigned based on the rubric)
+- Rubric Scores: (if teacher rubric provided, score each criterion)
+- Misconceptions: (any errors or misunderstandings identified, with NYS standard references)
+- Total Score: (points earned / total possible from teacher rubric)
+- Standards Met: (YES or NO - does work meet the minimum standard requirements?)
+- Grade: (55-100 scale: Score 4=90-100, Score 3=80-89, Score 2=65-79, Score 1=55-64, Score 0=55)
+- Grade Justification: (2-3 sentences explaining the grade, explicitly referencing NYS standards and what the student needs to meet proficiency)
+- Feedback: (constructive suggestions referencing specific NYS standards the student should focus on)`;
 
     // Build messages for Lovable AI
     const messages = [
@@ -701,10 +779,13 @@ function levenshteinDistance(str1: string, str2: string): number {
 interface ParsedResult {
   ocrText: string;
   problemIdentified: string;
+  nysStandard: string;
   approachAnalysis: string;
   rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
+  regentsScore: number;
+  regentsScoreJustification: string;
   grade: number;
   gradeJustification: string;
   feedback: string;
@@ -714,25 +795,41 @@ function parseAnalysisResult(text: string, rubricSteps?: any[]): ParsedResult {
   const result: ParsedResult = {
     ocrText: '',
     problemIdentified: '',
+    nysStandard: '',
     approachAnalysis: '',
     rubricScores: [],
     misconceptions: [],
     totalScore: { earned: 0, possible: 0, percentage: 0 },
+    regentsScore: 0,
+    regentsScoreJustification: '',
     grade: 55,
     gradeJustification: '',
     feedback: '',
   };
 
-  const ocrMatch = text.match(/OCR Text[:\s]*([^]*?)(?=Problem Identified|Approach Analysis|$)/i);
+  const ocrMatch = text.match(/OCR Text[:\s]*([^]*?)(?=Problem Identified|NYS Standard|Approach Analysis|$)/i);
   if (ocrMatch) result.ocrText = ocrMatch[1].trim();
 
-  const problemMatch = text.match(/Problem Identified[:\s]*([^]*?)(?=Approach Analysis|Rubric Scores|$)/i);
+  const problemMatch = text.match(/Problem Identified[:\s]*([^]*?)(?=NYS Standard|Approach Analysis|Rubric Scores|$)/i);
   if (problemMatch) result.problemIdentified = problemMatch[1].trim();
 
-  const approachMatch = text.match(/Approach Analysis[:\s]*([^]*?)(?=Rubric Scores|Misconceptions|$)/i);
+  // Parse NYS Standard
+  const standardMatch = text.match(/NYS Standard[:\s]*([^]*?)(?=Correct Solution|Approach Analysis|$)/i);
+  if (standardMatch) result.nysStandard = standardMatch[1].trim();
+
+  const approachMatch = text.match(/Approach Analysis[:\s]*([^]*?)(?=Is Correct|Regents Score|Rubric Scores|Misconceptions|$)/i);
   if (approachMatch) result.approachAnalysis = approachMatch[1].trim();
 
-  const misconceptionsMatch = text.match(/Misconceptions[:\s]*([^]*?)(?=Total Score|Feedback|$)/i);
+  // Parse Regents Score (0-4)
+  const regentsScoreMatch = text.match(/Regents Score[:\s]*(\d)/i);
+  if (regentsScoreMatch) {
+    result.regentsScore = Math.min(4, Math.max(0, parseInt(regentsScoreMatch[1])));
+  }
+
+  const regentsJustificationMatch = text.match(/Regents Score Justification[:\s]*([^]*?)(?=Rubric Scores|Misconceptions|$)/i);
+  if (regentsJustificationMatch) result.regentsScoreJustification = regentsJustificationMatch[1].trim();
+
+  const misconceptionsMatch = text.match(/Misconceptions[:\s]*([^]*?)(?=Total Score|Standards Met|Feedback|$)/i);
   if (misconceptionsMatch) {
     const misconceptionsText = misconceptionsMatch[1].trim();
     result.misconceptions = misconceptionsText
@@ -750,26 +847,35 @@ function parseAnalysisResult(text: string, rubricSteps?: any[]): ParsedResult {
       : 0;
   }
 
-  // Parse grade (55-100 scale) - 55 ONLY if no standards met
+  // Parse grade (55-100 scale) based on Regents score if available
   const gradeMatch = text.match(/Grade[:\s]*(\d+)/i);
   const standardsMetMatch = text.match(/Standards Met[:\s]*(YES|NO)/i);
   const standardsMet = standardsMetMatch ? standardsMetMatch[1].toUpperCase() === 'YES' : true;
   
   if (gradeMatch) {
     const parsedGrade = parseInt(gradeMatch[1]);
-    // Ensure grade is within 55-100 range
-    // If standards were met (even partially), minimum should be 60
-    if (standardsMet || parsedGrade >= 60) {
-      result.grade = Math.max(55, Math.min(100, parsedGrade));
-    } else {
-      // Only allow 55 if explicitly no standards met
-      result.grade = 55;
-    }
+    result.grade = Math.max(55, Math.min(100, parsedGrade));
+  } else if (result.regentsScore > 0) {
+    // Convert Regents score to grade if no explicit grade given
+    const regentsToGrade: Record<number, number> = {
+      4: 95,  // Exceeding
+      3: 85,  // Meeting
+      2: 72,  // Approaching
+      1: 60,  // Partially meeting
+      0: 55,  // Not meeting
+    };
+    result.grade = regentsToGrade[result.regentsScore] || 55;
   } else if (result.totalScore.percentage > 0) {
     // Fallback: convert percentage to 55-100 scale
-    // If they earned any points, they showed some effort, so minimum 60
     const baseGrade = result.totalScore.percentage > 0 ? 60 : 55;
     result.grade = Math.round(baseGrade + (result.totalScore.percentage / 100) * (100 - baseGrade));
+  }
+
+  // Ensure minimum grade of 55 unless standards explicitly not met
+  if (!standardsMet && result.grade < 60) {
+    result.grade = 55;
+  } else if (standardsMet && result.grade < 60) {
+    result.grade = 60; // At least partially meeting if any standards met
   }
 
   // Parse grade justification
@@ -780,7 +886,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[]): ParsedResult {
   if (feedbackMatch) result.feedback = feedbackMatch[1].trim();
 
   if (rubricSteps && rubricSteps.length > 0) {
-    const rubricSection = text.match(/Rubric Scores[:\s]*([^]*?)(?=Misconceptions|Total Score|$)/i);
+    const rubricSection = text.match(/Rubric Scores[:\s]*([^]*?)(?=Misconceptions|Total Score|Regents Score|$)/i);
     if (rubricSection) {
       rubricSteps.forEach((step, i) => {
         const criterionRegex = new RegExp(`(?:${i + 1}[.)]|${step.description.slice(0, 20)})[^\\d]*(\\d+(?:\\.\\d+)?)[\\s\\/]*(\\d+)?`, 'i');
