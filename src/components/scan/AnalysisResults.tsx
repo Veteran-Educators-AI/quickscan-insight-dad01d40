@@ -194,6 +194,7 @@ export function AnalysisResults({
           )}
 
           {/* Progress Bar */}
+          {/* Hidden as per request to remove raw score
           <div className="mb-4">
             <div className="flex justify-between mb-1">
               <span className="text-xs text-muted-foreground">Grade Scale ({gradeFloor}-100)</span>
@@ -201,6 +202,7 @@ export function AnalysisResults({
             </div>
             <Progress value={(grade - gradeFloor) / (100 - gradeFloor) * 100} className="h-2" />
           </div>
+          */}
 
           {/* Regents Score Justification */}
           {result.regentsScoreJustification && (
