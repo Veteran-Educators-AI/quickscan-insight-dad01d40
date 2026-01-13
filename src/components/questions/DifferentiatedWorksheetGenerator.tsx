@@ -126,6 +126,66 @@ const getStudentVariationSeed = (firstName: string, lastName: string): number =>
   return Math.abs(hash);
 };
 
+// Convert SVG string to data URI for display
+const svgToDataUri = (svg: string): string => {
+  if (!svg) return '';
+  // Check if it's already a data URI or URL
+  if (svg.startsWith('data:') || svg.startsWith('http')) {
+    return svg;
+  }
+  // Convert SVG string to data URI
+  const encoded = encodeURIComponent(svg)
+    .replace(/'/g, '%27')
+    .replace(/"/g, '%22');
+  return `data:image/svg+xml,${encoded}`;
+};
+
+// Convert SVG to PNG data URL for PDF embedding
+const svgToPngDataUrl = async (svgString: string, width: number = 200, height: number = 200): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (!svgString) {
+      reject(new Error('No SVG string provided'));
+      return;
+    }
+    
+    // If it's already a data URL or HTTP URL, return it
+    if (svgString.startsWith('data:image/png') || svgString.startsWith('http')) {
+      resolve(svgString);
+      return;
+    }
+    
+    // Create an image from the SVG
+    const img = new Image();
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        const pngDataUrl = canvas.toDataURL('image/png');
+        URL.revokeObjectURL(url);
+        resolve(pngDataUrl);
+      } else {
+        URL.revokeObjectURL(url);
+        reject(new Error('Could not get canvas context'));
+      }
+    };
+    
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load SVG'));
+    };
+    
+    img.src = url;
+  });
+};
+
 interface ClassOption {
   id: string;
   name: string;
@@ -619,8 +679,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               });
 
               // Add geometry diagram if available for warm-up
-              const warmUpImage = question.imageUrl || question.svg;
-              if (warmUpImage && includeGeometry) {
+              if ((question.imageUrl || question.svg) && includeGeometry) {
                 try {
                   if (yPosition > pageHeight - 55) {
                     pdf.addPage();
@@ -629,8 +688,22 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   const imgWidth = 40; // smaller for warm-up
                   const imgHeight = 40;
                   yPosition += 3;
-                  pdf.addImage(warmUpImage, 'PNG', margin + 5, yPosition, imgWidth, imgHeight);
-                  yPosition += imgHeight + 3;
+                  
+                  // Convert SVG to PNG if needed
+                  let imageData = question.imageUrl || '';
+                  if (question.svg && !question.imageUrl) {
+                    try {
+                      imageData = await svgToPngDataUrl(question.svg, 200, 200);
+                    } catch (convErr) {
+                      console.error('Error converting warm-up SVG to PNG:', convErr);
+                      imageData = '';
+                    }
+                  }
+                  
+                  if (imageData) {
+                    pdf.addImage(imageData, 'PNG', margin + 5, yPosition, imgWidth, imgHeight);
+                    yPosition += imgHeight + 3;
+                  }
                 } catch (imgError) {
                   console.error('Error adding warm-up image to PDF:', imgError);
                 }
@@ -703,8 +776,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             });
 
             // Add geometry diagram if available
-            const imageSource = question.imageUrl || question.svg;
-            if (imageSource && includeGeometry) {
+            if ((question.imageUrl || question.svg) && includeGeometry) {
               try {
                 // Check if we need a new page for the image
                 if (yPosition > pageHeight - 70) {
@@ -712,14 +784,27 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   yPosition = margin;
                 }
                 
-                // Add the image to the PDF
-                const imgWidth = 50; // mm
-                const imgHeight = 50; // mm
-                const imgX = margin + 5;
+                // Convert SVG to PNG if needed
+                let imageData = question.imageUrl || '';
+                if (question.svg && !question.imageUrl) {
+                  try {
+                    imageData = await svgToPngDataUrl(question.svg, 200, 200);
+                  } catch (convErr) {
+                    console.error('Error converting SVG to PNG:', convErr);
+                    imageData = '';
+                  }
+                }
                 
-                yPosition += 3;
-                pdf.addImage(imageSource, 'PNG', imgX, yPosition, imgWidth, imgHeight);
-                yPosition += imgHeight + 5;
+                if (imageData) {
+                  // Add the image to the PDF
+                  const imgWidth = 50; // mm
+                  const imgHeight = 50; // mm
+                  const imgX = margin + 5;
+                  
+                  yPosition += 3;
+                  pdf.addImage(imageData, 'PNG', imgX, yPosition, imgWidth, imgHeight);
+                  yPosition += imgHeight + 5;
+                }
               } catch (imgError) {
                 console.error('Error adding image to PDF:', imgError);
                 // Continue without the image
@@ -1356,11 +1441,18 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                     {/* Show geometry shapes in preview */}
                     {(q.imageUrl || q.svg) && includeGeometry && (
                       <div className="mt-2 flex justify-center">
-                        <img 
-                          src={q.imageUrl || q.svg} 
-                          alt="Geometry diagram" 
-                          className="max-w-[150px] max-h-[150px] border rounded"
-                        />
+                        {q.svg && !q.imageUrl ? (
+                          <div 
+                            className="max-w-[150px] max-h-[150px] border rounded overflow-hidden"
+                            dangerouslySetInnerHTML={{ __html: q.svg }}
+                          />
+                        ) : (
+                          <img 
+                            src={q.imageUrl || svgToDataUri(q.svg || '')} 
+                            alt="Geometry diagram" 
+                            className="max-w-[150px] max-h-[150px] border rounded"
+                          />
+                        )}
                       </div>
                     )}
                     {q.hint && includeHints && (
@@ -1412,11 +1504,18 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                     {/* Show geometry shapes in preview */}
                     {(q.imageUrl || q.svg) && includeGeometry && (
                       <div className="mt-2 flex justify-center">
-                        <img 
-                          src={q.imageUrl || q.svg} 
-                          alt="Geometry diagram" 
-                          className="max-w-[180px] max-h-[180px] border rounded"
-                        />
+                        {q.svg && !q.imageUrl ? (
+                          <div 
+                            className="max-w-[180px] max-h-[180px] border rounded overflow-hidden"
+                            dangerouslySetInnerHTML={{ __html: q.svg }}
+                          />
+                        ) : (
+                          <img 
+                            src={q.imageUrl || svgToDataUri(q.svg || '')} 
+                            alt="Geometry diagram" 
+                            className="max-w-[180px] max-h-[180px] border rounded"
+                          />
+                        )}
                       </div>
                     )}
                     {q.hint && includeHints && (
