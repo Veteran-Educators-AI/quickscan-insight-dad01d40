@@ -30,10 +30,14 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { Loader2, Webhook, TestTube, CheckCircle2, AlertCircle, Link2 } from "lucide-react";
+import { Loader2, Webhook, TestTube, CheckCircle2, AlertCircle, Link2, Cloud, Folder, RefreshCw, Settings2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
+import { useGoogleDrive } from "@/hooks/useGoogleDrive";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { GoogleDriveAutoSyncConfig } from "@/components/scan/GoogleDriveAutoSyncConfig";
 
 export function IntegrationSettings() {
   // ============================================================================
@@ -77,6 +81,12 @@ export function IntegrationSettings() {
   // Stores the result of the last webhook test ('success' | 'error' | null)
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
 
+  // --- Google Drive Configuration ---
+  const { connected: driveConnected, checkConnection: checkDriveConnection, loading: driveLoading } = useGoogleDrive();
+  const [driveChecked, setDriveChecked] = useState(false);
+  const [showAutoSyncConfig, setShowAutoSyncConfig] = useState(false);
+  const [autoSyncFolder, setAutoSyncFolder] = useState<{ id: string; name: string; interval: number } | null>(null);
+
   // ============================================================================
   // LOAD SETTINGS ON COMPONENT MOUNT
   // ============================================================================
@@ -84,8 +94,10 @@ export function IntegrationSettings() {
   useEffect(() => {
     if (user) {
       loadSettings();
+      // Check Google Drive connection status
+      checkDriveConnection().then(() => setDriveChecked(true));
     }
-  }, [user]);
+  }, [user, checkDriveConnection]);
 
   // ============================================================================
   // LOAD SETTINGS FROM DATABASE
@@ -474,7 +486,117 @@ export function IntegrationSettings() {
             </div>
           )}
         </div>
+
+        {/* Visual separator between sister app and google drive sections */}
+        <Separator className="my-6" />
+
+        {/* ================================================================== */}
+        {/* GOOGLE DRIVE INTEGRATION SECTION */}
+        {/* ================================================================== */}
+        <div className="space-y-6">
+          {/* --- Section Header --- */}
+          <div className="flex items-center gap-2">
+            <Cloud className="h-5 w-5 text-primary" />
+            <h3 className="text-lg font-semibold">Google Drive Integration</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Import scanned documents directly from Google Drive and set up auto-sync to automatically detect new files.
+          </p>
+
+          {/* --- Connection Status --- */}
+          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className={`h-10 w-10 rounded-full flex items-center justify-center ${driveConnected ? 'bg-green-100 dark:bg-green-900/30' : 'bg-muted'}`}>
+                <Cloud className={`h-5 w-5 ${driveConnected ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} />
+              </div>
+              <div>
+                <div className="font-medium text-sm">Google Drive</div>
+                <div className="text-xs text-muted-foreground">
+                  {!driveChecked ? 'Checking connection...' : driveConnected ? 'Connected via Google OAuth' : 'Not connected'}
+                </div>
+              </div>
+            </div>
+            {driveChecked && (
+              <Badge variant={driveConnected ? 'default' : 'secondary'} className={driveConnected ? 'bg-green-600' : ''}>
+                {driveConnected ? 'Connected' : 'Not Connected'}
+              </Badge>
+            )}
+          </div>
+
+          {/* --- Connection Instructions --- */}
+          {driveChecked && !driveConnected && (
+            <Alert>
+              <AlertDescription>
+                <strong>To connect Google Drive:</strong> You need to sign in with Google when logging into the app. 
+                Google Drive access is granted through your Google account login. Sign out and sign back in with Google to enable Drive integration.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* --- Auto-Sync Configuration --- */}
+          {driveConnected && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Scanner Auto-Sync Folder</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Automatically import new scans from a Google Drive folder
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAutoSyncConfig(true)}
+                >
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  Configure
+                </Button>
+              </div>
+
+              {autoSyncFolder && (
+                <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                  <Folder className="h-5 w-5 text-primary" />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{autoSyncFolder.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Checking every {autoSyncFolder.interval} seconds
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="gap-1">
+                    <RefreshCw className="h-3 w-3" />
+                    Auto-Sync
+                  </Badge>
+                </div>
+              )}
+
+              <Alert>
+                <AlertDescription>
+                  <strong>How it works:</strong> Configure your physical scanner to save files to a Google Drive folder. 
+                  The app will automatically detect new images and add them to your scan queue in Scanner mode.
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+        </div>
       </CardContent>
+
+      {/* Google Drive Auto-Sync Configuration Dialog */}
+      <Dialog open={showAutoSyncConfig} onOpenChange={setShowAutoSyncConfig}>
+        <DialogContent className="max-w-lg">
+          <GoogleDriveAutoSyncConfig
+            onFolderSelected={(folderId, folderName, intervalSeconds) => {
+              setAutoSyncFolder({ id: folderId, name: folderName, interval: intervalSeconds });
+              setShowAutoSyncConfig(false);
+              toast({
+                title: "Auto-sync configured",
+                description: `Will check "${folderName}" for new scans every ${intervalSeconds} seconds.`,
+              });
+            }}
+            onClose={() => setShowAutoSyncConfig(false)}
+            currentFolderId={autoSyncFolder?.id}
+          />
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
