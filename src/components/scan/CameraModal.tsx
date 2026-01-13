@@ -13,24 +13,61 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const mountedRef = useRef(true);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [isCapturing, setIsCapturing] = useState(false);
 
-  const startCamera = useCallback(async () => {
+  // Track mounted state to prevent state updates after unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        try {
+          track.stop();
+        } catch (e) {
+          console.warn('Error stopping track:', e);
+        }
+      });
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    if (mountedRef.current) {
+      setIsReady(false);
+    }
+  }, []);
+
+  const startCamera = useCallback(async (mode: 'environment' | 'user') => {
+    if (!mountedRef.current) return;
+    
     setError(null);
     setIsReady(false);
 
     try {
-      // Stop any existing stream
+      // Stop any existing stream first
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach(track => {
+          try {
+            track.stop();
+          } catch (e) {
+            console.warn('Error stopping track:', e);
+          }
+        });
+        streamRef.current = null;
       }
 
       const constraints: MediaStreamConstraints = {
         video: {
-          facingMode: { ideal: facingMode },
+          facingMode: { ideal: mode },
           width: { ideal: 1920, min: 640 },
           height: { ideal: 1080, min: 480 },
         },
@@ -38,18 +75,52 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      if (!mountedRef.current) {
+        // Component unmounted while waiting for camera
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      
       streamRef.current = stream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Wait for video to be ready
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
+        
+        // Use a promise-based approach for metadata loading
+        await new Promise<void>((resolve, reject) => {
+          if (!videoRef.current) {
+            reject(new Error('Video element not available'));
+            return;
+          }
+          
+          const video = videoRef.current;
+          
+          const handleLoadedMetadata = () => {
+            video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('error', handleError);
+            resolve();
+          };
+          
+          const handleError = () => {
+            video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('error', handleError);
+            reject(new Error('Video failed to load'));
+          };
+          
+          video.addEventListener('loadedmetadata', handleLoadedMetadata);
+          video.addEventListener('error', handleError);
+        });
+        
+        if (mountedRef.current && videoRef.current) {
+          await videoRef.current.play();
           setIsReady(true);
-        };
+        }
       }
     } catch (err) {
       console.error('Camera error:', err);
+      if (!mountedRef.current) return;
+      
       if (err instanceof DOMException) {
         if (err.name === 'NotAllowedError') {
           setError('Camera access denied. Please allow camera access in your browser or device settings.');
@@ -57,6 +128,9 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
           setError('No camera found on this device.');
         } else if (err.name === 'NotReadableError') {
           setError('Camera is already in use by another application.');
+        } else if (err.name === 'AbortError') {
+          // User cancelled or component closed - don't show error
+          return;
         } else {
           setError('Unable to access camera. Please try again.');
         }
@@ -64,17 +138,6 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
         setError('Unable to access camera. Please try again.');
       }
     }
-  }, [facingMode]);
-
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setIsReady(false);
   }, []);
 
   const capturePhoto = useCallback(() => {
@@ -96,7 +159,9 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
       
       // Brief flash effect
       setTimeout(() => {
-        setIsCapturing(false);
+        if (mountedRef.current) {
+          setIsCapturing(false);
+        }
         stopCamera();
         onCapture(dataUrl);
       }, 150);
@@ -112,16 +177,18 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
     onClose();
   }, [stopCamera, onClose]);
 
-  // Start camera when modal opens or facing mode changes
+  // Start camera when modal opens
   useEffect(() => {
     if (isOpen) {
-      startCamera();
+      startCamera(facingMode);
+    } else {
+      stopCamera();
     }
 
     return () => {
       stopCamera();
     };
-  }, [isOpen, facingMode]);
+  }, [isOpen, facingMode, startCamera, stopCamera]);
 
   if (!isOpen) return null;
 
@@ -187,7 +254,7 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
                 <Button variant="outline" onClick={handleClose} className="bg-transparent border-white text-white hover:bg-white/20">
                   Cancel
                 </Button>
-                <Button onClick={startCamera} className="bg-white/20 text-white hover:bg-white/30 border border-white">
+                <Button onClick={() => startCamera(facingMode)} className="bg-white/20 text-white hover:bg-white/30 border border-white">
                   Try Again
                 </Button>
               </div>
