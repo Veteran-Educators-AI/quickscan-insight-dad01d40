@@ -49,11 +49,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Check MFA status - redirect to enroll or challenge if needed
-  if (mfaStatus === 'not_enrolled') {
-    return <Navigate to="/mfa-enroll" replace />;
-  }
-  
+  // Only require MFA verification if user has already enrolled
+  // 2FA is now optional - users won't be forced to enroll
   if (mfaStatus === 'needs_verification') {
     return <Navigate to="/mfa-challenge" replace />;
   }
