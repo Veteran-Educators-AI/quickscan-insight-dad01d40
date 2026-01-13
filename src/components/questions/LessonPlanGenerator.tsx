@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType, Pencil, Check, Plus, Trash2, X, Save, Library, ArrowUp, ArrowDown, Layers, FileSpreadsheet, Move } from 'lucide-react';
+import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType, Pencil, Check, Plus, Trash2, X, Save, Library, ArrowUp, ArrowDown, Layers, FileSpreadsheet, Move, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
@@ -18,6 +18,7 @@ import pptxgen from 'pptxgenjs';
 import { StudentHandoutDialog, type HandoutOptions } from './StudentHandoutDialog';
 import { SlideClipartPicker, getClipartSvg, getClipartPosition, getClipartLibrary, type SlideClipart } from './SlideClipartPicker';
 import { DraggableClipart } from './DraggableClipart';
+import { NycologicPresentationBuilder } from '@/components/presentation/NycologicPresentationBuilder';
 
 interface LessonSlide {
   slideNumber: number;
@@ -101,6 +102,7 @@ export function LessonPlanGenerator({
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const [slideClipart, setSlideClipart] = useState<Record<number, SlideClipart[]>>({});
+  const [showNycologicPresents, setShowNycologicPresents] = useState(false);
 
   // Load existing lesson plan if ID is provided
   useEffect(() => {
@@ -1342,23 +1344,37 @@ export function LessonPlanGenerator({
                   </Card>
                 )}
 
-                <Button
-                  onClick={generateLessonPlan}
-                  disabled={!topic || isGenerating}
-                  className="w-full"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating Lesson Plan...
-                    </>
-                  ) : (
-                    <>
-                      <Presentation className="h-4 w-4 mr-2" />
-                      Generate Lesson Plan
-                    </>
-                  )}
-                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={generateLessonPlan}
+                    disabled={!topic || isGenerating}
+                    className="w-full"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Presentation className="h-4 w-4 mr-2" />
+                        PowerPoint Style
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => setShowNycologicPresents(true)}
+                    disabled={!topic}
+                    variant="secondary"
+                    className="w-full bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white border-0"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2 text-amber-400" />
+                    Nycologic Presents
+                  </Button>
+                </div>
+                <p className="text-xs text-center text-muted-foreground">
+                  Choose PowerPoint for traditional slides, or Nycologic Presents for a modern, interactive web-style presentation
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -1684,6 +1700,15 @@ export function LessonPlanGenerator({
                     )}
                     Save
                   </Button>
+                  <Button 
+                    onClick={() => setShowNycologicPresents(true)}
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 px-2 text-xs bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white border-0"
+                  >
+                    <Sparkles className="h-3 w-3 mr-1 text-amber-400" />
+                    Nycologic
+                  </Button>
                   <Button onClick={downloadAsPowerPoint} variant="outline" size="sm" className="h-8 px-2 text-xs">
                     <FileType className="h-3 w-3 mr-1" />
                     PPTX
@@ -1747,6 +1772,13 @@ export function LessonPlanGenerator({
             onGenerate={downloadStudentHandout}
           />
         )}
+
+        {/* Nycologic Presents Builder */}
+        <NycologicPresentationBuilder
+          open={showNycologicPresents}
+          onOpenChange={setShowNycologicPresents}
+          topic={topic}
+        />
       </DialogContent>
     </Dialog>
   );
