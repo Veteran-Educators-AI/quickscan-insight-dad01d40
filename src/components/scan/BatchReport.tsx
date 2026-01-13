@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye } from 'lucide-react';
+import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { BatchItem, BatchSummary } from '@/hooks/useBatchAnalysis';
 import { StudentWorkDetailDialog } from './StudentWorkDetailDialog';
+import { StudentComparisonView } from './StudentComparisonView';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -23,7 +25,38 @@ interface BatchReportProps {
 
 export function BatchReport({ items, summary, onExport }: BatchReportProps) {
   const [selectedStudent, setSelectedStudent] = useState<BatchItem | null>(null);
+  const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
+  const [showComparison, setShowComparison] = useState(false);
   const completedItems = items.filter(item => item.status === 'completed' && item.result);
+
+  const toggleCompareSelection = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedForCompare(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else if (next.size < 2) {
+        next.add(id);
+      } else {
+        // Replace the first selected with new selection
+        const arr = Array.from(next);
+        next.delete(arr[0]);
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const canCompare = selectedForCompare.size === 2;
+
+  const comparisonStudents = completedItems
+    .filter(item => item.result)
+    .map(item => ({
+      id: item.id,
+      studentName: item.studentName,
+      imageUrl: item.imageDataUrl,
+      result: item.result!,
+    }));
 
   const getScoreColor = (pct: number) => {
     if (pct >= 80) return 'text-green-600';
@@ -49,10 +82,23 @@ export function BatchReport({ items, summary, onExport }: BatchReportProps) {
             {summary.totalStudents} papers analyzed • Click any row to view details
           </p>
         </div>
-        <Button onClick={onExport} variant="outline">
-          <Download className="h-4 w-4 mr-2" />
-          Export PDF
-        </Button>
+        <div className="flex items-center gap-2">
+          {canCompare && (
+            <Button onClick={() => setShowComparison(true)} variant="secondary">
+              <GitCompare className="h-4 w-4 mr-2" />
+              Compare Selected ({selectedForCompare.size})
+            </Button>
+          )}
+          {selectedForCompare.size > 0 && !canCompare && (
+            <Badge variant="outline" className="text-xs">
+              Select {2 - selectedForCompare.size} more to compare
+            </Badge>
+          )}
+          <Button onClick={onExport} variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Export PDF
+          </Button>
+        </div>
       </div>
 
       {/* Summary Stats */}
@@ -165,18 +211,27 @@ export function BatchReport({ items, summary, onExport }: BatchReportProps) {
       {/* Individual Results Table */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            Individual Results
-            <Badge variant="outline" className="ml-2 text-xs">
-              <Eye className="h-3 w-3 mr-1" />
-              Click to view details
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              Individual Results
+              <Badge variant="outline" className="ml-2 text-xs">
+                <Eye className="h-3 w-3 mr-1" />
+                Click to view details
+              </Badge>
+            </CardTitle>
+            <Badge variant="secondary" className="text-xs">
+              <GitCompare className="h-3 w-3 mr-1" />
+              Check 2 students to compare
             </Badge>
-          </CardTitle>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[40px]">
+                  <span className="sr-only">Compare</span>
+                </TableHead>
                 <TableHead>Student</TableHead>
                 <TableHead className="text-center">Score</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
@@ -188,9 +243,32 @@ export function BatchReport({ items, summary, onExport }: BatchReportProps) {
               {completedItems.map((item) => (
                 <TableRow 
                   key={item.id}
-                  className="cursor-pointer hover:bg-accent/50 transition-colors"
+                  className={`cursor-pointer hover:bg-accent/50 transition-colors ${
+                    selectedForCompare.has(item.id) ? 'bg-primary/10' : ''
+                  }`}
                   onClick={() => setSelectedStudent(item)}
                 >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedForCompare.has(item.id)}
+                      onCheckedChange={() => {
+                        setSelectedForCompare(prev => {
+                          const next = new Set(prev);
+                          if (next.has(item.id)) {
+                            next.delete(item.id);
+                          } else if (next.size < 2) {
+                            next.add(item.id);
+                          } else {
+                            const arr = Array.from(next);
+                            next.delete(arr[0]);
+                            next.add(item.id);
+                          }
+                          return next;
+                        });
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{item.studentName}</TableCell>
                   <TableCell className="text-center">
                     <span className={`font-semibold ${getScoreColor(item.result!.totalScore.percentage)}`}>
@@ -235,6 +313,16 @@ export function BatchReport({ items, summary, onExport }: BatchReportProps) {
           studentName={selectedStudent.studentName}
           imageUrl={selectedStudent.imageDataUrl}
           result={selectedStudent.result}
+        />
+      )}
+
+      {/* Student Comparison View */}
+      {showComparison && comparisonStudents.length >= 2 && (
+        <StudentComparisonView
+          open={showComparison}
+          onOpenChange={setShowComparison}
+          students={comparisonStudents}
+          initialStudentIds={Array.from(selectedForCompare) as [string, string]}
         />
       )}
     </div>
