@@ -6,7 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2, Presentation, Download, FileText, ChevronLeft, ChevronRight, BookOpen, Send, Printer, Clock, FileType, Pencil, Check, Plus, Trash2, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
@@ -61,6 +63,60 @@ export function LessonPlanGenerator({
   const [currentSlide, setCurrentSlide] = useState(0);
   const [lessonDuration, setLessonDuration] = useState('45 minutes');
   const [isPushingToSisterApp, setIsPushingToSisterApp] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingContentIndex, setEditingContentIndex] = useState<number | null>(null);
+
+  // Edit handlers
+  const updateSlideTitle = (newTitle: string) => {
+    if (!lessonPlan) return;
+    const updatedSlides = [...lessonPlan.slides];
+    updatedSlides[currentSlide] = { ...updatedSlides[currentSlide], title: newTitle };
+    setLessonPlan({ ...lessonPlan, slides: updatedSlides });
+  };
+
+  const updateSlideContent = (index: number, newContent: string) => {
+    if (!lessonPlan) return;
+    const updatedSlides = [...lessonPlan.slides];
+    const updatedContent = [...updatedSlides[currentSlide].content];
+    updatedContent[index] = newContent;
+    updatedSlides[currentSlide] = { ...updatedSlides[currentSlide], content: updatedContent };
+    setLessonPlan({ ...lessonPlan, slides: updatedSlides });
+  };
+
+  const addContentBullet = () => {
+    if (!lessonPlan) return;
+    const updatedSlides = [...lessonPlan.slides];
+    const updatedContent = [...updatedSlides[currentSlide].content, 'New bullet point'];
+    updatedSlides[currentSlide] = { ...updatedSlides[currentSlide], content: updatedContent };
+    setLessonPlan({ ...lessonPlan, slides: updatedSlides });
+    setEditingContentIndex(updatedContent.length - 1);
+  };
+
+  const removeContentBullet = (index: number) => {
+    if (!lessonPlan) return;
+    const updatedSlides = [...lessonPlan.slides];
+    const updatedContent = updatedSlides[currentSlide].content.filter((_, i) => i !== index);
+    updatedSlides[currentSlide] = { ...updatedSlides[currentSlide], content: updatedContent };
+    setLessonPlan({ ...lessonPlan, slides: updatedSlides });
+    setEditingContentIndex(null);
+  };
+
+  const updateSpeakerNotes = (newNotes: string) => {
+    if (!lessonPlan) return;
+    const updatedSlides = [...lessonPlan.slides];
+    updatedSlides[currentSlide] = { ...updatedSlides[currentSlide], speakerNotes: newNotes };
+    setLessonPlan({ ...lessonPlan, slides: updatedSlides });
+  };
+
+  const updateLessonTitle = (newTitle: string) => {
+    if (!lessonPlan) return;
+    setLessonPlan({ ...lessonPlan, title: newTitle });
+  };
+
+  const updateObjective = (newObjective: string) => {
+    if (!lessonPlan) return;
+    setLessonPlan({ ...lessonPlan, objective: newObjective });
+  };
 
   const generateLessonPlan = async () => {
     if (!topic) return;
@@ -486,10 +542,18 @@ export function LessonPlanGenerator({
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Lesson header */}
+              {/* Lesson header with edit toggle */}
               <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-lg font-bold">{lessonPlan.title}</h3>
+                <div className="flex-1">
+                  {isEditing ? (
+                    <Input
+                      value={lessonPlan.title}
+                      onChange={(e) => updateLessonTitle(e.target.value)}
+                      className="text-lg font-bold mb-2"
+                    />
+                  ) : (
+                    <h3 className="text-lg font-bold">{lessonPlan.title}</h3>
+                  )}
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="outline">{lessonPlan.standard}</Badge>
                     <Badge variant="secondary" className="gap-1">
@@ -497,8 +561,38 @@ export function LessonPlanGenerator({
                       {lessonPlan.duration}
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-2">{lessonPlan.objective}</p>
+                  {isEditing ? (
+                    <Textarea
+                      value={lessonPlan.objective}
+                      onChange={(e) => updateObjective(e.target.value)}
+                      className="text-sm mt-2"
+                      rows={2}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-2">{lessonPlan.objective}</p>
+                  )}
                 </div>
+                <Button
+                  variant={isEditing ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setIsEditing(!isEditing);
+                    setEditingContentIndex(null);
+                  }}
+                  className="ml-2"
+                >
+                  {isEditing ? (
+                    <>
+                      <Check className="h-4 w-4 mr-1" />
+                      Done
+                    </>
+                  ) : (
+                    <>
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Edit
+                    </>
+                  )}
+                </Button>
               </div>
 
               <Separator />
@@ -515,17 +609,66 @@ export function LessonPlanGenerator({
                         Slide {currentSlide + 1} of {lessonPlan.slides.length}
                       </span>
                     </div>
-                    <CardTitle className="text-2xl">{currentSlideData.title}</CardTitle>
+                    {isEditing ? (
+                      <Input
+                        value={currentSlideData.title}
+                        onChange={(e) => updateSlideTitle(e.target.value)}
+                        className="text-xl font-bold bg-white/20 border-white/30 text-inherit placeholder:text-inherit/50"
+                      />
+                    ) : (
+                      <CardTitle className="text-2xl">{currentSlideData.title}</CardTitle>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-3">
                       {currentSlideData.content.map((item, index) => (
-                        <li key={index} className="text-lg flex items-start gap-2">
-                          <span className="opacity-75">•</span>
-                          <span>{item}</span>
+                        <li key={index} className="text-lg flex items-start gap-2 group">
+                          <span className="opacity-75 mt-2">•</span>
+                          {isEditing ? (
+                            <div className="flex-1 flex items-start gap-2">
+                              {editingContentIndex === index ? (
+                                <Textarea
+                                  value={item}
+                                  onChange={(e) => updateSlideContent(index, e.target.value)}
+                                  onBlur={() => setEditingContentIndex(null)}
+                                  autoFocus
+                                  className="flex-1 bg-white/20 border-white/30 text-inherit placeholder:text-inherit/50"
+                                  rows={2}
+                                />
+                              ) : (
+                                <span 
+                                  onClick={() => setEditingContentIndex(index)}
+                                  className="flex-1 cursor-text hover:bg-white/10 rounded px-1 -mx-1"
+                                >
+                                  {item}
+                                </span>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-inherit hover:bg-white/20"
+                                onClick={() => removeContentBullet(index)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span>{item}</span>
+                          )}
                         </li>
                       ))}
                     </ul>
+                    {isEditing && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={addContentBullet}
+                        className="mt-3 text-inherit hover:bg-white/20"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add bullet point
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -534,7 +677,10 @@ export function LessonPlanGenerator({
               <div className="flex items-center justify-between">
                 <Button
                   variant="outline"
-                  onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
+                  onClick={() => {
+                    setCurrentSlide(Math.max(0, currentSlide - 1));
+                    setEditingContentIndex(null);
+                  }}
                   disabled={currentSlide === 0}
                 >
                   <ChevronLeft className="h-4 w-4 mr-1" />
@@ -544,7 +690,10 @@ export function LessonPlanGenerator({
                   {lessonPlan.slides.map((_, index) => (
                     <button
                       key={index}
-                      onClick={() => setCurrentSlide(index)}
+                      onClick={() => {
+                        setCurrentSlide(index);
+                        setEditingContentIndex(null);
+                      }}
                       className={`w-2.5 h-2.5 rounded-full transition-colors ${
                         index === currentSlide ? 'bg-primary' : 'bg-muted-foreground/30'
                       }`}
@@ -553,7 +702,10 @@ export function LessonPlanGenerator({
                 </div>
                 <Button
                   variant="outline"
-                  onClick={() => setCurrentSlide(Math.min(lessonPlan.slides.length - 1, currentSlide + 1))}
+                  onClick={() => {
+                    setCurrentSlide(Math.min(lessonPlan.slides.length - 1, currentSlide + 1));
+                    setEditingContentIndex(null);
+                  }}
                   disabled={currentSlide === lessonPlan.slides.length - 1}
                 >
                   Next
@@ -562,19 +714,29 @@ export function LessonPlanGenerator({
               </div>
 
               {/* Speaker notes */}
-              {currentSlideData?.speakerNotes && (
-                <Card className="bg-muted/50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Speaker Notes
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{currentSlideData.speakerNotes}</p>
-                  </CardContent>
-                </Card>
-              )}
+              <Card className="bg-muted/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Speaker Notes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isEditing ? (
+                    <Textarea
+                      value={currentSlideData?.speakerNotes || ''}
+                      onChange={(e) => updateSpeakerNotes(e.target.value)}
+                      placeholder="Add speaker notes for this slide..."
+                      className="text-sm"
+                      rows={3}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {currentSlideData?.speakerNotes || 'No speaker notes for this slide.'}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Recommended worksheets */}
               {lessonPlan.recommendedWorksheets.length > 0 && (
