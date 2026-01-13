@@ -58,6 +58,7 @@ export default function Scan() {
   const [showBatchReport, setShowBatchReport] = useState(false);
   const [gradingMethod, setGradingMethod] = useState<GradingMethod>('ai');
   const [manualResult, setManualResult] = useState<ManualResult | null>(null);
+  const [batchCameraMode, setBatchCameraMode] = useState(false);
   
   const solutionInputRef = useRef<HTMLInputElement>(null);
 
@@ -152,7 +153,30 @@ export default function Scan() {
   const handleCameraCapture = useCallback((imageDataUrl: string) => {
     setCapturedImage(imageDataUrl);
     setScanState('preview');
+    setBatchCameraMode(false);
   }, []);
+
+  const handleBatchCameraComplete = useCallback(async (images: string[]) => {
+    if (images.length === 0) return;
+    
+    toast.info(`Processing ${images.length} captured image(s)...`);
+    
+    // Process all images with auto-identification if class is selected
+    for (const imageDataUrl of images) {
+      if (selectedClassId && students.length > 0) {
+        await batch.addImageWithAutoIdentify(imageDataUrl, students);
+      } else if (singleScanClassId && singleScanStudents.length > 0) {
+        await batch.addImageWithAutoIdentify(imageDataUrl, singleScanStudents);
+      } else {
+        batch.addImage(imageDataUrl);
+      }
+    }
+    
+    // Switch to batch mode automatically
+    setScanMode('batch');
+    toast.success(`Added ${images.length} image(s) to batch${(selectedClassId || singleScanClassId) ? ' with auto-identification' : ''}`);
+    setBatchCameraMode(false);
+  }, [batch, selectedClassId, singleScanClassId, students, singleScanStudents]);
 
   const handlePreviewConfirm = useCallback(async (finalImageDataUrl: string) => {
     if (scanMode === 'batch') {
@@ -1466,6 +1490,37 @@ export default function Scan() {
                                 <Camera className="h-5 w-5 mr-2" />
                                 {cameraStatus === 'denied' ? 'Camera Blocked' : 'Open Camera'}
                               </Button>
+                              {/* Batch capture button */}
+                              <Button 
+                                variant="outline" 
+                                size="lg"
+                                className="border-primary/50 hover:border-primary hover:bg-primary/5"
+                                onClick={async () => {
+                                  if (cameraStatus === 'denied') {
+                                    toast.error('Camera access denied. Please enable it in your browser settings.', {
+                                      icon: <AlertTriangle className="h-4 w-4" />,
+                                      duration: 5000,
+                                    });
+                                    return;
+                                  }
+                                  if (!hasCamera) {
+                                    toast.error('No camera found on this device. Please upload an image instead.');
+                                    return;
+                                  }
+                                  if (cameraStatus === 'prompt') {
+                                    const granted = await requestPermission();
+                                    if (!granted) {
+                                      return;
+                                    }
+                                  }
+                                  setBatchCameraMode(true);
+                                  setScanState('camera');
+                                }}
+                                disabled={!hasCamera || cameraStatus === 'denied'}
+                              >
+                                <Layers className="h-5 w-5 mr-2" />
+                                Batch Capture
+                              </Button>
                               <Button 
                                 variant="outline" 
                                 size="lg"
@@ -1789,8 +1844,13 @@ export default function Scan() {
       {/* Full-screen camera modal */}
       <CameraModal 
         isOpen={scanState === 'camera'}
-        onClose={() => setScanState('idle')}
+        onClose={() => {
+          setScanState('idle');
+          setBatchCameraMode(false);
+        }}
         onCapture={handleCameraCapture}
+        batchMode={batchCameraMode}
+        onBatchComplete={handleBatchCameraComplete}
       />
 
       {/* Full-screen preview with crop/rotate */}

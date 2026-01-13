@@ -1,15 +1,18 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Camera, X, SwitchCamera, Upload } from 'lucide-react';
+import { Camera, X, SwitchCamera, Upload, Layers, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface CameraModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCapture: (imageDataUrl: string) => void;
+  batchMode?: boolean;
+  onBatchComplete?: (images: string[]) => void;
 }
 
-export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
+export function CameraModal({ isOpen, onClose, onCapture, batchMode = false, onBatchComplete }: CameraModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -18,6 +21,8 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [isCapturing, setIsCapturing] = useState(false);
+  const [batchImages, setBatchImages] = useState<string[]>([]);
+  const [showThumbnail, setShowThumbnail] = useState(false);
 
   // Track mounted state to prevent state updates after unmount
   useEffect(() => {
@@ -162,11 +167,33 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
         if (mountedRef.current) {
           setIsCapturing(false);
         }
-        stopCamera();
-        onCapture(dataUrl);
+        
+        if (batchMode) {
+          // In batch mode, add to array and show thumbnail briefly
+          setBatchImages(prev => [...prev, dataUrl]);
+          setShowThumbnail(true);
+          setTimeout(() => setShowThumbnail(false), 800);
+        } else {
+          // Single capture mode - close immediately
+          stopCamera();
+          onCapture(dataUrl);
+        }
       }, 150);
     }
-  }, [isReady, stopCamera, onCapture]);
+  }, [isReady, stopCamera, onCapture, batchMode]);
+
+  const handleBatchDone = useCallback(() => {
+    if (batchImages.length > 0 && onBatchComplete) {
+      onBatchComplete(batchImages);
+    }
+    stopCamera();
+    setBatchImages([]);
+    onClose();
+  }, [batchImages, onBatchComplete, stopCamera, onClose]);
+
+  const removeLastImage = useCallback(() => {
+    setBatchImages(prev => prev.slice(0, -1));
+  }, []);
 
   const switchCamera = useCallback(() => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
@@ -174,8 +201,16 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
 
   const handleClose = useCallback(() => {
     stopCamera();
+    setBatchImages([]);
     onClose();
   }, [stopCamera, onClose]);
+
+  // Reset batch images when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setBatchImages([]);
+    }
+  }, [isOpen]);
 
   // Start camera when modal opens
   useEffect(() => {
@@ -298,15 +333,75 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
           {/* Hint text */}
           <div className="absolute top-20 left-0 right-0 text-center">
             <p className="text-white/80 text-sm bg-black/30 inline-block px-4 py-2 rounded-full">
-              Align student work within the frame
+              {batchMode 
+                ? `Batch mode: ${batchImages.length} photo${batchImages.length !== 1 ? 's' : ''} captured`
+                : 'Align student work within the frame'}
             </p>
           </div>
         </div>
       )}
 
+      {/* Batch mode thumbnail preview */}
+      {batchMode && batchImages.length > 0 && (
+        <div className="absolute bottom-32 left-4 z-30 flex items-end gap-2">
+          {/* Thumbnail of last captured image */}
+          <div 
+            className={cn(
+              "relative w-16 h-20 rounded-lg overflow-hidden border-2 border-white shadow-lg transition-all duration-300",
+              showThumbnail ? "scale-110 ring-4 ring-green-500" : ""
+            )}
+          >
+            <img 
+              src={batchImages[batchImages.length - 1]} 
+              alt="Last capture" 
+              className="w-full h-full object-cover"
+            />
+            {showThumbnail && (
+              <div className="absolute inset-0 bg-green-500/30 flex items-center justify-center">
+                <Check className="h-6 w-6 text-white" />
+              </div>
+            )}
+          </div>
+          
+          {/* Count badge */}
+          <Badge className="bg-primary text-primary-foreground mb-1">
+            <Layers className="h-3 w-3 mr-1" />
+            {batchImages.length}
+          </Badge>
+        </div>
+      )}
+
+      {/* Batch mode undo button */}
+      {batchMode && batchImages.length > 0 && (
+        <button
+          onClick={removeLastImage}
+          className="absolute bottom-32 right-4 z-30 p-2 rounded-full bg-red-500/80 text-white hover:bg-red-600 transition-colors"
+          aria-label="Remove last photo"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      )}
+
       {/* Bottom controls */}
       <div className="absolute bottom-0 left-0 right-0 pb-safe z-30">
-        <div className="flex items-center justify-center pb-8 pt-4 bg-gradient-to-t from-black/80 to-transparent">
+        <div className="flex items-center justify-center gap-6 pb-8 pt-4 bg-gradient-to-t from-black/80 to-transparent">
+          {/* Done button (batch mode only) */}
+          {batchMode && (
+            <button
+              onClick={handleBatchDone}
+              disabled={batchImages.length === 0}
+              className={cn(
+                "px-6 py-3 rounded-full flex items-center gap-2 transition-all font-medium",
+                batchImages.length > 0 
+                  ? "bg-green-500 text-white hover:bg-green-600" 
+                  : "bg-white/20 text-white/50 cursor-not-allowed"
+              )}
+            >
+              <Check className="h-5 w-5" />
+              Done ({batchImages.length})
+            </button>
+          )}
+          
           {/* Shutter button */}
           <button
             onClick={capturePhoto}
@@ -318,8 +413,14 @@ export function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
             )}
             aria-label="Take photo"
           >
-            <div className="w-16 h-16 rounded-full bg-white" />
+            <div className={cn(
+              "w-16 h-16 rounded-full",
+              batchMode ? "bg-primary" : "bg-white"
+            )} />
           </button>
+          
+          {/* Spacer for batch mode to center shutter */}
+          {batchMode && <div className="w-[108px]" />}
         </div>
       </div>
 
