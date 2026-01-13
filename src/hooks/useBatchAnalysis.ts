@@ -59,6 +59,10 @@ export interface BatchItem {
   result?: AnalysisResult;
   error?: string;
   rawAnalysis?: string;
+  // Multi-page paper support
+  pageType?: 'new' | 'continuation';
+  continuationOf?: string; // ID of the primary page this is a continuation of
+  continuationPages?: string[]; // IDs of pages that are continuations of this paper
 }
 
 export interface BatchSummary {
@@ -80,6 +84,9 @@ interface UseBatchAnalysisReturn {
   clearAll: () => void;
   autoIdentifyAll: (studentRoster: Student[]) => Promise<void>;
   scanAllQRCodes: (studentRoster: Student[]) => Promise<{ matched: number; total: number }>;
+  detectPageTypes: () => Promise<{ newPapers: number; continuations: number }>;
+  linkContinuation: (continuationId: string, primaryId: string) => void;
+  unlinkContinuation: (continuationId: string) => void;
   startBatchAnalysis: (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<void>;
   isProcessing: boolean;
   isIdentifying: boolean;
@@ -437,26 +444,251 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     }
   };
 
+  // Detect page types for all items (new paper vs continuation)
+  const detectPageTypes = useCallback(async (): Promise<{ newPapers: number; continuations: number }> => {
+    if (items.length === 0 || isProcessing || isIdentifying) {
+      return { newPapers: 0, continuations: 0 };
+    }
+
+    setIsIdentifying(true);
+    let newPapers = 0;
+    let continuations = 0;
+    let lastNewPaperId: string | null = null;
+
+    for (let i = 0; i < items.length; i++) {
+      // Skip items already marked
+      if (items[i].pageType) {
+        if (items[i].pageType === 'new') {
+          lastNewPaperId = items[i].id;
+          newPapers++;
+        } else {
+          continuations++;
+        }
+        continue;
+      }
+
+      setCurrentIndex(i);
+      
+      // Mark as identifying
+      setItems(prev => prev.map((item, idx) => 
+        idx === i ? { ...item, status: 'identifying' } : item
+      ));
+
+      try {
+        const { data, error } = await supabase.functions.invoke('analyze-student-work', {
+          body: {
+            imageBase64: items[i].imageDataUrl,
+            detectPageType: true,
+          },
+        });
+
+        if (!error && data?.success && data?.pageType) {
+          const isNew = data.pageType.isNewPaper && !data.pageType.isContinuation;
+          
+          if (isNew) {
+            newPapers++;
+            lastNewPaperId = items[i].id;
+            setItems(prev => prev.map((item, idx) => 
+              idx === i ? { 
+                ...item, 
+                status: 'pending',
+                pageType: 'new',
+                continuationOf: undefined,
+              } : item
+            ));
+          } else {
+            continuations++;
+            // Link to the most recent "new" paper
+            setItems(prev => {
+              const updated: BatchItem[] = prev.map((item, idx) => {
+                if (idx === i) {
+                  return { 
+                    ...item, 
+                    status: 'pending' as const,
+                    pageType: 'continuation' as const,
+                    continuationOf: lastNewPaperId || undefined,
+                  };
+                }
+                // Add this as a continuation page to the primary paper
+                if (lastNewPaperId && item.id === lastNewPaperId) {
+                  return {
+                    ...item,
+                    continuationPages: [...(item.continuationPages || []), items[i].id],
+                  };
+                }
+                return item;
+              });
+              return updated;
+            });
+          }
+        } else {
+          // Default to new paper if detection fails
+          newPapers++;
+          lastNewPaperId = items[i].id;
+          setItems(prev => prev.map((item, idx) => 
+            idx === i ? { ...item, status: 'pending', pageType: 'new' } : item
+          ));
+        }
+      } catch (err) {
+        console.error('Page type detection failed:', err);
+        setItems(prev => prev.map((item, idx) => 
+          idx === i ? { ...item, status: 'pending', pageType: 'new' } : item
+        ));
+        newPapers++;
+        lastNewPaperId = items[i].id;
+      }
+    }
+
+    setCurrentIndex(-1);
+    setIsIdentifying(false);
+    
+    return { newPapers, continuations };
+  }, [items, isProcessing, isIdentifying]);
+
+  // Manually link a continuation page to a primary paper
+  const linkContinuation = useCallback((continuationId: string, primaryId: string) => {
+    setItems(prev => {
+      return prev.map(item => {
+        if (item.id === continuationId) {
+          return { ...item, pageType: 'continuation', continuationOf: primaryId };
+        }
+        if (item.id === primaryId) {
+          const existingContinuations = item.continuationPages || [];
+          if (!existingContinuations.includes(continuationId)) {
+            return { ...item, continuationPages: [...existingContinuations, continuationId] };
+          }
+        }
+        return item;
+      });
+    });
+  }, []);
+
+  // Unlink a continuation page
+  const unlinkContinuation = useCallback((continuationId: string) => {
+    setItems(prev => {
+      const continuationItem = prev.find(i => i.id === continuationId);
+      const primaryId = continuationItem?.continuationOf;
+      
+      return prev.map(item => {
+        if (item.id === continuationId) {
+          return { ...item, pageType: 'new', continuationOf: undefined };
+        }
+        if (primaryId && item.id === primaryId) {
+          return { 
+            ...item, 
+            continuationPages: (item.continuationPages || []).filter(id => id !== continuationId) 
+          };
+        }
+        return item;
+      });
+    });
+  }, []);
+
+  // Analyze with multi-page support - combines continuation pages with primary
+  const analyzeItemWithContinuations = async (
+    item: BatchItem, 
+    allItems: BatchItem[],
+    rubricSteps?: RubricStep[], 
+    assessmentMode?: 'teacher' | 'ai', 
+    promptText?: string
+  ): Promise<BatchItem> => {
+    try {
+      // Get all continuation page images
+      const additionalImages: string[] = [];
+      if (item.continuationPages && item.continuationPages.length > 0) {
+        for (const contId of item.continuationPages) {
+          const contItem = allItems.find(i => i.id === contId);
+          if (contItem) {
+            additionalImages.push(contItem.imageDataUrl);
+          }
+        }
+      }
+
+      const { data, error } = await supabase.functions.invoke('analyze-student-work', {
+        body: {
+          imageBase64: item.imageDataUrl,
+          additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
+          rubricSteps,
+          studentName: item.studentName,
+          teacherId: user?.id,
+          assessmentMode: assessmentMode || 'teacher',
+          promptText,
+        },
+      });
+
+      if (error) {
+        const errorMsg = handleApiError(error, 'Analysis');
+        throw new Error(errorMsg);
+      }
+      if (data?.error) {
+        const errorMsg = handleApiError({ message: data.error }, 'Analysis');
+        throw new Error(errorMsg);
+      }
+      if (!data?.success || !data?.analysis) throw new Error('Invalid response');
+
+      return {
+        ...item,
+        status: 'completed',
+        result: data.analysis,
+        rawAnalysis: data.rawAnalysis,
+      };
+    } catch (err) {
+      return {
+        ...item,
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'Analysis failed',
+      };
+    }
+  };
+
   const startBatchAnalysis = useCallback(async (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => {
     if (items.length === 0 || isProcessing) return;
 
     setIsProcessing(true);
     setSummary(null);
 
-    for (let i = 0; i < items.length; i++) {
+    // Get current items state for the async loop
+    const currentItems = [...items];
+
+    for (let i = 0; i < currentItems.length; i++) {
+      const item = currentItems[i];
+      
+      // Skip continuation pages - they'll be analyzed with their primary paper
+      if (item.pageType === 'continuation' && item.continuationOf) {
+        // Mark as completed (will use primary's result)
+        setItems(prev => prev.map((it, idx) => 
+          idx === i ? { ...it, status: 'completed' } : it
+        ));
+        continue;
+      }
+
       setCurrentIndex(i);
       
       // Mark current item as analyzing
-      setItems(prev => prev.map((item, idx) => 
-        idx === i ? { ...item, status: 'analyzing' } : item
+      setItems(prev => prev.map((it, idx) => 
+        idx === i ? { ...it, status: 'analyzing' } : it
       ));
 
-      const result = await analyzeItem(items[i], rubricSteps, assessmentMode, promptText);
+      // Mark any continuation pages as analyzing too
+      if (item.continuationPages && item.continuationPages.length > 0) {
+        setItems(prev => prev.map(it => 
+          item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing' } : it
+        ));
+      }
 
-      // Update item with result
-      setItems(prev => prev.map((item, idx) => 
-        idx === i ? result : item
+      const result = await analyzeItemWithContinuations(item, currentItems, rubricSteps, assessmentMode, promptText);
+
+      // Update primary item with result
+      setItems(prev => prev.map((it, idx) => 
+        idx === i ? result : it
       ));
+
+      // Update continuation pages with the same result (they share the grade)
+      if (item.continuationPages && item.continuationPages.length > 0) {
+        setItems(prev => prev.map(it => 
+          item.continuationPages!.includes(it.id) ? { ...it, status: 'completed', result: result.result } : it
+        ));
+      }
     }
 
     setCurrentIndex(-1);
@@ -532,6 +764,9 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     clearAll,
     autoIdentifyAll,
     scanAllQRCodes,
+    detectPageTypes,
+    linkContinuation,
+    unlinkContinuation,
     startBatchAnalysis,
     isProcessing,
     isIdentifying,

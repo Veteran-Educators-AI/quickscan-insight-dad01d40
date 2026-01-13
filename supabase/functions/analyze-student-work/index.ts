@@ -163,13 +163,25 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const { imageBase64, solutionBase64, questionId, rubricSteps, identifyOnly, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric, gradeFloor: customGradeFloor, gradeFloorWithEffort: customGradeFloorWithEffort } = await req.json();
+    const { imageBase64, additionalImages, solutionBase64, questionId, rubricSteps, identifyOnly, detectPageType, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric, gradeFloor: customGradeFloor, gradeFloorWithEffort: customGradeFloorWithEffort } = await req.json();
     
     // Ensure teacherId matches authenticated user
     const effectiveTeacherId = teacherId || authenticatedUserId;
     
     if (!imageBase64) {
       throw new Error('Image data is required');
+    }
+
+    // If detectPageType is true, check if this is a new paper or continuation
+    if (detectPageType) {
+      console.log('Detecting page type...');
+      const pageType = await detectPageTypeFromImage(imageBase64, LOVABLE_API_KEY);
+      return new Response(JSON.stringify({
+        success: true,
+        pageType,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Initialize Supabase client with service role for sending notifications and rate limiting
@@ -380,14 +392,25 @@ Identify the problem being solved, its related NYS standard, and evaluate the st
 - Feedback: (constructive suggestions referencing specific NYS standards the student should focus on)`;
 
     // Build messages for Lovable AI
+    // If additionalImages provided, include all pages as a multi-page paper
+    const imageContent: any[] = [
+      { type: 'text', text: userPromptText },
+      formatImageForLovableAI(imageBase64),
+    ];
+    
+    // Add additional pages if this is a multi-page paper
+    if (additionalImages && Array.isArray(additionalImages) && additionalImages.length > 0) {
+      imageContent.push({ type: 'text', text: '\n\n[CONTINUATION PAGE(S) - Same student, same problem, additional work follows:]' });
+      for (const addImage of additionalImages) {
+        imageContent.push(formatImageForLovableAI(addImage));
+      }
+    }
+    
     const messages = [
       { role: 'system', content: systemPrompt },
       { 
         role: 'user', 
-        content: [
-          { type: 'text', text: userPromptText },
-          formatImageForLovableAI(imageBase64),
-        ]
+        content: imageContent
       }
     ];
 
@@ -586,6 +609,91 @@ Provide your analysis in this exact JSON format:
     feedback: 'Unable to parse AI comparison. Please score manually.',
     correctnessAnalysis: content,
     rawComparison: content,
+  };
+}
+
+// Detect if a page is a new paper (starts with question 1) or a continuation
+interface PageTypeResult {
+  isNewPaper: boolean;
+  isContinuation: boolean;
+  detectedQuestionNumbers: number[];
+  firstQuestionNumber: number | null;
+  confidence: 'high' | 'medium' | 'low';
+  rawExtraction: string;
+}
+
+async function detectPageTypeFromImage(imageBase64: string, apiKey: string): Promise<PageTypeResult> {
+  const prompt = `Analyze this image of student work to determine if this is a NEW PAPER or a CONTINUATION of a previous page.
+
+Look for:
+1. QUESTION NUMBERS: Find any numbered questions visible (e.g., "1.", "2.", "3." or "#1", "#2", "Question 1", etc.)
+2. If question #1 is visible, this is a NEW PAPER (first page)
+3. If the visible questions start with a number OTHER than 1 (e.g., starts at 3, 4, 5), this is a CONTINUATION page (back side or next page)
+4. Look for page indicators like "Page 2", "Side B", "Back", "(continued)", etc.
+
+Respond in this exact JSON format (no markdown, just raw JSON):
+{
+  "question_numbers_found": [1, 2, 3],
+  "first_question_number": 1,
+  "is_new_paper": true,
+  "is_continuation": false,
+  "page_indicators": ["Page 1", "Front"],
+  "confidence": "high"
+}
+
+RULES:
+- If Question 1 is present, is_new_paper = true, is_continuation = false
+- If Question 1 is NOT present but other questions are, is_new_paper = false, is_continuation = true
+- If no question numbers found, assume is_new_paper = true (benefit of doubt)`;
+
+  const messages = [
+    { role: 'system', content: 'You are an expert at analyzing scanned student worksheets to identify question numbering patterns.' },
+    { 
+      role: 'user', 
+      content: [
+        { type: 'text', text: prompt },
+        formatImageForLovableAI(imageBase64),
+      ]
+    }
+  ];
+
+  const content = await callLovableAI(messages, apiKey, 'detect-page-type');
+  console.log('Page type detection response:', content);
+
+  try {
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      
+      const questionNumbers = (parsed.question_numbers_found || []).map((n: any) => Number(n)).filter((n: number) => !isNaN(n));
+      const firstNum = parsed.first_question_number ? Number(parsed.first_question_number) : (questionNumbers.length > 0 ? Math.min(...questionNumbers) : null);
+      
+      // Determine if new paper based on presence of question 1
+      const hasQuestion1 = questionNumbers.includes(1) || firstNum === 1;
+      const isNewPaper = parsed.is_new_paper ?? hasQuestion1 ?? true;
+      const isContinuation = parsed.is_continuation ?? (!hasQuestion1 && questionNumbers.length > 0);
+      
+      return {
+        isNewPaper: isNewPaper && !isContinuation,
+        isContinuation: isContinuation,
+        detectedQuestionNumbers: questionNumbers,
+        firstQuestionNumber: firstNum,
+        confidence: parsed.confidence || 'medium',
+        rawExtraction: content,
+      };
+    }
+  } catch (e) {
+    console.error('Failed to parse page type response:', e);
+  }
+
+  // Default: assume new paper
+  return {
+    isNewPaper: true,
+    isContinuation: false,
+    detectedQuestionNumbers: [],
+    firstQuestionNumber: null,
+    confidence: 'low',
+    rawExtraction: content,
   };
 }
 
