@@ -37,8 +37,25 @@ export function useGoogleDriveAutoSync() {
   const onNewFilesCallbackRef = useRef<((files: SyncedFile[]) => void) | null>(null);
 
   const getAccessToken = async (): Promise<string | null> => {
+    // First try to get token from current session (best source after fresh OAuth)
     const { data: { session } } = await supabase.auth.getSession();
-    return session?.provider_token || null;
+    
+    if (session?.provider_token) {
+      return session.provider_token;
+    }
+    
+    // Fall back to stored token if not expired
+    const storedToken = localStorage.getItem('google_drive_access_token');
+    const storedExpiry = localStorage.getItem('google_drive_token_expiry');
+    
+    if (storedToken && storedExpiry) {
+      const expiryTime = parseInt(storedExpiry, 10);
+      if (Date.now() < expiryTime) {
+        return storedToken;
+      }
+    }
+    
+    return null;
   };
 
   const checkForNewFiles = useCallback(async (): Promise<SyncedFile[]> => {
