@@ -764,6 +764,39 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           pdf.line(margin, yPosition, pageWidth - margin, yPosition);
           yPosition += 10;
 
+          // Helper function to add continuation page header with QR
+          const addContinuationPageHeader = async (currentPage: number) => {
+            // Add student identifier strip at top of continuation page
+            pdf.setFillColor(245, 245, 245);
+            pdf.rect(0, 0, pageWidth, 18, 'F');
+            
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(80);
+            pdf.text(`${student.first_name} ${student.last_name}`, margin, 10);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(`Level ${level}${numForms > 1 ? ` | Form ${assignedForm}` : ''} | Page ${currentPage}`, margin + 60, 10);
+            
+            // Add QR code to continuation page header for identification
+            if (includeStudentQR) {
+              try {
+                const contWorksheetId = `diag_${selectedTopics[0]?.substring(0, 10) || 'math'}_${level}_${assignedForm}_${Date.now()}`;
+                const contQrDataUrl = await generateQRCodeDataUrl(student.id, contWorksheetId, 80);
+                const contQrSize = 14;
+                pdf.addImage(contQrDataUrl, 'PNG', pageWidth - margin - contQrSize, 2, contQrSize, contQrSize);
+              } catch (qrError) {
+                console.error('Error generating continuation QR code:', qrError);
+              }
+            }
+            
+            pdf.setTextColor(0);
+            pdf.setLineWidth(0.3);
+            pdf.setDrawColor(200);
+            pdf.line(margin, 18, pageWidth - margin, 18);
+          };
+
+          let pageCount = 1;
+
           // Warm-Up Section (confidence builders)
           if (warmUpQuestions.length > 0) {
             pdf.setFillColor(240, 253, 244); // Light green
@@ -778,7 +811,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             for (const question of warmUpQuestions) {
               if (yPosition > pageHeight - 50) {
                 pdf.addPage();
-                yPosition = margin;
+                pageCount++;
+                await addContinuationPageHeader(pageCount);
+                yPosition = 25; // Start below the continuation header
               }
 
               pdf.setFontSize(11);
@@ -871,7 +906,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           for (const question of questions) {
             if (yPosition > pageHeight - 60) {
               pdf.addPage();
-              yPosition = margin;
+              pageCount++;
+              await addContinuationPageHeader(pageCount);
+              yPosition = 25; // Start below the continuation header
             }
 
             pdf.setFontSize(11);
@@ -882,14 +919,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             pdf.setFont('helvetica', 'normal');
             const sanitizedQuestion = sanitizeForPDF(question.question);
             const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
-            lines.forEach((line: string) => {
+            for (const line of lines) {
               if (yPosition > pageHeight - 30) {
                 pdf.addPage();
-                yPosition = margin;
+                pageCount++;
+                await addContinuationPageHeader(pageCount);
+                yPosition = 25; // Start below the continuation header
               }
               pdf.text(line, margin + 5, yPosition);
               yPosition += 5;
-            });
+            }
 
             // Add geometry diagram if available
             if ((question.imageUrl || question.svg) && includeGeometry) {
@@ -897,7 +936,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 // Check if we need a new page for the image
                 if (yPosition > pageHeight - 70) {
                   pdf.addPage();
-                  yPosition = margin;
+                  pageCount++;
+                  await addContinuationPageHeader(pageCount);
+                  yPosition = 25; // Start below the continuation header
                 }
                 
                 // Convert SVG to PNG if needed
@@ -935,14 +976,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               pdf.setTextColor(120, 100, 50);
               const sanitizedHint = sanitizeForPDF(question.hint);
               const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, contentWidth - 10);
-              hintLines.forEach((line: string) => {
+              for (const line of hintLines) {
                 if (yPosition > pageHeight - 25) {
                   pdf.addPage();
-                  yPosition = margin;
+                  pageCount++;
+                  await addContinuationPageHeader(pageCount);
+                  yPosition = 25; // Start below the continuation header
                 }
                 pdf.text(line, margin + 5, yPosition);
                 yPosition += 4;
-              });
+              }
               pdf.setTextColor(0);
               pdf.setFontSize(11);
             }
@@ -954,7 +997,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             for (let i = 0; i < 4; i++) {
               if (yPosition > pageHeight - 20) {
                 pdf.addPage();
-                yPosition = margin;
+                pageCount++;
+                await addContinuationPageHeader(pageCount);
+                yPosition = 25; // Start below the continuation header
               }
               pdf.line(margin + 5, yPosition, pageWidth - margin, yPosition);
               yPosition += 8;
