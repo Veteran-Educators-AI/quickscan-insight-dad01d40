@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save } from 'lucide-react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +17,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { BatchItem } from '@/hooks/useBatchAnalysis';
 import { HandwritingComparisonDialog } from './HandwritingComparisonDialog';
 
@@ -35,6 +45,7 @@ interface BatchQueueProps {
   onLinkContinuation?: (continuationId: string, primaryId: string) => void;
   onUnlinkContinuation?: (continuationId: string) => void;
   onSaveToGradebook?: () => Promise<void>;
+  onOverrideGrade?: (itemId: string, newGrade: number, justification: string) => void;
   currentIndex: number;
   isProcessing: boolean;
   isIdentifying: boolean;
@@ -75,6 +86,7 @@ export function BatchQueue({
   onLinkContinuation,
   onUnlinkContinuation,
   onSaveToGradebook,
+  onOverrideGrade,
   currentIndex, 
   isProcessing,
   isIdentifying,
@@ -82,6 +94,9 @@ export function BatchQueue({
   allSaved = false,
 }: BatchQueueProps) {
   const [showComparisonDialog, setShowComparisonDialog] = useState(false);
+  const [overrideDialogItem, setOverrideDialogItem] = useState<BatchItem | null>(null);
+  const [overrideGrade, setOverrideGrade] = useState('');
+  const [overrideJustification, setOverrideJustification] = useState('');
 
   // Get primary pages (not continuations)
   const primaryPages = items.filter(i => i.pageType !== 'continuation');
@@ -103,13 +118,45 @@ export function BatchQueue({
 
   const getStatusBadge = (item: BatchItem) => {
     if (item.status === 'completed' && item.result) {
-      // Calculate grade using the same logic as AnalysisResults
-      // We don't have access to the full grade calculation context here easily (GradeFloorSettings)
-      // defaulting to the raw percentage for now, but suppressing the raw score from badge if requested
-      
-      const pct = item.result.grade || item.result.totalScore.percentage;
+      const pct = item.result.overriddenGrade ?? item.result.grade ?? item.result.totalScore.percentage;
       const variant = pct >= 80 ? 'default' : pct >= 60 ? 'secondary' : 'destructive';
-      return <Badge variant={variant}>{pct}%</Badge>;
+      const hasMultiAnalysis = item.result.multiAnalysisGrades && item.result.multiAnalysisGrades.length > 1;
+      const isOverridden = item.result.isOverridden;
+      
+      return (
+        <div className="flex items-center gap-1">
+          <Badge variant={variant} className={isOverridden ? 'ring-2 ring-amber-400' : ''}>
+            {pct}%
+            {isOverridden && <Pencil className="h-3 w-3 ml-1" />}
+          </Badge>
+          {hasMultiAnalysis && !isOverridden && item.result.confidenceScore && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${
+                      item.result.confidenceScore >= 85 ? 'border-green-500 text-green-600' :
+                      item.result.confidenceScore >= 70 ? 'border-amber-500 text-amber-600' :
+                      'border-red-500 text-red-600'
+                    }`}
+                  >
+                    <ShieldCheck className="h-3 w-3 mr-0.5" />
+                    {item.result.confidenceScore}%
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">
+                    Confidence based on {item.result.multiAnalysisGrades.length} analyses
+                    <br />
+                    Grades: {item.result.multiAnalysisGrades.join('%, ')}%
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      );
     }
     if (item.status === 'failed') {
       return <Badge variant="destructive">Failed</Badge>;
@@ -412,6 +459,31 @@ export function BatchQueue({
                 {/* Status badge */}
                 {getStatusBadge(item)}
 
+                {/* Override button - only for completed items with results */}
+                {!isBusy && item.status === 'completed' && item.result && onOverrideGrade && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 shrink-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          onClick={() => {
+                            setOverrideDialogItem(item);
+                            setOverrideGrade(String(item.result?.overriddenGrade ?? item.result?.grade ?? item.result?.totalScore.percentage ?? ''));
+                            setOverrideJustification(item.result?.overrideJustification || '');
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">Override grade</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
                 {/* Remove button */}
                 {!isBusy && (
                   <Button
@@ -476,6 +548,84 @@ export function BatchQueue({
         onUnlinkContinuation?.(continuationId);
       }}
     />
+
+    {/* Grade Override Dialog */}
+    <Dialog open={!!overrideDialogItem} onOpenChange={(open) => !open && setOverrideDialogItem(null)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pencil className="h-5 w-5 text-amber-600" />
+            Override Grade
+          </DialogTitle>
+        </DialogHeader>
+        {overrideDialogItem && (
+          <div className="space-y-4 py-2">
+            <div>
+              <p className="text-sm font-medium">{overrideDialogItem.studentName || 'Student'}</p>
+              {overrideDialogItem.result?.multiAnalysisGrades && overrideDialogItem.result.multiAnalysisGrades.length > 1 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Original analysis grades: {overrideDialogItem.result.multiAnalysisGrades.join('%, ')}%
+                  <br />
+                  Averaged grade: {Math.round(overrideDialogItem.result.multiAnalysisGrades.reduce((a, b) => a + b, 0) / overrideDialogItem.result.multiAnalysisGrades.length)}%
+                  <span className="ml-2">
+                    (Confidence: {overrideDialogItem.result.confidenceScore}%)
+                  </span>
+                </p>
+              )}
+              {!overrideDialogItem.result?.multiAnalysisGrades && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Current grade: {overrideDialogItem.result?.grade ?? overrideDialogItem.result?.totalScore.percentage}%
+                </p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="override-grade">New Grade (%)</Label>
+              <Input
+                id="override-grade"
+                type="number"
+                min="0"
+                max="100"
+                value={overrideGrade}
+                onChange={(e) => setOverrideGrade(e.target.value)}
+                placeholder="Enter new grade (0-100)"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="override-justification">Justification (required)</Label>
+              <Textarea
+                id="override-justification"
+                value={overrideJustification}
+                onChange={(e) => setOverrideJustification(e.target.value)}
+                placeholder="Explain why you're overriding this grade..."
+                rows={3}
+              />
+            </div>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOverrideDialogItem(null)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              if (overrideDialogItem && overrideGrade && overrideJustification) {
+                const grade = parseInt(overrideGrade, 10);
+                if (!isNaN(grade) && grade >= 0 && grade <= 100) {
+                  onOverrideGrade?.(overrideDialogItem.id, grade, overrideJustification);
+                  setOverrideDialogItem(null);
+                }
+              }
+            }}
+            disabled={!overrideGrade || !overrideJustification}
+            className="bg-amber-600 hover:bg-amber-700"
+          >
+            Save Override
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

@@ -33,6 +33,12 @@ export interface AnalysisResult {
   nysStandard?: string;
   regentsScore?: number;
   regentsScoreJustification?: string;
+  // Multi-analysis confidence fields
+  multiAnalysisGrades?: number[];
+  confidenceScore?: number; // 0-100 based on grade consistency
+  isOverridden?: boolean;
+  overriddenGrade?: number;
+  overrideJustification?: string;
 }
 
 export interface Student {
@@ -104,6 +110,8 @@ interface UseBatchAnalysisReturn {
   linkContinuation: (continuationId: string, primaryId: string) => void;
   unlinkContinuation: (continuationId: string) => void;
   startBatchAnalysis: (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<void>;
+  startConfidenceAnalysis: (analysisCount: 2 | 3, rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<void>;
+  overrideGrade: (itemId: string, newGrade: number, justification: string) => void;
   isProcessing: boolean;
   isIdentifying: boolean;
   currentIndex: number;
@@ -880,6 +888,133 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     setIsProcessing(false);
   }, [items, isProcessing]);
 
+  // Calculate confidence score based on grade consistency across multiple analyses
+  const calculateConfidence = (grades: number[]): number => {
+    if (grades.length < 2) return 100;
+    const max = Math.max(...grades);
+    const min = Math.min(...grades);
+    const range = max - min;
+    // If grades are within 5 points, very high confidence
+    // If within 10 points, high confidence
+    // If within 20 points, medium confidence
+    // Beyond 20 points, lower confidence
+    if (range <= 5) return 95;
+    if (range <= 10) return 85;
+    if (range <= 15) return 70;
+    if (range <= 20) return 55;
+    return Math.max(30, 100 - range * 2);
+  };
+
+  // Start confidence analysis - run multiple analyses per item and average
+  const startConfidenceAnalysis = useCallback(async (
+    analysisCount: 2 | 3,
+    rubricSteps?: RubricStep[], 
+    assessmentMode?: 'teacher' | 'ai', 
+    promptText?: string
+  ) => {
+    if (items.length === 0 || isProcessing) return;
+
+    setIsProcessing(true);
+    setSummary(null);
+
+    const currentItems = [...items];
+
+    for (let i = 0; i < currentItems.length; i++) {
+      const item = currentItems[i];
+      
+      // Skip continuation pages
+      if (item.pageType === 'continuation' && item.continuationOf) {
+        setItems(prev => prev.map((it, idx) => 
+          idx === i ? { ...it, status: 'completed' } : it
+        ));
+        continue;
+      }
+
+      setCurrentIndex(i);
+      
+      // Mark current item as analyzing
+      setItems(prev => prev.map((it, idx) => 
+        idx === i ? { ...it, status: 'analyzing' } : it
+      ));
+
+      // Mark any continuation pages as analyzing too
+      if (item.continuationPages && item.continuationPages.length > 0) {
+        setItems(prev => prev.map(it => 
+          item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing' } : it
+        ));
+      }
+
+      // Run multiple analyses
+      const analysisResults: AnalysisResult[] = [];
+      for (let run = 0; run < analysisCount; run++) {
+        const result = await analyzeItemWithContinuations(item, currentItems, rubricSteps, assessmentMode, promptText);
+        if (result.result) {
+          analysisResults.push(result.result);
+        }
+      }
+
+      if (analysisResults.length === 0) {
+        // All analyses failed
+        setItems(prev => prev.map((it, idx) => 
+          idx === i ? { ...it, status: 'failed', error: 'All analysis attempts failed' } : it
+        ));
+        continue;
+      }
+
+      // Calculate final grade by averaging
+      const grades = analysisResults.map(r => r.grade ?? r.totalScore.percentage);
+      const averageGrade = Math.round(grades.reduce((a, b) => a + b, 0) / grades.length);
+      const confidenceScore = calculateConfidence(grades);
+
+      // Combine the results - use first result as base but with averaged grade
+      const combinedResult: AnalysisResult = {
+        ...analysisResults[0],
+        grade: averageGrade,
+        gradeJustification: `Average of ${analysisCount} analyses (${grades.join('%, ')}%). ${analysisResults[0].gradeJustification || ''}`,
+        multiAnalysisGrades: grades,
+        confidenceScore,
+      };
+
+      // Apply grade curve if configured
+      const curvedResult = applyGradeCurve(combinedResult);
+
+      // Update primary item with combined result
+      setItems(prev => prev.map((it, idx) => 
+        idx === i ? { ...it, status: 'completed', result: curvedResult } : it
+      ));
+
+      // Update continuation pages with the same result
+      if (item.continuationPages && item.continuationPages.length > 0) {
+        setItems(prev => prev.map(it => 
+          item.continuationPages!.includes(it.id) ? { ...it, status: 'completed', result: curvedResult } : it
+        ));
+      }
+    }
+
+    setCurrentIndex(-1);
+    setIsProcessing(false);
+  }, [items, isProcessing, applyGradeCurve]);
+
+  // Override grade for a specific item
+  const overrideGrade = useCallback((itemId: string, newGrade: number, justification: string) => {
+    setItems(prev => prev.map(item => {
+      if (item.id === itemId && item.result) {
+        return {
+          ...item,
+          result: {
+            ...item.result,
+            isOverridden: true,
+            overriddenGrade: newGrade,
+            overrideJustification: justification,
+            grade: newGrade,
+            gradeJustification: `Teacher override: ${justification}. Original: ${item.result.multiAnalysisGrades?.join('%, ') || item.result.grade}%`,
+          },
+        };
+      }
+      return item;
+    }));
+  }, []);
+
   const generateSummary = useCallback((): BatchSummary => {
     // Only count primary pages (not continuations) to avoid double-counting
     const completedItems = items.filter(item => 
@@ -900,10 +1035,10 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
       };
     }
 
-    // Use grade if available (includes curve), otherwise use percentage
+    // Use overridden grade if available, then grade, then percentage
     const scores = completedItems.map(item => {
       const result = item.result!;
-      return result.grade ?? result.totalScore.percentage;
+      return result.overriddenGrade ?? result.grade ?? result.totalScore.percentage;
     });
     
     const validScores = scores.filter(s => typeof s === 'number' && !isNaN(s));
@@ -978,6 +1113,8 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     linkContinuation,
     unlinkContinuation,
     startBatchAnalysis,
+    startConfidenceAnalysis,
+    overrideGrade,
     isProcessing,
     isIdentifying,
     currentIndex,
