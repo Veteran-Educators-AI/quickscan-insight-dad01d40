@@ -1465,6 +1465,10 @@ export type Database = {
         Returns: Json
       }
       get_student_dashboard: { Args: { p_student_id: string }; Returns: Json }
+      is_student_in_class: {
+        Args: { p_class_id: string; p_user_id: string }
+        Returns: boolean
+      }
       join_class_with_code: {
         Args: { p_join_code: string; p_user_email: string }
         Returns: Json

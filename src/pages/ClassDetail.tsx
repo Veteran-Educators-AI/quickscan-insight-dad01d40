@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil, QrCode, BookOpen } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil, QrCode, BookOpen, ExternalLink } from 'lucide-react';
 import { StudentOnlyQRCode } from '@/components/print/StudentOnlyQRCode';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -394,10 +394,25 @@ export default function ClassDetail() {
                 <CardTitle className="text-2xl">{classData.name}</CardTitle>
                 <CardDescription>{classData.school_year || 'No year set'}</CardDescription>
               </div>
-              <Button variant="outline" onClick={copyJoinCode}>
-                {copiedCode ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-                Join Code: {classData.join_code}
-              </Button>
+              <div className="flex flex-col gap-2 items-end">
+                <Button variant="outline" onClick={copyJoinCode}>
+                  {copiedCode ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                  Join Code: {classData.join_code}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="text-xs text-muted-foreground"
+                  onClick={() => {
+                    const studentUrl = `${window.location.origin}/student/login`;
+                    navigator.clipboard.writeText(studentUrl);
+                    toast({ title: 'Copied!', description: 'Student portal URL copied to clipboard' });
+                  }}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  Copy Student Portal Link
+                </Button>
+              </div>
             </div>
           </CardHeader>
         </Card>
