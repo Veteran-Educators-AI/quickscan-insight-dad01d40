@@ -1464,6 +1464,11 @@ export type Database = {
         }
         Returns: Json
       }
+      get_student_dashboard: { Args: { p_student_id: string }; Returns: Json }
+      join_class_with_code: {
+        Args: { p_join_code: string; p_user_email: string }
+        Returns: Json
+      }
     }
     Enums: {
       attempt_status: "pending" | "analyzed" | "reviewed"
