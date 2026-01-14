@@ -1,4 +1,4 @@
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink } from 'lucide-react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -168,6 +168,9 @@ export function BatchQueue({
                       <TooltipTrigger asChild>
                         <div className="flex items-center gap-1 text-blue-600">
                           <Link className="h-4 w-4" />
+                          {item.handwritingSimilarity && (
+                            <Fingerprint className="h-3 w-3 text-blue-500" />
+                          )}
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -175,6 +178,14 @@ export function BatchQueue({
                           Continuation of: {linkedPrimary?.studentName || 'previous paper'}
                           <br />
                           Will be graded together as one paper
+                          {item.handwritingSimilarity && (
+                            <>
+                              <br />
+                              <span className="text-muted-foreground">
+                                Handwriting match: {item.handwritingSimilarity.similarityScore}% ({item.handwritingSimilarity.confidence})
+                              </span>
+                            </>
+                          )}
                         </p>
                       </TooltipContent>
                     </Tooltip>
