@@ -2441,7 +2441,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           </div>
 
           {/* Preview Content Area */}
-          <div className="flex-1 overflow-auto p-6 print:p-0 print:overflow-visible">
+          <div className="flex-1 overflow-y-auto overflow-x-auto p-6 print:p-0 print:overflow-visible" style={{ maxHeight: 'calc(100vh - 64px)' }}>
             <div 
               ref={printRef} 
               className="bg-white mx-auto shadow-xl print:shadow-none"
