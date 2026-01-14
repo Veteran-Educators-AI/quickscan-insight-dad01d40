@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { BookOpen, Sparkles, Send, ExternalLink, Loader2, ArrowRight, Target, Lightbulb, Users, Zap } from 'lucide-react';
+import { BookOpen, Sparkles, Send, ExternalLink, Loader2, ArrowRight, Target, Lightbulb, Users, Zap, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { useAutoPushSettings } from '@/hooks/useAutoPushSettings';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { GEOMETRY_TOPICS, ALGEBRA1_TOPICS, ALGEBRA2_TOPICS } from '@/data/nysTopics';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/lib/auth';
 
 interface RecommendedNextStepsProps {
   misconceptions: string[];
@@ -180,9 +182,11 @@ export function RecommendedNextSteps({
   const [isBulkPushing, setIsBulkPushing] = useState(false);
   const [pushedItems, setPushedItems] = useState<Set<string>>(new Set());
   const [autoPushTriggered, setAutoPushTriggered] = useState(false);
+  const [parentNotified, setParentNotified] = useState(false);
   const autoPushRef = useRef(false);
   const { pushToSisterApp } = usePushToSisterApp();
   const { shouldAutoPush, autoPushEnabled, autoPushThreshold, autoPushRegentsThreshold, autoPushWorksheetCount, isLoading: autoPushLoading } = useAutoPushSettings();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const topicRecommendations = findRelevantTopics(misconceptions, problemContext, nysStandard);
@@ -248,11 +252,53 @@ export function RecommendedNextSteps({
           icon: <Zap className="h-4 w-4 text-amber-500" />,
           description: `Grade ${grade}% triggered auto-push (threshold: ${autoPushThreshold}%)`,
         });
+
+        // Send parent notification
+        try {
+          // Fetch student's parent email
+          const { data: studentData } = await supabase
+            .from('students')
+            .select('parent_email')
+            .eq('id', studentId)
+            .single();
+
+          if (studentData?.parent_email) {
+            // Get teacher name
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', user?.id || '')
+              .single();
+
+            const { error: notifyError } = await supabase.functions.invoke('send-auto-push-parent-notification', {
+              body: {
+                studentId,
+                studentName: studentName || 'Student',
+                parentEmail: studentData.parent_email,
+                grade: grade || 0,
+                regentsScore,
+                topicName: topicName || 'General Practice',
+                worksheetCount: successCount,
+                teacherName: profile?.full_name,
+                threshold: autoPushThreshold,
+              },
+            });
+
+            if (!notifyError) {
+              setParentNotified(true);
+              toast.success('Parent notified about remediation practice', {
+                icon: <Mail className="h-4 w-4 text-blue-500" />,
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Failed to send parent notification:', err);
+        }
       }
     };
 
     triggerAutoPush();
-  }, [grade, regentsScore, classId, studentId, shouldAutoPush, autoPushLoading, autoPushTriggered, worksheetRecommendations, autoPushWorksheetCount, pushToSisterApp, studentName, autoPushThreshold]);
+  }, [grade, regentsScore, classId, studentId, shouldAutoPush, autoPushLoading, autoPushTriggered, worksheetRecommendations, autoPushWorksheetCount, pushToSisterApp, studentName, autoPushThreshold, user, topicName]);
 
   const handlePushToApp = async (worksheet: WorksheetRecommendation) => {
     if (!classId) {
@@ -521,14 +567,20 @@ export function RecommendedNextSteps({
           <div className={`mt-3 p-3 rounded-lg border ${autoPushTriggered ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800' : 'bg-muted/50 border-dashed'}`}>
             <div className="flex items-start gap-2">
               <Zap className={`h-4 w-4 mt-0.5 ${autoPushTriggered ? 'text-amber-600' : 'text-muted-foreground'}`} />
-              <div>
-                <p className="text-sm font-medium flex items-center gap-2">
+              <div className="flex-1">
+                <p className="text-sm font-medium flex items-center gap-2 flex-wrap">
                   Auto-Push {autoPushTriggered ? 'Triggered' : 'Enabled'}
                   {autoPushTriggered && <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">✓ Sent</Badge>}
+                  {parentNotified && (
+                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                      <Mail className="h-3 w-3 mr-1" />
+                      Parent Notified
+                    </Badge>
+                  )}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {autoPushTriggered 
-                    ? `Remediation worksheets were automatically sent because grade (${grade}%) was below ${autoPushThreshold}%`
+                    ? `Remediation worksheets were automatically sent because grade (${grade}%) was below ${autoPushThreshold}%${parentNotified ? '. Parent has been notified via email.' : ''}`
                     : `Will auto-push when grade < ${autoPushThreshold}% or Regents < ${autoPushRegentsThreshold}`
                   }
                 </p>
