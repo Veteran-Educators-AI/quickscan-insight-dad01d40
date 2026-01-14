@@ -392,6 +392,11 @@ export function BatchQueue({
                   </TooltipProvider>
                 )}
 
+                {/* Position number */}
+                <div className="flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
+                  {index + 1}
+                </div>
+
                 {/* Thumbnail */}
                 <div className="relative h-12 w-12 rounded-md overflow-hidden bg-muted shrink-0">
                   <img 

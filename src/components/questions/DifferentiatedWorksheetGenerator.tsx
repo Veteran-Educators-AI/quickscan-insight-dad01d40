@@ -711,9 +711,23 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           pdf.text(`${truncatedTopics} - Diagnostic Worksheet`, pageWidth / 2, yPosition + 12, { align: 'center' });
           yPosition += 30;
 
-          // Student info with form indicator
+          // Student info with form indicator and inline QR code next to name
           pdf.setFontSize(11);
           pdf.text(`Name: ${student.first_name} ${student.last_name}`, margin, yPosition);
+          
+          // Add small QR code next to student name
+          if (includeStudentQR) {
+            try {
+              const headerWorksheetId = `diag_${selectedTopics[0]?.substring(0, 10) || 'math'}_${level}_${assignedForm}_${Date.now()}`;
+              const headerQrDataUrl = await generateQRCodeDataUrl(student.id, headerWorksheetId, 80);
+              const headerQrSize = 12; // smaller QR for header
+              const nameWidth = pdf.getTextWidth(`Name: ${student.first_name} ${student.last_name}`);
+              pdf.addImage(headerQrDataUrl, 'PNG', margin + nameWidth + 3, yPosition - 8, headerQrSize, headerQrSize);
+            } catch (qrError) {
+              console.error('Error generating header QR code:', qrError);
+            }
+          }
+          
           if (numForms > 1) {
             pdf.setFont('helvetica', 'bold');
             pdf.text(`Form ${assignedForm}`, pageWidth - margin - 25, yPosition);
