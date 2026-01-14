@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Edit3, Check, Play, X, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, Maximize2, Minimize2, Volume2, VolumeX } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit3, Check, Play, X, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, Maximize2, Minimize2, Volume2, VolumeX, Download, FileText, Presentation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { exportToPDF, exportToPPTX } from '@/lib/presentationExport';
 import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 
 export interface PresentationSlide {
@@ -82,6 +85,7 @@ export function NycologicPresents({
   onSave,
   isEditable = true 
 }: NycologicPresentsProps) {
+  const { toast } = useToast();
   const [presentation, setPresentation] = useState(initialPresentation);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
@@ -90,6 +94,7 @@ export function NycologicPresents({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const slide = presentation.slides[currentSlide];
   const totalSlides = presentation.slides.length;
@@ -188,6 +193,46 @@ export function NycologicPresents({
     setTimeout(() => setShowAnswer(true), 500);
   };
 
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      await exportToPDF(presentation);
+      toast({
+        title: 'PDF exported!',
+        description: 'Your presentation has been downloaded as a PDF.',
+      });
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast({
+        title: 'Export failed',
+        description: 'Failed to export PDF. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPPTX = async () => {
+    setIsExporting(true);
+    try {
+      await exportToPPTX(presentation);
+      toast({
+        title: 'PowerPoint exported!',
+        description: 'Your presentation has been downloaded as a PPTX file.',
+      });
+    } catch (error) {
+      console.error('PPTX export error:', error);
+      toast({
+        title: 'Export failed',
+        description: 'Failed to export PowerPoint. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div 
       className={cn(
@@ -261,6 +306,31 @@ export function NycologicPresents({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Export dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={isExporting}
+                className="text-white/80 hover:text-white hover:bg-white/20 h-10 px-4"
+              >
+                <Download className="h-5 w-5 mr-2" />
+                {isExporting ? 'Exporting...' : 'Export'}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={handleExportPDF} className="cursor-pointer">
+                <FileText className="h-4 w-4 mr-2" />
+                Export as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportPPTX} className="cursor-pointer">
+                <Presentation className="h-4 w-4 mr-2" />
+                Export as PowerPoint
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {isEditable && (
             <Button
               variant="ghost"
