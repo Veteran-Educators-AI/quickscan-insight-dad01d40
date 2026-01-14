@@ -191,77 +191,91 @@ export function NycologicPresents({
   return (
     <div 
       className={cn(
-        "fixed inset-0 z-50",
+        "fixed inset-0 z-[9999] w-screen h-screen",
         visualTheme ? `bg-gradient-to-br ${visualTheme.gradient}` : `bg-gradient-to-br ${colors.bg}`
       )}
-      style={visualTheme ? { backgroundImage: visualTheme.pattern } : undefined}
+      style={{ 
+        ...(visualTheme ? { backgroundImage: visualTheme.pattern } : {}),
+        minHeight: '100vh',
+        minWidth: '100vw',
+      }}
     >
-      {/* Animated background particles */}
+      {/* Animated background particles - larger and more visible */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
+        {[...Array(30)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-1 h-1 rounded-full bg-white/10"
+            className="absolute rounded-full bg-white/20"
+            style={{
+              width: `${4 + Math.random() * 8}px`,
+              height: `${4 + Math.random() * 8}px`,
+            }}
             initial={{ 
-              x: Math.random() * window.innerWidth, 
-              y: Math.random() * window.innerHeight,
+              x: `${Math.random() * 100}%`, 
+              y: `${Math.random() * 100}%`,
               opacity: 0 
             }}
             animate={{ 
-              y: [null, Math.random() * -100],
-              opacity: [0, 0.5, 0],
+              y: [`${Math.random() * 100}%`, `${Math.random() * 100 - 20}%`],
+              opacity: [0, 0.6, 0],
             }}
             transition={{ 
-              duration: 3 + Math.random() * 2, 
+              duration: 4 + Math.random() * 3, 
               repeat: Infinity,
-              delay: Math.random() * 2 
+              delay: Math.random() * 3 
             }}
           />
         ))}
       </div>
 
-      {/* Header */}
+      {/* Decorative gradient orbs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 rounded-full bg-white/5 blur-3xl" />
+        <div className="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 rounded-full bg-white/5 blur-3xl" />
+      </div>
+
+      {/* Header - more prominent */}
       <motion.header 
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="absolute top-0 left-0 right-0 flex items-center justify-between px-8 py-4 z-10"
+        className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 md:px-12 py-6 z-20"
       >
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="text-white/70 hover:text-white hover:bg-white/10"
+            className="text-white/80 hover:text-white hover:bg-white/20 h-12 w-12"
           >
-            <X className="h-5 w-5" />
+            <X className="h-6 w-6" />
           </Button>
-          <div className="flex items-center gap-2">
-            <img src={nyclogicLogo} alt="NYClogic" className="h-8 w-8" />
+          <div className="flex items-center gap-3">
+            <img src={nyclogicLogo} alt="NYClogic" className="h-12 w-12 drop-shadow-lg" />
             <div>
-              <p className={cn("text-xs font-medium tracking-widest uppercase", colors.accent)}>
-                NYClogic PRESENTS:
+              <p className={cn("text-sm font-bold tracking-[0.2em] uppercase drop-shadow-md", colors.accent)}>
+                NYClogic PRESENTS
               </p>
-              <h1 className="text-white/90 font-serif text-lg">{presentation.title}</h1>
+              <h1 className="text-white font-serif text-xl md:text-2xl drop-shadow-lg">{presentation.title}</h1>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {isEditable && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-              className="text-white/70 hover:text-white hover:bg-white/10"
+              className="text-white/80 hover:text-white hover:bg-white/20 h-10 px-4"
             >
               {isEditing ? (
                 <>
-                  <Check className="h-4 w-4 mr-2" />
+                  <Check className="h-5 w-5 mr-2" />
                   Save
                 </>
               ) : (
                 <>
-                  <Edit3 className="h-4 w-4 mr-2" />
+                  <Edit3 className="h-5 w-5 mr-2" />
                   Edit
                 </>
               )}
@@ -271,85 +285,85 @@ export function NycologicPresents({
             variant="ghost"
             size="icon"
             onClick={() => setIsMuted(!isMuted)}
-            className="text-white/70 hover:text-white hover:bg-white/10"
+            className="text-white/80 hover:text-white hover:bg-white/20 h-12 w-12"
           >
-            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleFullscreen}
-            className="text-white/70 hover:text-white hover:bg-white/10"
+            className="text-white/80 hover:text-white hover:bg-white/20 h-12 w-12"
           >
-            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
           </Button>
         </div>
       </motion.header>
 
-      {/* Navigation arrows */}
+      {/* Navigation arrows - larger and more visible */}
       <button
         onClick={prevSlide}
         disabled={currentSlide === 0}
         className={cn(
-          "absolute left-4 top-1/2 -translate-y-1/2 z-10",
-          "w-12 h-12 rounded-full flex items-center justify-center",
-          "transition-all duration-300",
+          "absolute left-6 md:left-12 top-1/2 -translate-y-1/2 z-20",
+          "w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center",
+          "transition-all duration-300 backdrop-blur-sm",
           currentSlide === 0 
             ? "opacity-20 cursor-not-allowed" 
-            : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white hover:scale-110"
+            : "bg-white/10 hover:bg-white/20 text-white/80 hover:text-white hover:scale-110 shadow-2xl"
         )}
       >
-        <ChevronLeft className="h-6 w-6" />
+        <ChevronLeft className="h-8 w-8 md:h-10 md:w-10" />
       </button>
 
       <button
         onClick={nextSlide}
         disabled={currentSlide === totalSlides - 1}
         className={cn(
-          "absolute right-4 top-1/2 -translate-y-1/2 z-10",
-          "w-12 h-12 rounded-full flex items-center justify-center",
-          "transition-all duration-300",
+          "absolute right-6 md:right-12 top-1/2 -translate-y-1/2 z-20",
+          "w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center",
+          "transition-all duration-300 backdrop-blur-sm",
           currentSlide === totalSlides - 1 
             ? "opacity-20 cursor-not-allowed" 
-            : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white hover:scale-110"
+            : "bg-white/10 hover:bg-white/20 text-white/80 hover:text-white hover:scale-110 shadow-2xl"
         )}
       >
-        <ChevronRight className="h-6 w-6" />
+        <ChevronRight className="h-8 w-8 md:h-10 md:w-10" />
       </button>
 
-      {/* Main content */}
-      <main className="absolute inset-0 flex items-center justify-center px-20 py-24">
+      {/* Main content - truly fullscreen */}
+      <main className="absolute inset-0 flex items-center justify-center px-24 md:px-32 lg:px-40 py-28 md:py-32">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentSlide}
-            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.98 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="w-full max-w-5xl text-center"
+            exit={{ opacity: 0, y: -30, scale: 0.95 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="w-full h-full flex flex-col items-center justify-center text-center"
           >
-            {/* Icon */}
+            {/* Icon - larger */}
             {IconComponent && (
               <motion.div 
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.2, type: "spring" }}
                 className={cn(
-                  "mx-auto mb-6 w-16 h-16 rounded-2xl flex items-center justify-center",
-                  "bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm"
+                  "mx-auto mb-8 w-24 h-24 md:w-28 md:h-28 rounded-3xl flex items-center justify-center",
+                  "bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-md shadow-2xl"
                 )}
               >
-                <IconComponent className={cn("h-8 w-8", colors.accent)} />
+                <IconComponent className={cn("h-12 w-12 md:h-14 md:w-14", colors.accent)} />
               </motion.div>
             )}
 
-            {/* Subtitle/Topic tag */}
+            {/* Subtitle/Topic tag - larger */}
             {slide.subtitle && (
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className={cn("text-sm font-medium tracking-widest uppercase mb-4", colors.accent)}
+                className={cn("text-base md:text-lg font-bold tracking-[0.25em] uppercase mb-6 drop-shadow-lg", colors.accent)}
               >
                 {isEditing && editingField === 'subtitle' ? (
                   <Input
@@ -357,7 +371,7 @@ export function NycologicPresents({
                     onChange={(e) => updateSlide('subtitle', e.target.value)}
                     onBlur={() => setEditingField(null)}
                     autoFocus
-                    className="bg-white/10 border-white/20 text-white text-center max-w-md mx-auto"
+                    className="bg-white/10 border-white/20 text-white text-center max-w-lg mx-auto text-lg"
                   />
                 ) : (
                   <span 
@@ -370,12 +384,12 @@ export function NycologicPresents({
               </motion.p>
             )}
 
-            {/* Title */}
+            {/* Title - much larger */}
             <motion.h2
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="font-serif text-4xl md:text-5xl lg:text-6xl text-white mb-8 leading-tight"
+              className="font-serif text-5xl md:text-6xl lg:text-7xl xl:text-8xl text-white mb-10 leading-tight drop-shadow-2xl"
             >
               {isEditing && editingField === 'title' ? (
                 <Textarea
@@ -383,7 +397,7 @@ export function NycologicPresents({
                   onChange={(e) => updateSlide('title', e.target.value)}
                   onBlur={() => setEditingField(null)}
                   autoFocus
-                  className="bg-white/10 border-white/20 text-white text-center text-4xl font-serif resize-none"
+                  className="bg-white/10 border-white/20 text-white text-center text-5xl font-serif resize-none"
                   rows={2}
                 />
               ) : (
@@ -400,16 +414,16 @@ export function NycologicPresents({
               )}
             </motion.h2>
 
-            {/* Content */}
+            {/* Content - larger text */}
             {slide.content.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="text-white/70 text-lg md:text-xl leading-relaxed max-w-3xl mx-auto space-y-4"
+                className="text-white/80 text-xl md:text-2xl lg:text-3xl leading-relaxed max-w-5xl mx-auto space-y-6"
               >
                 {slide.content.map((item, index) => (
-                  <p key={index}>
+                  <p key={index} className="drop-shadow-md">
                     {isEditing && editingField === `content-${index}` ? (
                       <Textarea
                         value={item}
@@ -420,8 +434,8 @@ export function NycologicPresents({
                         }}
                         onBlur={() => setEditingField(null)}
                         autoFocus
-                        className="bg-white/10 border-white/20 text-white text-center resize-none"
-                        rows={2}
+                        className="bg-white/10 border-white/20 text-white text-center resize-none text-xl"
+                        rows={3}
                       />
                     ) : (
                       <span 
@@ -436,40 +450,40 @@ export function NycologicPresents({
               </motion.div>
             )}
 
-            {/* Question section */}
+            {/* Question section - larger */}
             {slide.type === 'question' && slide.question && (
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="mt-10 space-y-6"
+                className="mt-12 space-y-8 w-full max-w-4xl mx-auto"
               >
-                <p className="text-xl text-white/90 font-medium">{slide.question.prompt}</p>
+                <p className="text-2xl md:text-3xl text-white font-medium drop-shadow-lg">{slide.question.prompt}</p>
                 
                 {slide.question.options && (
-                  <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {slide.question.options.map((option, index) => (
                       <motion.button
                         key={index}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
                         onClick={() => handleOptionSelect(index)}
                         className={cn(
-                          "p-4 rounded-xl text-left transition-all duration-300",
-                          "border border-white/20",
+                          "p-6 rounded-2xl text-left transition-all duration-300",
+                          "border-2 border-white/20 backdrop-blur-sm",
                           selectedOption === index
                             ? showAnswer && slide.question?.answer === option
-                              ? "bg-emerald-500/30 border-emerald-400"
+                              ? "bg-emerald-500/40 border-emerald-400 shadow-lg shadow-emerald-500/20"
                               : showAnswer
-                              ? "bg-red-500/30 border-red-400"
-                              : "bg-white/20 border-white/40"
-                            : "bg-white/5 hover:bg-white/10"
+                              ? "bg-red-500/40 border-red-400 shadow-lg shadow-red-500/20"
+                              : "bg-white/25 border-white/50"
+                            : "bg-white/10 hover:bg-white/15"
                         )}
                       >
-                        <span className={cn("font-medium mr-2", colors.accent)}>
+                        <span className={cn("font-bold mr-3 text-xl", colors.accent)}>
                           {String.fromCharCode(65 + index)}.
                         </span>
-                        <span className="text-white/90">{option}</span>
+                        <span className="text-white text-lg md:text-xl">{option}</span>
                       </motion.button>
                     ))}
                   </div>
@@ -479,7 +493,7 @@ export function NycologicPresents({
                   <Button
                     variant="outline"
                     onClick={() => setShowAnswer(!showAnswer)}
-                    className="border-white/20 text-white hover:bg-white/10"
+                    className="border-2 border-white/30 text-white hover:bg-white/15 text-lg px-8 py-6 h-auto"
                   >
                     {showAnswer ? 'Hide Answer' : 'Reveal Answer'}
                   </Button>
@@ -493,13 +507,13 @@ export function NycologicPresents({
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden"
                     >
-                      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-                        <p className={cn("font-semibold mb-2", colors.accent)}>Answer:</p>
-                        <p className="text-white text-lg">{slide.question.answer}</p>
+                      <div className="bg-white/15 backdrop-blur-md rounded-3xl p-8 border-2 border-white/20 shadow-2xl">
+                        <p className={cn("font-bold mb-3 text-xl", colors.accent)}>Answer:</p>
+                        <p className="text-white text-xl md:text-2xl">{slide.question.answer}</p>
                         {slide.question.explanation && (
                           <>
-                            <p className={cn("font-semibold mt-4 mb-2", colors.accent)}>Explanation:</p>
-                            <p className="text-white/80">{slide.question.explanation}</p>
+                            <p className={cn("font-bold mt-6 mb-3 text-xl", colors.accent)}>Explanation:</p>
+                            <p className="text-white/90 text-lg md:text-xl">{slide.question.explanation}</p>
                           </>
                         )}
                       </div>
@@ -512,15 +526,15 @@ export function NycologicPresents({
         </AnimatePresence>
       </main>
 
-      {/* Footer with progress */}
+      {/* Footer with progress - larger */}
       <motion.footer 
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="absolute bottom-0 left-0 right-0 px-8 py-6 z-10"
+        className="absolute bottom-0 left-0 right-0 px-8 py-8 z-20"
       >
-        <div className="flex items-center justify-center gap-4">
-          {/* Slide dots */}
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center gap-6">
+          {/* Slide dots - larger */}
+          <div className="flex items-center gap-3">
             {presentation.slides.map((_, index) => (
               <button
                 key={index}
@@ -528,22 +542,22 @@ export function NycologicPresents({
                 className={cn(
                   "transition-all duration-300 rounded-full",
                   index === currentSlide 
-                    ? "w-8 h-2 bg-white" 
-                    : "w-2 h-2 bg-white/30 hover:bg-white/50"
+                    ? "w-12 h-3 bg-white shadow-lg" 
+                    : "w-3 h-3 bg-white/40 hover:bg-white/60"
                 )}
               />
             ))}
           </div>
           
-          {/* Slide counter */}
-          <p className="text-white/50 text-sm ml-4">
+          {/* Slide counter - larger */}
+          <p className="text-white/60 text-lg font-medium ml-6">
             {currentSlide + 1} / {totalSlides}
           </p>
         </div>
 
         {/* Navigation hint */}
-        <p className="text-center text-white/30 text-xs mt-3">
-          Press arrow keys or click to navigate
+        <p className="text-center text-white/40 text-sm mt-4">
+          Press ← → arrow keys or click to navigate • Press F for fullscreen
         </p>
       </motion.footer>
     </div>
