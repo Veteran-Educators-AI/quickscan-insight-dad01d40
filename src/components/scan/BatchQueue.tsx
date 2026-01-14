@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye } from 'lucide-react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -34,9 +34,12 @@ interface BatchQueueProps {
   onAssignStudent: (itemId: string, studentId: string, studentName: string) => void;
   onLinkContinuation?: (continuationId: string, primaryId: string) => void;
   onUnlinkContinuation?: (continuationId: string) => void;
+  onSaveToGradebook?: () => Promise<void>;
   currentIndex: number;
   isProcessing: boolean;
   isIdentifying: boolean;
+  isSaving?: boolean;
+  allSaved?: boolean;
 }
 
 const getConfidenceBadge = (confidence: 'high' | 'medium' | 'low' | 'none') => {
@@ -71,9 +74,12 @@ export function BatchQueue({
   onAssignStudent,
   onLinkContinuation,
   onUnlinkContinuation,
+  onSaveToGradebook,
   currentIndex, 
   isProcessing,
   isIdentifying,
+  isSaving = false,
+  allSaved = false,
 }: BatchQueueProps) {
   const [showComparisonDialog, setShowComparisonDialog] = useState(false);
 
@@ -82,6 +88,10 @@ export function BatchQueue({
   
   // Check if there are any linked pages
   const hasLinkedPages = items.some(i => i.continuationPages && i.continuationPages.length > 0);
+  
+  // Check if all items are analyzed (completed or failed)
+  const allAnalyzed = items.length > 0 && items.every(item => item.status === 'completed' || item.status === 'failed');
+  const completedCount = items.filter(item => item.status === 'completed').length;
 
   const getStatusIcon = (status: BatchItem['status']) => {
     if (status === 'completed') return <CheckCircle2 className="h-4 w-4 text-green-600" />;
@@ -418,6 +428,38 @@ export function BatchQueue({
             })}
           </div>
         </ScrollArea>
+        
+        {/* Save to Gradebook button - shown immediately after all items analyzed */}
+        {allAnalyzed && completedCount > 0 && onSaveToGradebook && (
+          <div className="p-3 border-t bg-green-50 dark:bg-green-950/20">
+            <Button
+              variant={allSaved ? "outline" : "default"}
+              className={allSaved 
+                ? "w-full bg-green-100 text-green-700 border-green-300 hover:bg-green-200" 
+                : "w-full bg-green-600 hover:bg-green-700"
+              }
+              onClick={onSaveToGradebook}
+              disabled={isSaving || allSaved}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving to Gradebook...
+                </>
+              ) : allSaved ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Saved to Gradebook
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save All to Gradebook ({completedCount})
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
 
