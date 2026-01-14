@@ -177,47 +177,56 @@ serve(async (req) => {
       return acc;
     }, {} as Record<string, GradeData[]>);
 
-    // Push to sister app
-    const payload = {
-      action: 'sync_grades',
-      teacher_id: user.id,
-      grades: gradesData,
-      grades_by_student: gradesByStudent,
-      total_students: Object.keys(gradesByStudent).length,
-      total_grades: gradesData.length,
-    };
+    // Push grades to sister app - send one request per grade using the expected format
+    console.log('Syncing grades to Scholar:', gradesData.length, 'grades for', Object.keys(gradesByStudent).length, 'students');
 
-    console.log('Syncing grades to Scholar:', payload.total_grades, 'grades for', payload.total_students, 'students');
+    let successCount = 0;
+    let errorCount = 0;
 
-    const response = await fetch(sisterAppEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': sisterAppApiKey,
-      },
-      body: JSON.stringify(payload),
-    });
+    for (const grade of gradesData) {
+      // Use the payload format expected by receive-sister-app-data
+      const payload = {
+        action: 'grade_completed',
+        student_id: grade.student_id,
+        data: {
+          activity_type: 'scanned_work',
+          activity_name: grade.topic_name,
+          score: grade.grade,
+          topic_name: grade.topic_name,
+          xp_earned: grade.xp_reward,
+          coins_earned: grade.coin_reward,
+          nys_standard: grade.nys_standard,
+          regents_score: grade.regents_score,
+          grade_justification: grade.grade_justification,
+          timestamp: grade.created_at,
+          source: 'nycologic_ai_sync',
+        },
+      };
 
-    const responseText = await response.text();
-    
-    if (!response.ok) {
-      console.error('Sister app error:', response.status, responseText);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to sync to Scholar app',
-          status: response.status 
-        }),
-        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      try {
+        const response = await fetch(sisterAppEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': sisterAppApiKey,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          successCount++;
+        } else {
+          const errorText = await response.text();
+          console.error('Sister app error for grade:', response.status, errorText);
+          errorCount++;
+        }
+      } catch (fetchError) {
+        console.error('Fetch error for grade:', fetchError);
+        errorCount++;
+      }
     }
 
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch {
-      responseData = { raw: responseText };
-    }
+    console.log('Sync complete:', successCount, 'succeeded,', errorCount, 'failed');
 
     // Log the sync action
     await supabase.from('sister_app_sync_log').insert({
@@ -226,16 +235,31 @@ serve(async (req) => {
       data: {
         total_grades: gradesData.length,
         total_students: Object.keys(gradesByStudent).length,
+        success_count: successCount,
+        error_count: errorCount,
         class_id,
       },
     });
 
+    // Return appropriate response based on results
+    if (errorCount > 0 && successCount === 0) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'All grade syncs failed',
+          synced_count: 0,
+          failed_count: errorCount,
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        synced_count: gradesData.length,
+        synced_count: successCount,
+        failed_count: errorCount,
         student_count: Object.keys(gradesByStudent).length,
-        response: responseData 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
