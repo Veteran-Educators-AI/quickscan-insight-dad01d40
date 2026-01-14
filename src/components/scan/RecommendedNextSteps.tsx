@@ -34,7 +34,8 @@ interface WorksheetRecommendation {
   title: string;
   topicName: string;
   standard: string;
-  difficulty: 'scaffolded' | 'practice' | 'challenge';
+  difficulty: 'scaffolded' | 'practice' | 'challenge' | 'basic-skills';
+  isBasicSkills?: boolean;
 }
 
 // Match misconceptions to relevant topics
@@ -119,7 +120,8 @@ function generateWorksheetRecommendations(
   misconceptions: string[],
   topicName?: string,
   nysStandard?: string,
-  regentsScore?: number
+  regentsScore?: number,
+  grade?: number
 ): WorksheetRecommendation[] {
   const recommendations: WorksheetRecommendation[] = [];
   
@@ -128,6 +130,17 @@ function generateWorksheetRecommendations(
     regentsScore !== undefined 
       ? regentsScore <= 2 ? 'scaffolded' : regentsScore <= 3 ? 'practice' : 'challenge'
       : 'practice';
+
+  // Add Basic Skills Remediation option for low-performing students
+  if ((grade !== undefined && grade < 60) || (regentsScore !== undefined && regentsScore <= 2)) {
+    recommendations.push({
+      title: 'Basic Skills Remediation: Foundational Concepts',
+      topicName: 'Basic Skills',
+      standard: 'Foundational',
+      difficulty: 'basic-skills',
+      isBasicSkills: true,
+    });
+  }
 
   // Create worksheet for each misconception (up to 3)
   misconceptions.slice(0, 3).forEach((misconception, index) => {
@@ -177,7 +190,8 @@ export function RecommendedNextSteps({
     misconceptions,
     topicName,
     nysStandard,
-    regentsScore
+    regentsScore,
+    grade
   );
 
   const unpushedWorksheets = worksheetRecommendations.filter(w => !pushedItems.has(w.title));
@@ -363,6 +377,7 @@ export function RecommendedNextSteps({
       case 'scaffolded': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
       case 'practice': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
       case 'challenge': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
+      case 'basic-skills': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
       default: return 'bg-muted text-muted-foreground';
     }
   };

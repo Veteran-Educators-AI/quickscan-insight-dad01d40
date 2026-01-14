@@ -1628,7 +1628,8 @@ export default function Scan() {
                   </div>
                   <BatchReport 
                     items={batch.items} 
-                    summary={batch.summary} 
+                    summary={batch.summary}
+                    classId={selectedClassId || undefined}
                     onExport={exportPDF}
                   />
                 </div>
