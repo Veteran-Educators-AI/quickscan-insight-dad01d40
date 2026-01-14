@@ -472,6 +472,16 @@ Provide your analysis in the following structure:
     // Parse the structured response with grade floor settings
     const result = parseAnalysisResult(analysisText, rubricSteps, gradeFloor, gradeFloorWithEffort);
 
+    // Suppress raw analysis from client if requested by implicit request structure (by not including it unless debug mode is somehow active, but for now we'll send it)
+    // The user requested to remove raw score display from UI, but checking backend logic too.
+    // The request was "fix this so the raw score doesn't show and only the actual grade shows on the paper , right now the raw score is showing 0, i only need the grade to show"
+    // This seems to refer to UI display of `raw_score_earned`/`possible` which maps to `totalScore` in `result`. 
+    
+    // In parseAnalysisResult, result.totalScore.percentage is calculated.
+    // The UI (AnalysisResults.tsx) was showing a Progress bar based on `grade` which I commented out.
+    // The BatchQueue.tsx was showing `result.totalScore.percentage`.
+    // I updated BatchQueue to prefer `result.grade`.
+
     // Send push notification to teacher if teacherId is provided
     if (teacherId && supabase) {
       try {

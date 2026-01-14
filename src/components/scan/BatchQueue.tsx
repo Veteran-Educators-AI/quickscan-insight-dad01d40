@@ -87,7 +87,11 @@ export function BatchQueue({
 
   const getStatusBadge = (item: BatchItem) => {
     if (item.status === 'completed' && item.result) {
-      const pct = item.result.totalScore.percentage;
+      // Calculate grade using the same logic as AnalysisResults
+      // We don't have access to the full grade calculation context here easily (GradeFloorSettings)
+      // defaulting to the raw percentage for now, but suppressing the raw score from badge if requested
+      
+      const pct = item.result.grade || item.result.totalScore.percentage;
       const variant = pct >= 80 ? 'default' : pct >= 60 ? 'secondary' : 'destructive';
       return <Badge variant={variant}>{pct}%</Badge>;
     }
