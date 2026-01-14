@@ -44,7 +44,7 @@ export default function MfaEnroll() {
         // Enroll new TOTP factor
         const { data, error } = await supabase.auth.mfa.enroll({
           factorType: 'totp',
-          friendlyName: 'The Scan Genius Authenticator',
+          friendlyName: 'NYCLogic Ai Authenticator',
         });
 
         if (error) throw error;
@@ -131,7 +131,7 @@ export default function MfaEnroll() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'scan-genius-recovery-codes.txt';
+    a.download = 'nyclogic-ai-recovery-codes.txt';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

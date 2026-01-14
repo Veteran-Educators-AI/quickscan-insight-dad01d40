@@ -250,8 +250,8 @@ export function IntegrationSettings() {
           // Identify this as a test event
           event_type: 'test',
           timestamp: new Date().toISOString(),
-          source: 'scan-genius',
-          message: 'This is a test webhook from ScanGenius',
+          source: 'nyclogic-ai',
+          message: 'This is a test webhook from NYCLogic Ai',
           // Sample student data so they can see the structure
           student: {
             id: 'test-student-id',

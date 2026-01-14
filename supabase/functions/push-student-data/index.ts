@@ -58,7 +58,7 @@ serve(async (req) => {
     const webhookPayload = {
       event_type: eventType,
       timestamp: new Date().toISOString(),
-      source: 'scan-genius',
+      source: 'nyclogic-ai',
       student: {
         id: studentId,
         name: studentName,

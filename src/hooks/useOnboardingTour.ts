@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 
-const TOUR_COMPLETED_KEY = 'scan-genius-tour-completed';
+const TOUR_COMPLETED_KEY = 'nyclogic-ai-tour-completed';
 
 export function useOnboardingTour() {
   const { user } = useAuth();

@@ -236,7 +236,7 @@ export default function MfaChallenge() {
                 </Button>
 
                 <p className="text-center text-xs text-muted-foreground">
-                  Open your authenticator app (Google Authenticator, Authy, etc.) and enter the code shown for The Scan Genius.
+                  Open your authenticator app (Google Authenticator, Authy, etc.) and enter the code shown for NYCLogic Ai.
                 </p>
               </>
             )}

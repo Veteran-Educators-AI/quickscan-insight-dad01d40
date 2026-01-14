@@ -106,7 +106,7 @@ function generateParentEmailHtml(
     </p>
 
     <p style="color: #9ca3af; font-size: 14px; margin-top: 32px; text-align: center;">
-      This notification was sent by ${teacherName || "your child's teacher"} via ScanGenius.
+      This notification was sent by ${teacherName || "your child's teacher"} via NYCLogic Ai.
     </p>
   </div>
 </body>
@@ -159,7 +159,7 @@ async function sendAutoPushNotification(request: AutoPushNotificationRequest): P
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        sender: { name: "ScanGenius", email: "noreply@lovable.dev" },
+        sender: { name: "NYCLogic Ai", email: "noreply@lovable.dev" },
         to: [{ email: parentEmail, name: "Parent/Guardian" }],
         subject: subject,
         htmlContent: emailHtml,

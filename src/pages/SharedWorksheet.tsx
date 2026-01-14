@@ -206,7 +206,7 @@ export default function SharedWorksheet() {
 
       pdf.setFontSize(8);
       pdf.setTextColor(150);
-      pdf.text('Generated with Scan Genius - NYS Regents Aligned', pageWidth / 2, pageHeight - 10, { align: 'center' });
+      pdf.text('Generated with NYCLogic Ai - NYS Regents Aligned', pageWidth / 2, pageHeight - 10, { align: 'center' });
 
       pdf.save(`${worksheet.title.replace(/\s+/g, '_')}.pdf`);
     } catch (err) {
@@ -255,7 +255,7 @@ export default function SharedWorksheet() {
         <div className="mb-6">
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
             <ArrowLeft className="h-4 w-4" />
-            Back to Scan Genius
+            Back to NYCLogic Ai
           </Link>
         </div>
 

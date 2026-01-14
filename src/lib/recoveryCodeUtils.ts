@@ -29,7 +29,7 @@ export async function hashRecoveryCode(code: string): Promise<string> {
 
 // Format recovery codes for display
 export function formatRecoveryCodesForPrint(codes: string[]): string {
-  return `The Scan Genius - Recovery Codes
+  return `NYCLogic Ai - Recovery Codes
 ================================
 Store these codes in a safe place.
 Each code can only be used once.

@@ -88,7 +88,7 @@ async function sendWebPush(
     // Generate authorization header
     const { authorization, cryptoKey } = await generateVAPIDAuthHeader(
       audience,
-      'mailto:notifications@scangenius.app',
+      'mailto:notifications@nyclogic.ai',
       vapidPublicKey,
       vapidPrivateKey
     );
@@ -204,7 +204,7 @@ serve(async (req) => {
     console.log(`Found ${subscriptions.length} subscription(s)`);
 
     const payload = {
-      title: title || 'ScanGenius',
+      title: title || 'NYCLogic Ai',
       body: body || 'You have a new notification',
       icon: '/icon-192.png',
       badge: '/icon-192.png',

@@ -168,7 +168,7 @@ export function LessonPlanLibrary({ open, onOpenChange, onSelectPlan }: LessonPl
 
   const downloadAsPowerPoint = (plan: SavedLessonPlan) => {
     const pptx = new pptxgen();
-    pptx.author = 'ScanGenius';
+    pptx.author = 'NYCLogic Ai';
     pptx.title = plan.title;
     pptx.subject = `Lesson on ${plan.topic_name}`;
     

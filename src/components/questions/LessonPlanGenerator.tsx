@@ -752,7 +752,7 @@ export function LessonPlanGenerator({
     const pptx = new pptxgen();
     
     // Set presentation properties
-    pptx.author = 'ScanGenius';
+    pptx.author = 'NYCLogic Ai';
     pptx.title = lessonPlan.title;
     pptx.subject = `Lesson on ${lessonPlan.topicName}`;
     

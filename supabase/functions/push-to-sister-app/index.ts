@@ -3,14 +3,17 @@
  * PUSH TO SISTER APP EDGE FUNCTION
  * ============================================================================
  * 
- * This function sends student grade data to the connected sister app (NYClogic Ai).
+ * This function sends student grade data to the connected sister app (NYClogic Scholar Ai).
+ * 
+ * NOTE: For direct database sync, use the shared_assignments table instead.
+ * This function is kept for backwards compatibility with external API integrations.
  * 
  * REQUIRED SECRETS:
  * - SISTER_APP_API_KEY: The API key for authenticating with the sister app
  * - NYCOLOGIC_API_URL: The endpoint URL of the sister app (e.g., https://app.nycologic.com/api/receive)
  * 
  * DATA FLOW:
- * 1. ScanGenius analyzes student work and calculates a grade
+ * 1. NYCLogic Ai analyzes student work and calculates a grade
  * 2. If sister app sync is enabled, this function is called
  * 3. Grade data is converted to XP/coins using configured multipliers
  * 4. Data is pushed to the sister app for gamification rewards
