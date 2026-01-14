@@ -881,7 +881,12 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
   }, [items, isProcessing]);
 
   const generateSummary = useCallback((): BatchSummary => {
-    const completedItems = items.filter(item => item.status === 'completed' && item.result);
+    // Only count primary pages (not continuations) to avoid double-counting
+    const completedItems = items.filter(item => 
+      item.status === 'completed' && 
+      item.result && 
+      item.pageType !== 'continuation'
+    );
     
     if (completedItems.length === 0) {
       return {
@@ -895,11 +900,30 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
       };
     }
 
-    const scores = completedItems.map(item => item.result!.totalScore.percentage);
-    const averageScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-    const highestScore = Math.max(...scores);
-    const lowestScore = Math.min(...scores);
-    const passRate = Math.round((scores.filter(s => s >= 60).length / scores.length) * 100);
+    // Use grade if available (includes curve), otherwise use percentage
+    const scores = completedItems.map(item => {
+      const result = item.result!;
+      return result.grade ?? result.totalScore.percentage;
+    });
+    
+    const validScores = scores.filter(s => typeof s === 'number' && !isNaN(s));
+    
+    if (validScores.length === 0) {
+      return {
+        totalStudents: completedItems.length,
+        averageScore: 0,
+        highestScore: 0,
+        lowestScore: 0,
+        passRate: 0,
+        commonMisconceptions: [],
+        scoreDistribution: [],
+      };
+    }
+    
+    const averageScore = Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length);
+    const highestScore = Math.max(...validScores);
+    const lowestScore = Math.min(...validScores);
+    const passRate = Math.round((validScores.filter(s => s >= 60).length / validScores.length) * 100);
 
     // Count misconceptions
     const misconceptionCounts: Record<string, number> = {};
@@ -913,7 +937,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    // Score distribution
+    // Score distribution using valid scores
     const ranges = [
       { range: '0-59%', min: 0, max: 59 },
       { range: '60-69%', min: 60, max: 69 },
@@ -923,7 +947,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     ];
     const scoreDistribution = ranges.map(({ range, min, max }) => ({
       range,
-      count: scores.filter(s => s >= min && s <= max).length,
+      count: validScores.filter(s => s >= min && s <= max).length,
     }));
 
     const newSummary = {
