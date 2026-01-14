@@ -67,12 +67,35 @@ export function BatchReport({ items, summary, onExport, onUpdateNotes }: BatchRe
     return 'text-red-600';
   };
 
-  const getGrade = (pct: number) => {
-    if (pct >= 90) return 'A';
-    if (pct >= 80) return 'B';
-    if (pct >= 70) return 'C';
-    if (pct >= 60) return 'D';
+  const getGradeColor = (grade: number) => {
+    if (grade >= 90) return 'text-green-600';
+    if (grade >= 80) return 'text-blue-600';
+    if (grade >= 70) return 'text-yellow-600';
+    if (grade >= 60) return 'text-orange-600';
+    return 'text-red-600';
+  };
+
+  const getLetterGrade = (grade: number) => {
+    if (grade >= 90) return 'A';
+    if (grade >= 80) return 'B';
+    if (grade >= 70) return 'C';
+    if (grade >= 60) return 'D';
     return 'F';
+  };
+
+  // Get the effective grade for a result - prefer grade field, fallback to totalScore percentage
+  const getEffectiveGrade = (result: BatchItem['result']) => {
+    if (!result) return 55;
+    // If grade field is available and reasonable, use it
+    if (result.grade && result.grade >= 55) {
+      return result.grade;
+    }
+    // Fallback to totalScore percentage if no grade field
+    if (result.totalScore.possible > 0) {
+      return result.totalScore.percentage;
+    }
+    // Last fallback - if there's any work shown but no scores, default to 65
+    return 65;
   };
 
   return (
@@ -278,17 +301,24 @@ export function BatchReport({ items, summary, onExport, onUpdateNotes }: BatchRe
                   </TableCell>
                   <TableCell className="font-medium">{item.studentName}</TableCell>
                   <TableCell className="text-center">
-                    <span className={`font-semibold ${getScoreColor(item.result!.totalScore.percentage)}`}>
-                      {item.result!.totalScore.earned}/{item.result!.totalScore.possible}
-                    </span>
-                    <span className="text-muted-foreground ml-1">
-                      ({item.result!.totalScore.percentage}%)
-                    </span>
+                    {(() => {
+                      const effectiveGrade = getEffectiveGrade(item.result);
+                      return (
+                        <span className={`font-semibold ${getGradeColor(effectiveGrade)}`}>
+                          {effectiveGrade}%
+                        </span>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant={item.result!.totalScore.percentage >= 60 ? 'default' : 'destructive'}>
-                      {getGrade(item.result!.totalScore.percentage)}
-                    </Badge>
+                    {(() => {
+                      const effectiveGrade = getEffectiveGrade(item.result);
+                      return (
+                        <Badge variant={effectiveGrade >= 60 ? 'default' : 'destructive'}>
+                          {getLetterGrade(effectiveGrade)}
+                        </Badge>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-xs truncate">
                     {item.result!.feedback || 'No feedback'}

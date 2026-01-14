@@ -27,6 +27,11 @@ export interface AnalysisResult {
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
   feedback: string;
+  grade?: number;
+  gradeJustification?: string;
+  nysStandard?: string;
+  regentsScore?: number;
+  regentsScoreJustification?: string;
 }
 
 export interface Student {
