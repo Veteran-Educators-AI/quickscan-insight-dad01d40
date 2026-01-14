@@ -1,12 +1,63 @@
 import { useState } from 'react';
-import { Users, TrendingUp, TrendingDown, Target, Send, BookOpen, Loader2, CheckCircle, ChevronDown, ChevronUp, Zap, Award, AlertTriangle } from 'lucide-react';
+import { Users, TrendingUp, TrendingDown, Target, Send, BookOpen, Loader2, CheckCircle, ChevronDown, ChevronUp, Zap, Award, AlertTriangle, Edit2, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Slider } from '@/components/ui/slider';
 import { BatchItem } from '@/hooks/useBatchAnalysis';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { toast } from 'sonner';
+
+interface ReassessmentCriteria {
+  id: string;
+  label: string;
+  description: string;
+  gradeAdjustment: number;
+}
+
+const REASSESSMENT_CRITERIA: ReassessmentCriteria[] = [
+  {
+    id: 'showed_work',
+    label: 'Showed Work',
+    description: 'Student showed their problem-solving process',
+    gradeAdjustment: 5,
+  },
+  {
+    id: 'partial_understanding',
+    label: 'Partial Understanding',
+    description: 'Demonstrated partial understanding of concepts',
+    gradeAdjustment: 8,
+  },
+  {
+    id: 'computational_error',
+    label: 'Computational Error Only',
+    description: 'Correct approach but arithmetic/calculation error',
+    gradeAdjustment: 10,
+  },
+  {
+    id: 'misread_problem',
+    label: 'Misread Problem',
+    description: 'Would have been correct if problem was read correctly',
+    gradeAdjustment: 12,
+  },
+  {
+    id: 'effort_evident',
+    label: 'Effort Evident',
+    description: 'Clear effort was made despite incorrect answer',
+    gradeAdjustment: 5,
+  },
+  {
+    id: 'close_answer',
+    label: 'Close Answer',
+    description: 'Answer was very close to correct',
+    gradeAdjustment: 7,
+  },
+];
 
 interface StudentGroup {
   level: 'struggling' | 'developing' | 'proficient';
@@ -26,12 +77,19 @@ interface DifferentiationGroupViewProps {
   items: BatchItem[];
   classId?: string;
   getEffectiveGrade: (result: BatchItem['result']) => number;
+  onBulkGradeOverride?: (studentIds: string[], newGrade: number, justification: string) => void;
 }
 
-export function DifferentiationGroupView({ items, classId, getEffectiveGrade }: DifferentiationGroupViewProps) {
+export function DifferentiationGroupView({ items, classId, getEffectiveGrade, onBulkGradeOverride }: DifferentiationGroupViewProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['struggling', 'developing']));
   const [pushingGroups, setPushingGroups] = useState<Set<string>>(new Set());
   const [pushedGroups, setPushedGroups] = useState<Set<string>>(new Set());
+  const [selectedStudents, setSelectedStudents] = useState<Map<string, Set<string>>>(new Map());
+  const [bulkAdjustDialogOpen, setBulkAdjustDialogOpen] = useState(false);
+  const [activeGroupForAdjust, setActiveGroupForAdjust] = useState<StudentGroup | null>(null);
+  const [selectedCriteria, setSelectedCriteria] = useState<string[]>([]);
+  const [manualAdjustment, setManualAdjustment] = useState(0);
+  const [justification, setJustification] = useState('');
   const { pushToSisterApp } = usePushToSisterApp();
 
   const completedItems = items.filter(item => item.status === 'completed' && item.result);
@@ -104,6 +162,125 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade }: 
       }
       return next;
     });
+  };
+
+  const toggleStudentSelection = (groupLevel: string, studentId: string) => {
+    setSelectedStudents(prev => {
+      const next = new Map(prev);
+      const groupSet = next.get(groupLevel) || new Set();
+      if (groupSet.has(studentId)) {
+        groupSet.delete(studentId);
+      } else {
+        groupSet.add(studentId);
+      }
+      next.set(groupLevel, groupSet);
+      return next;
+    });
+  };
+
+  const toggleSelectAllInGroup = (group: StudentGroup) => {
+    setSelectedStudents(prev => {
+      const next = new Map(prev);
+      const currentSet = next.get(group.level) || new Set();
+      const studentIds = group.students.map(s => s.id);
+      
+      if (currentSet.size === studentIds.length) {
+        // Deselect all
+        next.set(group.level, new Set());
+      } else {
+        // Select all
+        next.set(group.level, new Set(studentIds));
+      }
+      return next;
+    });
+  };
+
+  const getSelectedCount = (groupLevel: string) => {
+    return selectedStudents.get(groupLevel)?.size || 0;
+  };
+
+  const isStudentSelected = (groupLevel: string, studentId: string) => {
+    return selectedStudents.get(groupLevel)?.has(studentId) || false;
+  };
+
+  const isAllSelectedInGroup = (group: StudentGroup) => {
+    const selected = selectedStudents.get(group.level);
+    return selected && selected.size === group.students.length && group.students.length > 0;
+  };
+
+  const openBulkAdjustDialog = (group: StudentGroup) => {
+    setActiveGroupForAdjust(group);
+    setSelectedCriteria([]);
+    setManualAdjustment(0);
+    setJustification('');
+    setBulkAdjustDialogOpen(true);
+  };
+
+  const handleCriteriaToggle = (criteriaId: string) => {
+    setSelectedCriteria(prev => {
+      const newCriteria = prev.includes(criteriaId)
+        ? prev.filter(id => id !== criteriaId)
+        : [...prev, criteriaId];
+      
+      // Auto-generate justification based on selected criteria
+      const selectedLabels = newCriteria.map(id => 
+        REASSESSMENT_CRITERIA.find(c => c.id === id)?.label
+      ).filter(Boolean);
+      
+      if (selectedLabels.length > 0) {
+        setJustification(`Bulk grade adjusted based on: ${selectedLabels.join(', ')}`);
+      } else {
+        setJustification('');
+      }
+      
+      return newCriteria;
+    });
+  };
+
+  const calculateTotalAdjustment = () => {
+    const criteriaAdjustment = selectedCriteria.reduce((sum, id) => {
+      const criteria = REASSESSMENT_CRITERIA.find(c => c.id === id);
+      return sum + (criteria?.gradeAdjustment || 0);
+    }, 0);
+    return criteriaAdjustment + manualAdjustment;
+  };
+
+  const handleApplyBulkAdjustment = () => {
+    if (!activeGroupForAdjust || !justification.trim()) return;
+
+    const selectedInGroup = selectedStudents.get(activeGroupForAdjust.level);
+    if (!selectedInGroup || selectedInGroup.size === 0) {
+      toast.error('No students selected');
+      return;
+    }
+
+    const totalAdjustment = calculateTotalAdjustment();
+    const selectedStudentItems = activeGroupForAdjust.students.filter(s => selectedInGroup.has(s.id));
+
+    if (onBulkGradeOverride) {
+      // Call parent handler with student IDs and adjustment
+      const studentIds = selectedStudentItems.map(s => s.studentId).filter(Boolean) as string[];
+      
+      // For each selected student, calculate new grade and apply
+      selectedStudentItems.forEach(item => {
+        if (!item.studentId) return;
+        const currentGrade = getEffectiveGrade(item.result);
+        const newGrade = Math.min(100, Math.max(0, currentGrade + totalAdjustment));
+        onBulkGradeOverride([item.studentId], newGrade, justification);
+      });
+
+      toast.success(`Applied +${totalAdjustment}% adjustment to ${selectedInGroup.size} student(s)`);
+    } else {
+      toast.info(`Would apply +${totalAdjustment}% to ${selectedInGroup.size} students (handler not provided)`);
+    }
+
+    // Clear selections after applying
+    setSelectedStudents(prev => {
+      const next = new Map(prev);
+      next.set(activeGroupForAdjust.level, new Set());
+      return next;
+    });
+    setBulkAdjustDialogOpen(false);
   };
 
   const handlePushGroup = async (group: StudentGroup) => {
@@ -192,149 +369,310 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade }: 
     return null;
   }
 
+  const totalAdjustment = calculateTotalAdjustment();
+
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Users className="h-4 w-4" />
-          Differentiation Groups
-          <Badge variant="secondary" className="ml-2">
-            {completedItems.length} students
-          </Badge>
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Students grouped by performance level with targeted remediation options
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {groups.map((group) => {
-          const isPushing = pushingGroups.has(group.level);
-          const isPushed = pushedGroups.has(group.level);
-          const isExpanded = expandedGroups.has(group.level);
-          const misconceptions = getGroupMisconceptions(group.students);
+    <>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Differentiation Groups
+            <Badge variant="secondary" className="ml-2">
+              {completedItems.length} students
+            </Badge>
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Students grouped by performance level with targeted remediation options. Select students to apply bulk grade adjustments.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {groups.map((group) => {
+            const isPushing = pushingGroups.has(group.level);
+            const isPushed = pushedGroups.has(group.level);
+            const isExpanded = expandedGroups.has(group.level);
+            const misconceptions = getGroupMisconceptions(group.students);
+            const selectedCount = getSelectedCount(group.level);
+            const allSelected = isAllSelectedInGroup(group);
 
-          return (
-            <Collapsible
-              key={group.level}
-              open={isExpanded}
-              onOpenChange={() => toggleGroup(group.level)}
-            >
-              <Card className={`${group.bgColor} ${group.borderColor} border`}>
-                <CollapsibleTrigger asChild>
-                  <div className="flex items-center justify-between p-4 cursor-pointer hover:opacity-90 transition-opacity">
-                    <div className="flex items-center gap-3">
-                      <div className={`h-10 w-10 rounded-full ${group.bgColor} flex items-center justify-center border ${group.borderColor}`}>
-                        {group.icon}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className={`font-semibold ${group.color}`}>{group.label}</h3>
-                          <Badge variant="outline" className={group.color}>
-                            {group.students.length} student{group.students.length !== 1 ? 's' : ''}
-                          </Badge>
+            return (
+              <Collapsible
+                key={group.level}
+                open={isExpanded}
+                onOpenChange={() => toggleGroup(group.level)}
+              >
+                <Card className={`${group.bgColor} ${group.borderColor} border`}>
+                  <CollapsibleTrigger asChild>
+                    <div className="flex items-center justify-between p-4 cursor-pointer hover:opacity-90 transition-opacity">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-10 w-10 rounded-full ${group.bgColor} flex items-center justify-center border ${group.borderColor}`}>
+                          {group.icon}
                         </div>
-                        <p className="text-xs text-muted-foreground">{group.description}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {classId && group.students.length > 0 && (
-                        <Button
-                          size="sm"
-                          variant={isPushed ? 'outline' : 'secondary'}
-                          disabled={isPushing || isPushed}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePushGroup(group);
-                          }}
-                          className="text-xs"
-                        >
-                          {isPushed ? (
-                            <>
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Sent
-                            </>
-                          ) : isPushing ? (
-                            <>
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Sending...
-                            </>
-                          ) : (
-                            <>
-                              <Send className="h-3 w-3 mr-1" />
-                              Send {group.remediationType.split(' ')[0]}
-                            </>
-                          )}
-                        </Button>
-                      )}
-                      {isExpanded ? (
-                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </div>
-                  </div>
-                </CollapsibleTrigger>
-                
-                <CollapsibleContent>
-                  <div className="px-4 pb-4 space-y-3">
-                    {/* Student List */}
-                    {group.students.length > 0 ? (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                        {group.students.map((item) => {
-                          const grade = getEffectiveGrade(item.result);
-                          return (
-                            <div
-                              key={item.id}
-                              className="flex items-center justify-between p-2 bg-background/60 rounded-md border"
-                            >
-                              <span className="text-sm font-medium truncate">{item.studentName}</span>
-                              <Badge variant="outline" className={`text-xs ${group.color}`}>
-                                {grade}%
-                              </Badge>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic text-center py-2">
-                        No students in this group
-                      </p>
-                    )}
-
-                    {/* Common Misconceptions for this group */}
-                    {misconceptions.length > 0 && (
-                      <div className="pt-2 border-t">
-                        <p className="text-xs font-medium text-muted-foreground mb-2">
-                          Common focus areas for this group:
-                        </p>
-                        <div className="flex flex-wrap gap-1">
-                          {misconceptions.map((m, i) => (
-                            <Badge key={i} variant="secondary" className="text-xs">
-                              {m.misconception} ({m.count})
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className={`font-semibold ${group.color}`}>{group.label}</h3>
+                            <Badge variant="outline" className={group.color}>
+                              {group.students.length} student{group.students.length !== 1 ? 's' : ''}
                             </Badge>
-                          ))}
+                            {selectedCount > 0 && (
+                              <Badge variant="default" className="bg-primary">
+                                {selectedCount} selected
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{group.description}</p>
                         </div>
                       </div>
-                    )}
+                      <div className="flex items-center gap-2">
+                        {selectedCount > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openBulkAdjustDialog(group);
+                            }}
+                            className="text-xs gap-1"
+                          >
+                            <Edit2 className="h-3 w-3" />
+                            Adjust Grades
+                          </Button>
+                        )}
+                        {classId && group.students.length > 0 && (
+                          <Button
+                            size="sm"
+                            variant={isPushed ? 'outline' : 'secondary'}
+                            disabled={isPushing || isPushed}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePushGroup(group);
+                            }}
+                            className="text-xs"
+                          >
+                            {isPushed ? (
+                              <>
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Sent
+                              </>
+                            ) : isPushing ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Sending...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="h-3 w-3 mr-1" />
+                                Send {group.remediationType.split(' ')[0]}
+                              </>
+                            )}
+                          </Button>
+                        )}
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
+                  
+                  <CollapsibleContent>
+                    <div className="px-4 pb-4 space-y-3">
+                      {/* Select All Toggle */}
+                      {group.students.length > 0 && (
+                        <div className="flex items-center gap-2 pb-2 border-b">
+                          <Checkbox
+                            checked={allSelected}
+                            onCheckedChange={() => toggleSelectAllInGroup(group)}
+                            id={`select-all-${group.level}`}
+                          />
+                          <Label 
+                            htmlFor={`select-all-${group.level}`}
+                            className="text-sm cursor-pointer"
+                          >
+                            Select all students in this group
+                          </Label>
+                        </div>
+                      )}
 
-                    {/* Remediation Details */}
-                    <div className="flex items-center gap-4 pt-2 border-t text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Zap className="h-3 w-3 text-purple-500" />
-                        +{group.xpReward} XP per student
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Award className="h-3 w-3 text-amber-500" />
-                        +{group.coinReward} coins per student
-                      </span>
+                      {/* Student List with Checkboxes */}
+                      {group.students.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                          {group.students.map((item) => {
+                            const grade = getEffectiveGrade(item.result);
+                            const isSelected = isStudentSelected(group.level, item.id);
+                            return (
+                              <div
+                                key={item.id}
+                                className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                                  isSelected 
+                                    ? 'bg-primary/10 border-primary' 
+                                    : 'bg-background/60 hover:bg-background/80'
+                                }`}
+                                onClick={() => toggleStudentSelection(group.level, item.id)}
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => toggleStudentSelection(group.level, item.id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <span className="text-sm font-medium truncate flex-1">{item.studentName}</span>
+                                <Badge variant="outline" className={`text-xs ${group.color}`}>
+                                  {grade}%
+                                </Badge>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic text-center py-2">
+                          No students in this group
+                        </p>
+                      )}
+
+                      {/* Common Misconceptions for this group */}
+                      {misconceptions.length > 0 && (
+                        <div className="pt-2 border-t">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">
+                            Common focus areas for this group:
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {misconceptions.map((m, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs">
+                                {m.misconception} ({m.count})
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Remediation Details */}
+                      <div className="flex items-center gap-4 pt-2 border-t text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Zap className="h-3 w-3 text-purple-500" />
+                          +{group.xpReward} XP per student
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Award className="h-3 w-3 text-amber-500" />
+                          +{group.coinReward} coins per student
+                        </span>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      {/* Bulk Grade Adjustment Dialog */}
+      <Dialog open={bulkAdjustDialogOpen} onOpenChange={setBulkAdjustDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              Bulk Grade Adjustment
+            </DialogTitle>
+            <DialogDescription>
+              Apply the same grade adjustment to {activeGroupForAdjust ? getSelectedCount(activeGroupForAdjust.level) : 0} selected student(s) in the {activeGroupForAdjust?.label} group.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Quick Reassessment Criteria */}
+            <div className="space-y-2">
+              <Label>Select applicable criteria:</Label>
+              <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto">
+                {REASSESSMENT_CRITERIA.map(criteria => (
+                  <div
+                    key={criteria.id}
+                    className={`flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                      selectedCriteria.includes(criteria.id)
+                        ? 'bg-primary/10 border-primary'
+                        : 'hover:bg-muted/50'
+                    }`}
+                    onClick={() => handleCriteriaToggle(criteria.id)}
+                  >
+                    <Checkbox
+                      checked={selectedCriteria.includes(criteria.id)}
+                      onCheckedChange={() => handleCriteriaToggle(criteria.id)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium leading-none">
+                        {criteria.label}
+                        <span className="ml-1 text-xs text-green-600">
+                          +{criteria.gradeAdjustment}%
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {criteria.description}
+                      </p>
                     </div>
                   </div>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
-          );
-        })}
-      </CardContent>
-    </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* Additional Manual Adjustment */}
+            <div className="space-y-2">
+              <Label>Additional Manual Adjustment</Label>
+              <div className="flex items-center gap-3">
+                <Slider
+                  value={[manualAdjustment]}
+                  onValueChange={([value]) => setManualAdjustment(value)}
+                  min={-20}
+                  max={20}
+                  step={1}
+                  className="flex-1"
+                />
+                <span className={`text-lg font-bold min-w-[60px] text-right ${manualAdjustment >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {manualAdjustment >= 0 ? '+' : ''}{manualAdjustment}%
+                </span>
+              </div>
+            </div>
+
+            {/* Total Adjustment Preview */}
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Total Adjustment:</span>
+                <span className={`text-xl font-bold ${totalAdjustment >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {totalAdjustment >= 0 ? '+' : ''}{totalAdjustment}%
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Will be applied to each selected student's current grade (capped at 0-100%)
+              </p>
+            </div>
+
+            {/* Justification */}
+            <div className="space-y-2">
+              <Label htmlFor="bulk-justification">Justification (required)</Label>
+              <Textarea
+                id="bulk-justification"
+                placeholder="Explain the grade adjustment for these students..."
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkAdjustDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleApplyBulkAdjustment} 
+              disabled={!justification.trim() || totalAdjustment === 0}
+            >
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Apply to {activeGroupForAdjust ? getSelectedCount(activeGroupForAdjust.level) : 0} Students
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
