@@ -30,6 +30,9 @@ import StudentResults from "./pages/StudentResults";
 import MfaChallenge from "./pages/MfaChallenge";
 import MfaEnroll from "./pages/MfaEnroll";
 import NotFound from "./pages/NotFound";
+import StudentLogin from "./pages/StudentLogin";
+import StudentJoinClass from "./pages/StudentJoinClass";
+import StudentDashboard from "./pages/StudentDashboard";
 
 const queryClient = new QueryClient();
 
@@ -106,6 +109,10 @@ function AppRoutes() {
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/worksheet/:shareCode" element={<SharedWorksheet />} />
       <Route path="/results/:studentId/:questionId" element={<StudentResults />} />
+      {/* Student routes */}
+      <Route path="/student/login" element={<StudentLogin />} />
+      <Route path="/student/join" element={<StudentJoinClass />} />
+      <Route path="/student/dashboard" element={<StudentDashboard />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
