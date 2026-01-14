@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { BookOpen, Sparkles, Send, ExternalLink, Loader2, ArrowRight, Target, Lightbulb } from 'lucide-react';
+import { BookOpen, Sparkles, Send, ExternalLink, Loader2, ArrowRight, Target, Lightbulb, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { toast } from 'sonner';
 import { GEOMETRY_TOPICS, ALGEBRA1_TOPICS, ALGEBRA2_TOPICS } from '@/data/nysTopics';
@@ -162,6 +163,7 @@ export function RecommendedNextSteps({
   regentsScore,
 }: RecommendedNextStepsProps) {
   const [isPushingToApp, setIsPushingToApp] = useState(false);
+  const [isBulkPushing, setIsBulkPushing] = useState(false);
   const [pushedItems, setPushedItems] = useState<Set<string>>(new Set());
   const { pushToSisterApp } = usePushToSisterApp();
   const navigate = useNavigate();
@@ -173,6 +175,9 @@ export function RecommendedNextSteps({
     nysStandard,
     regentsScore
   );
+
+  const unpushedWorksheets = worksheetRecommendations.filter(w => !pushedItems.has(w.title));
+  const allPushed = worksheetRecommendations.length > 0 && unpushedWorksheets.length === 0;
 
   const handlePushToApp = async (worksheet: WorksheetRecommendation) => {
     if (!classId) {
@@ -218,6 +223,68 @@ export function RecommendedNextSteps({
     }
   };
 
+  const handleBulkPushToApp = async () => {
+    if (!classId) {
+      toast.error('Class ID required to push to student app');
+      return;
+    }
+
+    if (unpushedWorksheets.length === 0) {
+      toast.info('All worksheets have already been sent');
+      return;
+    }
+
+    setIsBulkPushing(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const worksheet of unpushedWorksheets) {
+        const xpReward = worksheet.difficulty === 'challenge' ? 50 : worksheet.difficulty === 'practice' ? 30 : 20;
+        const coinReward = worksheet.difficulty === 'challenge' ? 25 : worksheet.difficulty === 'practice' ? 15 : 10;
+
+        const result = await pushToSisterApp({
+          class_id: classId,
+          title: worksheet.title,
+          description: `Practice worksheet for ${worksheet.topicName} (${worksheet.standard}) - Assigned to entire class`,
+          student_id: studentId, // If studentId is provided, it's for that student; otherwise class-wide
+          student_name: studentName,
+          topic_name: worksheet.topicName,
+          standard_code: worksheet.standard,
+          xp_reward: xpReward,
+          coin_reward: coinReward,
+          grade,
+        });
+
+        if (result.success) {
+          successCount++;
+          setPushedItems(prev => new Set([...prev, worksheet.title]));
+        } else {
+          failCount++;
+          console.error(`Failed to push "${worksheet.title}":`, result.error);
+        }
+      }
+
+      if (successCount > 0 && failCount === 0) {
+        toast.success(`All ${successCount} worksheets sent to ${studentId ? 'student' : 'class'} app!`);
+      } else if (successCount > 0) {
+        toast.warning(`${successCount} sent, ${failCount} failed`);
+      } else {
+        throw new Error('All pushes failed');
+      }
+    } catch (err) {
+      console.error('Error in bulk push:', err);
+      const message = err instanceof Error ? err.message : 'Failed to push worksheets';
+      if (message.includes('API key not configured') || message.includes('endpoint URL not configured')) {
+        toast.error('Sister app integration not configured. Please set up the connection in Settings.');
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setIsBulkPushing(false);
+    }
+  };
+
   const handleCreateWorksheet = (worksheet: WorksheetRecommendation) => {
     // Navigate to worksheet builder with pre-filled data
     navigate('/questions', { 
@@ -256,9 +323,34 @@ export function RecommendedNextSteps({
         {/* Worksheet Recommendations */}
         {worksheetRecommendations.length > 0 && (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <BookOpen className="h-4 w-4" />
-              Suggested Worksheets
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <BookOpen className="h-4 w-4" />
+                Suggested Worksheets
+              </div>
+              {classId && worksheetRecommendations.length > 1 && (
+                <Button
+                  size="sm"
+                  variant={allPushed ? 'outline' : 'hero'}
+                  onClick={handleBulkPushToApp}
+                  disabled={isBulkPushing || allPushed}
+                  className="h-7 text-xs"
+                >
+                  {allPushed ? (
+                    <>✓ All Sent</>
+                  ) : isBulkPushing ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Users className="h-3 w-3 mr-1" />
+                      Bulk Push All ({unpushedWorksheets.length})
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
             <div className="space-y-2">
               {worksheetRecommendations.map((worksheet, index) => (
