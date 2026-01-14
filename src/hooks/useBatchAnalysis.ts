@@ -40,6 +40,7 @@ export interface AnalysisResult {
   isOverridden?: boolean;
   overriddenGrade?: number;
   overrideJustification?: string;
+  selectedRunIndex?: number; // Index of manually selected run (instead of average)
 }
 
 export interface Student {
@@ -113,6 +114,7 @@ interface UseBatchAnalysisReturn {
   startBatchAnalysis: (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<void>;
   startConfidenceAnalysis: (analysisCount: 2 | 3, rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<void>;
   overrideGrade: (itemId: string, newGrade: number, justification: string) => void;
+  selectRunAsGrade: (itemId: string, runIndex: number) => void;
   isProcessing: boolean;
   isIdentifying: boolean;
   currentIndex: number;
@@ -1010,6 +1012,32 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
             overrideJustification: justification,
             grade: newGrade,
             gradeJustification: `Teacher override: ${justification}. Original: ${item.result.multiAnalysisGrades?.join('%, ') || item.result.grade}%`,
+            selectedRunIndex: undefined, // Clear selected run when manually overriding
+          },
+        };
+      }
+      return item;
+    }));
+  }, []);
+
+  // Select a specific analysis run as the final grade (instead of average)
+  const selectRunAsGrade = useCallback((itemId: string, runIndex: number) => {
+    setItems(prev => prev.map(item => {
+      if (item.id === itemId && item.result?.multiAnalysisResults?.[runIndex]) {
+        const selectedRun = item.result.multiAnalysisResults[runIndex];
+        const selectedGrade = selectedRun.grade ?? selectedRun.totalScore.percentage;
+        const originalGrades = item.result.multiAnalysisGrades || [];
+        
+        return {
+          ...item,
+          result: {
+            ...item.result,
+            grade: selectedGrade,
+            gradeJustification: `Selected Run #${runIndex + 1} (${selectedGrade}%). Other runs: ${originalGrades.filter((_, i) => i !== runIndex).join('%, ')}%`,
+            selectedRunIndex: runIndex,
+            isOverridden: false,
+            overriddenGrade: undefined,
+            overrideJustification: undefined,
           },
         };
       }
@@ -1117,6 +1145,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     startBatchAnalysis,
     startConfidenceAnalysis,
     overrideGrade,
+    selectRunAsGrade,
     isProcessing,
     isIdentifying,
     currentIndex,

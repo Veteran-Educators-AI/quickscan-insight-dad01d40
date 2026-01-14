@@ -47,6 +47,7 @@ interface BatchQueueProps {
   onUnlinkContinuation?: (continuationId: string) => void;
   onSaveToGradebook?: () => Promise<void>;
   onOverrideGrade?: (itemId: string, newGrade: number, justification: string) => void;
+  onSelectRunAsGrade?: (itemId: string, runIndex: number) => void;
   currentIndex: number;
   isProcessing: boolean;
   isIdentifying: boolean;
@@ -88,6 +89,7 @@ export function BatchQueue({
   onUnlinkContinuation,
   onSaveToGradebook,
   onOverrideGrade,
+  onSelectRunAsGrade,
   currentIndex, 
   isProcessing,
   isIdentifying,
@@ -656,6 +658,8 @@ export function BatchQueue({
       onOpenChange={(open) => !open && setBreakdownDialogItem(null)}
       studentName={breakdownDialogItem?.studentName}
       result={breakdownDialogItem?.result || null}
+      itemId={breakdownDialogItem?.id}
+      onSelectRun={onSelectRunAsGrade}
     />
     </>
   );
