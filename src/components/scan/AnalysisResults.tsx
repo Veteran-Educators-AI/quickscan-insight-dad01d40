@@ -14,6 +14,7 @@ import {
 import { AIWorkDetector } from './AIWorkDetector';
 import { GradeOverrideDialog } from './GradeOverrideDialog';
 import { RemediationActions } from './RemediationActions';
+import { RecommendedNextSteps } from './RecommendedNextSteps';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 
 interface RubricScore {
@@ -340,6 +341,19 @@ export function AnalysisResults({
           onGenerateWorksheet={onGenerateRemediationWorksheet}
         />
       )}
+
+      {/* Recommended Next Steps - Worksheets & Topics for Sister App */}
+      <RecommendedNextSteps
+        misconceptions={result.misconceptions}
+        problemContext={result.problemIdentified}
+        nysStandard={result.nysStandard}
+        topicName={topicName || result.problemIdentified}
+        studentId={studentId || undefined}
+        studentName={studentName || undefined}
+        classId={classId || undefined}
+        grade={grade}
+        regentsScore={result.regentsScore}
+      />
 
       {/* Feedback */}
       {result.feedback && (
