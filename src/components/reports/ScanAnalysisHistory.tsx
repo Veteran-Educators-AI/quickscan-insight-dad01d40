@@ -4,10 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StudentWorkDetailDialog } from '@/components/scan/StudentWorkDetailDialog';
-import { FileImage, User, Calendar, ChevronRight, Eye } from 'lucide-react';
+import { GradeRecalculationDialog } from './GradeRecalculationDialog';
+import { FileImage, User, Calendar, ChevronRight, Eye, Calculator } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ScanAnalysisHistoryProps {
@@ -44,6 +46,7 @@ interface AttemptWithDetails {
 export function ScanAnalysisHistory({ classId }: ScanAnalysisHistoryProps) {
   const { user } = useAuth();
   const [selectedAttempt, setSelectedAttempt] = useState<AttemptWithDetails | null>(null);
+  const [showRecalcDialog, setShowRecalcDialog] = useState(false);
 
   const { data: attempts, isLoading } = useQuery({
     queryKey: ['scan-analysis-history', user?.id, classId],
@@ -172,16 +175,28 @@ export function ScanAnalysisHistory({ classId }: ScanAnalysisHistoryProps) {
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Scan Analysis History
-            <Badge variant="outline" className="ml-2 text-xs">
-              <Eye className="h-3 w-3 mr-1" />
-              Click to zoom in
-            </Badge>
-          </CardTitle>
-          <CardDescription>
-            {attempts.length} analyzed scan{attempts.length !== 1 ? 's' : ''} from student work
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                Scan Analysis History
+                <Badge variant="outline" className="ml-2 text-xs">
+                  <Eye className="h-3 w-3 mr-1" />
+                  Click to zoom in
+                </Badge>
+              </CardTitle>
+              <CardDescription>
+                {attempts.length} analyzed scan{attempts.length !== 1 ? 's' : ''} from student work
+              </CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowRecalcDialog(true)}
+            >
+              <Calculator className="h-4 w-4 mr-2" />
+              Recalculate Grades
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[400px] pr-4">
@@ -241,6 +256,13 @@ export function ScanAnalysisHistory({ classId }: ScanAnalysisHistoryProps) {
       </Card>
 
       {/* Student Work Detail Dialog */}
+      {/* Grade Recalculation Dialog */}
+      <GradeRecalculationDialog
+        open={showRecalcDialog}
+        onOpenChange={setShowRecalcDialog}
+        classId={classId}
+      />
+
       {selectedAttempt && (
         <StudentWorkDetailDialog
           open={!!selectedAttempt}

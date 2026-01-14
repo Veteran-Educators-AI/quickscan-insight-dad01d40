@@ -4,10 +4,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, GraduationCap, AlertTriangle } from 'lucide-react';
+import { Loader2, Save, GraduationCap, AlertTriangle, Calculator } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
+import { GradeRecalculationDialog } from '@/components/reports/GradeRecalculationDialog';
 
 const GRADE_FLOOR_OPTIONS = [
   { value: 50, label: '50', description: 'Minimum for any submission' },
@@ -31,6 +32,7 @@ export function GradeFloorSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [originalValues, setOriginalValues] = useState({ gradeFloor: 55, gradeFloorWithEffort: 65 });
+  const [showRecalcDialog, setShowRecalcDialog] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -213,20 +215,40 @@ export function GradeFloorSettings() {
           </div>
         </div>
 
-        {/* Save Button */}
-        <Button 
-          onClick={handleSave} 
-          disabled={isSaving || !hasChanges}
-          className="w-full"
-        >
-          {isSaving ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="mr-2 h-4 w-4" />
-          )}
-          {isSaving ? 'Saving...' : hasChanges ? 'Save Changes' : 'No Changes'}
-        </Button>
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleSave} 
+            disabled={isSaving || !hasChanges}
+            className="flex-1"
+          >
+            {isSaving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            {isSaving ? 'Saving...' : hasChanges ? 'Save Changes' : 'No Changes'}
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={() => setShowRecalcDialog(true)}
+          >
+            <Calculator className="mr-2 h-4 w-4" />
+            Recalculate Grades
+          </Button>
+        </div>
+
+        {/* Hint about recalculation */}
+        <p className="text-xs text-muted-foreground text-center">
+          After changing settings, use "Recalculate Grades" to update existing grades.
+        </p>
       </CardContent>
+
+      {/* Grade Recalculation Dialog */}
+      <GradeRecalculationDialog
+        open={showRecalcDialog}
+        onOpenChange={setShowRecalcDialog}
+      />
     </Card>
   );
 }
