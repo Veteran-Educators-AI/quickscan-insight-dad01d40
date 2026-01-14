@@ -142,7 +142,7 @@ export function BatchQueue({
             )}
           </div>
         </div>
-        <ScrollArea className="max-h-[400px]">
+        <ScrollArea className="h-[500px]">
           <div className="divide-y">
             {items.map((item, index) => {
               const isPrimary = item.pageType === 'new' || !item.pageType;

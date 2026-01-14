@@ -1039,12 +1039,14 @@ export type Database = {
           ai_detection_threshold: number | null
           ai_hourly_limit: number | null
           analysis_provider: string | null
+          auto_handwriting_grouping_enabled: boolean | null
           auto_push_enabled: boolean | null
           auto_push_regents_threshold: number | null
           auto_push_threshold: number | null
           auto_push_worksheet_count: number | null
           auto_qr_scan_enabled: boolean | null
           created_at: string
+          grade_curve_percent: number | null
           grade_floor: number | null
           grade_floor_with_effort: number | null
           grading_scale: Json | null
@@ -1070,12 +1072,14 @@ export type Database = {
           ai_detection_threshold?: number | null
           ai_hourly_limit?: number | null
           analysis_provider?: string | null
+          auto_handwriting_grouping_enabled?: boolean | null
           auto_push_enabled?: boolean | null
           auto_push_regents_threshold?: number | null
           auto_push_threshold?: number | null
           auto_push_worksheet_count?: number | null
           auto_qr_scan_enabled?: boolean | null
           created_at?: string
+          grade_curve_percent?: number | null
           grade_floor?: number | null
           grade_floor_with_effort?: number | null
           grading_scale?: Json | null
@@ -1101,12 +1105,14 @@ export type Database = {
           ai_detection_threshold?: number | null
           ai_hourly_limit?: number | null
           analysis_provider?: string | null
+          auto_handwriting_grouping_enabled?: boolean | null
           auto_push_enabled?: boolean | null
           auto_push_regents_threshold?: number | null
           auto_push_threshold?: number | null
           auto_push_worksheet_count?: number | null
           auto_qr_scan_enabled?: boolean | null
           created_at?: string
+          grade_curve_percent?: number | null
           grade_floor?: number | null
           grade_floor_with_effort?: number | null
           grading_scale?: Json | null

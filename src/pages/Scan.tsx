@@ -1880,7 +1880,7 @@ export default function Scan() {
             {/* Scanner Import Mode */}
             <TabsContent value="scanner" className="space-y-4 mt-4">
               <ScannerImportMode
-                onPagesReady={(pages) => {
+                onPagesReady={async (pages) => {
                   setScannerImportPages(pages);
                   // Add all pages to batch for processing
                   pages.forEach(page => {
@@ -1888,6 +1888,22 @@ export default function Scan() {
                   });
                   setScanMode('batch');
                   toast.success(`${pages.length} pages added to batch for analysis`);
+                  
+                  // Auto-run handwriting grouping if enabled and more than 1 page
+                  if (qrScanSettings.autoHandwritingGroupingEnabled && pages.length >= 2) {
+                    // Wait for state update
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    toast.info('Auto-grouping multi-page papers by handwriting...', { 
+                      icon: <FileStack className="h-4 w-4" /> 
+                    });
+                    const result = await batch.detectMultiPageByHandwriting();
+                    if (result.pagesLinked > 0) {
+                      toast.success(`Auto-grouped ${result.pagesLinked} continuation pages`, {
+                        description: `${result.groupsCreated} separate student papers detected`,
+                        icon: <FileStack className="h-4 w-4" />,
+                      });
+                    }
+                  }
                 }}
                 onClose={() => setScanMode('single')}
               />

@@ -4,12 +4,16 @@ import { useAuth } from '@/lib/auth';
 
 interface QRScanSettings {
   autoQRScanEnabled: boolean;
+  autoHandwritingGroupingEnabled: boolean;
+  gradeCurvePercent: number;
 }
 
 export function useQRScanSettings() {
   const { user } = useAuth();
   const [settings, setSettings] = useState<QRScanSettings>({
     autoQRScanEnabled: true,
+    autoHandwritingGroupingEnabled: false,
+    gradeCurvePercent: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -19,7 +23,7 @@ export function useQRScanSettings() {
     try {
       const { data, error } = await supabase
         .from('settings')
-        .select('auto_qr_scan_enabled')
+        .select('auto_qr_scan_enabled, auto_handwriting_grouping_enabled, grade_curve_percent')
         .eq('teacher_id', user.id)
         .maybeSingle();
 
@@ -28,6 +32,8 @@ export function useQRScanSettings() {
       if (data) {
         setSettings({
           autoQRScanEnabled: data.auto_qr_scan_enabled ?? true,
+          autoHandwritingGroupingEnabled: data.auto_handwriting_grouping_enabled ?? false,
+          gradeCurvePercent: data.grade_curve_percent ?? 0,
         });
       }
     } catch (err) {
@@ -50,6 +56,8 @@ export function useQRScanSettings() {
         .upsert({
           teacher_id: user.id,
           auto_qr_scan_enabled: newSettings.autoQRScanEnabled ?? settings.autoQRScanEnabled,
+          auto_handwriting_grouping_enabled: newSettings.autoHandwritingGroupingEnabled ?? settings.autoHandwritingGroupingEnabled,
+          grade_curve_percent: newSettings.gradeCurvePercent ?? settings.gradeCurvePercent,
           updated_at: new Date().toISOString(),
         }, {
           onConflict: 'teacher_id',
