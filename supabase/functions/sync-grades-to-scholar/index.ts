@@ -3,12 +3,21 @@
  * SYNC GRADES TO SCHOLAR EDGE FUNCTION
  * ============================================================================
  * 
- * This function syncs student grade history to NYCLogic Scholar AI so students
- * can view their grades, track progress, and earn XP/coins for their work.
+ * Syncs comprehensive student learning data to NYCLogic Scholar AI including:
+ * - Grade history with performance metrics
+ * - Misconceptions identified from work analysis
+ * - Recommended remediation topics
+ * - Skill gaps and weak areas
+ * 
+ * Scholar uses this data to:
+ * 1. Auto-assign targeted remediation practice
+ * 2. Display misconception patterns to students
+ * 3. Personalize learning paths based on weaknesses
+ * 4. Award XP/coins for improvement on weak topics
  * 
  * REQUIRED SECRETS:
- * - SISTER_APP_API_KEY: The API key for authenticating with the sister app
- * - NYCOLOGIC_API_URL: The endpoint URL of the sister app
+ * - SISTER_APP_API_KEY: The API key for authenticating with Scholar
+ * - NYCOLOGIC_API_URL: The endpoint URL of Scholar app
  * 
  * ============================================================================
  */
@@ -27,17 +36,48 @@ interface SyncRequest {
   sync_all?: boolean;
 }
 
-interface GradeData {
-  student_id: string;
-  student_name: string;
+interface MisconceptionData {
+  name: string;
+  description: string | null;
+  confidence: number | null;
+  topic_name: string | null;
+}
+
+interface GradeEntry {
   topic_name: string;
   grade: number;
   regents_score: number | null;
   nys_standard: string | null;
   grade_justification: string | null;
   created_at: string;
-  xp_reward: number;
-  coin_reward: number;
+}
+
+interface StudentLearningProfile {
+  student_id: string;
+  student_name: string;
+  class_id: string;
+  class_name: string;
+  overall_average: number;
+  grades: GradeEntry[];
+  misconceptions: MisconceptionData[];
+  weak_topics: { topic_name: string; avg_score: number }[];
+  recommended_remediation: string[];
+  xp_potential: number;
+  coin_potential: number;
+}
+
+interface BatchSyncPayload {
+  action: 'batch_sync';
+  teacher_id: string;
+  teacher_name: string | null;
+  sync_timestamp: string;
+  student_profiles: StudentLearningProfile[];
+  summary: {
+    total_students: number;
+    total_grades: number;
+    total_misconceptions: number;
+    weak_topics_identified: number;
+  };
 }
 
 serve(async (req) => {
@@ -89,7 +129,14 @@ serve(async (req) => {
     }
 
     const requestData: SyncRequest = await req.json();
-    const { class_id, student_ids, sync_all } = requestData;
+    const { class_id, student_ids } = requestData;
+
+    // Get teacher info
+    const { data: teacherProfile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single();
 
     // Get teacher settings for XP/coin multipliers
     const { data: settings } = await supabase
@@ -101,165 +148,213 @@ serve(async (req) => {
     const xpMultiplier = settings?.sister_app_xp_multiplier || 1;
     const coinMultiplier = settings?.sister_app_coin_multiplier || 1;
 
-    // Build query for grade history
-    let query = supabase
-      .from('grade_history')
-      .select(`
-        id,
-        student_id,
-        topic_name,
-        grade,
-        regents_score,
-        nys_standard,
-        grade_justification,
-        created_at,
-        student:students(first_name, last_name, class_id)
-      `)
-      .eq('teacher_id', user.id);
+    // Get students to sync
+    let studentQuery = supabase
+      .from('students')
+      .select('id, first_name, last_name, class_id, classes(name)')
+      .eq('classes.teacher_id', user.id);
 
-    // Apply filters
     if (student_ids && student_ids.length > 0) {
-      query = query.in('student_id', student_ids);
+      studentQuery = studentQuery.in('id', student_ids);
     } else if (class_id) {
-      // Get students in this class first
-      const { data: classStudents } = await supabase
-        .from('students')
-        .select('id')
-        .eq('class_id', class_id);
-      
-      if (classStudents && classStudents.length > 0) {
-        query = query.in('student_id', classStudents.map(s => s.id));
-      }
+      studentQuery = studentQuery.eq('class_id', class_id);
     }
 
-    const { data: grades, error: gradesError } = await query.order('created_at', { ascending: false });
+    const { data: students, error: studentsError } = await studentQuery;
 
-    if (gradesError) {
-      console.error('Error fetching grades:', gradesError);
+    if (studentsError || !students || students.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Failed to fetch grades' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!grades || grades.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, message: 'No grades to sync', synced_count: 0 }),
+        JSON.stringify({ success: true, message: 'No students to sync', synced_count: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Transform grades for sister app
-    const gradesData: GradeData[] = grades.map((g: any) => {
-      const baseXp = Math.round(g.grade * 0.5); // Base XP from grade percentage
-      const baseCoin = Math.round(g.grade * 0.25); // Base coins from grade
-      
-      return {
-        student_id: g.student_id,
-        student_name: g.student ? `${g.student.first_name} ${g.student.last_name}` : 'Unknown',
-        topic_name: g.topic_name,
-        grade: g.grade,
-        regents_score: g.regents_score,
-        nys_standard: g.nys_standard,
-        grade_justification: g.grade_justification,
-        created_at: g.created_at,
-        xp_reward: Math.round(baseXp * xpMultiplier),
-        coin_reward: Math.round(baseCoin * coinMultiplier),
-      };
-    });
+    const studentIds = students.map(s => s.id);
 
-    // Group grades by student for efficient push
-    const gradesByStudent = gradesData.reduce((acc, grade) => {
-      if (!acc[grade.student_id]) {
-        acc[grade.student_id] = [];
-      }
-      acc[grade.student_id].push(grade);
-      return acc;
-    }, {} as Record<string, GradeData[]>);
+    // Fetch all grades for these students
+    const { data: grades, error: gradesError } = await supabase
+      .from('grade_history')
+      .select('student_id, topic_name, grade, regents_score, nys_standard, grade_justification, created_at')
+      .in('student_id', studentIds)
+      .eq('teacher_id', user.id)
+      .order('created_at', { ascending: false });
 
-    // Push grades to sister app - send one request per grade using the expected format
-    console.log('Syncing grades to Scholar:', gradesData.length, 'grades for', Object.keys(gradesByStudent).length, 'students');
-
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const grade of gradesData) {
-      // Use the payload format expected by receive-sister-app-data
-      const payload = {
-        action: 'grade_completed',
-        student_id: grade.student_id,
-        data: {
-          activity_type: 'scanned_work',
-          activity_name: grade.topic_name,
-          score: grade.grade,
-          topic_name: grade.topic_name,
-          xp_earned: grade.xp_reward,
-          coins_earned: grade.coin_reward,
-          nys_standard: grade.nys_standard,
-          regents_score: grade.regents_score,
-          grade_justification: grade.grade_justification,
-          timestamp: grade.created_at,
-          source: 'nycologic_ai_sync',
-        },
-      };
-
-      try {
-        const response = await fetch(sisterAppEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': sisterAppApiKey,
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (response.ok) {
-          successCount++;
-        } else {
-          const errorText = await response.text();
-          console.error('Sister app error for grade:', response.status, errorText);
-          errorCount++;
-        }
-      } catch (fetchError) {
-        console.error('Fetch error for grade:', fetchError);
-        errorCount++;
-      }
+    if (gradesError) {
+      console.error('Error fetching grades:', gradesError);
     }
 
-    console.log('Sync complete:', successCount, 'succeeded,', errorCount, 'failed');
+    // Fetch misconceptions from attempts
+    const { data: attempts } = await supabase
+      .from('attempts')
+      .select('student_id, attempt_misconceptions(misconception_id, confidence, misconception_tags(name, description, topics(name)))')
+      .in('student_id', studentIds);
+
+    // Build comprehensive learning profiles for each student
+    const studentProfiles: StudentLearningProfile[] = [];
+    let totalMisconceptions = 0;
+    let totalWeakTopics = 0;
+
+    for (const student of students) {
+      const studentGrades = (grades || []).filter(g => g.student_id === student.id);
+      const studentAttempts = (attempts || []).filter(a => a.student_id === student.id);
+
+      // Calculate overall average
+      const avgGrade = studentGrades.length > 0
+        ? Math.round(studentGrades.reduce((sum, g) => sum + g.grade, 0) / studentGrades.length)
+        : 0;
+
+      // Extract misconceptions
+      const misconceptions: MisconceptionData[] = [];
+      const misconceptionSet = new Set<string>();
+      
+      for (const attempt of studentAttempts) {
+        const attemptMisconceptions = attempt.attempt_misconceptions as any[];
+        if (attemptMisconceptions) {
+          for (const am of attemptMisconceptions) {
+            const tag = am.misconception_tags as any;
+            if (tag && !misconceptionSet.has(tag.name)) {
+              misconceptionSet.add(tag.name);
+              misconceptions.push({
+                name: tag.name,
+                description: tag.description,
+                confidence: am.confidence,
+                topic_name: tag.topics?.name || null,
+              });
+            }
+          }
+        }
+      }
+      totalMisconceptions += misconceptions.length;
+
+      // Calculate weak topics (topics with avg < 70%)
+      const topicScores: Record<string, number[]> = {};
+      for (const g of studentGrades) {
+        if (!topicScores[g.topic_name]) {
+          topicScores[g.topic_name] = [];
+        }
+        topicScores[g.topic_name].push(g.grade);
+      }
+
+      const weakTopics: { topic_name: string; avg_score: number }[] = [];
+      for (const [topic, scores] of Object.entries(topicScores)) {
+        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        if (avg < 70) {
+          weakTopics.push({ topic_name: topic, avg_score: avg });
+        }
+      }
+      weakTopics.sort((a, b) => a.avg_score - b.avg_score);
+      totalWeakTopics += weakTopics.length;
+
+      // Generate remediation recommendations based on weak topics and misconceptions
+      const recommendedRemediation: string[] = [];
+      
+      // Add weak topics as remediation priorities
+      for (const wt of weakTopics.slice(0, 5)) {
+        recommendedRemediation.push(`Practice: ${wt.topic_name} (current: ${wt.avg_score}%)`);
+      }
+      
+      // Add topics from misconceptions
+      for (const m of misconceptions.slice(0, 3)) {
+        if (m.topic_name && !recommendedRemediation.some(r => r.includes(m.topic_name!))) {
+          recommendedRemediation.push(`Address misconception: ${m.name} in ${m.topic_name}`);
+        }
+      }
+
+      // Calculate XP/coin potential based on improvement opportunity
+      const improvementPotential = Math.max(0, 100 - avgGrade);
+      const xpPotential = Math.round(improvementPotential * 2 * xpMultiplier);
+      const coinPotential = Math.round(improvementPotential * coinMultiplier);
+
+      const classData = student.classes as any;
+      studentProfiles.push({
+        student_id: student.id,
+        student_name: `${student.first_name} ${student.last_name}`,
+        class_id: student.class_id,
+        class_name: classData?.name || 'Unknown',
+        overall_average: avgGrade,
+        grades: studentGrades.map(g => ({
+          topic_name: g.topic_name,
+          grade: g.grade,
+          regents_score: g.regents_score,
+          nys_standard: g.nys_standard,
+          grade_justification: g.grade_justification,
+          created_at: g.created_at,
+        })),
+        misconceptions,
+        weak_topics: weakTopics,
+        recommended_remediation: recommendedRemediation,
+        xp_potential: xpPotential,
+        coin_potential: coinPotential,
+      });
+    }
+
+    // Build single batch payload
+    const batchPayload: BatchSyncPayload = {
+      action: 'batch_sync',
+      teacher_id: user.id,
+      teacher_name: teacherProfile?.full_name || null,
+      sync_timestamp: new Date().toISOString(),
+      student_profiles: studentProfiles,
+      summary: {
+        total_students: studentProfiles.length,
+        total_grades: (grades || []).length,
+        total_misconceptions: totalMisconceptions,
+        weak_topics_identified: totalWeakTopics,
+      },
+    };
+
+    console.log('Syncing comprehensive data to Scholar:', JSON.stringify(batchPayload.summary));
+
+    // Send single batch request
+    const response = await fetch(sisterAppEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': sisterAppApiKey,
+      },
+      body: JSON.stringify(batchPayload),
+    });
+
+    const responseText = await response.text();
+    
+    if (!response.ok) {
+      console.error('Scholar app error:', response.status, responseText);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Scholar sync failed: ${responseText}`,
+          status: response.status 
+        }),
+        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch {
+      responseData = { raw: responseText };
+    }
 
     // Log the sync action
     await supabase.from('sister_app_sync_log').insert({
       teacher_id: user.id,
-      action: 'sync_grades',
+      action: 'batch_sync',
       data: {
-        total_grades: gradesData.length,
-        total_students: Object.keys(gradesByStudent).length,
-        success_count: successCount,
-        error_count: errorCount,
+        ...batchPayload.summary,
         class_id,
+        response: responseData,
       },
     });
 
-    // Return appropriate response based on results
-    if (errorCount > 0 && successCount === 0) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'All grade syncs failed',
-          synced_count: 0,
-          failed_count: errorCount,
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     return new Response(
       JSON.stringify({ 
-        success: true, 
-        synced_count: successCount,
-        failed_count: errorCount,
-        student_count: Object.keys(gradesByStudent).length,
+        success: true,
+        synced_students: studentProfiles.length,
+        synced_grades: (grades || []).length,
+        misconceptions_synced: totalMisconceptions,
+        weak_topics_synced: totalWeakTopics,
+        response: responseData,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

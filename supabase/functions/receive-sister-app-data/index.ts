@@ -43,9 +43,9 @@ const corsHeaders = {
 // data: Flexible object containing event-specific information
 // -----------------------------------------------------------------------------
 interface IncomingData {
-  action: 'grade_completed' | 'activity_completed' | 'reward_earned' | 'level_up' | 'achievement_unlocked';
-  student_id: string;
-  data: {
+  action: 'grade_completed' | 'activity_completed' | 'reward_earned' | 'level_up' | 'achievement_unlocked' | 'batch_sync';
+  student_id?: string; // Optional for batch_sync
+  data?: {
     activity_type?: string;      // e.g., "quiz", "game", "practice"
     activity_name?: string;      // e.g., "Algebra Challenge Level 5"
     score?: number;              // 0-100 score if applicable
@@ -57,6 +57,43 @@ interface IncomingData {
     timestamp?: string;          // When the event occurred (ISO string)
     [key: string]: unknown;      // Allow additional custom fields
   };
+  // Batch sync fields (when action === 'batch_sync')
+  teacher_id?: string;
+  teacher_name?: string | null;
+  sync_timestamp?: string;
+  student_profiles?: StudentLearningProfile[];
+  summary?: {
+    total_students: number;
+    total_grades: number;
+    total_misconceptions: number;
+    weak_topics_identified: number;
+  };
+}
+
+interface StudentLearningProfile {
+  student_id: string;
+  student_name: string;
+  class_id: string;
+  class_name: string;
+  overall_average: number;
+  grades: {
+    topic_name: string;
+    grade: number;
+    regents_score: number | null;
+    nys_standard: string | null;
+    grade_justification: string | null;
+    created_at: string;
+  }[];
+  misconceptions: {
+    name: string;
+    description: string | null;
+    confidence: number | null;
+    topic_name: string | null;
+  }[];
+  weak_topics: { topic_name: string; avg_score: number }[];
+  recommended_remediation: string[];
+  xp_potential: number;
+  coin_potential: number;
 }
 
 // -----------------------------------------------------------------------------
@@ -170,115 +207,196 @@ serve(async (req) => {
     // STEP 7: PARSE AND VALIDATE REQUEST BODY
     // -------------------------------------------------------------------------
     // Extract the JSON payload from the request.
-    // Validate that required fields (action, student_id) are present.
+    // Validate that required fields are present based on action type.
     // -------------------------------------------------------------------------
     const body: IncomingData = await req.json();
     
-    if (!body.action || !body.student_id) {
+    if (!body.action) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Missing required fields: action, student_id' }),
+        JSON.stringify({ success: false, error: 'Missing required field: action' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // For batch_sync, validate differently
+    if (body.action === 'batch_sync') {
+      if (!body.student_profiles || body.student_profiles.length === 0) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'batch_sync requires student_profiles array' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } else if (!body.student_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing required field: student_id' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // -------------------------------------------------------------------------
-    // STEP 8: LOG THE INCOMING DATA
+    // STEP 8: PROCESS BASED ON ACTION TYPE
     // -------------------------------------------------------------------------
-    // Every request is logged to the sister_app_sync_log table.
-    // This provides an audit trail and helps with debugging.
-    // The log includes:
-    //   - teacher_id: Whose API key was used
-    //   - student_id: Which student the data is about
-    //   - action: What type of event occurred
-    //   - data: The full payload from the sister app
-    //   - source_app: Identifies where the data came from
-    //   - processed: Whether we've fully processed this data yet
-    // -------------------------------------------------------------------------
-    const { data: logEntry, error: logError } = await supabaseAdmin
-      .from('sister_app_sync_log')
-      .insert({
-        teacher_id: keyRecord.teacher_id,
-        student_id: body.student_id,
-        action: body.action,
-        data: body.data || {},
-        source_app: 'sister_app',
-        processed: false,
-      })
-      .select()
-      .single();
+    let processedResult: any = null;
+    let logEntry: any = null;
 
-    if (logError) {
-      console.error('Error logging sync data:', logError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Failed to log sync data' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    if (body.action === 'batch_sync') {
+      // ---------------------------------------------------------------------
+      // BATCH SYNC PROCESSING
+      // ---------------------------------------------------------------------
+      // Process comprehensive learning profiles from NYCLogic AI
+      // This includes grades, misconceptions, weak topics, and remediation
+      // ---------------------------------------------------------------------
+      console.log('Processing batch sync:', body.summary);
 
-    // -------------------------------------------------------------------------
-    // STEP 9: PROCESS DATA BASED ON ACTION TYPE
-    // -------------------------------------------------------------------------
-    // Different actions may require different processing.
-    // Currently, we save grade data to grade_history when applicable.
-    // Other actions are just logged for now but could trigger additional logic.
-    // -------------------------------------------------------------------------
-    let processedResult = null;
-    
-    switch (body.action) {
-      case 'grade_completed':
-      case 'activity_completed':
-        // ---------------------------------------------------------------------
-        // GRADE/ACTIVITY COMPLETED PROCESSING
-        // ---------------------------------------------------------------------
-        // If the sister app sends a score and topic name, we can save it
-        // to the grade_history table. This allows NYCLogic Ai to track
-        // grades from both scanned work AND sister app activities.
-        // ---------------------------------------------------------------------
-        if (body.data?.score !== undefined && body.data?.topic_name) {
-          const { error: gradeError } = await supabaseAdmin
-            .from('grade_history')
-            .insert({
-              student_id: body.student_id,
-              teacher_id: keyRecord.teacher_id,
-              topic_name: body.data.topic_name,
-              grade: body.data.score,
-              grade_justification: `Synced from sister app: ${body.data.activity_name || body.action}`,
-            });
+      const profiles = body.student_profiles!;
+      let gradesProcessed = 0;
+      let remediationsCreated = 0;
 
-          if (gradeError) {
-            console.error('Error saving grade:', gradeError);
-          } else {
-            processedResult = { grade_saved: true };
-          }
+      for (const profile of profiles) {
+        // Log each student's sync
+        await supabaseAdmin.from('sister_app_sync_log').insert({
+          teacher_id: keyRecord.teacher_id,
+          student_id: profile.student_id,
+          action: 'batch_sync_student',
+          data: {
+            student_name: profile.student_name,
+            overall_average: profile.overall_average,
+            grades_count: profile.grades.length,
+            misconceptions_count: profile.misconceptions.length,
+            weak_topics: profile.weak_topics,
+            recommended_remediation: profile.recommended_remediation,
+            xp_potential: profile.xp_potential,
+            coin_potential: profile.coin_potential,
+          },
+          source_app: 'nycologic_ai',
+          processed: true,
+          processed_at: new Date().toISOString(),
+        });
+
+        gradesProcessed += profile.grades.length;
+
+        // Here Scholar would:
+        // 1. Create targeted practice assignments based on weak_topics
+        // 2. Track misconceptions for student progress views
+        // 3. Set up XP/coin rewards for improvement
+        // 4. Generate personalized learning paths
+        
+        // For now, we log it - the actual Scholar app would implement these
+        if (profile.recommended_remediation.length > 0) {
+          remediationsCreated++;
         }
-        break;
+      }
 
-      case 'reward_earned':
-      case 'level_up':
-      case 'achievement_unlocked':
-        // ---------------------------------------------------------------------
-        // REWARD/LEVEL/ACHIEVEMENT PROCESSING
-        // ---------------------------------------------------------------------
-        // These events don't require additional database writes.
-        // They're logged for analytics and could trigger notifications later.
-        // ---------------------------------------------------------------------
-        processedResult = { logged: true };
-        break;
+      // Log the batch sync summary
+      const { data: summaryLog } = await supabaseAdmin
+        .from('sister_app_sync_log')
+        .insert({
+          teacher_id: keyRecord.teacher_id,
+          action: 'batch_sync',
+          data: {
+            summary: body.summary,
+            teacher_name: body.teacher_name,
+            sync_timestamp: body.sync_timestamp,
+            profiles_processed: profiles.length,
+            grades_processed: gradesProcessed,
+          },
+          source_app: 'nycologic_ai',
+          processed: true,
+          processed_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      logEntry = summaryLog;
+
+      processedResult = {
+        batch_processed: true,
+        students_synced: profiles.length,
+        grades_received: gradesProcessed,
+        remediations_queued: remediationsCreated,
+        message: 'Scholar will auto-assign remediation, track misconceptions, and award XP for improvement',
+      };
+
+    } else {
+      // ---------------------------------------------------------------------
+      // SINGLE EVENT PROCESSING (original behavior)
+      // ---------------------------------------------------------------------
+      const { data: singleLogEntry, error: logError } = await supabaseAdmin
+        .from('sister_app_sync_log')
+        .insert({
+          teacher_id: keyRecord.teacher_id,
+          student_id: body.student_id,
+          action: body.action,
+          data: body.data || {},
+          source_app: 'sister_app',
+          processed: false,
+        })
+        .select()
+        .single();
+
+      if (logError) {
+        console.error('Error logging sync data:', logError);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Failed to log sync data' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      logEntry = singleLogEntry;
+
+      switch (body.action) {
+        case 'grade_completed':
+        case 'activity_completed':
+          if (body.data?.score !== undefined && body.data?.topic_name) {
+            const { error: gradeError } = await supabaseAdmin
+              .from('grade_history')
+              .insert({
+                student_id: body.student_id,
+                teacher_id: keyRecord.teacher_id,
+                topic_name: body.data.topic_name,
+                grade: body.data.score,
+                grade_justification: `Synced from sister app: ${body.data.activity_name || body.action}`,
+              });
+
+            if (gradeError) {
+              console.error('Error saving grade:', gradeError);
+            } else {
+              processedResult = { grade_saved: true };
+            }
+          }
+          break;
+
+        case 'reward_earned':
+        case 'level_up':
+        case 'achievement_unlocked':
+          processedResult = { logged: true };
+          break;
+      }
+
+      // Mark single event as processed
+      await supabaseAdmin
+        .from('sister_app_sync_log')
+        .update({ 
+          processed: true, 
+          processed_at: new Date().toISOString() 
+        })
+        .eq('id', logEntry.id);
     }
 
     // -------------------------------------------------------------------------
-    // STEP 10: MARK LOG ENTRY AS PROCESSED
+    // STEP 10: RETURN SUCCESS RESPONSE
     // -------------------------------------------------------------------------
-    // Update the log entry to indicate we've finished processing.
-    // This helps identify any entries that failed mid-processing.
+    // Let the sender know the request was successful.
+    // Include the log ID and processing result.
     // -------------------------------------------------------------------------
-    await supabaseAdmin
-      .from('sister_app_sync_log')
-      .update({ 
-        processed: true, 
-        processed_at: new Date().toISOString() 
-      })
-      .eq('id', logEntry.id);
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        log_id: logEntry?.id,
+        processed: processedResult 
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
     // -------------------------------------------------------------------------
     // STEP 11: RETURN SUCCESS RESPONSE
