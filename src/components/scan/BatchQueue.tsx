@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon } from 'lucide-react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +31,22 @@ import { BatchItem } from '@/hooks/useBatchAnalysis';
 import { HandwritingComparisonDialog } from './HandwritingComparisonDialog';
 import { MultiAnalysisBreakdownDialog } from './MultiAnalysisBreakdownDialog';
 import { ManualLinkDialog } from './ManualLinkDialog';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface Student {
   id: string;
@@ -46,6 +62,7 @@ interface BatchQueueProps {
   onAssignStudent: (itemId: string, studentId: string, studentName: string) => void;
   onLinkContinuation?: (continuationId: string, primaryId: string) => void;
   onUnlinkContinuation?: (continuationId: string) => void;
+  onReorder?: (activeId: string, overId: string) => void;
   onSaveToGradebook?: () => Promise<void>;
   onOverrideGrade?: (itemId: string, newGrade: number, justification: string) => void;
   onSelectRunAsGrade?: (itemId: string, runIndex: number) => void;
@@ -54,6 +71,51 @@ interface BatchQueueProps {
   isIdentifying: boolean;
   isSaving?: boolean;
   allSaved?: boolean;
+}
+
+// Sortable item wrapper component
+function SortableItem({ 
+  id, 
+  disabled, 
+  children 
+}: { 
+  id: string; 
+  disabled: boolean; 
+  children: React.ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 0,
+    position: 'relative' as const,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center">
+      {!disabled && (
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-2 hover:bg-muted/50 rounded-l touch-none shrink-0"
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        {children}
+      </div>
+    </div>
+  );
 }
 
 const getConfidenceBadge = (confidence: 'high' | 'medium' | 'low' | 'none') => {
@@ -88,6 +150,7 @@ export function BatchQueue({
   onAssignStudent,
   onLinkContinuation,
   onUnlinkContinuation,
+  onReorder,
   onSaveToGradebook,
   onOverrideGrade,
   onSelectRunAsGrade,
@@ -97,6 +160,25 @@ export function BatchQueue({
   isSaving = false,
   allSaved = false,
 }: BatchQueueProps) {
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id && onReorder) {
+      onReorder(active.id as string, over.id as string);
+    }
+  };
   const [showComparisonDialog, setShowComparisonDialog] = useState(false);
   const [overrideDialogItem, setOverrideDialogItem] = useState<BatchItem | null>(null);
   const [overrideGrade, setOverrideGrade] = useState('');
@@ -226,24 +308,38 @@ export function BatchQueue({
           </div>
         </div>
         <ScrollArea className="h-[500px]">
-          <div className="divide-y">
-            {items.map((item, index) => {
-              const isPrimary = item.pageType === 'new' || !item.pageType;
-              const isContinuation = item.pageType === 'continuation';
-              const continuationCount = item.continuationPages?.length || 0;
-              const linkedPrimary = isContinuation && item.continuationOf 
-                ? items.find(i => i.id === item.continuationOf) 
-                : null;
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={items.map(i => i.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="divide-y">
+                {items.map((item, index) => {
+                  const isPrimary = item.pageType === 'new' || !item.pageType;
+                  const isContinuation = item.pageType === 'continuation';
+                  const continuationCount = item.continuationPages?.length || 0;
+                  const linkedPrimary = isContinuation && item.continuationOf 
+                    ? items.find(i => i.id === item.continuationOf) 
+                    : null;
+                  const canDrag = !isBusy && onReorder;
 
-              return (
-              <div 
-                key={item.id}
-                className={`flex items-center gap-3 p-3 ${
-                  item.status === 'analyzing' ? 'bg-primary/5' : 
-                  item.status === 'identifying' ? 'bg-amber-50 dark:bg-amber-950/20' :
-                  isContinuation ? 'bg-muted/30 border-l-4 border-l-blue-400 ml-2' : ''
-                }`}
-              >
+                  return (
+                  <SortableItem
+                    key={item.id}
+                    id={item.id}
+                    disabled={!canDrag}
+                  >
+                    <div 
+                      className={`flex items-center gap-3 p-3 ${
+                        item.status === 'analyzing' ? 'bg-primary/5' : 
+                        item.status === 'identifying' ? 'bg-amber-50 dark:bg-amber-950/20' :
+                        isContinuation ? 'bg-muted/30 border-l-4 border-l-blue-400 ml-2' : ''
+                      }`}
+                    >
                 {/* Page type indicator */}
                 {isContinuation && (
                   <TooltipProvider>
@@ -569,10 +665,13 @@ export function BatchQueue({
                     <X className="h-4 w-4" />
                   </Button>
                 )}
+                    </div>
+                  </SortableItem>
+                  );
+                })}
               </div>
-              );
-            })}
-          </div>
+            </SortableContext>
+          </DndContext>
         </ScrollArea>
         
         {/* Save to Gradebook button - shown immediately after all items analyzed */}

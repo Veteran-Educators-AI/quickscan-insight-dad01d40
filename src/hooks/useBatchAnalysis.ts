@@ -104,6 +104,7 @@ interface UseBatchAnalysisReturn {
   addImageWithAutoIdentify: (imageDataUrl: string, studentRoster?: Student[]) => Promise<string>;
   removeImage: (id: string) => void;
   updateItemStudent: (itemId: string, studentId: string, studentName: string) => void;
+  reorderItems: (activeId: string, overId: string) => void;
   clearAll: () => void;
   autoIdentifyAll: (studentRoster: Student[]) => Promise<void>;
   scanAllQRCodes: (studentRoster: Student[]) => Promise<{ matched: number; total: number }>;
@@ -777,7 +778,24 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     });
   }, []);
 
-  // Analyze with multi-page support - combines continuation pages with primary
+  // Reorder items (drag and drop)
+  const reorderItems = useCallback((activeId: string, overId: string) => {
+    setItems(prev => {
+      const oldIndex = prev.findIndex(item => item.id === activeId);
+      const newIndex = prev.findIndex(item => item.id === overId);
+      
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
+        return prev;
+      }
+      
+      const newItems = [...prev];
+      const [movedItem] = newItems.splice(oldIndex, 1);
+      newItems.splice(newIndex, 0, movedItem);
+      
+      return newItems;
+    });
+  }, []);
+
   const analyzeItemWithContinuations = async (
     item: BatchItem, 
     allItems: BatchItem[],
@@ -1135,6 +1153,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     addImageWithAutoIdentify,
     removeImage,
     updateItemStudent,
+    reorderItems,
     clearAll,
     autoIdentifyAll,
     scanAllQRCodes,
