@@ -2,7 +2,7 @@
 // API KEY SETTINGS COMPONENT
 // =============================================================================
 // This component allows teachers to generate and manage API keys that the
-// sister app uses to send data back to ScanGenius.
+// sister app (NYClogic Scholar Ai) uses to send data back to NYCLogic Ai.
 //
 // KEY FEATURES:
 // - Generate new API keys (shown only once for security)
@@ -108,12 +108,12 @@ export function ApiKeySettings() {
   // ---------------------------------------------------------------------------
   // GENERATE RANDOM API KEY
   // ---------------------------------------------------------------------------
-  // Creates a new API key with format: sg_live_[32 random alphanumeric chars]
-  // The "sg_live_" prefix helps identify this as a ScanGenius production key.
+  // Creates a new API key with format: nl_live_[32 random alphanumeric chars]
+  // The "nl_live_" prefix helps identify this as a NYCLogic Ai production key.
   // ---------------------------------------------------------------------------
   const generateApiKey = (): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    const prefix = 'sg_live_';
+    const prefix = 'nl_live_';
     let key = '';
     
     // Generate 32 random characters
@@ -316,10 +316,10 @@ export function ApiKeySettings() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Key className="h-5 w-5" />
-          Sister App API Key
+          NYClogic Scholar Ai API Key
         </CardTitle>
         <CardDescription>
-          Generate an API key for the sister app to send graded work and activity data back to ScanGenius.
+          Generate an API key for NYClogic Scholar Ai to send graded work and activity data back to NYCLogic Ai.
         </CardDescription>
       </CardHeader>
 

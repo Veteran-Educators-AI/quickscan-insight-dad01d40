@@ -146,7 +146,7 @@ const faqItems: FAQItem[] = [
 
 const videoTutorials: VideoTutorial[] = [
   {
-    title: "Getting Started with Scan Genius",
+    title: "Getting Started with NYCLogic Ai",
     description: "A complete walkthrough of setting up your account, creating classes, and scanning your first worksheet.",
     duration: "5:30",
     category: "Getting Started",
@@ -218,7 +218,7 @@ const docArticles: DocArticle[] = [
     category: "Core Features",
     icon: Users,
     keywords: ["class", "students", "roster", "period", "manage"],
-    content: "Classes are the foundation of your Scan Genius workflow. Each class contains students and can be associated with assessments. You can import students via CSV, add them manually, or scan roster images for automatic extraction."
+    content: "Classes are the foundation of your NYCLogic Ai workflow. Each class contains students and can be associated with assessments. You can import students via CSV, add them manually, or scan roster images for automatic extraction."
   },
   {
     title: "Question Bank & Rubrics",
@@ -254,7 +254,7 @@ const docArticles: DocArticle[] = [
   },
   {
     title: "Settings & Configuration",
-    description: "Customize your Scan Genius experience.",
+    description: "Customize your NYCLogic Ai experience.",
     category: "Advanced",
     icon: Settings,
     keywords: ["settings", "configure", "customize", "preferences"],
@@ -356,7 +356,7 @@ export default function Help() {
         <div className="text-center space-y-2">
           <h1 className="font-display text-3xl font-bold">Help Center</h1>
           <p className="text-muted-foreground">
-            Find answers, watch tutorials, and learn how to get the most out of Scan Genius
+            Find answers, watch tutorials, and learn how to get the most out of NYCLogic Ai
           </p>
         </div>
 

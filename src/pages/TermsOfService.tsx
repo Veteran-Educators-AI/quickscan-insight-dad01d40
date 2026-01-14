@@ -20,7 +20,7 @@ export default function TermsOfService() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">1. Acceptance of Terms</h2>
             <p className="text-muted-foreground leading-relaxed">
-              By accessing or using Scan Genius ("Service"), you agree to be bound by these Terms of 
+              By accessing or using NYCLogic Ai ("Service"), you agree to be bound by these Terms of 
               Service ("Terms"). If you are using the Service on behalf of a school, district, or 
               organization, you represent that you have the authority to bind that entity to these Terms. 
               If you do not agree to these Terms, do not use the Service.
@@ -30,7 +30,7 @@ export default function TermsOfService() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">2. Description of Service</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Scan Genius is an educational technology platform that enables teachers to scan, analyze, 
+              NYCLogic Ai is an educational technology platform that enables teachers to scan, analyze, 
               and assess student work using AI-assisted technology. The Service includes features for:
             </p>
             <ul className="list-disc pl-6 mt-3 space-y-2 text-muted-foreground">
@@ -129,7 +129,7 @@ export default function TermsOfService() {
             <h2 className="text-xl font-semibold text-foreground mb-4">8. Intellectual Property</h2>
             <p className="text-muted-foreground leading-relaxed">
               The Service, including its design, features, and content (excluding User Content), is 
-              owned by Scan Genius and protected by copyright, trademark, and other intellectual 
+              owned by NYCLogic Ai and protected by copyright, trademark, and other intellectual 
               property laws. You may not copy, modify, distribute, or create derivative works based 
               on the Service without our express written permission.
             </p>
@@ -180,7 +180,7 @@ export default function TermsOfService() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">12. Limitation of Liability</h2>
             <p className="text-muted-foreground leading-relaxed">
-              TO THE MAXIMUM EXTENT PERMITTED BY LAW, SCAN GENIUS SHALL NOT BE LIABLE FOR ANY 
+              TO THE MAXIMUM EXTENT PERMITTED BY LAW, NYCLOGIC AI SHALL NOT BE LIABLE FOR ANY 
               INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF 
               PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA, 
               USE, GOODWILL, OR OTHER INTANGIBLE LOSSES RESULTING FROM YOUR USE OF THE SERVICE.
@@ -190,7 +190,7 @@ export default function TermsOfService() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">13. Indemnification</h2>
             <p className="text-muted-foreground leading-relaxed">
-              You agree to indemnify, defend, and hold harmless Scan Genius and its officers, 
+              You agree to indemnify, defend, and hold harmless NYCLogic Ai and its officers, 
               directors, employees, and agents from any claims, damages, losses, or expenses 
               (including reasonable attorneys' fees) arising from your use of the Service, 
               violation of these Terms, or infringement of any third-party rights.
@@ -239,8 +239,8 @@ export default function TermsOfService() {
               For questions about these Terms, please contact us:
             </p>
             <div className="bg-muted/50 p-4 rounded-lg text-muted-foreground">
-              <p><strong>Scan Genius Legal Team</strong></p>
-              <p>Email: legal@scangenius.edu</p>
+              <p><strong>NYCLogic Ai Legal Team</strong></p>
+              <p>Email: legal@nyclogic.ai</p>
               <p>Address: [Your Business Address]</p>
             </div>
           </section>
@@ -249,7 +249,7 @@ export default function TermsOfService() {
             <h2 className="text-xl font-semibold text-foreground mb-4">18. Entire Agreement</h2>
             <p className="text-muted-foreground leading-relaxed">
               These Terms, together with the Privacy Policy, constitute the entire agreement between 
-              you and Scan Genius regarding the Service and supersede all prior agreements and 
+              you and NYCLogic Ai regarding the Service and supersede all prior agreements and 
               understandings.
             </p>
           </section>

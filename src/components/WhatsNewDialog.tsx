@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Increment this version when adding new features
 const CURRENT_VERSION = '1.7.0';
-const STORAGE_KEY = 'scan-genius-last-seen-version';
+const STORAGE_KEY = 'nyclogic-ai-last-seen-version';
 
 interface Update {
   version: string;

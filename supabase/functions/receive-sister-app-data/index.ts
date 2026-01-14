@@ -1,8 +1,8 @@
 // =============================================================================
 // RECEIVE SISTER APP DATA - Edge Function
 // =============================================================================
-// This edge function allows the sister app (e.g., a gamification/rewards app)
-// to send graded work and activity data back to ScanGenius.
+// This edge function allows the sister app (NYClogic Scholar Ai)
+// to send graded work and activity data back to NYCLogic Ai.
 // 
 // HOW IT WORKS:
 // 1. Sister app sends a POST request with an API key in the x-api-key header
@@ -231,7 +231,7 @@ serve(async (req) => {
         // GRADE/ACTIVITY COMPLETED PROCESSING
         // ---------------------------------------------------------------------
         // If the sister app sends a score and topic name, we can save it
-        // to the grade_history table. This allows ScanGenius to track
+        // to the grade_history table. This allows NYCLogic Ai to track
         // grades from both scanned work AND sister app activities.
         // ---------------------------------------------------------------------
         if (body.data?.score !== undefined && body.data?.topic_name) {

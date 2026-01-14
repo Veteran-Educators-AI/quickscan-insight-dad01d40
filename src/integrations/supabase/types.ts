@@ -1135,6 +1135,75 @@ export type Database = {
           },
         ]
       }
+      shared_assignments: {
+        Row: {
+          class_id: string | null
+          coin_reward: number
+          created_at: string
+          description: string | null
+          due_at: string | null
+          id: string
+          questions: Json
+          source_app: string
+          status: string
+          teacher_id: string
+          title: string
+          topics: Json
+          updated_at: string
+          worksheet_id: string | null
+          xp_reward: number
+        }
+        Insert: {
+          class_id?: string | null
+          coin_reward?: number
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          questions?: Json
+          source_app?: string
+          status?: string
+          teacher_id: string
+          title: string
+          topics?: Json
+          updated_at?: string
+          worksheet_id?: string | null
+          xp_reward?: number
+        }
+        Update: {
+          class_id?: string | null
+          coin_reward?: number
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          questions?: Json
+          source_app?: string
+          status?: string
+          teacher_id?: string
+          title?: string
+          topics?: Json
+          updated_at?: string
+          worksheet_id?: string | null
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_assignments_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shared_assignments_worksheet_id_fkey"
+            columns: ["worksheet_id"]
+            isOneToOne: false
+            referencedRelation: "worksheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sister_app_sync_log: {
         Row: {
           action: string

@@ -6,7 +6,7 @@ const tourSteps: Step[] = [
     target: 'body',
     placement: 'center',
     disableBeacon: true,
-    title: '👋 Welcome to The Scan Genius!',
+    title: '👋 Welcome to NYCLogic Ai!',
     content: (
       <div className="text-left space-y-2">
         <p>Let's take a quick tour to help you get started with grading student work efficiently.</p>

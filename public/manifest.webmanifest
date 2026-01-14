@@ -1,6 +1,6 @@
 {
-  "name": "The Scan Genius",
-  "short_name": "Scan Genius",
+  "name": "NYCLogic Ai",
+  "short_name": "NYCLogic Ai",
   "description": "Smart AI-powered diagnostics for student work analysis",
   "start_url": "/",
   "display": "standalone",

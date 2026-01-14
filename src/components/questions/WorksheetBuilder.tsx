@@ -21,7 +21,7 @@ import { renderMathText, sanitizeForPDF, fixEncodingCorruption } from '@/lib/mat
 import { MathSymbolPreview } from './MathSymbolPreview';
 import jsPDF from 'jspdf';
 import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
-import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
+// Shared assignments are now saved directly to database - no need for usePushToSisterApp
 
 export interface WorksheetQuestion {
   id: string;
@@ -176,7 +176,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [pushCoinReward, setPushCoinReward] = useState(25);
   const [pushDueDate, setPushDueDate] = useState('');
   const [isPushing, setIsPushing] = useState(false);
-  const { pushToSisterApp } = usePushToSisterApp();
+  // Push button now uses direct database insert - no hook needed
   
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -1314,7 +1314,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       // Footer
       pdf.setFontSize(8);
       pdf.setTextColor(150);
-      pdf.text('Generated with Scan Genius - NYS Regents Aligned', pageWidth / 2, pageHeight - 10, { align: 'center' });
+      pdf.text('Generated with NYCLogic Ai - NYS Regents Aligned', pageWidth / 2, pageHeight - 10, { align: 'center' });
 
       // Download
       pdf.save(`${worksheetTitle.replace(/\s+/g, '_')}.pdf`);
@@ -2533,7 +2533,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 )}
 
                 <div className="mt-12 text-center text-xs text-gray-400">
-                  Generated with Scan Genius - NYS Regents Aligned
+                  Generated with NYCLogic Ai - NYS Regents Aligned
                 </div>
               </div>
             </div>
@@ -2719,19 +2719,19 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         </DialogContent>
       </Dialog>
 
-      {/* Push to NYCLogic AI Dialog */}
+      {/* Push to NYClogic Scholar Ai Dialog */}
       <Dialog open={showPushDialog} onOpenChange={setShowPushDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Send className="h-5 w-5 text-purple-600" />
-              Push to NYCLogic AI
+              Push to NYClogic Scholar Ai
             </DialogTitle>
             <DialogDescription>
-              Send this worksheet as an assignment to students on NYCLogic AI. Configure XP and coin rewards.
+              Send this worksheet as an assignment to students on NYClogic Scholar Ai. Configure XP and coin rewards.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             {/* Worksheet Info */}
             <div className="p-3 bg-muted/50 rounded-lg">
@@ -2778,7 +2778,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 />
                 <span className="text-sm font-medium w-16 text-right">{pushCoinReward} 🪙</span>
               </div>
-              <p className="text-xs text-muted-foreground">Coins students can spend in the NYCLogic AI store</p>
+              <p className="text-xs text-muted-foreground">Coins students can spend in the NYClogic Scholar Ai store</p>
             </div>
 
             {/* Due Date (Optional) */}
@@ -2804,35 +2804,36 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   const standardCode = selectedQuestions.length > 0 ? selectedQuestions[0].standard : undefined;
                   const topicName = selectedQuestions.map(q => q.topicName).join(', ');
                   
-                  const result = await pushToSisterApp({
-                    class_id: '', // Will be handled by the sister app
-                    title: worksheetTitle,
-                    description: `${compiledQuestions.length} question worksheet covering: ${topicName}`,
-                    due_at: pushDueDate || undefined,
-                    standard_code: standardCode,
-                    xp_reward: pushXpReward,
-                    coin_reward: pushCoinReward,
-                    topic_name: topicName,
-                  });
+                  // Save directly to shared_assignments table instead of calling external API
+                  const { error } = await supabase
+                    .from('shared_assignments')
+                    .insert({
+                      teacher_id: user?.id,
+                      title: worksheetTitle,
+                      description: `${compiledQuestions.length} question worksheet covering: ${topicName}`,
+                      topics: JSON.parse(JSON.stringify(selectedQuestions)),
+                      questions: JSON.parse(JSON.stringify(compiledQuestions)),
+                      xp_reward: pushXpReward,
+                      coin_reward: pushCoinReward,
+                      due_at: pushDueDate || null,
+                      source_app: 'nyclogic_ai',
+                      status: 'active',
+                    });
 
-                  if (result.success) {
-                    toast({
-                      title: 'Pushed to NYCLogic AI!',
-                      description: `"${worksheetTitle}" is now available as an assignment with ${pushXpReward} XP and ${pushCoinReward} coins.`,
-                    });
-                    setShowPushDialog(false);
-                  } else {
-                    toast({
-                      title: 'Failed to push',
-                      description: result.error || 'Could not send to NYCLogic AI. Please check your settings.',
-                      variant: 'destructive',
-                    });
+                  if (error) {
+                    throw error;
                   }
+
+                  toast({
+                    title: 'Pushed to NYClogic Scholar Ai!',
+                    description: `"${worksheetTitle}" is now available as an assignment with ${pushXpReward} XP and ${pushCoinReward} coins.`,
+                  });
+                  setShowPushDialog(false);
                 } catch (error) {
                   console.error('Push error:', error);
                   toast({
                     title: 'Push failed',
-                    description: 'An unexpected error occurred.',
+                    description: error instanceof Error ? error.message : 'An unexpected error occurred.',
                     variant: 'destructive',
                   });
                 } finally {

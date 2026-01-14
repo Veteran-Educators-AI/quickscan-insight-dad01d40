@@ -20,7 +20,7 @@ export default function PrivacyPolicy() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">Introduction</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Scan Genius ("we," "our," or "us") is committed to protecting the privacy of students, 
+              NYCLogic Ai ("we," "our," or "us") is committed to protecting the privacy of students, 
               parents, and educators who use our educational assessment platform. This Privacy Policy 
               explains how we collect, use, disclose, and safeguard information in compliance with the 
               Family Educational Rights and Privacy Act (FERPA), the Children's Online Privacy Protection 
@@ -190,8 +190,8 @@ export default function PrivacyPolicy() {
               For questions about this Privacy Policy or our data practices, contact us:
             </p>
             <div className="bg-muted/50 p-4 rounded-lg text-muted-foreground">
-              <p><strong>Scan Genius Privacy Team</strong></p>
-              <p>Email: privacy@scangenius.edu</p>
+              <p><strong>NYCLogic Ai Privacy Team</strong></p>
+              <p>Email: privacy@nyclogic.ai</p>
               <p>Address: [Your Business Address]</p>
             </div>
             <p className="text-muted-foreground leading-relaxed mt-4">
