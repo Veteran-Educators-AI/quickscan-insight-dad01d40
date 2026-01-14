@@ -129,10 +129,11 @@ export default function Dashboard() {
           }
         }
 
-        // Fetch recent lesson plans
+        // Fetch recent lesson plans for this teacher
         const { data: lessons } = await supabase
           .from('lesson_plans')
           .select('id, title, topic_name, standard, subject, created_at')
+          .eq('teacher_id', user.id)
           .order('created_at', { ascending: false })
           .limit(5);
 
