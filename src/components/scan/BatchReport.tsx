@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2 } from 'lucide-react';
+import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2, Save, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,8 @@ import { StudentComparisonView } from './StudentComparisonView';
 import { GradedPapersGallery } from './GradedPapersGallery';
 import { Checkbox } from '@/components/ui/checkbox';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 import {
   Table,
@@ -24,16 +26,21 @@ interface BatchReportProps {
   items: BatchItem[];
   summary: BatchSummary;
   classId?: string;
+  questionId?: string;
   onExport: () => void;
   onUpdateNotes?: (itemId: string, notes: string) => void;
+  onSaveComplete?: () => void;
 }
 
-export function BatchReport({ items, summary, classId, onExport, onUpdateNotes }: BatchReportProps) {
+export function BatchReport({ items, summary, classId, questionId, onExport, onUpdateNotes, onSaveComplete }: BatchReportProps) {
+  const { user } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState<BatchItem | null>(null);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
   const [showComparison, setShowComparison] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [isPushingAll, setIsPushingAll] = useState(false);
+  const [isSavingAll, setIsSavingAll] = useState(false);
+  const [savedStudents, setSavedStudents] = useState<Set<string>>(new Set());
   const [pushedStudents, setPushedStudents] = useState<Set<string>>(new Set());
   const { pushToSisterApp } = usePushToSisterApp();
   const completedItems = items.filter(item => item.status === 'completed' && item.result);
@@ -97,6 +104,108 @@ export function BatchReport({ items, summary, classId, onExport, onUpdateNotes }
       setIsPushingAll(false);
     }
   };
+
+  // Save all results to gradebook (grade_history table)
+  const handleSaveAllToGradebook = async () => {
+    if (!user) {
+      toast.error('You must be logged in to save results');
+      return;
+    }
+
+    setIsSavingAll(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const item of completedItems) {
+        if (!item.studentId || savedStudents.has(item.studentId)) continue;
+        
+        const effectiveGrade = getEffectiveGrade(item.result);
+        const topicName = item.result?.problemIdentified || 'General Assessment';
+        const nysStandard = item.result?.nysStandard || null;
+        const regentsScore = item.result?.regentsScore ?? null;
+
+        // Save to grade_history
+        const { error: gradeError } = await supabase
+          .from('grade_history')
+          .insert({
+            student_id: item.studentId,
+            topic_name: topicName,
+            grade: effectiveGrade,
+            grade_justification: item.result?.gradeJustification || item.result?.feedback || null,
+            raw_score_earned: item.result?.totalScore.earned || 0,
+            raw_score_possible: item.result?.totalScore.possible || 0,
+            teacher_id: user.id,
+            regents_score: regentsScore,
+            nys_standard: nysStandard,
+            regents_justification: item.result?.regentsScoreJustification || null,
+          });
+
+        if (gradeError) {
+          console.error('Error saving grade for', item.studentName, ':', gradeError);
+          failCount++;
+          continue;
+        }
+
+        // Also create an attempt record if we have a questionId
+        if (questionId) {
+          const { data: attempt, error: attemptError } = await supabase
+            .from('attempts')
+            .insert({
+              student_id: item.studentId,
+              question_id: questionId,
+              status: 'analyzed',
+            })
+            .select('id')
+            .single();
+
+          if (!attemptError && attempt) {
+            // Save attempt image
+            await supabase
+              .from('attempt_images')
+              .insert({
+                attempt_id: attempt.id,
+                image_url: item.imageDataUrl,
+                ocr_text: item.result?.ocrText || '',
+              });
+
+            // Save score
+            await supabase
+              .from('scores')
+              .insert({
+                attempt_id: attempt.id,
+                points_earned: item.result?.totalScore.earned || 0,
+                notes: item.result?.feedback || '',
+                is_auto_scored: true,
+                teacher_override: false,
+              });
+          }
+        }
+
+        successCount++;
+        setSavedStudents(prev => new Set([...prev, item.studentId!]));
+      }
+
+      if (successCount > 0 && failCount === 0) {
+        toast.success(`Saved ${successCount} student grade(s) to gradebook!`);
+        onSaveComplete?.();
+      } else if (successCount > 0) {
+        toast.warning(`${successCount} saved, ${failCount} failed`);
+      } else if (failCount > 0) {
+        toast.error('Failed to save grades to gradebook');
+      } else {
+        toast.info('No new grades to save');
+      }
+    } catch (err) {
+      console.error('Save to gradebook error:', err);
+      toast.error('Failed to save to gradebook');
+    } finally {
+      setIsSavingAll(false);
+    }
+  };
+
+  const allSaved = completedItems.length > 0 && 
+    completedItems.filter(i => i.studentId).every(i => savedStudents.has(i.studentId!));
 
   const allPushed = completedItems.length > 0 && 
     completedItems.filter(i => i.studentId).every(i => pushedStudents.has(i.studentId!));
@@ -178,6 +287,31 @@ export function BatchReport({ items, summary, classId, onExport, onUpdateNotes }
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Save All to Gradebook - Primary Action */}
+          <Button 
+            onClick={handleSaveAllToGradebook} 
+            variant={allSaved ? 'outline' : 'default'}
+            disabled={isSavingAll || allSaved || completedItems.filter(i => i.studentId).length === 0}
+          >
+            {allSaved ? (
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                All Saved
+              </>
+            ) : isSavingAll ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save All to Gradebook
+              </>
+            )}
+          </Button>
+          
+          {/* Push to NYClogic Scholar AI */}
           {classId && (
             <Button 
               onClick={handlePushAllToScholar} 
@@ -199,7 +333,7 @@ export function BatchReport({ items, summary, classId, onExport, onUpdateNotes }
               )}
             </Button>
           )}
-          <Button onClick={() => setShowGallery(true)} variant="default">
+          <Button onClick={() => setShowGallery(true)} variant="outline">
             <LayoutGrid className="h-4 w-4 mr-2" />
             View All Papers
           </Button>

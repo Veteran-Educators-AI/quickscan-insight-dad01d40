@@ -1630,7 +1630,11 @@ export default function Scan() {
                     items={batch.items} 
                     summary={batch.summary}
                     classId={selectedClassId || undefined}
+                    questionId={selectedQuestionIds[0] || undefined}
                     onExport={exportPDF}
+                    onSaveComplete={() => {
+                      toast.success('All grades saved to gradebook');
+                    }}
                   />
                 </div>
               ) : (
