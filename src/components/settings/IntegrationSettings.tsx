@@ -600,13 +600,15 @@ export function IntegrationSettings() {
             )}
           </div>
 
-          {/* --- Enable/Disable Sister App Sync Toggle --- */}
-          {/* Master switch for sister app synchronization */}
-          <div className="flex items-center justify-between">
+          {/* --- Enable/Disable Scholar Auto-Sync Toggle --- */}
+          {/* Master switch for automatic grade syncing to NYCLogic Scholar AI */}
+          <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 border border-purple-200 dark:border-purple-800">
             <div className="space-y-0.5">
-              <Label htmlFor="sister-sync-enabled">Enable Sister App Sync</Label>
-              <p className="text-sm text-muted-foreground">
-                Automatically push grades when scans are analyzed
+              <Label htmlFor="sister-sync-enabled" className="text-purple-900 dark:text-purple-100 font-medium">
+                Auto-Sync Grades to NYCLogic Scholar AI
+              </Label>
+              <p className="text-sm text-purple-700 dark:text-purple-300">
+                Automatically sync grades when scans are analyzed so students can view their grades and earn XP/coins
               </p>
             </div>
             <Switch
