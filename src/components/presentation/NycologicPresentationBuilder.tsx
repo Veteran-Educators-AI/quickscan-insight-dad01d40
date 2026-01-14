@@ -9,7 +9,7 @@ import { Loader2, Sparkles, Play, Save, Plus, Trash2, Check } from 'lucide-react
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
-import { NycologicPresents, NycologicPresentation, PresentationSlide } from './NycologicPresents';
+import { NycologicPresents, NycologicPresentation, PresentationSlide, VisualTheme } from './NycologicPresents';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -130,10 +130,22 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
       if (error) throw error;
 
       if (data.presentation) {
-        setPresentation(data.presentation);
+        // Attach the selected visual theme to the presentation
+        const selectedTheme = visualThemes.find(t => t.id === visualTheme);
+        const presentationWithTheme: NycologicPresentation = {
+          ...data.presentation,
+          visualTheme: selectedTheme ? {
+            id: selectedTheme.id,
+            name: selectedTheme.name,
+            gradient: selectedTheme.gradient,
+            accent: selectedTheme.accent,
+            pattern: selectedTheme.pattern,
+          } : undefined,
+        };
+        setPresentation(presentationWithTheme);
         toast({
           title: 'Presentation generated!',
-          description: `Created ${data.presentation.slides.length} beautiful slides.`,
+          description: `Created ${data.presentation.slides.length} beautiful slides with ${selectedTheme?.name || 'default'} theme.`,
         });
       }
     } catch (error) {

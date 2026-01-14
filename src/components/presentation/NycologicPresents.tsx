@@ -23,6 +23,14 @@ export interface PresentationSlide {
   icon?: 'lightbulb' | 'book' | 'question' | 'award' | 'sparkles';
 }
 
+export interface VisualTheme {
+  id: string;
+  name: string;
+  gradient: string;
+  accent: string;
+  pattern: string;
+}
+
 export interface NycologicPresentation {
   id: string;
   title: string;
@@ -30,6 +38,7 @@ export interface NycologicPresentation {
   topic: string;
   slides: PresentationSlide[];
   createdAt: Date;
+  visualTheme?: VisualTheme;
 }
 
 interface NycologicPresentsProps {
@@ -47,13 +56,24 @@ const slideIcons = {
   sparkles: Sparkles,
 };
 
-const slideTypeColors: Record<PresentationSlide['type'], { bg: string; accent: string }> = {
+// Default slide type colors (used as fallback)
+const defaultSlideTypeColors: Record<PresentationSlide['type'], { bg: string; accent: string }> = {
   title: { bg: 'from-slate-900 via-slate-800 to-slate-900', accent: 'text-amber-400' },
   content: { bg: 'from-slate-900 via-blue-950 to-slate-900', accent: 'text-sky-400' },
   question: { bg: 'from-slate-900 via-purple-950 to-slate-900', accent: 'text-violet-400' },
   reveal: { bg: 'from-slate-900 via-emerald-950 to-slate-900', accent: 'text-emerald-400' },
   summary: { bg: 'from-slate-900 via-amber-950 to-slate-900', accent: 'text-amber-400' },
   interactive: { bg: 'from-slate-900 via-rose-950 to-slate-900', accent: 'text-rose-400' },
+};
+
+// Theme accent color mapping
+const themeAccentColors: Record<string, string> = {
+  'neon-city': 'text-pink-400',
+  'ocean-wave': 'text-cyan-400',
+  'sunset-glow': 'text-amber-400',
+  'forest-zen': 'text-emerald-400',
+  'galaxy-dreams': 'text-violet-400',
+  'candy-pop': 'text-rose-400',
 };
 
 export function NycologicPresents({ 
@@ -73,7 +93,16 @@ export function NycologicPresents({
 
   const slide = presentation.slides[currentSlide];
   const totalSlides = presentation.slides.length;
-  const colors = slideTypeColors[slide.type];
+  const visualTheme = presentation.visualTheme;
+  
+  // Use visual theme colors if available, otherwise fall back to default slide type colors
+  const colors = visualTheme 
+    ? { 
+        bg: `bg-gradient-to-br ${visualTheme.gradient}`, 
+        accent: themeAccentColors[visualTheme.id] || 'text-amber-400' 
+      }
+    : defaultSlideTypeColors[slide.type];
+  
   const IconComponent = slide.icon ? slideIcons[slide.icon] : null;
 
   const goToSlide = useCallback((index: number) => {
@@ -160,10 +189,13 @@ export function NycologicPresents({
   };
 
   return (
-    <div className={cn(
-      "fixed inset-0 z-50 bg-gradient-to-br",
-      colors.bg
-    )}>
+    <div 
+      className={cn(
+        "fixed inset-0 z-50",
+        visualTheme ? `bg-gradient-to-br ${visualTheme.gradient}` : `bg-gradient-to-br ${colors.bg}`
+      )}
+      style={visualTheme ? { backgroundImage: visualTheme.pattern } : undefined}
+    >
       {/* Animated background particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(20)].map((_, i) => (
