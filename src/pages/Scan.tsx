@@ -1792,6 +1792,7 @@ export default function Scan() {
                     onAssignStudent={batch.updateItemStudent}
                     onLinkContinuation={batch.linkContinuation}
                     onUnlinkContinuation={batch.unlinkContinuation}
+                    onReorder={batch.reorderItems}
                     onSaveToGradebook={handleBatchSaveToGradebook}
                     onOverrideGrade={batch.overrideGrade}
                     onSelectRunAsGrade={batch.selectRunAsGrade}
