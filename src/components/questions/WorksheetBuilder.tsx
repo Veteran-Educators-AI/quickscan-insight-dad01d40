@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,7 @@ import { useAuth } from '@/lib/auth';
 import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
 import { renderMathText, sanitizeForPDF, fixEncodingCorruption } from '@/lib/mathRenderer';
 import { MathSymbolPreview } from './MathSymbolPreview';
+import { CanvasDrawingTool } from './CanvasDrawingTool';
 import jsPDF from 'jspdf';
 import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
 // Shared assignments are now saved directly to database - no need for usePushToSisterApp
@@ -169,6 +170,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   // Lightbox state for full-screen image viewing
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
   const [lightboxQuestionNumber, setLightboxQuestionNumber] = useState<number | null>(null);
+  
+  // Canvas drawing tool state
+  const [showDrawingTool, setShowDrawingTool] = useState(false);
+  const [drawingQuestionNumber, setDrawingQuestionNumber] = useState<number | null>(null);
   
   // Push to NYCLogic AI state
   const [showPushDialog, setShowPushDialog] = useState(false);
@@ -745,6 +750,24 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     } finally {
       setRegeneratingQuestionNumber(null);
     }
+  };
+
+  // Handle saving custom drawing to a question
+  const handleSaveDrawing = (dataUrl: string, questionNumber?: number) => {
+    if (questionNumber) {
+      const updatedQuestions = compiledQuestions.map(q =>
+        q.questionNumber === questionNumber
+          ? { ...q, imageUrl: dataUrl }
+          : q
+      );
+      setCompiledQuestions(updatedQuestions);
+      toast({
+        title: 'Drawing added!',
+        description: `Custom shape added to question ${questionNumber}.`,
+      });
+    }
+    setShowDrawingTool(false);
+    setDrawingQuestionNumber(null);
   };
 
   // State for regenerating question text
@@ -2222,6 +2245,19 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               )}
 
               {/* Add Clipart Button - Only show for non-geometry/trig subjects */}
+              {/* Draw Custom Shape Button */}
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={() => {
+                  setDrawingQuestionNumber(compiledQuestions[0]?.questionNumber || 1);
+                  setShowDrawingTool(true);
+                }}
+              >
+                <PenTool className="h-4 w-4 mr-2" />
+                Draw Custom Shape
+              </Button>
+
               {!isGeometryOrTrigSubject && !clipartGenerated && (
                 <Button
                   className="w-full"
@@ -2858,6 +2894,14 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Canvas Drawing Tool */}
+      <CanvasDrawingTool
+        open={showDrawingTool}
+        onOpenChange={setShowDrawingTool}
+        onSaveDrawing={handleSaveDrawing}
+        questionNumber={drawingQuestionNumber || undefined}
+      />
     </>
   );
 }
