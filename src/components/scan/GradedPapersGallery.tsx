@@ -79,11 +79,26 @@ export function GradedPapersGallery({
   };
 
   const getLetterGrade = (grade: number): string => {
-    if (grade >= 90) return 'A';
-    if (grade >= 80) return 'B';
-    if (grade >= 70) return 'C';
+    if (grade >= 97) return 'A+';
+    if (grade >= 93) return 'A';
+    if (grade >= 90) return 'A-';
+    if (grade >= 87) return 'B+';
+    if (grade >= 83) return 'B';
+    if (grade >= 80) return 'B-';
+    if (grade >= 77) return 'C+';
+    if (grade >= 73) return 'C';
+    if (grade >= 70) return 'C-';
+    if (grade >= 67) return 'D+';
     if (grade >= 65) return 'D';
     return 'F';
+  };
+
+  const getLetterGradeBadgeColor = (grade: number): string => {
+    if (grade >= 90) return 'bg-green-500 text-white';
+    if (grade >= 80) return 'bg-blue-500 text-white';
+    if (grade >= 70) return 'bg-yellow-500 text-white';
+    if (grade >= 65) return 'bg-orange-500 text-white';
+    return 'bg-red-500 text-white';
   };
 
   const getGradeBgColor = (grade: number) => {
@@ -272,9 +287,9 @@ export function GradedPapersGallery({
                             <span className={`text-4xl font-bold ${getGradeColor(calculateItemGrade(selectedItem))}`}>
                               {calculateItemGrade(selectedItem)}
                             </span>
-                            <span className={`text-2xl font-bold ${getGradeColor(calculateItemGrade(selectedItem))}`}>
+                            <Badge className={`text-lg px-2 py-0.5 ${getLetterGradeBadgeColor(calculateItemGrade(selectedItem))}`}>
                               {getLetterGrade(calculateItemGrade(selectedItem))}
-                            </span>
+                            </Badge>
                             <span className="text-lg text-muted-foreground">
                               ({selectedItem.result.totalScore.percentage}%)
                             </span>
