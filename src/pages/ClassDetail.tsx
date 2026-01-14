@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil, QrCode } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil, QrCode, BookOpen } from 'lucide-react';
 import { StudentOnlyQRCode } from '@/components/print/StudentOnlyQRCode';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +18,7 @@ import { PrintWorksheetDialog } from '@/components/print/PrintWorksheetDialog';
 import { useStudentNames } from '@/lib/StudentNameContext';
 import { getStudentPseudonym, getAvailablePseudonyms, setCustomPseudonym } from '@/lib/studentPseudonyms';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { Gradebook } from '@/components/reports/Gradebook';
 
 interface Student {
   id: string;
@@ -400,18 +402,31 @@ export default function ClassDetail() {
           </CardHeader>
         </Card>
 
-        {/* Students Section */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Students ({students.length})
-                </CardTitle>
-                <CardDescription>Manage your class roster</CardDescription>
-              </div>
-              <div className="flex gap-2 flex-wrap justify-end">
+        {/* Tabs for Students and Gradebook */}
+        <Tabs defaultValue="students" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="students" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Students ({students.length})
+            </TabsTrigger>
+            <TabsTrigger value="gradebook" className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Gradebook
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="students">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Students ({students.length})
+                    </CardTitle>
+                    <CardDescription>Manage your class roster</CardDescription>
+                  </div>
+                  <div className="flex gap-2 flex-wrap justify-end">
                 {selectedStudents.size > 0 && (
                   <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
                     <AlertDialogTrigger asChild>
@@ -664,6 +679,12 @@ export default function ClassDetail() {
             )}
           </CardContent>
         </Card>
+      </TabsContent>
+
+      <TabsContent value="gradebook">
+        <Gradebook classId={id} />
+      </TabsContent>
+    </Tabs>
       </div>
     </AppLayout>
   );
