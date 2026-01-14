@@ -1,4 +1,5 @@
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint } from 'lucide-react';
+import { useState } from 'react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { BatchItem } from '@/hooks/useBatchAnalysis';
+import { HandwritingComparisonDialog } from './HandwritingComparisonDialog';
 
 interface Student {
   id: string;
@@ -73,9 +75,13 @@ export function BatchQueue({
   isProcessing,
   isIdentifying,
 }: BatchQueueProps) {
+  const [showComparisonDialog, setShowComparisonDialog] = useState(false);
 
   // Get primary pages (not continuations)
   const primaryPages = items.filter(i => i.pageType !== 'continuation');
+  
+  // Check if there are any linked pages
+  const hasLinkedPages = items.some(i => i.continuationPages && i.continuationPages.length > 0);
 
   const getStatusIcon = (status: BatchItem['status']) => {
     if (status === 'completed') return <CheckCircle2 className="h-4 w-4 text-green-600" />;
@@ -124,11 +130,25 @@ export function BatchQueue({
   }
 
   return (
+    <>
     <Card>
       <CardContent className="p-0">
         <div className="p-3 border-b bg-muted/50">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">{items.length} paper(s) in queue</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">{items.length} paper(s) in queue</span>
+              {hasLinkedPages && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  onClick={() => setShowComparisonDialog(true)}
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  Preview Links
+                </Button>
+              )}
+            </div>
             {isIdentifying && (
               <span className="text-xs text-amber-600 flex items-center gap-1">
                 <Sparkles className="h-3 w-3" />
@@ -400,5 +420,20 @@ export function BatchQueue({
         </ScrollArea>
       </CardContent>
     </Card>
+
+    {/* Handwriting Comparison Dialog */}
+    <HandwritingComparisonDialog
+      open={showComparisonDialog}
+      onOpenChange={setShowComparisonDialog}
+      items={items}
+      onConfirmGroup={(primaryId, continuationIds) => {
+        // Group is already confirmed, just close
+        setShowComparisonDialog(false);
+      }}
+      onUnlinkPage={(continuationId) => {
+        onUnlinkContinuation?.(continuationId);
+      }}
+    />
+    </>
   );
 }
