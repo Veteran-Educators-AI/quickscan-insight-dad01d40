@@ -8,6 +8,7 @@ import { BatchItem, BatchSummary } from '@/hooks/useBatchAnalysis';
 import { StudentWorkDetailDialog } from './StudentWorkDetailDialog';
 import { StudentComparisonView } from './StudentComparisonView';
 import { GradedPapersGallery } from './GradedPapersGallery';
+import { DifferentiationGroupView } from './DifferentiationGroupView';
 import { Checkbox } from '@/components/ui/checkbox';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { supabase } from '@/integrations/supabase/client';
@@ -561,6 +562,13 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
           </CardContent>
         </Card>
       )}
+
+      {/* Differentiation Groups */}
+      <DifferentiationGroupView 
+        items={items}
+        classId={classId}
+        getEffectiveGrade={getEffectiveGrade}
+      />
 
       {/* Individual Results Table */}
       <Card>
