@@ -204,7 +204,7 @@ export function NycologicPresents({
           </Button>
           <div>
             <p className={cn("text-xs font-medium tracking-widest uppercase", colors.accent)}>
-              Nycologic Presents
+              NYClogic PRESENTS:
             </p>
             <h1 className="text-white/90 font-serif text-lg">{presentation.title}</h1>
           </div>
