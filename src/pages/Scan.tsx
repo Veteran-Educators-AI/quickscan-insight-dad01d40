@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -1765,9 +1765,47 @@ export default function Scan() {
                         </Button>
                       )}
 
+                      {/* Two-sided scanning / Multi-page grouping by handwriting */}
+                      {batch.items.length >= 2 && batch.items.some(item => !item.pageType) && (
+                        <Button
+                          variant="outline"
+                          className="w-full border-blue-500/50 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10"
+                          onClick={async () => {
+                            toast.info('Analyzing handwriting to group multi-page papers...', { 
+                              description: 'Sequential pages with similar handwriting will be linked together',
+                              icon: <FileStack className="h-4 w-4" /> 
+                            });
+                            const result = await batch.detectMultiPageByHandwriting();
+                            if (result.pagesLinked > 0) {
+                              toast.success(`Grouped ${result.pagesLinked} continuation pages with their primary papers`, {
+                                description: `${result.groupsCreated} separate student papers detected`,
+                                icon: <FileStack className="h-4 w-4" />,
+                              });
+                            } else {
+                              toast.info('All pages appear to be from different students', {
+                                description: 'No multi-page groupings detected',
+                              });
+                            }
+                          }}
+                          disabled={batch.isProcessing || batch.isIdentifying}
+                        >
+                          {batch.isIdentifying ? (
+                            <>
+                              <FileStack className="h-4 w-4 mr-2 animate-pulse" />
+                              Comparing {batch.currentIndex + 1}/{batch.items.length}...
+                            </>
+                          ) : (
+                            <>
+                              <FileStack className="h-4 w-4 mr-2" />
+                              Group Two-Sided Papers
+                            </>
+                          )}
+                        </Button>
+                      )}
+
                       {/* Summary of identified papers */}
                       {batch.items.length > 0 && (
-                        <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <QrCode className="h-3.5 w-3.5 text-green-600" />
                             {batch.items.filter(i => i.identification?.qrCodeDetected).length} QR matched
@@ -1780,6 +1818,12 @@ export default function Scan() {
                             <Clock className="h-3.5 w-3.5" />
                             {batch.items.filter(i => !i.studentId).length} unassigned
                           </span>
+                          {batch.items.some(i => i.pageType === 'continuation') && (
+                            <span className="flex items-center gap-1">
+                              <FileStack className="h-3.5 w-3.5 text-blue-600" />
+                              {batch.items.filter(i => i.pageType === 'continuation').length} linked pages
+                            </span>
+                          )}
                         </div>
                       )}
                       

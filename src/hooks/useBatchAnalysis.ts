@@ -52,6 +52,13 @@ export interface IdentificationResult {
   confidence: 'high' | 'medium' | 'low' | 'none';
 }
 
+export interface HandwritingSimilarity {
+  isSameStudent: boolean;
+  confidence: 'high' | 'medium' | 'low';
+  similarityScore: number;
+  reasoning: string;
+}
+
 export interface BatchItem {
   id: string;
   imageDataUrl: string;
@@ -68,6 +75,8 @@ export interface BatchItem {
   pageType?: 'new' | 'continuation';
   continuationOf?: string; // ID of the primary page this is a continuation of
   continuationPages?: string[]; // IDs of pages that are continuations of this paper
+  // Handwriting similarity info
+  handwritingSimilarity?: HandwritingSimilarity;
 }
 
 export interface BatchSummary {
@@ -90,6 +99,7 @@ interface UseBatchAnalysisReturn {
   autoIdentifyAll: (studentRoster: Student[]) => Promise<void>;
   scanAllQRCodes: (studentRoster: Student[]) => Promise<{ matched: number; total: number }>;
   detectPageTypes: () => Promise<{ newPapers: number; continuations: number }>;
+  detectMultiPageByHandwriting: () => Promise<{ groupsCreated: number; pagesLinked: number }>;
   linkContinuation: (continuationId: string, primaryId: string) => void;
   unlinkContinuation: (continuationId: string) => void;
   startBatchAnalysis: (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<void>;
@@ -550,6 +560,147 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     return { newPapers, continuations };
   }, [items, isProcessing, isIdentifying]);
 
+  // Detect multi-page papers using handwriting similarity between sequential pages
+  const detectMultiPageByHandwriting = useCallback(async (): Promise<{ groupsCreated: number; pagesLinked: number }> => {
+    if (items.length < 2 || isProcessing || isIdentifying) {
+      return { groupsCreated: 0, pagesLinked: 0 };
+    }
+
+    setIsIdentifying(true);
+    let groupsCreated = 0;
+    let pagesLinked = 0;
+    let lastNewPaperId: string | null = null;
+
+    // First pass: identify pages with students already assigned
+    const itemsWithStudents = items.map((item, idx) => ({
+      ...item,
+      originalIndex: idx,
+      hasStudent: !!(item.studentId || item.identification?.matchedStudentId),
+    }));
+
+    for (let i = 0; i < items.length; i++) {
+      const currentItem = items[i];
+      
+      // If this is the first item or has a student assigned, treat as new paper
+      if (i === 0 || currentItem.studentId || currentItem.identification?.matchedStudentId) {
+        lastNewPaperId = currentItem.id;
+        groupsCreated++;
+        setItems(prev => prev.map((item, idx) => 
+          idx === i ? { ...item, pageType: 'new' as const } : item
+        ));
+        continue;
+      }
+
+      // If no previous paper to link to, mark as new
+      if (!lastNewPaperId) {
+        lastNewPaperId = currentItem.id;
+        groupsCreated++;
+        setItems(prev => prev.map((item, idx) => 
+          idx === i ? { ...item, pageType: 'new' as const } : item
+        ));
+        continue;
+      }
+
+      setCurrentIndex(i);
+      
+      // Mark as identifying
+      setItems(prev => prev.map((item, idx) => 
+        idx === i ? { ...item, status: 'identifying' } : item
+      ));
+
+      // Get the previous item (the one we're comparing to)
+      const previousItem = items[i - 1];
+
+      try {
+        // Compare handwriting between this page and the previous one
+        const { data, error } = await supabase.functions.invoke('detect-handwriting-similarity', {
+          body: {
+            image1Base64: previousItem.imageDataUrl,
+            image2Base64: currentItem.imageDataUrl,
+          },
+        });
+
+        if (!error && data?.success && data?.similarity) {
+          const similarity = data.similarity;
+          
+          // Store similarity info
+          const handwritingSimilarity: HandwritingSimilarity = {
+            isSameStudent: similarity.isSameStudent,
+            confidence: similarity.confidence,
+            similarityScore: similarity.similarityScore,
+            reasoning: similarity.reasoning,
+          };
+
+          if (similarity.isSameStudent && (similarity.confidence === 'high' || similarity.confidence === 'medium')) {
+            // Link as continuation to the previous paper's primary
+            const primaryId = previousItem.pageType === 'continuation' && previousItem.continuationOf 
+              ? previousItem.continuationOf 
+              : previousItem.id;
+            
+            pagesLinked++;
+            
+            setItems(prev => {
+              const updated: BatchItem[] = prev.map((item, idx) => {
+                if (idx === i) {
+                  return { 
+                    ...item, 
+                    status: 'pending' as const,
+                    pageType: 'continuation' as const,
+                    continuationOf: primaryId,
+                    handwritingSimilarity,
+                    // Inherit student from primary if available
+                    studentId: prev.find(p => p.id === primaryId)?.studentId,
+                    studentName: prev.find(p => p.id === primaryId)?.studentName,
+                  };
+                }
+                // Add this as a continuation page to the primary paper
+                if (item.id === primaryId) {
+                  return {
+                    ...item,
+                    continuationPages: [...(item.continuationPages || []), currentItem.id],
+                  };
+                }
+                return item;
+              });
+              return updated;
+            });
+          } else {
+            // Different student - mark as new paper
+            lastNewPaperId = currentItem.id;
+            groupsCreated++;
+            setItems(prev => prev.map((item, idx) => 
+              idx === i ? { 
+                ...item, 
+                status: 'pending' as const, 
+                pageType: 'new' as const,
+                handwritingSimilarity,
+              } : item
+            ));
+          }
+        } else {
+          // API error - default to new paper
+          lastNewPaperId = currentItem.id;
+          groupsCreated++;
+          setItems(prev => prev.map((item, idx) => 
+            idx === i ? { ...item, status: 'pending', pageType: 'new' } : item
+          ));
+        }
+      } catch (err) {
+        console.error('Handwriting similarity detection failed:', err);
+        lastNewPaperId = currentItem.id;
+        groupsCreated++;
+        setItems(prev => prev.map((item, idx) => 
+          idx === i ? { ...item, status: 'pending', pageType: 'new' } : item
+        ));
+      }
+    }
+
+    setCurrentIndex(-1);
+    setIsIdentifying(false);
+    
+    return { groupsCreated, pagesLinked };
+  }, [items, isProcessing, isIdentifying]);
+
   // Manually link a continuation page to a primary paper
   const linkContinuation = useCallback((continuationId: string, primaryId: string) => {
     setItems(prev => {
@@ -770,6 +921,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     autoIdentifyAll,
     scanAllQRCodes,
     detectPageTypes,
+    detectMultiPageByHandwriting,
     linkContinuation,
     unlinkContinuation,
     startBatchAnalysis,
