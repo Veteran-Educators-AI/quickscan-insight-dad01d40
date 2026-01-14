@@ -1792,6 +1792,7 @@ export default function Scan() {
                     onAssignStudent={batch.updateItemStudent}
                     onSaveToGradebook={handleBatchSaveToGradebook}
                     onOverrideGrade={batch.overrideGrade}
+                    onSelectRunAsGrade={batch.selectRunAsGrade}
                     currentIndex={batch.currentIndex}
                     isProcessing={batch.isProcessing}
                     isIdentifying={batch.isIdentifying}

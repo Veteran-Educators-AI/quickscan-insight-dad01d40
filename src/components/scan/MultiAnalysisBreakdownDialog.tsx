@@ -1,9 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { ShieldCheck, TrendingUp, TrendingDown, Minus, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, TrendingUp, TrendingDown, Minus, CheckCircle2, AlertTriangle, MousePointerClick, RotateCcw } from 'lucide-react';
 import { AnalysisResult } from '@/hooks/useBatchAnalysis';
 
 interface MultiAnalysisBreakdownDialogProps {
@@ -11,6 +12,8 @@ interface MultiAnalysisBreakdownDialogProps {
   onOpenChange: (open: boolean) => void;
   studentName?: string;
   result: AnalysisResult | null;
+  itemId?: string;
+  onSelectRun?: (itemId: string, runIndex: number) => void;
 }
 
 export function MultiAnalysisBreakdownDialog({
@@ -18,13 +21,17 @@ export function MultiAnalysisBreakdownDialog({
   onOpenChange,
   studentName,
   result,
+  itemId,
+  onSelectRun,
 }: MultiAnalysisBreakdownDialogProps) {
   if (!result?.multiAnalysisResults || result.multiAnalysisResults.length <= 1) {
     return null;
   }
 
-  const { multiAnalysisResults, multiAnalysisGrades, confidenceScore, grade } = result;
+  const { multiAnalysisResults, multiAnalysisGrades, confidenceScore, grade, selectedRunIndex } = result;
   const grades = multiAnalysisGrades || multiAnalysisResults.map(r => r.grade ?? r.totalScore.percentage);
+  const averageGrade = Math.round(grades.reduce((a, b) => a + b, 0) / grades.length);
+  const isUsingAverage = selectedRunIndex === undefined;
   const maxGrade = Math.max(...grades);
   const minGrade = Math.min(...grades);
   const range = maxGrade - minGrade;
@@ -68,6 +75,9 @@ export function MultiAnalysisBreakdownDialog({
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Final Grade</p>
                   <p className="text-3xl font-bold">{grade}%</p>
+                  {selectedRunIndex !== undefined && (
+                    <Badge variant="outline" className="mt-1 text-xs">Run #{selectedRunIndex + 1}</Badge>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Confidence</p>
@@ -83,28 +93,51 @@ export function MultiAnalysisBreakdownDialog({
                 </div>
               </div>
 
+              {/* High variance warning with selection hint */}
               {range > 10 && (
                 <div className="mt-4 flex items-center gap-2 text-amber-600 bg-amber-50 dark:bg-amber-950/30 p-2 rounded-md">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   <p className="text-sm">
-                    High grade variance detected. Consider reviewing this paper manually or using teacher override.
+                    High grade variance detected. Click "Use This Grade" on any run below to select it as the final grade.
                   </p>
+                </div>
+              )}
+
+              {/* Reset to average button if a specific run is selected */}
+              {selectedRunIndex !== undefined && itemId && onSelectRun && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Reset by using a special "average" selection - we'll handle this via override
+                    }}
+                    className="gap-2"
+                    disabled
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Currently using Run #{selectedRunIndex + 1} (Avg: {averageGrade}%)
+                  </Button>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Individual Analysis Runs */}
           <div className="space-y-3">
             {multiAnalysisResults.map((analysis, index) => {
               const analysisGrade = analysis.grade ?? analysis.totalScore.percentage;
               const isHighest = analysisGrade === maxGrade;
               const isLowest = analysisGrade === minGrade && range > 5;
+              const isSelected = selectedRunIndex === index;
 
               return (
                 <Card 
                   key={index} 
-                  className={`${isHighest ? 'ring-2 ring-green-400' : ''} ${isLowest ? 'ring-2 ring-red-400' : ''}`}
+                  className={`
+                    ${isHighest ? 'ring-2 ring-green-400' : ''} 
+                    ${isLowest ? 'ring-2 ring-red-400' : ''} 
+                    ${isSelected ? 'ring-2 ring-primary bg-primary/5' : ''}
+                  `}
                 >
                   <CardHeader className="py-3 px-4">
                     <div className="flex items-center justify-between">
@@ -113,10 +146,34 @@ export function MultiAnalysisBreakdownDialog({
                         {getGradeTrend(index)}
                         {isHighest && <Badge variant="outline" className="text-green-600 border-green-300">Highest</Badge>}
                         {isLowest && <Badge variant="outline" className="text-red-600 border-red-300">Lowest</Badge>}
+                        {isSelected && <Badge className="bg-primary">Selected</Badge>}
                       </CardTitle>
-                      <Badge variant={getGradeVariant(analysisGrade)} className="text-lg px-3">
-                        {analysisGrade}%
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={getGradeVariant(analysisGrade)} className="text-lg px-3">
+                          {analysisGrade}%
+                        </Badge>
+                        {itemId && onSelectRun && range > 5 && (
+                          <Button
+                            size="sm"
+                            variant={isSelected ? "secondary" : "outline"}
+                            className="gap-1.5"
+                            onClick={() => onSelectRun(itemId, index)}
+                            disabled={isSelected}
+                          >
+                            {isSelected ? (
+                              <>
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Using
+                              </>
+                            ) : (
+                              <>
+                                <MousePointerClick className="h-3.5 w-3.5" />
+                                Use This
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0 pb-3 px-4">
