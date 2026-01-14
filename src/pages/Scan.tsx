@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -573,10 +573,18 @@ export default function Scan() {
     try {
       for (const item of completedItems) {
         const result = item.result!;
-        const effectiveGrade = result.grade ?? result.totalScore.percentage;
+        // Use overridden grade first, then grade, then percentage
+        const effectiveGrade = result.overriddenGrade ?? result.grade ?? result.totalScore.percentage;
         const topicName = result.problemIdentified || 'General Assessment';
         const nysStandard = result.nysStandard || null;
         const regentsScore = result.regentsScore ?? null;
+        const isOverridden = result.isOverridden || false;
+
+        // Build justification with override info if applicable
+        let gradeJustification = result.gradeJustification || result.feedback || null;
+        if (isOverridden && result.overrideJustification) {
+          gradeJustification = `TEACHER OVERRIDE: ${result.overrideJustification}. ${gradeJustification || ''}`;
+        }
 
         // Save to grade_history
         const { error: gradeError } = await supabase
@@ -585,7 +593,7 @@ export default function Scan() {
             student_id: item.studentId,
             topic_name: topicName,
             grade: effectiveGrade,
-            grade_justification: result.gradeJustification || result.feedback || null,
+            grade_justification: gradeJustification,
             raw_score_earned: result.totalScore.earned || 0,
             raw_score_possible: result.totalScore.possible || 0,
             teacher_id: user.id,
@@ -1783,6 +1791,7 @@ export default function Scan() {
                     onRemove={batch.removeImage}
                     onAssignStudent={batch.updateItemStudent}
                     onSaveToGradebook={handleBatchSaveToGradebook}
+                    onOverrideGrade={batch.overrideGrade}
                     currentIndex={batch.currentIndex}
                     isProcessing={batch.isProcessing}
                     isIdentifying={batch.isIdentifying}
@@ -1940,6 +1949,71 @@ export default function Scan() {
                           )}
                         </Button>
                       </div>
+
+                      {/* Confidence Analysis Buttons */}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1 border-blue-500/50 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10"
+                          onClick={async () => {
+                            toast.info('Running double analysis for higher confidence...', {
+                              icon: <ShieldCheck className="h-4 w-4" />,
+                              description: 'Each paper will be analyzed twice and grades averaged',
+                            });
+                            await batch.startConfidenceAnalysis(2, mockRubricSteps);
+                            const summary = batch.generateSummary();
+                            setShowBatchReport(true);
+                            toast.success('Double analysis complete!', {
+                              description: `Average score: ${summary.averageScore}%`,
+                            });
+                          }}
+                          disabled={batch.isProcessing || batch.isIdentifying || batch.items.length === 0}
+                        >
+                          {batch.isProcessing ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              Analyzing...
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="h-4 w-4 mr-2" />
+                              2x Analysis
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 border-purple-500/50 text-purple-700 dark:text-purple-400 hover:bg-purple-500/10"
+                          onClick={async () => {
+                            toast.info('Running triple analysis for maximum confidence...', {
+                              icon: <ShieldCheck className="h-4 w-4" />,
+                              description: 'Each paper will be analyzed three times and grades averaged',
+                            });
+                            await batch.startConfidenceAnalysis(3, mockRubricSteps);
+                            const summary = batch.generateSummary();
+                            setShowBatchReport(true);
+                            toast.success('Triple analysis complete!', {
+                              description: `Average score: ${summary.averageScore}%`,
+                            });
+                          }}
+                          disabled={batch.isProcessing || batch.isIdentifying || batch.items.length === 0}
+                        >
+                          {batch.isProcessing ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              Analyzing...
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="h-4 w-4 mr-2" />
+                              3x Analysis
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center">
+                        Multi-analysis runs AI grading 2-3 times per paper, averages the grades, and shows confidence level
+                      </p>
                     </div>
                   )}
 
