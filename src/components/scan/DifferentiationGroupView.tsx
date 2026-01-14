@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Users, TrendingUp, TrendingDown, Target, Send, BookOpen, Loader2, CheckCircle, ChevronDown, ChevronUp, Zap, Award, AlertTriangle, Edit2, RefreshCw } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Users, TrendingUp, TrendingDown, Target, Send, BookOpen, Loader2, CheckCircle, ChevronDown, ChevronUp, Zap, Award, AlertTriangle, Edit2, RefreshCw, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { BatchItem } from '@/hooks/useBatchAnalysis';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { toast } from 'sonner';
@@ -86,6 +88,7 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
   const [pushedGroups, setPushedGroups] = useState<Set<string>>(new Set());
   const [selectedStudents, setSelectedStudents] = useState<Map<string, Set<string>>>(new Map());
   const [bulkAdjustDialogOpen, setBulkAdjustDialogOpen] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [activeGroupForAdjust, setActiveGroupForAdjust] = useState<StudentGroup | null>(null);
   const [selectedCriteria, setSelectedCriteria] = useState<string[]>([]);
   const [manualAdjustment, setManualAdjustment] = useState(0);
@@ -245,6 +248,42 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
     return criteriaAdjustment + manualAdjustment;
   };
 
+  // Get preview data for confirmation step
+  const getPreviewData = useMemo(() => {
+    if (!activeGroupForAdjust) return [];
+    const selectedInGroup = selectedStudents.get(activeGroupForAdjust.level);
+    if (!selectedInGroup) return [];
+    
+    const totalAdjustment = calculateTotalAdjustment();
+    
+    return activeGroupForAdjust.students
+      .filter(s => selectedInGroup.has(s.id))
+      .map(item => {
+        const currentGrade = getEffectiveGrade(item.result);
+        const newGrade = Math.min(100, Math.max(0, currentGrade + totalAdjustment));
+        return {
+          id: item.id,
+          studentId: item.studentId,
+          studentName: item.studentName,
+          currentGrade,
+          newGrade,
+          adjustment: totalAdjustment,
+        };
+      });
+  }, [activeGroupForAdjust, selectedStudents, selectedCriteria, manualAdjustment, getEffectiveGrade]);
+
+  const handleProceedToConfirmation = () => {
+    if (!justification.trim()) {
+      toast.error('Please provide a justification');
+      return;
+    }
+    setShowConfirmation(true);
+  };
+
+  const handleBackToAdjustment = () => {
+    setShowConfirmation(false);
+  };
+
   const handleApplyBulkAdjustment = () => {
     if (!activeGroupForAdjust || !justification.trim()) return;
 
@@ -258,9 +297,6 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
     const selectedStudentItems = activeGroupForAdjust.students.filter(s => selectedInGroup.has(s.id));
 
     if (onBulkGradeOverride) {
-      // Call parent handler with student IDs and adjustment
-      const studentIds = selectedStudentItems.map(s => s.studentId).filter(Boolean) as string[];
-      
       // For each selected student, calculate new grade and apply
       selectedStudentItems.forEach(item => {
         if (!item.studentId) return;
@@ -269,9 +305,9 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
         onBulkGradeOverride([item.studentId], newGrade, justification);
       });
 
-      toast.success(`Applied +${totalAdjustment}% adjustment to ${selectedInGroup.size} student(s)`);
+      toast.success(`Applied ${totalAdjustment >= 0 ? '+' : ''}${totalAdjustment}% adjustment to ${selectedInGroup.size} student(s)`);
     } else {
-      toast.info(`Would apply +${totalAdjustment}% to ${selectedInGroup.size} students (handler not provided)`);
+      toast.info(`Would apply ${totalAdjustment >= 0 ? '+' : ''}${totalAdjustment}% to ${selectedInGroup.size} students (handler not provided)`);
     }
 
     // Clear selections after applying
@@ -280,6 +316,7 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
       next.set(activeGroupForAdjust.level, new Set());
       return next;
     });
+    setShowConfirmation(false);
     setBulkAdjustDialogOpen(false);
   };
 
@@ -575,101 +612,195 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
               Bulk Grade Adjustment
             </DialogTitle>
             <DialogDescription>
-              Apply the same grade adjustment to {activeGroupForAdjust ? getSelectedCount(activeGroupForAdjust.level) : 0} selected student(s) in the {activeGroupForAdjust?.label} group.
+              {showConfirmation 
+                ? `Review and confirm the grade adjustments for ${getPreviewData.length} student(s).`
+                : `Apply the same grade adjustment to ${activeGroupForAdjust ? getSelectedCount(activeGroupForAdjust.level) : 0} selected student(s) in the ${activeGroupForAdjust?.label} group.`
+              }
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            {/* Quick Reassessment Criteria */}
-            <div className="space-y-2">
-              <Label>Select applicable criteria:</Label>
-              <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto">
-                {REASSESSMENT_CRITERIA.map(criteria => (
-                  <div
-                    key={criteria.id}
-                    className={`flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
-                      selectedCriteria.includes(criteria.id)
-                        ? 'bg-primary/10 border-primary'
-                        : 'hover:bg-muted/50'
-                    }`}
-                    onClick={() => handleCriteriaToggle(criteria.id)}
-                  >
-                    <Checkbox
-                      checked={selectedCriteria.includes(criteria.id)}
-                      onCheckedChange={() => handleCriteriaToggle(criteria.id)}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium leading-none">
-                        {criteria.label}
-                        <span className="ml-1 text-xs text-green-600">
-                          +{criteria.gradeAdjustment}%
-                        </span>
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {criteria.description}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Additional Manual Adjustment */}
-            <div className="space-y-2">
-              <Label>Additional Manual Adjustment</Label>
-              <div className="flex items-center gap-3">
-                <Slider
-                  value={[manualAdjustment]}
-                  onValueChange={([value]) => setManualAdjustment(value)}
-                  min={-20}
-                  max={20}
-                  step={1}
-                  className="flex-1"
-                />
-                <span className={`text-lg font-bold min-w-[60px] text-right ${manualAdjustment >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {manualAdjustment >= 0 ? '+' : ''}{manualAdjustment}%
-                </span>
-              </div>
-            </div>
-
-            {/* Total Adjustment Preview */}
-            <div className="p-3 bg-muted/50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total Adjustment:</span>
-                <span className={`text-xl font-bold ${totalAdjustment >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          {showConfirmation ? (
+            /* Confirmation Preview Step */
+            <div className="space-y-4 py-4">
+              <div className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Total Adjustment</p>
+                  <p className="text-xs text-muted-foreground">{justification}</p>
+                </div>
+                <span className={`text-2xl font-bold ${totalAdjustment >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {totalAdjustment >= 0 ? '+' : ''}{totalAdjustment}%
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Will be applied to each selected student's current grade (capped at 0-100%)
-              </p>
-            </div>
 
-            {/* Justification */}
-            <div className="space-y-2">
-              <Label htmlFor="bulk-justification">Justification (required)</Label>
-              <Textarea
-                id="bulk-justification"
-                placeholder="Explain the grade adjustment for these students..."
-                value={justification}
-                onChange={(e) => setJustification(e.target.value)}
-                rows={2}
-              />
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  Preview of Changes
+                  <Badge variant="secondary">{getPreviewData.length} students</Badge>
+                </Label>
+                <ScrollArea className="h-[250px] border rounded-lg">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background">
+                      <TableRow>
+                        <TableHead>Student</TableHead>
+                        <TableHead className="text-center">Current</TableHead>
+                        <TableHead className="text-center w-[50px]"></TableHead>
+                        <TableHead className="text-center">New</TableHead>
+                        <TableHead className="text-center">Change</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {getPreviewData.map((student) => (
+                        <TableRow key={student.id}>
+                          <TableCell className="font-medium">{student.studentName}</TableCell>
+                          <TableCell className="text-center">
+                            <span className={`font-semibold ${
+                              student.currentGrade >= 80 ? 'text-green-600' :
+                              student.currentGrade >= 60 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {Math.round(student.currentGrade)}%
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <ArrowRight className="h-4 w-4 text-muted-foreground mx-auto" />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={`font-bold ${
+                              student.newGrade >= 80 ? 'text-green-600' :
+                              student.newGrade >= 60 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {Math.round(student.newGrade)}%
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge 
+                              variant={student.adjustment >= 0 ? 'default' : 'destructive'}
+                              className="text-xs"
+                            >
+                              {student.adjustment >= 0 ? '+' : ''}{student.adjustment}%
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
+
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>Note:</strong> This will update the grades for all students listed above. 
+                  This action can be reversed by manually adjusting grades individually.
+                </p>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Adjustment Selection Step */
+            <div className="space-y-4 py-4">
+              {/* Quick Reassessment Criteria */}
+              <div className="space-y-2">
+                <Label>Select applicable criteria:</Label>
+                <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto">
+                  {REASSESSMENT_CRITERIA.map(criteria => (
+                    <div
+                      key={criteria.id}
+                      className={`flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                        selectedCriteria.includes(criteria.id)
+                          ? 'bg-primary/10 border-primary'
+                          : 'hover:bg-muted/50'
+                      }`}
+                      onClick={() => handleCriteriaToggle(criteria.id)}
+                    >
+                      <Checkbox
+                        checked={selectedCriteria.includes(criteria.id)}
+                        onCheckedChange={() => handleCriteriaToggle(criteria.id)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium leading-none">
+                          {criteria.label}
+                          <span className="ml-1 text-xs text-green-600">
+                            +{criteria.gradeAdjustment}%
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {criteria.description}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Additional Manual Adjustment */}
+              <div className="space-y-2">
+                <Label>Additional Manual Adjustment</Label>
+                <div className="flex items-center gap-3">
+                  <Slider
+                    value={[manualAdjustment]}
+                    onValueChange={([value]) => setManualAdjustment(value)}
+                    min={-20}
+                    max={20}
+                    step={1}
+                    className="flex-1"
+                  />
+                  <span className={`text-lg font-bold min-w-[60px] text-right ${manualAdjustment >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {manualAdjustment >= 0 ? '+' : ''}{manualAdjustment}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Total Adjustment Preview */}
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total Adjustment:</span>
+                  <span className={`text-xl font-bold ${totalAdjustment >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {totalAdjustment >= 0 ? '+' : ''}{totalAdjustment}%
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Will be applied to each selected student's current grade (capped at 0-100%)
+                </p>
+              </div>
+
+              {/* Justification */}
+              <div className="space-y-2">
+                <Label htmlFor="bulk-justification">Justification (required)</Label>
+                <Textarea
+                  id="bulk-justification"
+                  placeholder="Explain the grade adjustment for these students..."
+                  value={justification}
+                  onChange={(e) => setJustification(e.target.value)}
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkAdjustDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleApplyBulkAdjustment} 
-              disabled={!justification.trim() || totalAdjustment === 0}
-            >
-              <CheckCircle className="h-4 w-4 mr-1" />
-              Apply to {activeGroupForAdjust ? getSelectedCount(activeGroupForAdjust.level) : 0} Students
-            </Button>
+            {showConfirmation ? (
+              <>
+                <Button variant="outline" onClick={handleBackToAdjustment}>
+                  Back
+                </Button>
+                <Button onClick={handleApplyBulkAdjustment}>
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  Confirm & Apply
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setBulkAdjustDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleProceedToConfirmation} 
+                  disabled={!justification.trim() || totalAdjustment === 0}
+                >
+                  <ArrowRight className="h-4 w-4 mr-1" />
+                  Preview Changes
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
