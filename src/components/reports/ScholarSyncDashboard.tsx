@@ -1,0 +1,346 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/lib/auth';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { 
+  Cloud, 
+  CloudOff, 
+  CheckCircle2, 
+  XCircle, 
+  ChevronDown, 
+  Users, 
+  AlertTriangle,
+  BookOpen,
+  TrendingUp,
+  RefreshCw,
+  Clock
+} from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
+
+interface SyncLogData {
+  total_students?: number;
+  total_grades?: number;
+  total_misconceptions?: number;
+  weak_topics_identified?: number;
+  class_id?: string;
+  response?: {
+    success?: boolean;
+    message?: string;
+    processed?: {
+      students_processed?: number;
+      remediation_assigned?: number;
+      misconceptions_tracked?: number;
+      xp_awarded?: number;
+      coins_awarded?: number;
+    };
+  };
+}
+
+interface SyncLog {
+  id: string;
+  created_at: string;
+  action: string;
+  data: SyncLogData;
+  processed: boolean;
+  processed_at: string | null;
+}
+
+interface StudentProfile {
+  student_id: string;
+  student_name: string;
+  misconceptions: Array<{ name: string; count: number }>;
+  weak_topics: string[];
+  remediation_suggestions: string[];
+  total_xp_potential: number;
+  total_coins_potential: number;
+}
+
+interface ScholarSyncDashboardProps {
+  classId?: string;
+}
+
+export function ScholarSyncDashboard({ classId }: ScholarSyncDashboardProps) {
+  const { user } = useAuth();
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const { data: syncLogs, isLoading, refetch } = useQuery({
+    queryKey: ['scholar-sync-logs', user?.id, classId],
+    queryFn: async () => {
+      let query = supabase
+        .from('sister_app_sync_log')
+        .select('*')
+        .eq('teacher_id', user!.id)
+        .eq('action', 'batch_sync')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      // Filter by class_id if specified
+      if (classId) {
+        return (data as SyncLog[]).filter(log => 
+          (log.data as SyncLogData)?.class_id === classId
+        );
+      }
+      
+      return data as SyncLog[];
+    },
+    enabled: !!user,
+  });
+
+  const handleManualSync = async () => {
+    if (!user) return;
+    setIsSyncing(true);
+    
+    try {
+      const response = await supabase.functions.invoke('sync-grades-to-scholar', {
+        body: classId ? { class_id: classId } : {},
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      toast.success('Successfully synced data to Scholar AI');
+      refetch();
+    } catch (err) {
+      console.error('Sync error:', err);
+      toast.error('Failed to sync to Scholar AI');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const getStatusBadge = (log: SyncLog) => {
+    const response = log.data?.response;
+    if (response?.success) {
+      return (
+        <Badge variant="default" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+          <CheckCircle2 className="h-3 w-3 mr-1" />
+          Success
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="destructive">
+        <XCircle className="h-3 w-3 mr-1" />
+        Failed
+      </Badge>
+    );
+  };
+
+  const latestSync = syncLogs?.[0];
+  const totalSyncs = syncLogs?.length || 0;
+  const successfulSyncs = syncLogs?.filter(log => log.data?.response?.success).length || 0;
+
+  // Calculate totals from all syncs
+  const totals = syncLogs?.reduce((acc, log) => {
+    const data = log.data;
+    const processed = data?.response?.processed;
+    return {
+      students: acc.students + (processed?.students_processed || data?.total_students || 0),
+      misconceptions: acc.misconceptions + (processed?.misconceptions_tracked || data?.total_misconceptions || 0),
+      remediation: acc.remediation + (processed?.remediation_assigned || 0),
+      xp: acc.xp + (processed?.xp_awarded || 0),
+      coins: acc.coins + (processed?.coins_awarded || 0),
+    };
+  }, { students: 0, misconceptions: 0, remediation: 0, xp: 0, coins: 0 }) || { students: 0, misconceptions: 0, remediation: 0, xp: 0, coins: 0 };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-72" />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-32" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Cloud className="h-5 w-5 text-primary" />
+            <CardTitle>Scholar AI Sync Dashboard</CardTitle>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleManualSync}
+            disabled={isSyncing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Syncing...' : 'Sync Now'}
+          </Button>
+        </div>
+        <CardDescription>
+          Track data synced to Scholar AI including misconceptions and remediation assignments
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Summary Stats */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Users className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold">{totals.students}</p>
+              <p className="text-xs text-muted-foreground">Students Synced</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+            <div className="p-2 rounded-lg bg-amber-500/10">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold">{totals.misconceptions}</p>
+              <p className="text-xs text-muted-foreground">Misconceptions Tracked</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+            <div className="p-2 rounded-lg bg-emerald-500/10">
+              <BookOpen className="h-4 w-4 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold">{totals.remediation}</p>
+              <p className="text-xs text-muted-foreground">Remediation Assigned</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+            <div className="p-2 rounded-lg bg-blue-500/10">
+              <TrendingUp className="h-4 w-4 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold">{totals.xp} XP / {totals.coins} 🪙</p>
+              <p className="text-xs text-muted-foreground">Rewards Awarded</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Last Sync Info */}
+        {latestSync && (
+          <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+            <div className="flex items-center gap-3">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Last Sync</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatDistanceToNow(new Date(latestSync.created_at), { addSuffix: true })}
+                </p>
+              </div>
+            </div>
+            {getStatusBadge(latestSync)}
+          </div>
+        )}
+
+        {/* Sync History */}
+        {!syncLogs || syncLogs.length === 0 ? (
+          <div className="text-center py-8">
+            <CloudOff className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+            <h3 className="font-medium text-lg mb-2">No sync history yet</h3>
+            <p className="text-muted-foreground text-sm mb-4">
+              Sync student data to Scholar AI to see history here
+            </p>
+            <Button onClick={handleManualSync} disabled={isSyncing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+              Start First Sync
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">
+              Sync History ({successfulSyncs}/{totalSyncs} successful)
+            </h3>
+            <ScrollArea className="h-[300px]">
+              <div className="space-y-2 pr-4">
+                {syncLogs.map((log) => (
+                  <Collapsible
+                    key={log.id}
+                    open={expandedLogId === log.id}
+                    onOpenChange={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="text-left">
+                            <p className="text-sm font-medium">
+                              {format(new Date(log.created_at), 'MMM d, yyyy h:mm a')}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {log.data?.total_students || 0} students • {log.data?.total_grades || 0} grades • {log.data?.total_misconceptions || 0} misconceptions
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(log)}
+                          <ChevronDown className={`h-4 w-4 transition-transform ${expandedLogId === log.id ? 'rotate-180' : ''}`} />
+                        </div>
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="mt-2 p-4 rounded-lg bg-muted/30 space-y-3">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Students Processed</p>
+                            <p className="font-medium">{log.data?.response?.processed?.students_processed || log.data?.total_students || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Grades Synced</p>
+                            <p className="font-medium">{log.data?.total_grades || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Misconceptions Tracked</p>
+                            <p className="font-medium">{log.data?.response?.processed?.misconceptions_tracked || log.data?.total_misconceptions || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Remediation Assigned</p>
+                            <p className="font-medium">{log.data?.response?.processed?.remediation_assigned || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">XP Awarded</p>
+                            <p className="font-medium">{log.data?.response?.processed?.xp_awarded || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Coins Awarded</p>
+                            <p className="font-medium">{log.data?.response?.processed?.coins_awarded || 0}</p>
+                          </div>
+                        </div>
+                        {log.data?.response?.message && (
+                          <div className="pt-2 border-t">
+                            <p className="text-xs text-muted-foreground">Response Message</p>
+                            <p className="text-sm">{log.data.response.message}</p>
+                          </div>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

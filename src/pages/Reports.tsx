@@ -17,6 +17,7 @@ import { DiagnosticDashboard } from '@/components/reports/DiagnosticDashboard';
 import { StudentProgressTracker } from '@/components/reports/StudentProgressTracker';
 import { RegentsScoreReport } from '@/components/reports/RegentsScoreReport';
 import { Gradebook } from '@/components/reports/Gradebook';
+import { ScholarSyncDashboard } from '@/components/reports/ScholarSyncDashboard';
 import { useMasteryData } from '@/hooks/useMasteryData';
 import { toast } from 'sonner';
 
@@ -236,6 +237,9 @@ export default function Reports() {
 
             {/* Regents Score Report */}
             <RegentsScoreReport classId={selectedClassId === 'all' ? undefined : selectedClassId} />
+
+            {/* Scholar AI Sync Dashboard */}
+            <ScholarSyncDashboard classId={selectedClassId === 'all' ? undefined : selectedClassId} />
 
             {/* Scan Analysis History */}
             <ScanAnalysisHistory classId={selectedClassId === 'all' ? undefined : selectedClassId} />
