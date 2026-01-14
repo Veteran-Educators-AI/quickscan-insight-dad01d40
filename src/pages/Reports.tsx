@@ -16,6 +16,7 @@ import { ScanAnalysisHistory } from '@/components/reports/ScanAnalysisHistory';
 import { DiagnosticDashboard } from '@/components/reports/DiagnosticDashboard';
 import { StudentProgressTracker } from '@/components/reports/StudentProgressTracker';
 import { RegentsScoreReport } from '@/components/reports/RegentsScoreReport';
+import { Gradebook } from '@/components/reports/Gradebook';
 import { useMasteryData } from '@/hooks/useMasteryData';
 import { toast } from 'sonner';
 
@@ -215,6 +216,9 @@ export default function Reports() {
 
             {/* Strengths and Weaknesses */}
             <TopicStrengthsChart data={students} topics={topics} />
+
+            {/* Gradebook - All saved grades */}
+            <Gradebook classId={selectedClassId === 'all' ? undefined : selectedClassId} />
 
             {/* Heat Map */}
             <MasteryHeatMap
