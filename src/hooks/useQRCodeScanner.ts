@@ -50,12 +50,16 @@ export function useQRCodeScanner() {
             // Try scanning different regions of the image
             // QR codes are typically in corners or along edges
             const regions = [
+              // Bottom-right corner (diagnostic worksheet QR location)
+              { x: Math.max(0, img.width - 300), y: Math.max(0, img.height - 300), w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
               // Top-left corner (where student QR typically is)
               { x: 0, y: 0, w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
               // Top-right corner
               { x: Math.max(0, img.width - 300), y: 0, w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
               // Bottom-left corner
               { x: 0, y: Math.max(0, img.height - 300), w: Math.min(300, img.width / 3), h: Math.min(300, img.height / 3) },
+              // Right edge (for diagnostic worksheets)
+              { x: Math.max(0, img.width - 200), y: 0, w: Math.min(200, img.width / 4), h: img.height },
               // Left edge (for worksheet question QRs)
               { x: 0, y: 0, w: Math.min(150, img.width / 4), h: img.height },
               // Full image (fallback)

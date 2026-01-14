@@ -159,6 +159,13 @@ export function ContinuousQRScanner({
 
     // Scan multiple regions for QR codes
     const regions = [
+      // Bottom-right corner (diagnostic worksheet QR location - prioritize this)
+      { 
+        x: Math.floor(canvas.width * 0.6), 
+        y: Math.floor(canvas.height * 0.6), 
+        w: Math.floor(canvas.width * 0.4), 
+        h: Math.floor(canvas.height * 0.4) 
+      },
       // Center region (most likely location)
       { 
         x: Math.floor(canvas.width * 0.2), 
@@ -170,6 +177,8 @@ export function ContinuousQRScanner({
       { x: 0, y: 0, w: Math.floor(canvas.width * 0.4), h: Math.floor(canvas.height * 0.4) },
       // Top-right
       { x: Math.floor(canvas.width * 0.6), y: 0, w: Math.floor(canvas.width * 0.4), h: Math.floor(canvas.height * 0.4) },
+      // Bottom-left
+      { x: 0, y: Math.floor(canvas.height * 0.6), w: Math.floor(canvas.width * 0.4), h: Math.floor(canvas.height * 0.4) },
       // Full frame (fallback)
       { x: 0, y: 0, w: canvas.width, h: canvas.height },
     ];
