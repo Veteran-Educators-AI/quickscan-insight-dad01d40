@@ -1366,10 +1366,11 @@ export function LessonPlanGenerator({
                     onClick={() => setShowNycologicPresents(true)}
                     disabled={!topic}
                     variant="secondary"
-                    className="w-full bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white border-0"
+                    className="w-full bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-600 hover:to-slate-700 text-white border-2 border-amber-400/50 shadow-lg shadow-amber-400/20 hover:shadow-amber-400/40 transition-all duration-300 hover:scale-[1.02]"
                   >
-                    <Sparkles className="h-4 w-4 mr-2 text-amber-400" />
-                    Nycologic Presents
+                    <Sparkles className="h-5 w-5 mr-2 text-amber-400 animate-pulse" />
+                    <span className="font-semibold">Nycologic Presents</span>
+                    <span className="ml-2 text-xs bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full">NEW</span>
                   </Button>
                 </div>
                 <p className="text-xs text-center text-muted-foreground">
@@ -1704,10 +1705,10 @@ export function LessonPlanGenerator({
                     onClick={() => setShowNycologicPresents(true)}
                     variant="outline" 
                     size="sm" 
-                    className="h-8 px-2 text-xs bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white border-0"
+                    className="h-8 px-3 text-xs bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-600 hover:to-slate-700 text-white border border-amber-400/50 shadow-md shadow-amber-400/20 hover:shadow-amber-400/30 transition-all duration-300"
                   >
-                    <Sparkles className="h-3 w-3 mr-1 text-amber-400" />
-                    Nycologic
+                    <Sparkles className="h-3 w-3 mr-1 text-amber-400 animate-pulse" />
+                    <span className="font-medium">Nycologic</span>
                   </Button>
                   <Button onClick={downloadAsPowerPoint} variant="outline" size="sm" className="h-8 px-2 text-xs">
                     <FileType className="h-3 w-3 mr-1" />
