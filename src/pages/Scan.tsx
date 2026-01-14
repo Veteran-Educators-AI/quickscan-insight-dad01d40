@@ -1790,6 +1790,8 @@ export default function Scan() {
                     students={students}
                     onRemove={batch.removeImage}
                     onAssignStudent={batch.updateItemStudent}
+                    onLinkContinuation={batch.linkContinuation}
+                    onUnlinkContinuation={batch.unlinkContinuation}
                     onSaveToGradebook={handleBatchSaveToGradebook}
                     onOverrideGrade={batch.overrideGrade}
                     onSelectRunAsGrade={batch.selectRunAsGrade}

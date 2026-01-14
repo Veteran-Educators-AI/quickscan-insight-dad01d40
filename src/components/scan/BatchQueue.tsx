@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3 } from 'lucide-react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +30,7 @@ import { Label } from '@/components/ui/label';
 import { BatchItem } from '@/hooks/useBatchAnalysis';
 import { HandwritingComparisonDialog } from './HandwritingComparisonDialog';
 import { MultiAnalysisBreakdownDialog } from './MultiAnalysisBreakdownDialog';
+import { ManualLinkDialog } from './ManualLinkDialog';
 
 interface Student {
   id: string;
@@ -101,6 +102,7 @@ export function BatchQueue({
   const [overrideGrade, setOverrideGrade] = useState('');
   const [overrideJustification, setOverrideJustification] = useState('');
   const [breakdownDialogItem, setBreakdownDialogItem] = useState<BatchItem | null>(null);
+  const [manualLinkItem, setManualLinkItem] = useState<BatchItem | null>(null);
 
   // Get primary pages (not continuations)
   const primaryPages = items.filter(i => i.pageType !== 'continuation');
@@ -509,6 +511,53 @@ export function BatchQueue({
                   </TooltipProvider>
                 )}
 
+                {/* Manual Link/Unlink buttons */}
+                {!isBusy && (
+                  <>
+                    {/* Unlink button for continuation pages */}
+                    {isContinuation && onUnlinkContinuation && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 shrink-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              onClick={() => onUnlinkContinuation(item.id)}
+                            >
+                              <Unlink className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Unlink from primary paper</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                    
+                    {/* Link button for unlinked pages (non-continuation) */}
+                    {!isContinuation && onLinkContinuation && items.length > 1 && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 shrink-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              onClick={() => setManualLinkItem(item)}
+                            >
+                              <LinkIcon className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Link as continuation of another paper</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </>
+                )}
+
                 {/* Remove button */}
                 {!isBusy && (
                   <Button
@@ -660,6 +709,19 @@ export function BatchQueue({
       result={breakdownDialogItem?.result || null}
       itemId={breakdownDialogItem?.id}
       onSelectRun={onSelectRunAsGrade}
+    />
+
+    {/* Manual Link Dialog */}
+    {/* Manual Link Dialog */}
+    <ManualLinkDialog
+      open={!!manualLinkItem}
+      onOpenChange={(open) => !open && setManualLinkItem(null)}
+      continuationItem={manualLinkItem}
+      items={items}
+      onLink={(continuationId, primaryId) => {
+        onLinkContinuation?.(continuationId, primaryId);
+        setManualLinkItem(null);
+      }}
     />
     </>
   );
