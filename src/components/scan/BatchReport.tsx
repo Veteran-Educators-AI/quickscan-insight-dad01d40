@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid } from 'lucide-react';
+import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,8 @@ import { StudentWorkDetailDialog } from './StudentWorkDetailDialog';
 import { StudentComparisonView } from './StudentComparisonView';
 import { GradedPapersGallery } from './GradedPapersGallery';
 import { Checkbox } from '@/components/ui/checkbox';
+import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -21,16 +23,83 @@ import {
 interface BatchReportProps {
   items: BatchItem[];
   summary: BatchSummary;
+  classId?: string;
   onExport: () => void;
   onUpdateNotes?: (itemId: string, notes: string) => void;
 }
 
-export function BatchReport({ items, summary, onExport, onUpdateNotes }: BatchReportProps) {
+export function BatchReport({ items, summary, classId, onExport, onUpdateNotes }: BatchReportProps) {
   const [selectedStudent, setSelectedStudent] = useState<BatchItem | null>(null);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
   const [showComparison, setShowComparison] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
+  const [isPushingAll, setIsPushingAll] = useState(false);
+  const [pushedStudents, setPushedStudents] = useState<Set<string>>(new Set());
+  const { pushToSisterApp } = usePushToSisterApp();
   const completedItems = items.filter(item => item.status === 'completed' && item.result);
+
+  const handlePushAllToScholar = async () => {
+    if (!classId) {
+      toast.error('Class ID required to push to NYClogic Scholar AI');
+      return;
+    }
+
+    setIsPushingAll(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const item of completedItems) {
+        if (!item.studentId || pushedStudents.has(item.studentId)) continue;
+        
+        const effectiveGrade = getEffectiveGrade(item.result);
+        const misconceptions = item.result?.misconceptions || [];
+        const topicName = item.result?.problemIdentified || 'General Practice';
+        const nysStandard = item.result?.nysStandard || 'N/A';
+        
+        // Determine difficulty based on grade
+        const difficulty = effectiveGrade < 60 ? 'scaffolded' : effectiveGrade < 80 ? 'practice' : 'challenge';
+        const xpReward = difficulty === 'challenge' ? 50 : difficulty === 'practice' ? 30 : 20;
+        const coinReward = difficulty === 'challenge' ? 25 : difficulty === 'practice' ? 15 : 10;
+
+        const result = await pushToSisterApp({
+          class_id: classId,
+          title: `Remediation: ${topicName}`,
+          description: `Based on scan analysis. Misconceptions: ${misconceptions.slice(0, 2).join(', ') || 'General review needed'}`,
+          student_id: item.studentId,
+          student_name: item.studentName,
+          topic_name: topicName,
+          standard_code: nysStandard,
+          xp_reward: xpReward,
+          coin_reward: coinReward,
+          grade: effectiveGrade,
+        });
+
+        if (result.success) {
+          successCount++;
+          setPushedStudents(prev => new Set([...prev, item.studentId!]));
+        } else {
+          failCount++;
+        }
+      }
+
+      if (successCount > 0 && failCount === 0) {
+        toast.success(`Pushed ${successCount} student remediation(s) to NYClogic Scholar AI!`);
+      } else if (successCount > 0) {
+        toast.warning(`${successCount} pushed, ${failCount} failed`);
+      } else {
+        toast.error('Failed to push to NYClogic Scholar AI');
+      }
+    } catch (err) {
+      console.error('Push to Scholar error:', err);
+      toast.error('Failed to push to NYClogic Scholar AI');
+    } finally {
+      setIsPushingAll(false);
+    }
+  };
+
+  const allPushed = completedItems.length > 0 && 
+    completedItems.filter(i => i.studentId).every(i => pushedStudents.has(i.studentId!));
 
   const toggleCompareSelection = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -108,7 +177,28 @@ export function BatchReport({ items, summary, onExport, onUpdateNotes }: BatchRe
             {summary.totalStudents} papers analyzed • Click any row to view details
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {classId && (
+            <Button 
+              onClick={handlePushAllToScholar} 
+              variant={allPushed ? 'outline' : 'hero'}
+              disabled={isPushingAll || allPushed || completedItems.filter(i => i.studentId).length === 0}
+            >
+              {allPushed ? (
+                <>✓ All Sent to Scholar</>
+              ) : isPushingAll ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Pushing...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Push All to NYClogic Scholar AI
+                </>
+              )}
+            </Button>
+          )}
           <Button onClick={() => setShowGallery(true)} variant="default">
             <LayoutGrid className="h-4 w-4 mr-2" />
             View All Papers

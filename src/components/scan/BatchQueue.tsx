@@ -137,7 +137,7 @@ export function BatchQueue({
             )}
             {isProcessing && (
               <span className="text-xs text-muted-foreground">
-                Analyzing {currentIndex + 1} of {items.length}
+                Analyzing {Math.max(1, currentIndex + 1)} of {items.length}
               </span>
             )}
           </div>
