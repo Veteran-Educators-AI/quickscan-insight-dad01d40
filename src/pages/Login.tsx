@@ -399,18 +399,26 @@ export default function Login() {
           </Tabs>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          By continuing, you agree to our{" "}
-          <Link to="/terms" className="underline hover:text-foreground">
-            Terms of Service
-          </Link>{" "}
-          and{" "}
-          <Link to="/privacy" className="underline hover:text-foreground">
-            Privacy Policy
-          </Link>.
-          <br />
-          Student data is handled in accordance with FERPA guidelines.
-        </p>
+        <div className="text-center mt-6 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Are you a student?{" "}
+            <Link to="/student/login" className="text-primary font-medium hover:underline">
+              Student Portal →
+            </Link>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            By continuing, you agree to our{" "}
+            <Link to="/terms" className="underline hover:text-foreground">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link to="/privacy" className="underline hover:text-foreground">
+              Privacy Policy
+            </Link>.
+            <br />
+            Student data is handled in accordance with FERPA guidelines.
+          </p>
+        </div>
 
       </div>
 
