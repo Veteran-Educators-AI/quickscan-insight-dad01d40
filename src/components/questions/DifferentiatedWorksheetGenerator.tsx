@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw } from 'lucide-react';
+import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { QuestionPreviewPanel } from './QuestionPreviewPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -186,6 +187,82 @@ const svgToPngDataUrl = async (svgString: string, width: number = 200, height: n
   });
 };
 
+// Generate QR code as PNG data URL for PDF embedding
+const generateQRCodeDataUrl = (studentId: string, worksheetId: string, size: number = 100): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    // Create a temporary container to render the QR code
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    document.body.appendChild(container);
+    
+    // Create QR data matching StudentQRCode format
+    const qrData = JSON.stringify({
+      v: 1,
+      s: studentId,
+      q: worksheetId,
+    });
+    
+    // Create temporary React root for QR rendering
+    import('react-dom/client').then(({ createRoot }) => {
+      const root = createRoot(container);
+      const { QRCodeSVG } = require('qrcode.react');
+      const React = require('react');
+      
+      root.render(React.createElement(QRCodeSVG, {
+        value: qrData,
+        size: size,
+        level: 'M',
+        includeMargin: true,
+      }));
+      
+      // Wait for render then convert
+      setTimeout(() => {
+        const svg = container.querySelector('svg');
+        if (svg) {
+          const svgData = new XMLSerializer().serializeToString(svg);
+          const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+          const url = URL.createObjectURL(svgBlob);
+          
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = 'white';
+              ctx.fillRect(0, 0, size, size);
+              ctx.drawImage(img, 0, 0, size, size);
+              const pngDataUrl = canvas.toDataURL('image/png');
+              URL.revokeObjectURL(url);
+              root.unmount();
+              document.body.removeChild(container);
+              resolve(pngDataUrl);
+            } else {
+              URL.revokeObjectURL(url);
+              root.unmount();
+              document.body.removeChild(container);
+              reject(new Error('Could not get canvas context'));
+            }
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(url);
+            root.unmount();
+            document.body.removeChild(container);
+            reject(new Error('Failed to load QR SVG'));
+          };
+          img.src = url;
+        } else {
+          root.unmount();
+          document.body.removeChild(container);
+          reject(new Error('QR code SVG not found'));
+        }
+      }, 50);
+    }).catch(reject);
+  });
+};
+
 interface ClassOption {
   id: string;
   name: string;
@@ -208,6 +285,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [useAdaptiveDifficulty, setUseAdaptiveDifficulty] = useState(true);
   const [includeGeometry, setIncludeGeometry] = useState(false);
   const [useAIImages, setUseAIImages] = useState(false);
+  const [includeStudentQR, setIncludeStudentQR] = useState(true);
   
   // Topics from standards menu selection
   const [customTopics, setCustomTopics] = useState<{ topicName: string; standard: string }[]>([]);
@@ -846,12 +924,33 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             yPosition += 5;
           }
 
-          // Footer
+          // Footer with optional QR code
+          if (includeStudentQR) {
+            try {
+              // Generate unique worksheet ID for this student
+              const worksheetId = `diag_${selectedTopics[0]?.substring(0, 10) || 'math'}_${level}_${assignedForm}_${Date.now()}`;
+              const qrDataUrl = await generateQRCodeDataUrl(student.id, worksheetId, 120);
+              
+              // Add QR code in bottom-right corner
+              const qrSize = 18; // mm
+              const qrX = pageWidth - margin - qrSize;
+              const qrY = pageHeight - qrSize - 5;
+              pdf.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+              
+              // Add small label under QR
+              pdf.setFontSize(6);
+              pdf.setTextColor(150);
+              pdf.text('Scan to grade', qrX + qrSize / 2, pageHeight - 3, { align: 'center' });
+            } catch (qrError) {
+              console.error('Error generating QR code:', qrError);
+            }
+          }
+          
           pdf.setFontSize(8);
           pdf.setTextColor(150);
           pdf.text(
             `Diagnostic Worksheet - Level ${level}${numForms > 1 ? ` | Form ${assignedForm}` : ''} | Generated by NYCLogic Ai`,
-            pageWidth / 2,
+            includeStudentQR ? (pageWidth / 2) - 10 : pageWidth / 2,
             pageHeight - 10,
             { align: 'center' }
           );
@@ -1985,7 +2084,40 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             </div>
           )}
 
-          {/* Question Preview Panel */}
+          {/* Include Student QR Code Option */}
+          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <QrCode className="h-5 w-5 text-green-600" />
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="includeStudentQR" className="text-sm font-medium text-green-900 cursor-pointer flex items-center gap-2">
+                  Include Student QR Codes
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Sparkles className="h-3.5 w-3.5 text-green-500" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-sm">
+                          Adds a unique QR code to each student's worksheet for quick scanning and 
+                          automatic student identification during grading.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </Label>
+                <p className="text-xs text-green-700 mt-0.5">
+                  Quick scan worksheets to auto-identify students during grading
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="includeStudentQR"
+              checked={includeStudentQR}
+              onCheckedChange={setIncludeStudentQR}
+            />
+          </div>
           <QuestionPreviewPanel
             selectedTopics={selectedTopics}
             customTopics={customTopics}
