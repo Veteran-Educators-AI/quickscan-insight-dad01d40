@@ -85,8 +85,29 @@ Always return valid JSON without markdown formatting.`,
     throw new Error(`AI API error: ${response.status}`);
   }
 
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || "";
+  // Get response text first to handle empty responses
+  const responseText = await response.text();
+  
+  if (!responseText || responseText.trim() === "") {
+    console.error("AI API returned empty response");
+    throw new Error("AI returned an empty response. Please try again.");
+  }
+
+  let data;
+  try {
+    data = JSON.parse(responseText);
+  } catch (parseError) {
+    console.error("Failed to parse AI API response:", responseText.substring(0, 500));
+    throw new Error("Failed to parse AI response. Please try again.");
+  }
+
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    console.error("AI response missing content:", JSON.stringify(data).substring(0, 500));
+    throw new Error("AI response was incomplete. Please try again.");
+  }
+
+  return content;
 }
 
 function generateId(): string {
