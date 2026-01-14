@@ -305,24 +305,25 @@ export function useSaveAnalysisResults() {
       }
 
       // 7. Push to sister app (automatic sync) - check settings first
-      if (params.classId) {
-        const { data: settings } = await supabase
-          .from('settings')
-          .select('sister_app_sync_enabled, sister_app_xp_multiplier, sister_app_coin_multiplier')
-          .eq('teacher_id', user.id)
-          .single();
+      const { data: settings } = await supabase
+        .from('settings')
+        .select('sister_app_sync_enabled, sister_app_xp_multiplier, sister_app_coin_multiplier')
+        .eq('teacher_id', user.id)
+        .single();
 
-        if (settings?.sister_app_sync_enabled) {
-          setSyncStatus(prev => ({ ...prev, sisterAppSync: 'syncing' }));
-          
-          const xpMultiplier = settings.sister_app_xp_multiplier || 0.5;
-          const coinMultiplier = settings.sister_app_coin_multiplier || 0.25;
-          
+      if (settings?.sister_app_sync_enabled) {
+        setSyncStatus(prev => ({ ...prev, sisterAppSync: 'syncing' }));
+        
+        const xpMultiplier = settings.sister_app_xp_multiplier || 0.5;
+        const coinMultiplier = settings.sister_app_coin_multiplier || 0.25;
+        
+        try {
+          // Push individual grade to sister app for immediate rewards
           const sisterAppResult = await pushToSisterApp({
-            class_id: params.classId,
+            class_id: params.classId || '',
             title: `Grade: ${params.topicName || 'Assessment'}`,
             description: `${params.studentName || 'Student'} scored ${finalGrade}% - ${params.result.feedback}`,
-            standard_code: params.topicName || undefined,
+            standard_code: params.result.nysStandard || params.topicName || undefined,
             xp_reward: Math.round(finalGrade * xpMultiplier),
             coin_reward: Math.round(finalGrade * coinMultiplier),
             student_id: params.studentId,
@@ -331,12 +332,43 @@ export function useSaveAnalysisResults() {
             topic_name: params.topicName,
           });
 
+          // Also sync full grade data to Scholar for student grade viewing
+          const gradePayload = {
+            action: 'grade_update',
+            student_id: params.studentId,
+            student_name: params.studentName || 'Unknown',
+            topic_name: params.topicName,
+            grade: finalGrade,
+            regents_score: params.result.regentsScore ?? null,
+            nys_standard: params.result.nysStandard ?? null,
+            grade_justification: params.result.gradeJustification ?? null,
+            feedback: params.result.feedback,
+            xp_reward: Math.round(finalGrade * xpMultiplier),
+            coin_reward: Math.round(finalGrade * coinMultiplier),
+            class_id: params.classId,
+            attempt_id: attempt.id,
+            timestamp: new Date().toISOString(),
+          };
+
+          // Log the sync for audit purposes
+          await supabase.from('sister_app_sync_log').insert({
+            teacher_id: user.id,
+            student_id: params.studentId,
+            action: 'auto_grade_sync',
+            data: gradePayload,
+          });
+
           if (sisterAppResult.success) {
             setSyncStatus(prev => ({ 
               ...prev, 
               sisterAppSync: 'success',
               lastSyncTime: new Date()
             }));
+            console.log('Grade synced to Scholar AI:', {
+              student: params.studentName,
+              grade: finalGrade,
+              topic: params.topicName,
+            });
           } else {
             setSyncStatus(prev => ({ 
               ...prev, 
@@ -344,8 +376,13 @@ export function useSaveAnalysisResults() {
               sisterAppError: sisterAppResult.error || 'Sync to Scholar AI failed'
             }));
           }
-        } else {
-          setSyncStatus(prev => ({ ...prev, sisterAppSync: 'disabled' }));
+        } catch (syncError) {
+          console.error('Scholar sync error:', syncError);
+          setSyncStatus(prev => ({ 
+            ...prev, 
+            sisterAppSync: 'failed',
+            sisterAppError: syncError instanceof Error ? syncError.message : 'Sync failed'
+          }));
         }
       } else {
         setSyncStatus(prev => ({ ...prev, sisterAppSync: 'disabled' }));
