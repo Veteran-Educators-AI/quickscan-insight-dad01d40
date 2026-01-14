@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2, Save, CheckCircle } from 'lucide-react';
+import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2, Save, CheckCircle, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,11 +39,36 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
   const [showComparison, setShowComparison] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [isPushingAll, setIsPushingAll] = useState(false);
+  const [isPushingBasicSkills, setIsPushingBasicSkills] = useState(false);
   const [isSavingAll, setIsSavingAll] = useState(false);
   const [savedStudents, setSavedStudents] = useState<Set<string>>(new Set());
   const [pushedStudents, setPushedStudents] = useState<Set<string>>(new Set());
+  const [basicSkillsPushed, setBasicSkillsPushed] = useState<Set<string>>(new Set());
   const { pushToSisterApp } = usePushToSisterApp();
   const completedItems = items.filter(item => item.status === 'completed' && item.result);
+  
+  // Get the effective grade for a result - prefer grade field, fallback to totalScore percentage
+  // (Defined early so it can be used by lowScoringStudents filter)
+  const getEffectiveGrade = (result: BatchItem['result']) => {
+    if (!result) return 55;
+    if (result.grade && result.grade >= 55) {
+      return result.grade;
+    }
+    if (result.totalScore.possible > 0) {
+      return result.totalScore.percentage;
+    }
+    return 65;
+  };
+
+  // Students scoring below 60%
+  const lowScoringStudents = completedItems.filter(item => {
+    if (!item.studentId || !item.result) return false;
+    const grade = getEffectiveGrade(item.result);
+    return grade < 60;
+  });
+  
+  const allBasicSkillsPushed = lowScoringStudents.length > 0 && 
+    lowScoringStudents.every(i => basicSkillsPushed.has(i.studentId!));
 
   const handlePushAllToScholar = async () => {
     if (!classId) {
@@ -102,6 +127,67 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
       toast.error('Failed to push to NYClogic Scholar AI');
     } finally {
       setIsPushingAll(false);
+    }
+  };
+
+  // Push basic skills remediation for students scoring below 60%
+  const handlePushBasicSkillsRemediation = async () => {
+    if (!classId) {
+      toast.error('Class ID required to push to NYClogic Scholar AI');
+      return;
+    }
+
+    if (lowScoringStudents.length === 0) {
+      toast.info('No students scoring below 60% to send basic skills remediation');
+      return;
+    }
+
+    setIsPushingBasicSkills(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const item of lowScoringStudents) {
+        if (!item.studentId || basicSkillsPushed.has(item.studentId)) continue;
+        
+        const effectiveGrade = getEffectiveGrade(item.result);
+        const topicName = item.result?.problemIdentified || 'Basic Skills';
+        
+        const result = await pushToSisterApp({
+          class_id: classId,
+          title: `Basic Skills Remediation: ${topicName}`,
+          description: `Foundational skills practice to build confidence. Focus on prerequisite concepts and step-by-step problem solving.`,
+          student_id: item.studentId,
+          student_name: item.studentName,
+          topic_name: 'Basic Skills - ' + topicName,
+          standard_code: item.result?.nysStandard || 'Foundation',
+          xp_reward: 25, // Higher XP for encouragement
+          coin_reward: 15,
+          grade: effectiveGrade,
+        });
+
+        if (result.success) {
+          successCount++;
+          setBasicSkillsPushed(prev => new Set([...prev, item.studentId!]));
+        } else {
+          failCount++;
+        }
+      }
+
+      if (successCount > 0 && failCount === 0) {
+        toast.success(`Sent basic skills remediation to ${successCount} student(s)!`, {
+          description: 'Students will receive scaffolded practice in NYClogic Scholar AI',
+        });
+      } else if (successCount > 0) {
+        toast.warning(`${successCount} sent, ${failCount} failed`);
+      } else {
+        toast.error('Failed to send basic skills remediation');
+      }
+    } catch (err) {
+      console.error('Basic skills push error:', err);
+      toast.error('Failed to send basic skills remediation');
+    } finally {
+      setIsPushingBasicSkills(false);
     }
   };
 
@@ -261,20 +347,6 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
     return 'F';
   };
 
-  // Get the effective grade for a result - prefer grade field, fallback to totalScore percentage
-  const getEffectiveGrade = (result: BatchItem['result']) => {
-    if (!result) return 55;
-    // If grade field is available and reasonable, use it
-    if (result.grade && result.grade >= 55) {
-      return result.grade;
-    }
-    // Fallback to totalScore percentage if no grade field
-    if (result.totalScore.possible > 0) {
-      return result.totalScore.percentage;
-    }
-    // Last fallback - if there's any work shown but no scores, default to 65
-    return 65;
-  };
 
   return (
     <div className="space-y-6">
@@ -333,6 +405,34 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
               )}
             </Button>
           )}
+          
+          {/* Basic Skills Remediation for Low Scorers */}
+          {classId && lowScoringStudents.length > 0 && (
+            <Button 
+              onClick={handlePushBasicSkillsRemediation} 
+              variant={allBasicSkillsPushed ? 'outline' : 'secondary'}
+              disabled={isPushingBasicSkills || allBasicSkillsPushed}
+              className="border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/20"
+            >
+              {allBasicSkillsPushed ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2 text-orange-600" />
+                  Basic Skills Sent
+                </>
+              ) : isPushingBasicSkills ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <BookOpen className="h-4 w-4 mr-2 text-orange-600" />
+                  Basic Skills ({lowScoringStudents.length})
+                </>
+              )}
+            </Button>
+          )}
+          
           <Button onClick={() => setShowGallery(true)} variant="outline">
             <LayoutGrid className="h-4 w-4 mr-2" />
             View All Papers
