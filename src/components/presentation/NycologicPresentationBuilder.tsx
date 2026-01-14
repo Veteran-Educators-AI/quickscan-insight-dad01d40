@@ -151,7 +151,7 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            Nycologic Presents: Create Presentation
+            NYClogic PRESENTS: Create Presentation
           </DialogTitle>
           <DialogDescription>
             Generate a stunning, interactive presentation that's more engaging than PowerPoint.
