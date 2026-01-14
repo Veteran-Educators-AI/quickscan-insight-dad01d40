@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Loader2, Eye, RefreshCw, Sparkles } from 'lucide-react';
+import { Loader2, Eye, RefreshCw, Sparkles, Shapes, ImageIcon, ZoomIn, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -18,6 +20,9 @@ interface PreviewQuestion {
   difficulty: string;
   advancementLevel: AdvancementLevel;
   hint?: string;
+  svg?: string;
+  imageUrl?: string;
+  imagePrompt?: string;
 }
 
 interface QuestionPreviewPanelProps {
@@ -28,6 +33,8 @@ interface QuestionPreviewPanelProps {
   questionCount: string;
   includeHints: boolean;
   previewLevel: AdvancementLevel;
+  includeGeometry?: boolean;
+  useAIImages?: boolean;
 }
 
 const getLevelColor = (level: AdvancementLevel) => {
@@ -52,6 +59,20 @@ const getLevelDescription = (level: AdvancementLevel) => {
   }
 };
 
+// Convert SVG string to data URI for display
+const svgToDataUri = (svg: string): string => {
+  if (!svg) return '';
+  // Check if it's already a data URI or URL
+  if (svg.startsWith('data:') || svg.startsWith('http')) {
+    return svg;
+  }
+  // Convert SVG string to data URI
+  const encoded = encodeURIComponent(svg)
+    .replace(/'/g, '%27')
+    .replace(/"/g, '%22');
+  return `data:image/svg+xml,${encoded}`;
+};
+
 export function QuestionPreviewPanel({
   selectedTopics,
   customTopics,
@@ -60,12 +81,15 @@ export function QuestionPreviewPanel({
   questionCount,
   includeHints,
   previewLevel,
+  includeGeometry = false,
+  useAIImages = false,
 }: QuestionPreviewPanelProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [warmUpQuestions, setWarmUpQuestions] = useState<PreviewQuestion[]>([]);
   const [mainQuestions, setMainQuestions] = useState<PreviewQuestion[]>([]);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; questionNumber: number } | null>(null);
 
   const loadPreview = async () => {
     if (selectedTopics.length === 0 && customTopics.length === 0) {
@@ -104,6 +128,8 @@ export function QuestionPreviewPanel({
             formVariation: 'Preview',
             formSeed: Date.now(),
             includeHints,
+            includeGeometry,
+            useAIImages,
           },
         });
 
@@ -135,6 +161,8 @@ export function QuestionPreviewPanel({
           formVariation: 'Preview',
           formSeed: Date.now(),
           includeHints,
+          includeGeometry,
+          useAIImages,
         },
       });
 
@@ -145,7 +173,7 @@ export function QuestionPreviewPanel({
 
       toast({
         title: 'Preview loaded',
-        description: 'Sample questions generated successfully.',
+        description: `Sample questions generated${includeGeometry ? ' with shapes' : ''}.`,
       });
     } catch (error) {
       console.error('Error loading preview:', error);
@@ -161,112 +189,206 @@ export function QuestionPreviewPanel({
 
   const hasQuestions = warmUpQuestions.length > 0 || mainQuestions.length > 0;
 
-  return (
-    <Card className="border-dashed border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Eye className="h-4 w-4 text-primary" />
-            Question Preview
+  const getImageUrl = (question: PreviewQuestion): string | null => {
+    if (question.imageUrl) return question.imageUrl;
+    if (question.svg) return svgToDataUri(question.svg);
+    return null;
+  };
+
+  const renderQuestionWithShape = (question: PreviewQuestion, idx: number, variant: 'warmup' | 'main') => {
+    const imageUrl = getImageUrl(question);
+    const bgClass = variant === 'warmup' ? 'bg-green-50/50 border-green-100' : 'bg-muted/50';
+    const textClass = variant === 'warmup' ? 'text-green-800' : '';
+
+    return (
+      <div key={`${variant}-${idx}`} className={`p-2 rounded-md border ${bgClass}`}>
+        <div className="flex items-center justify-between mb-1">
+          <p className={`text-xs font-medium ${textClass}`}>Q{question.questionNumber}</p>
+          <div className="flex items-center gap-1">
+            {imageUrl && (
+              <HoverCard openDelay={200} closeDelay={100}>
+                <HoverCardTrigger asChild>
+                  <Badge variant="secondary" className="text-[10px] h-4 cursor-pointer bg-blue-100 text-blue-700 hover:bg-blue-200">
+                    <Shapes className="h-2.5 w-2.5 mr-0.5" />
+                    Shape
+                  </Badge>
+                </HoverCardTrigger>
+                <HoverCardContent side="right" className="w-auto p-2 z-50">
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="text-xs font-medium text-muted-foreground">Click to enlarge</p>
+                    <img 
+                      src={imageUrl} 
+                      alt={`Shape for Q${question.questionNumber}`}
+                      className="border rounded max-w-[150px] max-h-[150px] object-contain cursor-pointer hover:opacity-80 transition-opacity bg-white"
+                      onClick={() => setLightboxImage({ url: imageUrl, questionNumber: question.questionNumber })}
+                    />
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            )}
+            {variant === 'main' && (
+              <Badge variant="outline" className="text-[10px] h-4">
+                {question.difficulty}
+              </Badge>
+            )}
           </div>
-          <Badge variant="outline" className={getLevelColor(previewLevel)}>
-            Level {previewLevel} - {getLevelDescription(previewLevel)}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {!hasLoaded ? (
-          <div className="text-center py-6">
-            <Sparkles className="h-8 w-8 mx-auto mb-3 text-primary/40" />
-            <p className="text-sm text-muted-foreground mb-3">
-              Preview sample questions before generating the full worksheet
-            </p>
-            <Button 
-              onClick={loadPreview} 
-              disabled={isLoading || (selectedTopics.length === 0 && customTopics.length === 0)}
-              size="sm"
-              variant="outline"
+        </div>
+        
+        {/* Question text with optional inline shape preview */}
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <p className="text-sm">{question.question}</p>
+            {question.hint && includeHints && (
+              <p className="text-xs text-amber-600 mt-1 italic">💡 {question.hint}</p>
+            )}
+          </div>
+          
+          {/* Small inline shape preview */}
+          {imageUrl && (
+            <div 
+              className="flex-shrink-0 w-12 h-12 border rounded bg-white flex items-center justify-center cursor-pointer hover:border-primary transition-colors"
+              onClick={() => setLightboxImage({ url: imageUrl, questionNumber: question.questionNumber })}
             >
-              <Eye className="h-4 w-4 mr-2" />
-              Load Preview
-            </Button>
-          </div>
-        ) : isLoading ? (
-          <div className="flex flex-col items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-primary mb-2" />
-            <p className="text-sm text-muted-foreground">Generating preview...</p>
-          </div>
-        ) : hasQuestions ? (
-          <>
-            <div className="flex justify-end">
-              <Button variant="ghost" size="sm" onClick={loadPreview} className="h-7 text-xs">
-                <RefreshCw className="h-3 w-3 mr-1" />
-                Refresh
+              <img 
+                src={imageUrl} 
+                alt={`Shape for Q${question.questionNumber}`}
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <Card className="border-dashed border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-primary" />
+              Question Preview
+              {includeGeometry && (
+                <Badge variant="secondary" className="text-[10px] bg-blue-100 text-blue-700">
+                  <Shapes className="h-3 w-3 mr-1" />
+                  Shapes
+                </Badge>
+              )}
+            </div>
+            <Badge variant="outline" className={getLevelColor(previewLevel)}>
+              Level {previewLevel} - {getLevelDescription(previewLevel)}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!hasLoaded ? (
+            <div className="text-center py-6">
+              <Sparkles className="h-8 w-8 mx-auto mb-3 text-primary/40" />
+              <p className="text-sm text-muted-foreground mb-3">
+                Preview sample questions{includeGeometry ? ' with shapes' : ''} before generating the full worksheet
+              </p>
+              <Button 
+                onClick={loadPreview} 
+                disabled={isLoading || (selectedTopics.length === 0 && customTopics.length === 0)}
+                size="sm"
+                variant="outline"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Load Preview
               </Button>
             </div>
-            <ScrollArea className="h-[200px]">
-              <div className="space-y-3 pr-3">
-                {warmUpQuestions.length > 0 && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
-                        ✨ Warm-Up
-                      </Badge>
-                    </div>
-                    {warmUpQuestions.map((q, idx) => (
-                      <div key={`warmup-${idx}`} className="p-2 bg-green-50/50 rounded-md border border-green-100">
-                        <p className="text-xs font-medium text-green-800 mb-1">Q{q.questionNumber}</p>
-                        <p className="text-sm">{q.question}</p>
-                        {q.hint && includeHints && (
-                          <p className="text-xs text-amber-600 mt-1 italic">💡 {q.hint}</p>
-                        )}
-                      </div>
-                    ))}
-                    <Separator className="my-2" />
-                  </>
-                )}
-                
-                {mainQuestions.length > 0 && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
-                        📝 Practice Questions
-                      </Badge>
-                    </div>
-                    {mainQuestions.map((q, idx) => (
-                      <div key={`main-${idx}`} className="p-2 bg-muted/50 rounded-md border">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-xs font-medium">Q{q.questionNumber}</p>
-                          <Badge variant="outline" className="text-[10px] h-4">
-                            {q.difficulty}
-                          </Badge>
-                        </div>
-                        <p className="text-sm">{q.question}</p>
-                        {q.hint && includeHints && (
-                          <p className="text-xs text-amber-600 mt-1 italic">💡 {q.hint}</p>
-                        )}
-                      </div>
-                    ))}
-                  </>
-                )}
+          ) : isLoading ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary mb-2" />
+              <p className="text-sm text-muted-foreground">
+                Generating preview{includeGeometry ? ' with shapes' : ''}...
+              </p>
+              {includeGeometry && (
+                <p className="text-xs text-blue-600 mt-1">
+                  <Shapes className="h-3 w-3 inline mr-1" />
+                  Creating geometric diagrams...
+                </p>
+              )}
+            </div>
+          ) : hasQuestions ? (
+            <>
+              <div className="flex justify-end">
+                <Button variant="ghost" size="sm" onClick={loadPreview} className="h-7 text-xs">
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Refresh
+                </Button>
               </div>
-            </ScrollArea>
-            <p className="text-[10px] text-muted-foreground text-center">
-              This is a preview. Final worksheet will have {warmUpCount} warm-up + {questionCount} practice questions.
-            </p>
-          </>
-        ) : (
-          <div className="text-center py-6">
-            <p className="text-sm text-muted-foreground mb-3">
-              No questions generated. Try different settings.
-            </p>
-            <Button onClick={loadPreview} size="sm" variant="outline">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              <ScrollArea className="h-[250px]">
+                <div className="space-y-3 pr-3">
+                  {warmUpQuestions.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+                          ✨ Warm-Up
+                        </Badge>
+                      </div>
+                      {warmUpQuestions.map((q, idx) => renderQuestionWithShape(q, idx, 'warmup'))}
+                      <Separator className="my-2" />
+                    </>
+                  )}
+                  
+                  {mainQuestions.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">
+                          📝 Practice Questions
+                        </Badge>
+                        {mainQuestions.some(q => q.svg || q.imageUrl) && (
+                          <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-200">
+                            <ImageIcon className="h-3 w-3 mr-1" />
+                            {mainQuestions.filter(q => q.svg || q.imageUrl).length} with shapes
+                          </Badge>
+                        )}
+                      </div>
+                      {mainQuestions.map((q, idx) => renderQuestionWithShape(q, idx, 'main'))}
+                    </>
+                  )}
+                </div>
+              </ScrollArea>
+              <p className="text-[10px] text-muted-foreground text-center">
+                This is a preview. Final worksheet will have {warmUpCount} warm-up + {questionCount} practice questions.
+              </p>
+            </>
+          ) : (
+            <div className="text-center py-6">
+              <p className="text-sm text-muted-foreground mb-3">
+                No questions generated. Try different settings.
+              </p>
+              <Button onClick={loadPreview} size="sm" variant="outline">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Lightbox for enlarged shape view */}
+      <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shapes className="h-5 w-5 text-blue-600" />
+              Shape Preview - Question {lightboxImage?.questionNumber}
+            </DialogTitle>
+          </DialogHeader>
+          {lightboxImage && (
+            <div className="flex items-center justify-center p-4 bg-white rounded-lg border">
+              <img 
+                src={lightboxImage.url} 
+                alt={`Shape for Question ${lightboxImage.questionNumber}`}
+                className="max-w-full max-h-[400px] object-contain"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
