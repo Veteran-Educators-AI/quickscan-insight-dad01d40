@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit2 } from 'lucide-react';
+import { Edit2, RefreshCw, CheckCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,54 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+interface ReassessmentCriteria {
+  id: string;
+  label: string;
+  description: string;
+  gradeAdjustment: number;
+}
+
+const REASSESSMENT_CRITERIA: ReassessmentCriteria[] = [
+  {
+    id: 'showed_work',
+    label: 'Showed Work',
+    description: 'Student showed their problem-solving process',
+    gradeAdjustment: 5,
+  },
+  {
+    id: 'partial_understanding',
+    label: 'Partial Understanding',
+    description: 'Demonstrated partial understanding of concepts',
+    gradeAdjustment: 8,
+  },
+  {
+    id: 'computational_error',
+    label: 'Computational Error Only',
+    description: 'Correct approach but arithmetic/calculation error',
+    gradeAdjustment: 10,
+  },
+  {
+    id: 'misread_problem',
+    label: 'Misread Problem',
+    description: 'Would have been correct if problem was read correctly',
+    gradeAdjustment: 12,
+  },
+  {
+    id: 'effort_evident',
+    label: 'Effort Evident',
+    description: 'Clear effort was made despite incorrect answer',
+    gradeAdjustment: 5,
+  },
+  {
+    id: 'close_answer',
+    label: 'Close Answer',
+    description: 'Answer was very close to correct',
+    gradeAdjustment: 7,
+  },
+];
 
 interface GradeOverrideDialogProps {
   currentGrade: number;
@@ -31,12 +79,48 @@ export function GradeOverrideDialog({
   const [open, setOpen] = useState(false);
   const [grade, setGrade] = useState(currentGrade);
   const [justification, setJustification] = useState(currentJustification || '');
+  const [selectedCriteria, setSelectedCriteria] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<string>('quick');
+
+  const handleCriteriaToggle = (criteriaId: string) => {
+    setSelectedCriteria(prev => {
+      const newCriteria = prev.includes(criteriaId)
+        ? prev.filter(id => id !== criteriaId)
+        : [...prev, criteriaId];
+      
+      // Calculate new grade based on selected criteria
+      const totalAdjustment = newCriteria.reduce((sum, id) => {
+        const criteria = REASSESSMENT_CRITERIA.find(c => c.id === id);
+        return sum + (criteria?.gradeAdjustment || 0);
+      }, 0);
+      
+      const newGrade = Math.min(100, currentGrade + totalAdjustment);
+      setGrade(newGrade);
+      
+      // Auto-generate justification based on selected criteria
+      const selectedLabels = newCriteria.map(id => 
+        REASSESSMENT_CRITERIA.find(c => c.id === id)?.label
+      ).filter(Boolean);
+      
+      if (selectedLabels.length > 0) {
+        setJustification(`Grade adjusted based on: ${selectedLabels.join(', ')}`);
+      }
+      
+      return newCriteria;
+    });
+  };
 
   const handleSubmit = () => {
     if (justification.trim()) {
       onOverride(grade, justification.trim());
       setOpen(false);
     }
+  };
+
+  const handleReset = () => {
+    setGrade(currentGrade);
+    setSelectedCriteria([]);
+    setJustification('');
   };
 
   const getGradeColor = (grade: number) => {
@@ -54,59 +138,134 @@ export function GradeOverrideDialog({
           Override
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Override AI Grade</DialogTitle>
           <DialogDescription>
-            Set your own grade and provide a justification for the override.
+            Adjust the grade using quick criteria or set a manual override.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="grade">Grade (55-100)</Label>
-            <div className="flex items-center gap-4">
-              <Slider
-                value={[grade]}
-                onValueChange={([value]) => setGrade(value)}
-                min={55}
-                max={100}
-                step={1}
-                className="flex-1"
-              />
-              <Input
-                id="grade"
-                type="number"
-                min={55}
-                max={100}
-                value={grade}
-                onChange={(e) => setGrade(Math.min(100, Math.max(55, parseInt(e.target.value) || 55)))}
-                className="w-20"
-              />
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="quick" className="gap-1">
+              <RefreshCw className="h-3.5 w-3.5" />
+              Quick Reassess
+            </TabsTrigger>
+            <TabsTrigger value="manual" className="gap-1">
+              <Edit2 className="h-3.5 w-3.5" />
+              Manual
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="quick" className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Select applicable criteria:</Label>
+              <div className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto">
+                {REASSESSMENT_CRITERIA.map(criteria => (
+                  <div
+                    key={criteria.id}
+                    className={`flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                      selectedCriteria.includes(criteria.id)
+                        ? 'bg-primary/10 border-primary'
+                        : 'hover:bg-muted/50'
+                    }`}
+                    onClick={() => handleCriteriaToggle(criteria.id)}
+                  >
+                    <Checkbox
+                      checked={selectedCriteria.includes(criteria.id)}
+                      onCheckedChange={() => handleCriteriaToggle(criteria.id)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium leading-none">
+                        {criteria.label}
+                        <span className="ml-1 text-xs text-green-600">
+                          +{criteria.gradeAdjustment}%
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {criteria.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>55 (Below Standards)</span>
-              <span className={`font-medium ${getGradeColor(grade)}`}>
-                {grade >= 90 ? 'Exceeds' : grade >= 80 ? 'Meets' : grade >= 70 ? 'Approaching' : 'Below'} Standards
-              </span>
-              <span>100 (Exceeds)</span>
+
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <div>
+                <p className="text-sm text-muted-foreground">Original Grade</p>
+                <p className="text-lg font-semibold">{Math.round(currentGrade)}%</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Adjustment</p>
+                <p className="text-lg font-semibold text-green-600">
+                  +{Math.round(grade - currentGrade)}%
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">New Grade</p>
+                <p className={`text-lg font-bold ${getGradeColor(grade)}`}>
+                  {Math.round(grade)}%
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="justification">Justification (required)</Label>
-            <Textarea
-              id="justification"
-              placeholder="Explain why you're overriding the AI grade..."
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
-              rows={3}
-            />
-          </div>
+          </TabsContent>
+
+          <TabsContent value="manual" className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="grade">Grade (0-100)</Label>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[grade]}
+                  onValueChange={([value]) => setGrade(value)}
+                  min={0}
+                  max={100}
+                  step={1}
+                  className="flex-1"
+                />
+                <Input
+                  id="grade"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={grade}
+                  onChange={(e) => setGrade(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className="w-20"
+                />
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0 (Below Standards)</span>
+                <span className={`font-medium ${getGradeColor(grade)}`}>
+                  {grade >= 90 ? 'Exceeds' : grade >= 80 ? 'Meets' : grade >= 70 ? 'Approaching' : 'Below'} Standards
+                </span>
+                <span>100 (Exceeds)</span>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <div className="space-y-2">
+          <Label htmlFor="justification">Justification (required)</Label>
+          <Textarea
+            id="justification"
+            placeholder="Explain why you're adjusting the grade..."
+            value={justification}
+            onChange={(e) => setJustification(e.target.value)}
+            rows={2}
+          />
         </div>
-        <DialogFooter>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" onClick={handleReset}>
+            Reset
+          </Button>
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={!justification.trim()}>
+            <CheckCircle className="h-4 w-4 mr-1" />
             Save Override
           </Button>
         </DialogFooter>
