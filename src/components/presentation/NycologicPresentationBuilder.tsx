@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Sparkles, Play, Save, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Sparkles, Play, Save, Plus, Trash2, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
@@ -41,6 +41,65 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
   const [includeQuestions, setIncludeQuestions] = useState(true);
   const [questionCount, setQuestionCount] = useState('3');
   const [style, setStyle] = useState<'engaging' | 'formal' | 'story'>('engaging');
+  const [visualTheme, setVisualTheme] = useState<string>('neon-city');
+
+  // Visual theme options with colorful designs
+  const visualThemes = [
+    {
+      id: 'neon-city',
+      name: 'Neon City',
+      description: 'Vibrant NYC skyline vibes',
+      gradient: 'from-purple-600 via-pink-500 to-orange-400',
+      accent: 'bg-pink-500',
+      emoji: '🌆',
+      pattern: 'radial-gradient(circle at 20% 80%, rgba(168, 85, 247, 0.4) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(236, 72, 153, 0.4) 0%, transparent 50%)',
+    },
+    {
+      id: 'ocean-wave',
+      name: 'Ocean Wave',
+      description: 'Cool and calming blues',
+      gradient: 'from-cyan-500 via-blue-500 to-indigo-600',
+      accent: 'bg-cyan-400',
+      emoji: '🌊',
+      pattern: 'radial-gradient(circle at 30% 70%, rgba(34, 211, 238, 0.4) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(59, 130, 246, 0.4) 0%, transparent 50%)',
+    },
+    {
+      id: 'sunset-glow',
+      name: 'Sunset Glow',
+      description: 'Warm golden hour colors',
+      gradient: 'from-amber-400 via-orange-500 to-rose-500',
+      accent: 'bg-amber-400',
+      emoji: '🌅',
+      pattern: 'radial-gradient(circle at 50% 100%, rgba(251, 191, 36, 0.4) 0%, transparent 50%), radial-gradient(circle at 50% 0%, rgba(244, 63, 94, 0.3) 0%, transparent 50%)',
+    },
+    {
+      id: 'forest-zen',
+      name: 'Forest Zen',
+      description: 'Natural earthy greens',
+      gradient: 'from-emerald-500 via-teal-500 to-cyan-600',
+      accent: 'bg-emerald-400',
+      emoji: '🌿',
+      pattern: 'radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.4) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(20, 184, 166, 0.4) 0%, transparent 50%)',
+    },
+    {
+      id: 'galaxy-dreams',
+      name: 'Galaxy Dreams',
+      description: 'Deep space exploration',
+      gradient: 'from-violet-600 via-purple-600 to-fuchsia-500',
+      accent: 'bg-violet-400',
+      emoji: '✨',
+      pattern: 'radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.5) 0%, transparent 40%), radial-gradient(circle at 90% 90%, rgba(192, 38, 211, 0.4) 0%, transparent 40%)',
+    },
+    {
+      id: 'candy-pop',
+      name: 'Candy Pop',
+      description: 'Fun and playful pastels',
+      gradient: 'from-pink-400 via-rose-400 to-red-400',
+      accent: 'bg-rose-300',
+      emoji: '🍭',
+      pattern: 'radial-gradient(circle at 25% 25%, rgba(244, 114, 182, 0.4) 0%, transparent 40%), radial-gradient(circle at 75% 75%, rgba(251, 113, 133, 0.4) 0%, transparent 40%)',
+    },
+  ];
 
   const generatePresentation = async () => {
     if (!title.trim()) {
@@ -237,33 +296,6 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
                     </Select>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="includeQuestions"
-                        checked={includeQuestions}
-                        onChange={(e) => setIncludeQuestions(e.target.checked)}
-                        className="rounded border-input"
-                      />
-                      <Label htmlFor="includeQuestions" className="text-sm cursor-pointer">
-                        Include Q&A slides
-                      </Label>
-                    </div>
-                    {includeQuestions && (
-                      <Select value={questionCount} onValueChange={setQuestionCount}>
-                        <SelectTrigger className="w-24">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="2">2</SelectItem>
-                          <SelectItem value="3">3</SelectItem>
-                          <SelectItem value="5">5</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </div>
-
                   {topic?.standard && (
                     <div className="pt-2">
                       <Badge variant="secondary" className="text-xs">
@@ -272,6 +304,98 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Visual Theme Selection */}
+            {!presentation && (
+              <div className="space-y-3">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-400" />
+                  Choose Your Visual Theme
+                </Label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {visualThemes.map((theme) => (
+                    <button
+                      key={theme.id}
+                      onClick={() => setVisualTheme(theme.id)}
+                      className={`relative group overflow-hidden rounded-xl p-4 text-left transition-all duration-300 hover:scale-[1.02] ${
+                        visualTheme === theme.id
+                          ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                          : 'hover:ring-1 hover:ring-primary/50'
+                      }`}
+                    >
+                      {/* Gradient background */}
+                      <div
+                        className={`absolute inset-0 bg-gradient-to-br ${theme.gradient} opacity-90`}
+                        style={{ backgroundImage: theme.pattern }}
+                      />
+                      
+                      {/* Animated particles */}
+                      <div className="absolute inset-0 overflow-hidden">
+                        {[...Array(3)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="absolute w-2 h-2 rounded-full bg-white/30 animate-pulse"
+                            style={{
+                              left: `${20 + i * 30}%`,
+                              top: `${30 + i * 20}%`,
+                              animationDelay: `${i * 0.3}s`,
+                            }}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Content */}
+                      <div className="relative z-10">
+                        <span className="text-2xl mb-2 block">{theme.emoji}</span>
+                        <h4 className="font-bold text-white text-sm drop-shadow-md">
+                          {theme.name}
+                        </h4>
+                        <p className="text-white/80 text-xs mt-1 drop-shadow">
+                          {theme.description}
+                        </p>
+                      </div>
+
+                      {/* Selected checkmark */}
+                      {visualTheme === theme.id && (
+                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-white flex items-center justify-center">
+                          <Check className="h-3 w-3 text-primary" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Q&A Options */}
+            {!presentation && (
+              <div className="flex items-center gap-4 pt-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="includeQuestions"
+                    checked={includeQuestions}
+                    onChange={(e) => setIncludeQuestions(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  <Label htmlFor="includeQuestions" className="text-sm cursor-pointer">
+                    Include Q&A slides
+                  </Label>
+                </div>
+                {includeQuestions && (
+                  <Select value={questionCount} onValueChange={setQuestionCount}>
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">2</SelectItem>
+                      <SelectItem value="3">3</SelectItem>
+                      <SelectItem value="5">5</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
 
