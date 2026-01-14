@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ import { renderMathText, sanitizeForPDF, fixEncodingCorruption } from '@/lib/mat
 import { MathSymbolPreview } from './MathSymbolPreview';
 import jsPDF from 'jspdf';
 import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
+import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 
 export interface WorksheetQuestion {
   id: string;
@@ -168,6 +169,14 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   // Lightbox state for full-screen image viewing
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
   const [lightboxQuestionNumber, setLightboxQuestionNumber] = useState<number | null>(null);
+  
+  // Push to NYCLogic AI state
+  const [showPushDialog, setShowPushDialog] = useState(false);
+  const [pushXpReward, setPushXpReward] = useState(50);
+  const [pushCoinReward, setPushCoinReward] = useState(25);
+  const [pushDueDate, setPushDueDate] = useState('');
+  const [isPushing, setIsPushing] = useState(false);
+  const { pushToSisterApp } = usePushToSisterApp();
   
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -2314,6 +2323,16 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 )}
               </div>
 
+              {/* Push to NYCLogic AI Button */}
+              <Button
+                variant="outline"
+                className="w-full bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 border-purple-200 dark:border-purple-800 hover:from-purple-100 hover:to-indigo-100 dark:hover:from-purple-950/30 dark:hover:to-indigo-950/30"
+                onClick={() => setShowPushDialog(true)}
+              >
+                <Send className="h-4 w-4 mr-2 text-purple-600" />
+                <span className="text-purple-700 dark:text-purple-300">Push to NYCLogic AI</span>
+              </Button>
+
               {/* Diagnostic: Record Results Note */}
               {worksheetMode === 'diagnostic' && (
                 <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
@@ -2695,6 +2714,145 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             }}>
               <X className="h-4 w-4 mr-2" />
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Push to NYCLogic AI Dialog */}
+      <Dialog open={showPushDialog} onOpenChange={setShowPushDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-purple-600" />
+              Push to NYCLogic AI
+            </DialogTitle>
+            <DialogDescription>
+              Send this worksheet as an assignment to students on NYCLogic AI. Configure XP and coin rewards.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Worksheet Info */}
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <p className="text-sm font-medium">{worksheetTitle}</p>
+              <p className="text-xs text-muted-foreground">
+                {compiledQuestions.length} questions • {selectedQuestions.map(q => q.topicName).join(', ')}
+              </p>
+            </div>
+
+            {/* XP Reward */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-yellow-500" />
+                XP Reward
+              </Label>
+              <div className="flex items-center gap-3">
+                <Slider
+                  value={[pushXpReward]}
+                  onValueChange={(value) => setPushXpReward(value[0])}
+                  min={10}
+                  max={200}
+                  step={10}
+                  className="flex-1"
+                />
+                <span className="text-sm font-medium w-16 text-right">{pushXpReward} XP</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Experience points students earn for completing this assignment</p>
+            </div>
+
+            {/* Coin Reward */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Coins className="h-4 w-4 text-amber-500" />
+                Coin Reward
+              </Label>
+              <div className="flex items-center gap-3">
+                <Slider
+                  value={[pushCoinReward]}
+                  onValueChange={(value) => setPushCoinReward(value[0])}
+                  min={5}
+                  max={100}
+                  step={5}
+                  className="flex-1"
+                />
+                <span className="text-sm font-medium w-16 text-right">{pushCoinReward} 🪙</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Coins students can spend in the NYCLogic AI store</p>
+            </div>
+
+            {/* Due Date (Optional) */}
+            <div className="space-y-2">
+              <Label htmlFor="dueDate">Due Date (Optional)</Label>
+              <Input
+                id="dueDate"
+                type="datetime-local"
+                value={pushDueDate}
+                onChange={(e) => setPushDueDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowPushDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                setIsPushing(true);
+                try {
+                  const standardCode = selectedQuestions.length > 0 ? selectedQuestions[0].standard : undefined;
+                  const topicName = selectedQuestions.map(q => q.topicName).join(', ');
+                  
+                  const result = await pushToSisterApp({
+                    class_id: '', // Will be handled by the sister app
+                    title: worksheetTitle,
+                    description: `${compiledQuestions.length} question worksheet covering: ${topicName}`,
+                    due_at: pushDueDate || undefined,
+                    standard_code: standardCode,
+                    xp_reward: pushXpReward,
+                    coin_reward: pushCoinReward,
+                    topic_name: topicName,
+                  });
+
+                  if (result.success) {
+                    toast({
+                      title: 'Pushed to NYCLogic AI!',
+                      description: `"${worksheetTitle}" is now available as an assignment with ${pushXpReward} XP and ${pushCoinReward} coins.`,
+                    });
+                    setShowPushDialog(false);
+                  } else {
+                    toast({
+                      title: 'Failed to push',
+                      description: result.error || 'Could not send to NYCLogic AI. Please check your settings.',
+                      variant: 'destructive',
+                    });
+                  }
+                } catch (error) {
+                  console.error('Push error:', error);
+                  toast({
+                    title: 'Push failed',
+                    description: 'An unexpected error occurred.',
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setIsPushing(false);
+                }
+              }}
+              disabled={isPushing}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {isPushing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Pushing...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Push Assignment
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
