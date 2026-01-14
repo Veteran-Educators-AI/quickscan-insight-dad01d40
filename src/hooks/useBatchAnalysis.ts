@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { handleApiError } from '@/lib/apiErrorHandler';
+import { useQRScanSettings } from '@/hooks/useQRScanSettings';
 import jsQR from 'jsqr';
 import { parseStudentQRCode } from '@/components/print/StudentQRCode';
 import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
@@ -112,11 +113,33 @@ interface UseBatchAnalysisReturn {
 
 export function useBatchAnalysis(): UseBatchAnalysisReturn {
   const { user } = useAuth();
+  const { settings: qrScanSettings } = useQRScanSettings();
   const [items, setItems] = useState<BatchItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [summary, setSummary] = useState<BatchSummary | null>(null);
+
+  // Apply grade curve to a result
+  const applyGradeCurve = useCallback((result: AnalysisResult): AnalysisResult => {
+    const curvePercent = qrScanSettings.gradeCurvePercent || 0;
+    if (curvePercent <= 0) return result;
+
+    const newPercentage = Math.min(100, result.totalScore.percentage + curvePercent);
+    const newGrade = result.grade ? Math.min(100, result.grade + curvePercent) : undefined;
+
+    return {
+      ...result,
+      totalScore: {
+        ...result.totalScore,
+        percentage: newPercentage,
+      },
+      grade: newGrade,
+      gradeJustification: result.gradeJustification 
+        ? `${result.gradeJustification} (Grade curved +${curvePercent}%)`
+        : `Grade curved +${curvePercent}%`,
+    };
+  }, [qrScanSettings.gradeCurvePercent]);
 
 const addImage = useCallback((imageDataUrl: string, studentId?: string, studentName?: string): string => {
     const id = crypto.randomUUID();
@@ -444,10 +467,13 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
       }
       if (!data?.success || !data?.analysis) throw new Error('Invalid response');
 
+      // Apply grade curve if configured
+      const curvedAnalysis = applyGradeCurve(data.analysis);
+
       return {
         ...item,
         status: 'completed',
-        result: data.analysis,
+        result: curvedAnalysis,
         rawAnalysis: data.rawAnalysis,
       };
     } catch (err) {
@@ -782,10 +808,13 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
       }
       if (!data?.success || !data?.analysis) throw new Error('Invalid response');
 
+      // Apply grade curve if configured
+      const curvedAnalysis = applyGradeCurve(data.analysis);
+
       return {
         ...item,
         status: 'completed',
-        result: data.analysis,
+        result: curvedAnalysis,
         rawAnalysis: data.rawAnalysis,
       };
     } catch (err) {
