@@ -35,6 +35,7 @@ export interface AnalysisResult {
   regentsScoreJustification?: string;
   // Multi-analysis confidence fields
   multiAnalysisGrades?: number[];
+  multiAnalysisResults?: AnalysisResult[]; // Full breakdown of each analysis run
   confidenceScore?: number; // 0-100 based on grade consistency
   isOverridden?: boolean;
   overriddenGrade?: number;
@@ -972,6 +973,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
         grade: averageGrade,
         gradeJustification: `Average of ${analysisCount} analyses (${grades.join('%, ')}%). ${analysisResults[0].gradeJustification || ''}`,
         multiAnalysisGrades: grades,
+        multiAnalysisResults: analysisResults, // Store full breakdown of each run
         confidenceScore,
       };
 

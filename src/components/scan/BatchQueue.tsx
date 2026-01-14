@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil } from 'lucide-react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +29,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { BatchItem } from '@/hooks/useBatchAnalysis';
 import { HandwritingComparisonDialog } from './HandwritingComparisonDialog';
+import { MultiAnalysisBreakdownDialog } from './MultiAnalysisBreakdownDialog';
 
 interface Student {
   id: string;
@@ -97,6 +98,7 @@ export function BatchQueue({
   const [overrideDialogItem, setOverrideDialogItem] = useState<BatchItem | null>(null);
   const [overrideGrade, setOverrideGrade] = useState('');
   const [overrideJustification, setOverrideJustification] = useState('');
+  const [breakdownDialogItem, setBreakdownDialogItem] = useState<BatchItem | null>(null);
 
   // Get primary pages (not continuations)
   const primaryPages = items.filter(i => i.pageType !== 'continuation');
@@ -459,6 +461,27 @@ export function BatchQueue({
                 {/* Status badge */}
                 {getStatusBadge(item)}
 
+                {/* Multi-analysis breakdown button - only for items with multiple analyses */}
+                {!isBusy && item.status === 'completed' && item.result?.multiAnalysisResults && item.result.multiAnalysisResults.length > 1 && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 shrink-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => setBreakdownDialogItem(item)}
+                        >
+                          <BarChart3 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">View analysis breakdown ({item.result.multiAnalysisResults.length} runs)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
                 {/* Override button - only for completed items with results */}
                 {!isBusy && item.status === 'completed' && item.result && onOverrideGrade && (
                   <TooltipProvider>
@@ -626,6 +649,14 @@ export function BatchQueue({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Multi-Analysis Breakdown Dialog */}
+    <MultiAnalysisBreakdownDialog
+      open={!!breakdownDialogItem}
+      onOpenChange={(open) => !open && setBreakdownDialogItem(null)}
+      studentName={breakdownDialogItem?.studentName}
+      result={breakdownDialogItem?.result || null}
+    />
     </>
   );
 }
