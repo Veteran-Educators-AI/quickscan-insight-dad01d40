@@ -33,6 +33,7 @@ import { MultiStudentScanner } from '@/components/scan/MultiStudentScanner';
 import { ScannerImportMode } from '@/components/scan/ScannerImportMode';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
+import { supabase } from '@/integrations/supabase/client';
 
 type ScanState = 'idle' | 'camera' | 'preview' | 'choose-method' | 'upload-solution' | 'analyzed' | 'manual-scoring' | 'analyze-saved';
 type ScanMode = 'single' | 'batch' | 'saved' | 'scanner';
@@ -59,6 +60,8 @@ export default function Scan() {
   const [gradingMethod, setGradingMethod] = useState<GradingMethod>('ai');
   const [manualResult, setManualResult] = useState<ManualResult | null>(null);
   const [batchCameraMode, setBatchCameraMode] = useState(false);
+  const [batchSaving, setBatchSaving] = useState(false);
+  const [batchSavedStudents, setBatchSavedStudents] = useState<Set<string>>(new Set());
   
   const solutionInputRef = useRef<HTMLInputElement>(null);
 
@@ -547,6 +550,84 @@ export default function Scan() {
     toast.success('Report exported as PDF');
   };
 
+  // Save all batch results to gradebook directly from BatchQueue
+  const handleBatchSaveToGradebook = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error('You must be logged in to save results');
+      return;
+    }
+
+    setBatchSaving(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    const completedItems = batch.items.filter(
+      item => item.status === 'completed' && 
+      item.result && 
+      item.studentId && 
+      item.pageType !== 'continuation' &&
+      !batchSavedStudents.has(item.studentId)
+    );
+
+    try {
+      for (const item of completedItems) {
+        const result = item.result!;
+        const effectiveGrade = result.grade ?? result.totalScore.percentage;
+        const topicName = result.problemIdentified || 'General Assessment';
+        const nysStandard = result.nysStandard || null;
+        const regentsScore = result.regentsScore ?? null;
+
+        // Save to grade_history
+        const { error: gradeError } = await supabase
+          .from('grade_history')
+          .insert({
+            student_id: item.studentId,
+            topic_name: topicName,
+            grade: effectiveGrade,
+            grade_justification: result.gradeJustification || result.feedback || null,
+            raw_score_earned: result.totalScore.earned || 0,
+            raw_score_possible: result.totalScore.possible || 0,
+            teacher_id: user.id,
+            regents_score: regentsScore,
+            nys_standard: nysStandard,
+            regents_justification: result.regentsScoreJustification || null,
+          });
+
+        if (gradeError) {
+          console.error('Error saving grade for', item.studentName, ':', gradeError);
+          failCount++;
+          continue;
+        }
+
+        successCount++;
+        setBatchSavedStudents(prev => new Set([...prev, item.studentId!]));
+      }
+
+      if (successCount > 0 && failCount === 0) {
+        toast.success(`Saved ${successCount} student grade(s) to gradebook!`, {
+          icon: <Save className="h-4 w-4" />,
+        });
+      } else if (successCount > 0) {
+        toast.warning(`${successCount} saved, ${failCount} failed`);
+      } else if (failCount > 0) {
+        toast.error('Failed to save grades to gradebook');
+      } else {
+        toast.info('No new grades to save');
+      }
+    } catch (err) {
+      console.error('Batch save to gradebook error:', err);
+      toast.error('Failed to save to gradebook');
+    } finally {
+      setBatchSaving(false);
+    }
+  };
+
+  // Check if all batch items with students have been saved
+  const allBatchSaved = batch.items.length > 0 && 
+    batch.items.filter(i => i.status === 'completed' && i.studentId && i.pageType !== 'continuation')
+      .every(i => batchSavedStudents.has(i.studentId!));
+
   const clearImage = () => {
     setFinalImage(null);
     setCapturedImage(null);
@@ -571,6 +652,7 @@ export default function Scan() {
     setShowStudentPicker(false);
     setDetectedQR(null);
     setAutoIdentifiedStudent(null);
+    setBatchSavedStudents(new Set());
     clearQRResult();
     clearIdentification();
     resetSyncStatus();
@@ -1700,9 +1782,12 @@ export default function Scan() {
                     students={students}
                     onRemove={batch.removeImage}
                     onAssignStudent={batch.updateItemStudent}
+                    onSaveToGradebook={handleBatchSaveToGradebook}
                     currentIndex={batch.currentIndex}
                     isProcessing={batch.isProcessing}
                     isIdentifying={batch.isIdentifying}
+                    isSaving={batchSaving}
+                    allSaved={allBatchSaved}
                   />
 
                   {/* Action buttons */}
