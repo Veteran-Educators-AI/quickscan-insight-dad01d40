@@ -13,7 +13,9 @@ import {
   Trash2,
   Loader2,
   Save,
-  X
+  X,
+  Send,
+  Sparkles
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,6 +34,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useStudentNames } from '@/lib/StudentNameContext';
 import { toast } from 'sonner';
+import nycologicLogo from '@/assets/nycologic-logo.png';
 
 interface GradeEntry {
   id: string;
@@ -68,6 +71,7 @@ export function Gradebook({ classId }: GradebookProps) {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [isExpanded, setIsExpanded] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isSyncingToScholar, setIsSyncingToScholar] = useState(false);
   
   // Edit state
   const [editingEntry, setEditingEntry] = useState<GradeEntry | null>(null);
@@ -293,6 +297,42 @@ export function Gradebook({ classId }: GradebookProps) {
     return { avgGrade, avgRegents, uniqueStudents, uniqueTopics, total: filteredGrades.length };
   }, [filteredGrades]);
 
+  // Sync grades to NYCLogic Scholar AI
+  const handleSyncToScholar = async () => {
+    if (!filteredGrades.length) {
+      toast.error('No grades to sync');
+      return;
+    }
+
+    setIsSyncingToScholar(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-grades-to-scholar', {
+        body: { class_id: classId, sync_all: !classId },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast.success(
+          `Synced ${data.synced_count} grades for ${data.student_count} students to NYCLogic Scholar AI!`,
+          { 
+            description: 'Students can now view their grades and earn rewards in the Scholar app.',
+            duration: 5000,
+          }
+        );
+      } else {
+        throw new Error(data?.error || 'Failed to sync grades');
+      }
+    } catch (err) {
+      console.error('Sync error:', err);
+      toast.error('Failed to sync grades to Scholar app', {
+        description: err instanceof Error ? err.message : 'Please check your connection settings',
+      });
+    } finally {
+      setIsSyncingToScholar(false);
+    }
+  };
+
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
       <Card>
@@ -343,6 +383,32 @@ export function Gradebook({ classId }: GradebookProps) {
                 <Download className="h-4 w-4 mr-2" />
                 Export CSV
               </Button>
+              <Button 
+                onClick={handleSyncToScholar} 
+                disabled={!filteredGrades.length || isSyncingToScholar}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+              >
+                {isSyncingToScholar ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <img src={nycologicLogo} alt="" className="h-4 w-4 mr-2" />
+                )}
+                Sync to Scholar
+              </Button>
+            </div>
+
+            {/* Scholar Sync Info */}
+            <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
+              <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                  Share grades with NYCLogic Scholar AI
+                </p>
+                <p className="text-xs text-purple-700 dark:text-purple-300">
+                  Students can view their grades, track progress, and earn XP & coins for their work
+                </p>
+              </div>
+              <Send className="h-4 w-4 text-purple-500 dark:text-purple-400 flex-shrink-0" />
             </div>
 
             {/* Summary Stats */}
