@@ -25,10 +25,16 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  StickyNote
+  StickyNote,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Sparkles
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { BatchItem, AnalysisResult } from '@/hooks/useBatchAnalysis';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
+import { useMultipleGradeTrends, TrendDirection } from '@/hooks/useGradeTrend';
 
 // Extended result type that may include additional fields
 interface ExtendedAnalysisResult extends AnalysisResult {
@@ -58,6 +64,86 @@ export function GradedPapersGallery({
   const { gradeFloor, gradeFloorWithEffort, calculateGrade } = useGradeFloorSettings();
 
   const completedItems = items.filter(item => item.status === 'completed' && item.result);
+  
+  // Get student IDs for trend lookup
+  const studentIds = completedItems
+    .map(item => item.studentId)
+    .filter((id): id is string => !!id);
+  
+  const { data: gradeTrends } = useMultipleGradeTrends(studentIds);
+
+  const getStudentTrend = (studentId?: string, currentGrade?: number): { direction: TrendDirection; change: number } => {
+    if (!studentId || !gradeTrends || currentGrade === undefined) {
+      return { direction: 'new', change: 0 };
+    }
+    
+    const previousGrades = gradeTrends[studentId];
+    if (!previousGrades || previousGrades.length === 0) {
+      return { direction: 'new', change: 0 };
+    }
+    
+    const previousGrade = previousGrades[0];
+    const change = currentGrade - previousGrade;
+    
+    if (change > 5) return { direction: 'improving', change };
+    if (change < -5) return { direction: 'declining', change };
+    return { direction: 'stable', change };
+  };
+
+  const TrendIndicator = ({ studentId, grade }: { studentId?: string; grade: number }) => {
+    const { direction, change } = getStudentTrend(studentId, grade);
+    
+    const trendConfig = {
+      improving: {
+        icon: TrendingUp,
+        color: 'text-green-500',
+        bgColor: 'bg-green-100 dark:bg-green-900/30',
+        label: `Improving (+${change} pts)`,
+      },
+      declining: {
+        icon: TrendingDown,
+        color: 'text-red-500',
+        bgColor: 'bg-red-100 dark:bg-red-900/30',
+        label: `Declining (${change} pts)`,
+      },
+      stable: {
+        icon: Minus,
+        color: 'text-blue-500',
+        bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+        label: 'Stable performance',
+      },
+      new: {
+        icon: Sparkles,
+        color: 'text-purple-500',
+        bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+        label: 'First recorded grade',
+      },
+    };
+    
+    const config = trendConfig[direction];
+    const Icon = config.icon;
+    
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${config.bgColor}`}>
+              <Icon className={`h-4 w-4 ${config.color}`} />
+              <span className={`text-xs font-medium ${config.color}`}>
+                {direction === 'improving' && `+${change}`}
+                {direction === 'declining' && change}
+                {direction === 'stable' && '~'}
+                {direction === 'new' && 'New'}
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{config.label}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
 
   const getScoreColor = (percentage: number) => {
     if (percentage >= 80) return 'bg-green-500';
@@ -293,6 +379,12 @@ export function GradedPapersGallery({
                             <span className="text-lg text-muted-foreground">
                               ({selectedItem.result.totalScore.percentage}%)
                             </span>
+                          </div>
+                          <div className="mt-2">
+                            <TrendIndicator 
+                              studentId={selectedItem.studentId} 
+                              grade={calculateItemGrade(selectedItem)} 
+                            />
                           </div>
                         </div>
                         {extendedResult.regentsScore !== undefined && (
