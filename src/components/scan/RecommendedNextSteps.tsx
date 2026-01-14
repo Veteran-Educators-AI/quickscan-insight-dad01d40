@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { BookOpen, Sparkles, Send, ExternalLink, Loader2, ArrowRight, Target, Lightbulb, Users } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { BookOpen, Sparkles, Send, ExternalLink, Loader2, ArrowRight, Target, Lightbulb, Users, Zap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
+import { useAutoPushSettings } from '@/hooks/useAutoPushSettings';
 import { toast } from 'sonner';
 import { GEOMETRY_TOPICS, ALGEBRA1_TOPICS, ALGEBRA2_TOPICS } from '@/data/nysTopics';
 import { useNavigate } from 'react-router-dom';
@@ -165,7 +166,10 @@ export function RecommendedNextSteps({
   const [isPushingToApp, setIsPushingToApp] = useState(false);
   const [isBulkPushing, setIsBulkPushing] = useState(false);
   const [pushedItems, setPushedItems] = useState<Set<string>>(new Set());
+  const [autoPushTriggered, setAutoPushTriggered] = useState(false);
+  const autoPushRef = useRef(false);
   const { pushToSisterApp } = usePushToSisterApp();
+  const { shouldAutoPush, autoPushEnabled, autoPushThreshold, autoPushRegentsThreshold, autoPushWorksheetCount, isLoading: autoPushLoading } = useAutoPushSettings();
   const navigate = useNavigate();
 
   const topicRecommendations = findRelevantTopics(misconceptions, problemContext, nysStandard);
@@ -178,6 +182,63 @@ export function RecommendedNextSteps({
 
   const unpushedWorksheets = worksheetRecommendations.filter(w => !pushedItems.has(w.title));
   const allPushed = worksheetRecommendations.length > 0 && unpushedWorksheets.length === 0;
+
+  // Auto-push effect - triggers when conditions are met
+  useEffect(() => {
+    const triggerAutoPush = async () => {
+      // Prevent duplicate auto-pushes
+      if (autoPushRef.current || autoPushTriggered || autoPushLoading) return;
+      if (!classId || !studentId) return;
+      if (worksheetRecommendations.length === 0) return;
+      
+      // Check if auto-push should trigger
+      const shouldTrigger = shouldAutoPush(grade, regentsScore);
+      if (!shouldTrigger) return;
+
+      autoPushRef.current = true;
+      setAutoPushTriggered(true);
+
+      // Limit to configured worksheet count
+      const worksheetsToSend = worksheetRecommendations.slice(0, autoPushWorksheetCount);
+      let successCount = 0;
+
+      for (const worksheet of worksheetsToSend) {
+        try {
+          const xpReward = worksheet.difficulty === 'challenge' ? 50 : worksheet.difficulty === 'practice' ? 30 : 20;
+          const coinReward = worksheet.difficulty === 'challenge' ? 25 : worksheet.difficulty === 'practice' ? 15 : 10;
+
+          const result = await pushToSisterApp({
+            class_id: classId,
+            title: `[Auto] ${worksheet.title}`,
+            description: `Auto-generated remediation for ${worksheet.topicName} (${worksheet.standard})`,
+            student_id: studentId,
+            student_name: studentName,
+            topic_name: worksheet.topicName,
+            standard_code: worksheet.standard,
+            xp_reward: xpReward,
+            coin_reward: coinReward,
+            grade,
+          });
+
+          if (result.success) {
+            successCount++;
+            setPushedItems(prev => new Set([...prev, worksheet.title]));
+          }
+        } catch (err) {
+          console.error('Auto-push error:', err);
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Auto-pushed ${successCount} remediation worksheet${successCount > 1 ? 's' : ''} to student app`, {
+          icon: <Zap className="h-4 w-4 text-amber-500" />,
+          description: `Grade ${grade}% triggered auto-push (threshold: ${autoPushThreshold}%)`,
+        });
+      }
+    };
+
+    triggerAutoPush();
+  }, [grade, regentsScore, classId, studentId, shouldAutoPush, autoPushLoading, autoPushTriggered, worksheetRecommendations, autoPushWorksheetCount, pushToSisterApp, studentName, autoPushThreshold]);
 
   const handlePushToApp = async (worksheet: WorksheetRecommendation) => {
     if (!classId) {
@@ -440,8 +501,29 @@ export function RecommendedNextSteps({
           </div>
         )}
 
-        {/* Gamification Info */}
-        {studentId && classId && (
+        {/* Auto-Push Status Indicator */}
+        {autoPushEnabled && studentId && classId && (
+          <div className={`mt-3 p-3 rounded-lg border ${autoPushTriggered ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800' : 'bg-muted/50 border-dashed'}`}>
+            <div className="flex items-start gap-2">
+              <Zap className={`h-4 w-4 mt-0.5 ${autoPushTriggered ? 'text-amber-600' : 'text-muted-foreground'}`} />
+              <div>
+                <p className="text-sm font-medium flex items-center gap-2">
+                  Auto-Push {autoPushTriggered ? 'Triggered' : 'Enabled'}
+                  {autoPushTriggered && <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">✓ Sent</Badge>}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {autoPushTriggered 
+                    ? `Remediation worksheets were automatically sent because grade (${grade}%) was below ${autoPushThreshold}%`
+                    : `Will auto-push when grade < ${autoPushThreshold}% or Regents < ${autoPushRegentsThreshold}`
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Gamification Info - only show if auto-push not enabled */}
+        {studentId && classId && !autoPushEnabled && (
           <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-dashed">
             <div className="flex items-start gap-2">
               <ArrowRight className="h-4 w-4 mt-0.5 text-primary" />

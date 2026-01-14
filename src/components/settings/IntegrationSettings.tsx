@@ -38,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { useGoogleDrive } from "@/hooks/useGoogleDrive";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { GoogleDriveAutoSyncConfig } from "@/components/scan/GoogleDriveAutoSyncConfig";
+import { AutoPushSettings } from "./AutoPushSettings";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -854,6 +855,11 @@ export function IntegrationSettings() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Auto-Push Settings */}
+      <div className="mt-6">
+        <AutoPushSettings />
+      </div>
     </Card>
   );
 }
