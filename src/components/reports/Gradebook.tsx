@@ -11,7 +11,9 @@ import {
   ArrowUpDown,
   Edit2,
   Trash2,
-  Loader2
+  Loader2,
+  Save,
+  X
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +24,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useStudentNames } from '@/lib/StudentNameContext';
@@ -62,6 +68,15 @@ export function Gradebook({ classId }: GradebookProps) {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [isExpanded, setIsExpanded] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  // Edit state
+  const [editingEntry, setEditingEntry] = useState<GradeEntry | null>(null);
+  const [editGrade, setEditGrade] = useState(0);
+  const [editRegentsScore, setEditRegentsScore] = useState<number | null>(null);
+  const [editJustification, setEditJustification] = useState('');
+  const [editTopicName, setEditTopicName] = useState('');
+  const [editNysStandard, setEditNysStandard] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Fetch grade history
   const { data: grades, isLoading, refetch } = useQuery({
@@ -182,6 +197,43 @@ export function Gradebook({ classId }: GradebookProps) {
       toast.error('Failed to delete grade entry');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleEdit = (entry: GradeEntry) => {
+    setEditingEntry(entry);
+    setEditGrade(entry.grade);
+    setEditRegentsScore(entry.regents_score);
+    setEditJustification(entry.grade_justification || '');
+    setEditTopicName(entry.topic_name);
+    setEditNysStandard(entry.nys_standard || '');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingEntry) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('grade_history')
+        .update({
+          grade: editGrade,
+          regents_score: editRegentsScore,
+          grade_justification: editJustification || null,
+          topic_name: editTopicName,
+          nys_standard: editNysStandard || null,
+        })
+        .eq('id', editingEntry.id);
+
+      if (error) throw error;
+      toast.success('Grade entry updated');
+      setEditingEntry(null);
+      refetch();
+    } catch (err) {
+      console.error('Update error:', err);
+      toast.error('Failed to update grade entry');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -424,40 +476,50 @@ export function Gradebook({ classId }: GradebookProps) {
                           {format(new Date(grade.created_at), 'MMM d, yyyy')}
                         </TableCell>
                         <TableCell>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                disabled={deletingId === grade.id}
-                              >
-                                {deletingId === grade.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Grade Entry?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently remove this grade entry from the gradebook. 
-                                  This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(grade.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleEdit(grade)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  disabled={deletingId === grade.id}
                                 >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                                  {deletingId === grade.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Grade Entry?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently remove this grade entry from the gradebook. 
+                                    This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDelete(grade.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -468,6 +530,147 @@ export function Gradebook({ classId }: GradebookProps) {
           </CardContent>
         </CollapsibleContent>
       </Card>
+
+      {/* Edit Grade Dialog */}
+      <Dialog open={!!editingEntry} onOpenChange={(open) => !open && setEditingEntry(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="h-5 w-5" />
+              Edit Grade Entry
+            </DialogTitle>
+            <DialogDescription>
+              {editingEntry?.student && (
+                <span>
+                  Editing grade for{' '}
+                  <strong>
+                    {getDisplayName(
+                      editingEntry.student_id,
+                      editingEntry.student.first_name,
+                      editingEntry.student.last_name
+                    )}
+                  </strong>
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Topic Name */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-topic">Topic Name</Label>
+              <Input
+                id="edit-topic"
+                value={editTopicName}
+                onChange={(e) => setEditTopicName(e.target.value)}
+                placeholder="Enter topic name"
+              />
+            </div>
+
+            {/* NYS Standard */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-standard">NYS Standard (optional)</Label>
+              <Input
+                id="edit-standard"
+                value={editNysStandard}
+                onChange={(e) => setEditNysStandard(e.target.value)}
+                placeholder="e.g., A.REI.4"
+              />
+            </div>
+
+            {/* Grade */}
+            <div className="space-y-2">
+              <Label>Grade: <span className={`font-bold ${getGradeColor(editGrade)}`}>{editGrade}%</span></Label>
+              <div className="flex items-center gap-3">
+                <Slider
+                  value={[editGrade]}
+                  onValueChange={([value]) => setEditGrade(value)}
+                  min={0}
+                  max={100}
+                  step={1}
+                  className="flex-1"
+                />
+                <Input
+                  type="number"
+                  value={editGrade}
+                  onChange={(e) => setEditGrade(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className="w-20"
+                  min={0}
+                  max={100}
+                />
+              </div>
+            </div>
+
+            {/* Regents Score */}
+            <div className="space-y-2">
+              <Label>Regents Score (optional)</Label>
+              <div className="flex items-center gap-2">
+                {[0, 1, 2, 3, 4, 5, 6].map((score) => (
+                  <Button
+                    key={score}
+                    type="button"
+                    variant={editRegentsScore === score ? 'default' : 'outline'}
+                    size="sm"
+                    className="w-9 h-9"
+                    onClick={() => setEditRegentsScore(score)}
+                  >
+                    {score}
+                  </Button>
+                ))}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditRegentsScore(null)}
+                  className="text-muted-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Justification */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-justification">Justification / Notes</Label>
+              <Textarea
+                id="edit-justification"
+                value={editJustification}
+                onChange={(e) => setEditJustification(e.target.value)}
+                placeholder="Explain the grade or any adjustments made..."
+                rows={3}
+              />
+            </div>
+
+            {/* Original Values Reference */}
+            {editingEntry && (
+              <div className="p-3 bg-muted/50 rounded-lg text-sm">
+                <p className="text-muted-foreground mb-1">Original Values:</p>
+                <div className="flex flex-wrap gap-3">
+                  <span>Grade: <strong>{editingEntry.grade}%</strong></span>
+                  {editingEntry.regents_score !== null && (
+                    <span>Regents: <strong>{editingEntry.regents_score}/6</strong></span>
+                  )}
+                  <span>Date: <strong>{format(new Date(editingEntry.created_at), 'MMM d, yyyy')}</strong></span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingEntry(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isSaving || !editTopicName.trim()}>
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Collapsible>
   );
 }
