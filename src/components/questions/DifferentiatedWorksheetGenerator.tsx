@@ -1994,6 +1994,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             questionCount={questionCount}
             includeHints={includeHints}
             previewLevel={students.find(s => s.selected)?.recommendedLevel || 'C'}
+            includeGeometry={includeGeometry}
+            useAIImages={useAIImages}
           />
 
           <Separator />
