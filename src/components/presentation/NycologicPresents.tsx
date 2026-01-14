@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 
 export interface PresentationSlide {
   id: string;
@@ -202,11 +203,14 @@ export function NycologicPresents({
           >
             <X className="h-5 w-5" />
           </Button>
-          <div>
-            <p className={cn("text-xs font-medium tracking-widest uppercase", colors.accent)}>
-              NYClogic PRESENTS:
-            </p>
-            <h1 className="text-white/90 font-serif text-lg">{presentation.title}</h1>
+          <div className="flex items-center gap-2">
+            <img src={nyclogicLogo} alt="NYClogic" className="h-8 w-8" />
+            <div>
+              <p className={cn("text-xs font-medium tracking-widest uppercase", colors.accent)}>
+                NYClogic PRESENTS:
+              </p>
+              <h1 className="text-white/90 font-serif text-lg">{presentation.title}</h1>
+            </div>
           </div>
         </div>
 

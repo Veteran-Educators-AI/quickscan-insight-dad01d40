@@ -19,6 +19,7 @@ import { StudentHandoutDialog, type HandoutOptions } from './StudentHandoutDialo
 import { SlideClipartPicker, getClipartSvg, getClipartPosition, getClipartLibrary, type SlideClipart } from './SlideClipartPicker';
 import { DraggableClipart } from './DraggableClipart';
 import { NycologicPresentationBuilder } from '@/components/presentation/NycologicPresentationBuilder';
+import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 
 interface LessonSlide {
   slideNumber: number;
@@ -1368,7 +1369,7 @@ export function LessonPlanGenerator({
                     variant="secondary"
                     className="w-full bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-600 hover:to-slate-700 text-white border-2 border-amber-400/50 shadow-lg shadow-amber-400/20 hover:shadow-amber-400/40 transition-all duration-300 hover:scale-[1.02]"
                   >
-                    <Sparkles className="h-5 w-5 mr-2 text-amber-400 animate-pulse" />
+                    <img src={nyclogicLogo} alt="NYClogic" className="h-6 w-6 mr-2" />
                     <span className="font-semibold">NYClogic PRESENTS:</span>
                     <span className="ml-2 text-xs bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full">NEW</span>
                   </Button>

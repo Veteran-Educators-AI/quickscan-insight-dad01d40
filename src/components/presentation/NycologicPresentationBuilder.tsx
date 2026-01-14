@@ -13,6 +13,7 @@ import { NycologicPresents, NycologicPresentation, PresentationSlide } from './N
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 
 interface NycologicPresentationBuilderProps {
   open: boolean;
@@ -150,7 +151,7 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
+            <img src={nyclogicLogo} alt="NYClogic" className="h-6 w-6" />
             NYClogic PRESENTS: Create Presentation
           </DialogTitle>
           <DialogDescription>
