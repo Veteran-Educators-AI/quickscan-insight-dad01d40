@@ -19,6 +19,9 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  Lightbulb,
+  Send,
+  Sparkles,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -47,6 +50,9 @@ interface GradeEntry {
   regents_score: number | null;
   nys_standard: string | null;
   grade_justification: string | null;
+  regents_justification: string | null;
+  raw_score_earned: number | null;
+  raw_score_possible: number | null;
   created_at: string;
 }
 
@@ -56,6 +62,18 @@ interface DiagnosticEntry {
   recommended_level: string | null;
   standard: string | null;
   notes: string | null;
+  created_at: string;
+}
+
+interface SharedAssignment {
+  id: string;
+  title: string;
+  description: string | null;
+  xp_reward: number;
+  coin_reward: number;
+  due_at: string | null;
+  status: string;
+  topics: any[];
   created_at: string;
 }
 
@@ -72,6 +90,19 @@ const LEVEL_BG_COLORS: Record<string, string> = {
   F: 'bg-red-700',
 };
 
+// Suggested remedies for common misconception patterns
+const REMEDIATION_SUGGESTIONS: Record<string, string[]> = {
+  'sign error': ['Practice signed number operations with number lines', 'Use color coding for positive/negative values'],
+  'order of operations': ['PEMDAS mnemonic practice', 'Stepwise problem breakdown exercises'],
+  'fraction': ['Visual fraction models', 'Equivalent fraction practice'],
+  'decimal': ['Place value reinforcement', 'Decimal-fraction conversion drills'],
+  'variable': ['Substitution practice', 'Variable definition exercises'],
+  'equation': ['Balance method practice', 'Inverse operation drills'],
+  'graph': ['Coordinate plotting practice', 'Slope-intercept form exercises'],
+  'exponent': ['Exponent rules flashcards', 'Scientific notation practice'],
+  'default': ['Targeted practice problems', 'One-on-one tutoring session', 'Visual learning aids'],
+};
+
 export function StudentReportDialog({
   open,
   onOpenChange,
@@ -84,6 +115,7 @@ export function StudentReportDialog({
     grades: true,
     diagnostics: true,
     misconceptions: true,
+    pushedAssignments: true,
   });
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -119,7 +151,7 @@ export function StudentReportDialog({
     enabled: open && !!studentId,
   });
 
-  // Fetch misconceptions
+  // Fetch misconceptions with topic info
   const { data: misconceptions } = useQuery({
     queryKey: ['student-report-misconceptions', studentId],
     queryFn: async () => {
@@ -127,13 +159,39 @@ export function StudentReportDialog({
         .from('attempt_misconceptions')
         .select(`
           *,
-          misconception:misconception_tags(name, description),
-          attempt:attempts!inner(student_id)
+          misconception:misconception_tags(name, description, topic:topics(name)),
+          attempt:attempts!inner(student_id, created_at, question:questions(prompt_text))
         `)
         .eq('attempt.student_id', studentId);
 
       if (error) throw error;
       return data;
+    },
+    enabled: open && !!studentId,
+  });
+
+  // Fetch pushed assignments (shared_assignments) for this student's class
+  const { data: pushedAssignments } = useQuery({
+    queryKey: ['student-report-pushed-assignments', studentId],
+    queryFn: async () => {
+      // First get the student's class
+      const { data: student, error: studentError } = await supabase
+        .from('students')
+        .select('class_id')
+        .eq('id', studentId)
+        .single();
+
+      if (studentError || !student) return [];
+
+      // Then fetch shared assignments for that class
+      const { data, error } = await supabase
+        .from('shared_assignments')
+        .select('*')
+        .eq('class_id', student.class_id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data as SharedAssignment[];
     },
     enabled: open && !!studentId,
   });
@@ -156,6 +214,18 @@ export function StudentReportDialog({
       ...(diagnosticResults?.map(d => d.topic_name) || []),
     ]).size,
     misconceptionCount: misconceptions?.length || 0,
+    pushedCount: pushedAssignments?.length || 0,
+  };
+
+  // Get suggested remedies based on misconception name
+  const getSuggestedRemedies = (misconceptionName: string): string[] => {
+    const nameLower = misconceptionName.toLowerCase();
+    for (const [key, remedies] of Object.entries(REMEDIATION_SUGGESTIONS)) {
+      if (nameLower.includes(key)) {
+        return remedies;
+      }
+    }
+    return REMEDIATION_SUGGESTIONS.default;
   };
 
   // Calculate trend
@@ -396,51 +466,80 @@ export function StudentReportDialog({
                 </div>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="section space-y-2 mt-2">
+                <div className="section space-y-3 mt-2">
                   {isLoading ? (
                     <div className="text-center py-8 text-muted-foreground">Loading...</div>
                   ) : gradeHistory?.length ? (
                     gradeHistory.map(entry => (
-                      <div
-                        key={entry.id}
-                        className="grade-entry p-3 rounded-lg border flex items-center justify-between hover:bg-muted/30"
-                      >
-                        <div className="flex-1">
-                          <p className="grade-topic font-medium">{entry.topic_name}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            {entry.nys_standard && (
-                              <Badge variant="outline" className="text-xs">
-                                {entry.nys_standard}
-                              </Badge>
-                            )}
-                            <span className="text-xs text-muted-foreground">
-                              {format(new Date(entry.created_at), 'MMM d, yyyy')}
-                            </span>
-                          </div>
-                          {entry.grade_justification && (
-                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                              {entry.grade_justification}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 ml-4">
-                          <span className={cn('grade-score text-xl font-bold', getGradeColor(entry.grade))}>
-                            {entry.grade}%
-                          </span>
-                          {entry.regents_score !== null && (
-                            <Badge
-                              className={cn(
-                                'text-white',
-                                entry.regents_score >= 5 && 'bg-green-500',
-                                entry.regents_score >= 3 && entry.regents_score < 5 && 'bg-yellow-500',
-                                entry.regents_score < 3 && 'bg-red-500'
+                      <Card key={entry.id} className="overflow-hidden">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-lg">{entry.topic_name}</p>
+                                {entry.nys_standard && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {entry.nys_standard}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {format(new Date(entry.created_at), 'MMMM d, yyyy h:mm a')}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <span className={cn('text-2xl font-bold', getGradeColor(entry.grade))}>
+                                  {entry.grade}%
+                                </span>
+                                {entry.raw_score_earned !== null && entry.raw_score_possible !== null && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {entry.raw_score_earned}/{entry.raw_score_possible} pts
+                                  </p>
+                                )}
+                              </div>
+                              {entry.regents_score !== null && (
+                                <Badge
+                                  className={cn(
+                                    'text-white text-lg px-3 py-1',
+                                    entry.regents_score >= 5 && 'bg-green-500',
+                                    entry.regents_score >= 3 && entry.regents_score < 5 && 'bg-yellow-500',
+                                    entry.regents_score < 3 && 'bg-red-500'
+                                  )}
+                                >
+                                  {entry.regents_score}/6
+                                </Badge>
                               )}
-                            >
-                              {entry.regents_score}/6
-                            </Badge>
+                            </div>
+                          </div>
+                          
+                          {/* Grade Justification */}
+                          {entry.grade_justification && (
+                            <div className="mt-3 p-3 bg-muted/50 rounded-lg">
+                              <div className="flex items-center gap-2 text-sm font-medium mb-1">
+                                <FileText className="h-4 w-4 text-primary" />
+                                Grade Justification
+                              </div>
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                {entry.grade_justification}
+                              </p>
+                            </div>
                           )}
-                        </div>
-                      </div>
+                          
+                          {/* Regents Justification */}
+                          {entry.regents_justification && (
+                            <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                              <div className="flex items-center gap-2 text-sm font-medium mb-1 text-blue-700 dark:text-blue-300">
+                                <Award className="h-4 w-4" />
+                                Regents Scoring Rationale
+                              </div>
+                              <p className="text-sm text-blue-600 dark:text-blue-400 whitespace-pre-wrap">
+                                {entry.regents_justification}
+                              </p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
                     ))
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
@@ -524,32 +623,175 @@ export function StudentReportDialog({
                 </div>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="section space-y-2 mt-2">
+                <div className="section space-y-3 mt-2">
                   {misconceptions?.length ? (
-                    misconceptions.map((item: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="misconception-item p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800"
-                      >
-                        <p className="font-medium text-yellow-900 dark:text-yellow-100">
-                          {item.misconception?.name || 'Unknown Misconception'}
-                        </p>
-                        {item.misconception?.description && (
-                          <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                            {item.misconception.description}
-                          </p>
-                        )}
-                        {item.confidence && (
-                          <Badge variant="outline" className="mt-2 text-xs">
-                            Confidence: {Math.round(item.confidence * 100)}%
-                          </Badge>
-                        )}
-                      </div>
-                    ))
+                    misconceptions.map((item: any, idx: number) => {
+                      const misconceptionName = item.misconception?.name || 'Unknown Misconception';
+                      const remedies = getSuggestedRemedies(misconceptionName);
+                      
+                      return (
+                        <Card key={idx} className="border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/20">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                                  <p className="font-semibold text-yellow-900 dark:text-yellow-100">
+                                    {misconceptionName}
+                                  </p>
+                                </div>
+                                {item.misconception?.topic?.name && (
+                                  <Badge variant="outline" className="mt-1 text-xs">
+                                    Topic: {item.misconception.topic.name}
+                                  </Badge>
+                                )}
+                              </div>
+                              {item.confidence && (
+                                <Badge 
+                                  className={cn(
+                                    'text-white',
+                                    item.confidence >= 0.8 && 'bg-red-500',
+                                    item.confidence >= 0.5 && item.confidence < 0.8 && 'bg-yellow-500',
+                                    item.confidence < 0.5 && 'bg-green-500'
+                                  )}
+                                >
+                                  {Math.round(item.confidence * 100)}% confidence
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            {item.misconception?.description && (
+                              <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2">
+                                {item.misconception.description}
+                              </p>
+                            )}
+                            
+                            {/* Suggested Remedies */}
+                            <div className="mt-3 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                              <div className="flex items-center gap-2 text-sm font-medium mb-2 text-green-700 dark:text-green-300">
+                                <Lightbulb className="h-4 w-4" />
+                                Suggested Remediation Strategies
+                              </div>
+                              <ul className="space-y-1">
+                                {remedies.map((remedy, rIdx) => (
+                                  <li key={rIdx} className="text-sm text-green-600 dark:text-green-400 flex items-start gap-2">
+                                    <span className="text-green-500 mt-0.5">•</span>
+                                    {remedy}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                            
+                            {item.attempt?.created_at && (
+                              <p className="text-xs text-muted-foreground mt-2">
+                                Identified on {format(new Date(item.attempt.created_at), 'MMM d, yyyy')}
+                              </p>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <Award className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       No misconceptions identified - Great work!
+                    </div>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            <Separator className="my-6" />
+
+            {/* Pushed Assignments to Scholar App */}
+            <Collapsible open={sectionsExpanded.pushedAssignments} onOpenChange={() => toggleSection('pushedAssignments')}>
+              <CollapsibleTrigger className="w-full">
+                <div className="section-title flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <Send className="h-5 w-5 text-purple-500" />
+                    Problem Sets Pushed to Scholar App
+                    <Badge variant="secondary">{pushedAssignments?.length || 0}</Badge>
+                  </div>
+                  {sectionsExpanded.pushedAssignments ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="section space-y-3 mt-2">
+                  {pushedAssignments?.length ? (
+                    pushedAssignments.map(assignment => {
+                      const topics = Array.isArray(assignment.topics) ? assignment.topics : [];
+                      
+                      return (
+                        <Card key={assignment.id} className="border-purple-200 dark:border-purple-800">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <Sparkles className="h-5 w-5 text-purple-500" />
+                                  <p className="font-semibold">{assignment.title}</p>
+                                </div>
+                                {assignment.description && (
+                                  <p className="text-sm text-muted-foreground mt-1">
+                                    {assignment.description}
+                                  </p>
+                                )}
+                              </div>
+                              <Badge 
+                                className={cn(
+                                  'text-white',
+                                  assignment.status === 'active' && 'bg-green-500',
+                                  assignment.status === 'completed' && 'bg-blue-500',
+                                  assignment.status === 'expired' && 'bg-gray-500'
+                                )}
+                              >
+                                {assignment.status}
+                              </Badge>
+                            </div>
+                            
+                            {/* Rewards */}
+                            <div className="flex items-center gap-4 mt-3">
+                              <div className="flex items-center gap-1 text-sm">
+                                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+                                  🏆 {assignment.xp_reward} XP
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-1 text-sm">
+                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">
+                                  🪙 {assignment.coin_reward} Coins
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            {/* Topics */}
+                            {topics.length > 0 && (
+                              <div className="mt-3">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Topics Covered:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {topics.map((topic: any, tIdx: number) => (
+                                    <Badge key={tIdx} variant="secondary" className="text-xs">
+                                      {typeof topic === 'string' ? topic : topic.name || 'Unknown'}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
+                              <span>Pushed on {format(new Date(assignment.created_at), 'MMM d, yyyy')}</span>
+                              {assignment.due_at && (
+                                <span className="text-orange-600">
+                                  Due: {format(new Date(assignment.due_at), 'MMM d, yyyy')}
+                                </span>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Send className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      No problem sets pushed to Scholar App yet
                     </div>
                   )}
                 </div>
