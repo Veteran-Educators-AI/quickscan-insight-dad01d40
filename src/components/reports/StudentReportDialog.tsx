@@ -762,36 +762,67 @@ export function StudentReportDialog({
   const handleGenerateNextLevelWorksheet = async () => {
     const { currentLevel, nextLevel, canAdvance, topicName, latestGrade } = levelProgressInfo;
     
+    // Get the latest grade entry to find the standard
+    const latestEntry = gradeHistory?.[0];
+    const topicStandard = latestEntry?.nys_standard || '7.G.B.6';
+    
+    // Clean up the topic name if it contains markdown artifacts
+    const cleanTopicName = topicName
+      .replace(/^\*\*\s*/, '')
+      .replace(/\s*\*\*$/, '')
+      .replace(/^The student is working on.*?"([^"]+)".*$/i, '$1')
+      .trim() || 'Math Practice';
+    
     setIsGeneratingNextLevel(true);
-    setNextLevelTopicName(topicName);
+    setNextLevelTopicName(cleanTopicName);
 
     try {
       // Determine worksheet type based on progress
       let worksheetType: 'same_level' | 'next_level' | 'enrichment' = 'same_level';
       let targetLevel = currentLevel;
-      let prompt = '';
+      let customInstructions = '';
       
       if (latestGrade === 100 || canAdvance) {
         if (currentLevel === 'A') {
           worksheetType = 'enrichment';
-          prompt = `Generate enrichment/challenge questions for a student who has mastered Level A in ${topicName}. Include real-world applications and advanced problem-solving.`;
+          customInstructions = `Generate enrichment/challenge questions for ${studentName} who has mastered Level A. Include real-world applications and advanced problem-solving.`;
         } else if (nextLevel) {
           worksheetType = 'next_level';
           targetLevel = nextLevel;
-          prompt = `Generate questions at Level ${nextLevel} difficulty for ${topicName}. This student scored 100% and is ready to advance from Level ${currentLevel}. Include progressively challenging questions appropriate for Level ${nextLevel}.`;
+          customInstructions = `Generate questions at Level ${nextLevel} difficulty for ${studentName}. Student scored 100% and is ready to advance from Level ${currentLevel}. Include progressively challenging questions.`;
         }
       } else {
-        prompt = `Generate practice questions at Level ${currentLevel} difficulty for ${topicName}. This student scored ${latestGrade}% and needs more practice at the current level before advancing. Focus on reinforcing understanding with varied question types.`;
+        customInstructions = `Generate practice questions at Level ${currentLevel} difficulty for ${studentName}. Student scored ${latestGrade}% and needs more practice before advancing. Focus on reinforcing understanding.`;
       }
+
+      // Map advancement level to difficulty levels
+      const difficultyMap: Record<string, string[]> = {
+        'A': ['hard', 'challenging'],
+        'B': ['medium', 'hard'],
+        'C': ['medium', 'hard'],
+        'D': ['easy', 'medium'],
+        'E': ['easy'],
+        'F': ['super-easy', 'easy'],
+      };
+
+      // Build the topics array in the correct format expected by the edge function
+      const topics = [{
+        topicName: cleanTopicName,
+        standard: topicStandard.replace(/^\*\*\s*/, '').replace(/\s*\*\*$/, '').split('\n')[0].trim(),
+        subject: 'Mathematics',
+        category: 'Geometry',
+      }];
 
       const response = await supabase.functions.invoke('generate-worksheet-questions', {
         body: {
-          topic: topicName,
-          level: targetLevel,
+          topics,
           questionCount: 6,
+          difficultyLevels: difficultyMap[targetLevel] || ['medium', 'hard'],
           includeHints: worksheetType === 'same_level',
-          customPrompt: prompt,
-          worksheetType,
+          includeAnswerKey: true,
+          studentName,
+          worksheetMode: worksheetType === 'enrichment' ? 'practice' : 'diagnostic',
+          variationSeed: Date.now(), // Unique seed for each worksheet
         },
       });
 
@@ -1860,6 +1891,7 @@ export function StudentReportDialog({
         onOpenChange={setShowRemediationDialog}
         questions={remediationQuestions}
         studentName={studentName}
+        studentId={studentId}
         topicName={remediationTopicName}
       />
       
@@ -1869,6 +1901,7 @@ export function StudentReportDialog({
         onOpenChange={setShowNextLevelDialog}
         questions={nextLevelQuestions}
         studentName={studentName}
+        studentId={studentId}
         topicName={`${nextLevelTopicName} - Level ${levelProgressInfo.canAdvance ? (levelProgressInfo.nextLevel || 'Enrichment') : levelProgressInfo.currentLevel}`}
       />
     </Dialog>
