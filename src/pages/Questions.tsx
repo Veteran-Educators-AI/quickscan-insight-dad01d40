@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { DifferentiatedWorksheetGenerator } from '@/components/questions/Differe
 import { LessonPlanGenerator } from '@/components/questions/LessonPlanGenerator';
 import { LessonPlanLibrary } from '@/components/questions/LessonPlanLibrary';
 import { LessonTopicSelector, type PresentationTheme } from '@/components/questions/LessonTopicSelector';
+import { MasteryChallengeGenerator } from '@/components/questions/MasteryChallengeGenerator';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Questions() {
@@ -33,6 +34,7 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
   const [showLessonLibrary, setShowLessonLibrary] = useState(false);
   const [showTopicSelector, setShowTopicSelector] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<PresentationTheme | null>(null);
+  const [showMasteryChallenge, setShowMasteryChallenge] = useState(false);
 
   // Get selected topics as array for passing to generator
   const getSelectedTopicsArray = () => {
@@ -436,6 +438,14 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                   </Badge>
                 )}
               </Button>
+              <Button 
+                onClick={() => setShowMasteryChallenge(true)}
+                variant="outline"
+                className="border-amber-300 text-amber-700 hover:bg-amber-50"
+              >
+                <Trophy className="h-4 w-4 mr-2" />
+                Mastery Challenge
+              </Button>
             </TooltipProvider>
           </div>
         </div>
@@ -712,6 +722,12 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
       <LessonPlanLibrary
         open={showLessonLibrary}
         onOpenChange={setShowLessonLibrary}
+      />
+
+      {/* Mastery Challenge Generator Modal */}
+      <MasteryChallengeGenerator
+        open={showMasteryChallenge}
+        onOpenChange={setShowMasteryChallenge}
       />
     </AppLayout>
   );
