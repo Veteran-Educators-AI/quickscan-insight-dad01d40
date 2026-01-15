@@ -186,8 +186,24 @@ export function StudentReportDialog({
     enabled: open && !!studentId,
   });
 
-  // Fetch misconceptions with topic info
-  const { data: misconceptions } = useQuery({
+  // Fetch misconceptions from dedicated analysis_misconceptions table
+  const { data: analysisMisconceptions } = useQuery({
+    queryKey: ['student-report-analysis-misconceptions', studentId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('analysis_misconceptions')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: open && !!studentId,
+  });
+
+  // Fetch legacy misconceptions with topic info (from attempt_misconceptions)
+  const { data: legacyMisconceptions } = useQuery({
     queryKey: ['student-report-misconceptions', studentId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -233,9 +249,47 @@ export function StudentReportDialog({
 
   const isLoading = gradesLoading || diagnosticsLoading;
 
+  // Combine analysis misconceptions (new table) with legacy misconceptions
+  const allMisconceptions = useMemo(() => {
+    const combined: any[] = [];
+    
+    // Add from new analysis_misconceptions table (primary source)
+    if (analysisMisconceptions?.length) {
+      analysisMisconceptions.forEach(m => {
+        combined.push({
+          type: 'analysis',
+          id: m.id,
+          text: m.misconception_text,
+          topic: m.topic_name,
+          severity: m.severity,
+          remedies: m.suggested_remedies || [],
+          gradeImpact: m.grade_impact,
+          date: m.created_at,
+        });
+      });
+    }
+    
+    // Add from legacy attempt_misconceptions table
+    if (legacyMisconceptions?.length) {
+      legacyMisconceptions.forEach((item: any) => {
+        combined.push({
+          type: 'legacy',
+          id: item.misconception_id,
+          text: item.misconception?.name || 'Unknown Misconception',
+          description: item.misconception?.description,
+          topic: item.misconception?.topic?.name,
+          confidence: item.confidence,
+          date: item.attempt?.created_at,
+        });
+      });
+    }
+    
+    return combined;
+  }, [analysisMisconceptions, legacyMisconceptions]);
+
   // Extract misconceptions from grade justifications when no formal misconceptions exist
   const extractedMisconceptions = useMemo(() => {
-    if (misconceptions?.length) return []; // Use formal misconceptions if they exist
+    if (allMisconceptions.length > 0) return []; // Use stored misconceptions if they exist
     
     const extracted: { text: string; topic: string; grade: number; date: string }[] = [];
     gradeHistory?.forEach(entry => {
@@ -252,7 +306,7 @@ export function StudentReportDialog({
       }
     });
     return extracted;
-  }, [gradeHistory, misconceptions]);
+  }, [gradeHistory, allMisconceptions]);
 
   // Calculate summary statistics
   const stats = {
@@ -269,7 +323,7 @@ export function StudentReportDialog({
       ...(gradeHistory?.map(g => g.topic_name) || []),
       ...(diagnosticResults?.map(d => d.topic_name) || []),
     ]).size,
-    misconceptionCount: (misconceptions?.length || 0) + extractedMisconceptions.length,
+    misconceptionCount: allMisconceptions.length + extractedMisconceptions.length,
     pushedCount: pushedAssignments?.length || 0,
   };
 
@@ -673,17 +727,17 @@ export function StudentReportDialog({
                   <div className="flex items-center gap-2 font-semibold">
                     <AlertTriangle className="h-5 w-5 text-yellow-500" />
                     Identified Misconceptions
-                    <Badge variant="secondary">{misconceptions?.length || 0}</Badge>
+                    <Badge variant="secondary">{stats.misconceptionCount}</Badge>
                   </div>
                   {sectionsExpanded.misconceptions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </div>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="section space-y-3 mt-2">
-                  {misconceptions?.length ? (
-                    misconceptions.map((item: any, idx: number) => {
-                      const misconceptionName = item.misconception?.name || 'Unknown Misconception';
-                      const remedies = getSuggestedRemedies(misconceptionName);
+                  {allMisconceptions.length > 0 ? (
+                    allMisconceptions.map((item: any, idx: number) => {
+                      const misconceptionName = item.text || 'Unknown Misconception';
+                      const remedies = item.remedies?.length > 0 ? item.remedies : getSuggestedRemedies(misconceptionName);
                       
                       return (
                         <Card key={idx} className="border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/20">
@@ -696,11 +750,30 @@ export function StudentReportDialog({
                                     {misconceptionName}
                                   </p>
                                 </div>
-                                {item.misconception?.topic?.name && (
-                                  <Badge variant="outline" className="mt-1 text-xs">
-                                    Topic: {item.misconception.topic.name}
-                                  </Badge>
-                                )}
+                                <div className="flex items-center gap-2 mt-1">
+                                  {item.topic && (
+                                    <Badge variant="outline" className="text-xs">
+                                      Topic: {item.topic}
+                                    </Badge>
+                                  )}
+                                  {item.severity && (
+                                    <Badge 
+                                      className={cn(
+                                        'text-xs',
+                                        item.severity === 'high' && 'bg-red-500 text-white',
+                                        item.severity === 'medium' && 'bg-yellow-500 text-white',
+                                        item.severity === 'low' && 'bg-green-500 text-white'
+                                      )}
+                                    >
+                                      {item.severity} severity
+                                    </Badge>
+                                  )}
+                                  {item.gradeImpact && (
+                                    <Badge variant="outline" className="text-xs text-red-600 border-red-300">
+                                      -{item.gradeImpact} pts impact
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                               {item.confidence && (
                                 <Badge 
@@ -716,9 +789,9 @@ export function StudentReportDialog({
                               )}
                             </div>
                             
-                            {item.misconception?.description && (
+                            {item.description && (
                               <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2">
-                                {item.misconception.description}
+                                {item.description}
                               </p>
                             )}
                             
@@ -729,7 +802,7 @@ export function StudentReportDialog({
                                 Suggested Remediation Strategies
                               </div>
                               <ul className="space-y-1">
-                                {remedies.map((remedy, rIdx) => (
+                                {remedies.map((remedy: string, rIdx: number) => (
                                   <li key={rIdx} className="text-sm text-green-600 dark:text-green-400 flex items-start gap-2">
                                     <span className="text-green-500 mt-0.5">•</span>
                                     {remedy}
@@ -738,9 +811,9 @@ export function StudentReportDialog({
                               </ul>
                             </div>
                             
-                            {item.attempt?.created_at && (
+                            {item.date && (
                               <p className="text-xs text-muted-foreground mt-2">
-                                Identified on {format(new Date(item.attempt.created_at), 'MMM d, yyyy')}
+                                Identified on {format(new Date(item.date), 'MMM d, yyyy')}
                               </p>
                             )}
                           </CardContent>
