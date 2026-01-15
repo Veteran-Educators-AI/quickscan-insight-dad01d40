@@ -305,24 +305,110 @@ serve(async (req) => {
 
     console.log('Syncing comprehensive data to Scholar:', JSON.stringify(batchPayload.summary));
 
-    // Send single batch request
-    const response = await fetch(sisterAppEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': sisterAppApiKey,
-      },
-      body: JSON.stringify(batchPayload),
-    });
-
-    const responseText = await response.text();
+    // First, try to detect if we're syncing to our own receive-sister-app-data function
+    // or to an external Scholar API that might have a different format
+    let response: Response;
+    let responseText: string;
     
-    if (!response.ok) {
-      console.error('Scholar app error:', response.status, responseText);
+    try {
+      // Attempt the sync with batch_sync format first
+      response = await fetch(sisterAppEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': sisterAppApiKey,
+        },
+        body: JSON.stringify(batchPayload),
+      });
+
+      responseText = await response.text();
+      
+      // If we get "Unknown payload type", try alternative format for external Scholar APIs
+      if (!response.ok && responseText.includes('Unknown payload type')) {
+        console.log('External Scholar API detected, trying alternative sync format...');
+        
+        // Try sending individual student syncs in a format external Scholar might expect
+        const alternativePayload = {
+          type: 'learning_data_sync',
+          source: 'nycologic_ai',
+          teacher_id: user.id,
+          teacher_name: teacherProfile?.full_name || null,
+          timestamp: new Date().toISOString(),
+          students: studentProfiles.map(profile => ({
+            id: profile.student_id,
+            name: profile.student_name,
+            class_id: profile.class_id,
+            class_name: profile.class_name,
+            average_grade: profile.overall_average,
+            recent_grades: profile.grades.slice(0, 10).map(g => ({
+              topic: g.topic_name,
+              score: g.grade,
+              regents: g.regents_score,
+              standard: g.nys_standard,
+              date: g.created_at,
+            })),
+            identified_misconceptions: profile.misconceptions.map(m => ({
+              name: m.name,
+              description: m.description,
+              topic: m.topic_name,
+              confidence: m.confidence,
+            })),
+            weak_areas: profile.weak_topics,
+            remediation_recommendations: profile.recommended_remediation,
+            rewards: {
+              xp_potential: profile.xp_potential,
+              coin_potential: profile.coin_potential,
+            },
+          })),
+          summary: batchPayload.summary,
+        };
+        
+        response = await fetch(sisterAppEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': sisterAppApiKey,
+          },
+          body: JSON.stringify(alternativePayload),
+        });
+        
+        responseText = await response.text();
+      }
+    } catch (fetchError) {
+      console.error('Network error syncing to Scholar:', fetchError);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: `Scholar sync failed: ${responseText}`,
+          error: `Network error: ${fetchError instanceof Error ? fetchError.message : 'Connection failed'}. Please check NYCOLOGIC_API_URL is correct.`,
+        }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!response.ok) {
+      console.error('Scholar app error:', response.status, responseText);
+      
+      // Provide helpful error messages based on the error
+      let errorMessage = `Scholar sync failed (${response.status})`;
+      let suggestion = '';
+      
+      if (responseText.includes('Unknown payload type')) {
+        errorMessage = 'Scholar API does not recognize the sync format';
+        suggestion = 'The external Scholar API may require a different payload format. Please check the Scholar API documentation or contact support.';
+      } else if (responseText.includes('Invalid API key') || response.status === 401) {
+        errorMessage = 'Authentication failed';
+        suggestion = 'Please verify the SISTER_APP_API_KEY is correct for the target Scholar instance.';
+      } else if (response.status === 404) {
+        errorMessage = 'Scholar API endpoint not found';
+        suggestion = 'Please verify NYCOLOGIC_API_URL points to the correct Scholar API endpoint.';
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: errorMessage,
+          details: responseText,
+          suggestion,
           status: response.status 
         }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
