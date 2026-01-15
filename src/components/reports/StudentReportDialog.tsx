@@ -27,6 +27,9 @@ import {
   GraduationCap,
   ArrowUp,
   ArrowRight,
+  Compass,
+  MapPin,
+  Wand2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PrintRemediationQuestionsDialog } from '@/components/print/PrintRemediationQuestionsDialog';
@@ -203,6 +206,16 @@ export function StudentReportDialog({
   const [nextLevelQuestions, setNextLevelQuestions] = useState<any[]>([]);
   const [showNextLevelDialog, setShowNextLevelDialog] = useState(false);
   const [nextLevelTopicName, setNextLevelTopicName] = useState('');
+  
+  // Next topic suggestion state
+  const [isLoadingNextTopic, setIsLoadingNextTopic] = useState(false);
+  const [nextTopicSuggestion, setNextTopicSuggestion] = useState<{
+    nextTopic: { name: string; standard: string; category: string };
+    reasoning: string;
+    prerequisiteReview?: string[];
+    alternativeTopics?: { name: string; standard: string; reason: string }[];
+    difficultyProgression: 'natural' | 'stretch' | 'consolidate';
+  } | null>(null);
 
   // Fetch grade history
   const { data: gradeHistory, isLoading: gradesLoading } = useQuery({
@@ -679,6 +692,66 @@ export function StudentReportDialog({
       });
     } finally {
       setIsGeneratingNextLevel(false);
+    }
+  };
+
+  // Fetch AI suggestion for next topic when student is at Level A
+  const handleSuggestNextTopic = async () => {
+    setIsLoadingNextTopic(true);
+    setNextTopicSuggestion(null);
+
+    try {
+      // Gather mastered topics from grade history (grades >= 95%)
+      const masteredTopics = gradeHistory
+        ?.filter(g => g.grade >= 95)
+        .map(g => g.topic_name) || [];
+      
+      // Identify strengths and weaknesses
+      const topicGrades: Record<string, number[]> = {};
+      gradeHistory?.forEach(g => {
+        if (!topicGrades[g.topic_name]) topicGrades[g.topic_name] = [];
+        topicGrades[g.topic_name].push(g.grade);
+      });
+      
+      const strengths: string[] = [];
+      const weaknesses: string[] = [];
+      
+      Object.entries(topicGrades).forEach(([topic, grades]) => {
+        const avg = grades.reduce((a, b) => a + b, 0) / grades.length;
+        if (avg >= 90) strengths.push(topic);
+        else if (avg < 70) weaknesses.push(topic);
+      });
+
+      const response = await supabase.functions.invoke('suggest-next-topic', {
+        body: {
+          currentTopic: levelProgressInfo.topicName,
+          masteredTopics: [...new Set(masteredTopics)],
+          studentName,
+          studentStrengths: strengths,
+          studentWeaknesses: weaknesses,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to get topic suggestion');
+      }
+
+      if (response.data?.suggestion) {
+        setNextTopicSuggestion(response.data.suggestion);
+        toast({
+          title: 'Topic suggestion ready!',
+          description: `Recommended: ${response.data.suggestion.nextTopic.name}`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error suggesting next topic:', error);
+      toast({
+        title: 'Failed to get suggestion',
+        description: error.message || 'An error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingNextTopic(false);
     }
   };
 
@@ -1409,6 +1482,155 @@ export function StudentReportDialog({
                 </div>
               </CardContent>
             </Card>
+
+            {/* Suggest Next Topic Section - Only shown when at Level A or mastered */}
+            {(levelProgressInfo.currentLevel === 'A' || levelProgressInfo.canAdvance) && (
+              <>
+                <Separator className="my-6" />
+                
+                <Card className="border-2 border-dashed border-violet-300 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/20 dark:to-purple-950/20">
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 rounded-full bg-gradient-to-r from-violet-500 to-purple-500">
+                        <Compass className="h-6 w-6 text-white" />
+                      </div>
+                      
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <h3 className="font-semibold text-lg flex items-center gap-2">
+                              <Wand2 className="h-5 w-5 text-violet-500" />
+                              Suggest Next Topic
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              AI-powered curriculum recommendation for {studentName}'s next learning goal
+                            </p>
+                          </div>
+                          
+                          <Button
+                            variant={nextTopicSuggestion ? "outline" : "default"}
+                            className={cn(
+                              "gap-2",
+                              !nextTopicSuggestion && "bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
+                            )}
+                            onClick={handleSuggestNextTopic}
+                            disabled={isLoadingNextTopic}
+                          >
+                            {isLoadingNextTopic ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Analyzing...
+                              </>
+                            ) : nextTopicSuggestion ? (
+                              <>
+                                <Wand2 className="h-4 w-4" />
+                                Get New Suggestion
+                              </>
+                            ) : (
+                              <>
+                                <Wand2 className="h-4 w-4" />
+                                Get AI Suggestion
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                        
+                        {/* AI Suggestion Results */}
+                        {nextTopicSuggestion && (
+                          <div className="mt-4 space-y-4">
+                            {/* Main Recommendation */}
+                            <div className="p-4 rounded-lg bg-white dark:bg-card border-2 border-violet-200 dark:border-violet-800">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <MapPin className="h-5 w-5 text-violet-500" />
+                                    <h4 className="font-bold text-lg text-violet-700 dark:text-violet-300">
+                                      {nextTopicSuggestion.nextTopic.name}
+                                    </h4>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline" className="text-xs">
+                                      {nextTopicSuggestion.nextTopic.standard}
+                                    </Badge>
+                                    <Badge variant="secondary" className="text-xs">
+                                      {nextTopicSuggestion.nextTopic.category}
+                                    </Badge>
+                                    <Badge 
+                                      className={cn(
+                                        'text-xs text-white',
+                                        nextTopicSuggestion.difficultyProgression === 'natural' && 'bg-blue-500',
+                                        nextTopicSuggestion.difficultyProgression === 'stretch' && 'bg-orange-500',
+                                        nextTopicSuggestion.difficultyProgression === 'consolidate' && 'bg-green-500'
+                                      )}
+                                    >
+                                      {nextTopicSuggestion.difficultyProgression === 'natural' && '📈 Natural Progression'}
+                                      {nextTopicSuggestion.difficultyProgression === 'stretch' && '🚀 Stretch Challenge'}
+                                      {nextTopicSuggestion.difficultyProgression === 'consolidate' && '🔄 Consolidation'}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <p className="mt-3 text-sm text-muted-foreground">
+                                {nextTopicSuggestion.reasoning}
+                              </p>
+                              
+                              {/* Prerequisite Review */}
+                              {nextTopicSuggestion.prerequisiteReview && nextTopicSuggestion.prerequisiteReview.length > 0 && (
+                                <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                                  <p className="text-sm font-medium text-amber-700 dark:text-amber-300 mb-2">
+                                    📝 Quick review recommended before starting:
+                                  </p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {nextTopicSuggestion.prerequisiteReview.map((topic, idx) => (
+                                      <Badge key={idx} variant="outline" className="text-xs bg-amber-100 dark:bg-amber-900/30">
+                                        {topic}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Alternative Topics */}
+                            {nextTopicSuggestion.alternativeTopics && nextTopicSuggestion.alternativeTopics.length > 0 && (
+                              <div className="p-4 rounded-lg bg-muted/50 border">
+                                <p className="text-sm font-medium mb-2 text-muted-foreground">
+                                  Alternative options:
+                                </p>
+                                <div className="space-y-2">
+                                  {nextTopicSuggestion.alternativeTopics.map((alt, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-2 rounded bg-card border">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-sm">{alt.name}</span>
+                                        <Badge variant="outline" className="text-xs">{alt.standard}</Badge>
+                                      </div>
+                                      <span className="text-xs text-muted-foreground max-w-[200px] truncate">
+                                        {alt.reason}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Empty State */}
+                        {!nextTopicSuggestion && !isLoadingNextTopic && (
+                          <div className="mt-4 p-4 rounded-lg bg-muted/30 border border-dashed text-center">
+                            <Compass className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                            <p className="text-sm text-muted-foreground">
+                              Click "Get AI Suggestion" to receive a personalized recommendation for {studentName}'s next topic
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </div>
         </ScrollArea>
       </DialogContent>
