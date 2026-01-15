@@ -361,7 +361,6 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [worksheetQuestions, setWorksheetQuestions] = useState<any[]>([]);
   const [showWorksheetDialog, setShowWorksheetDialog] = useState(false);
-  const [worksheetTopicName, setWorksheetTopicName] = useState<string>('Remediation');
 
   // Fetch grade history with student info for the class
   const { data: gradeData, isLoading } = useQuery({
@@ -518,7 +517,6 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
       const questions = response.data?.questions || [];
       if (questions.length > 0) {
         setWorksheetQuestions(questions);
-        setWorksheetTopicName(group.category);
         setShowWorksheetDialog(true);
         toast.success(`Generated ${questions.length} questions targeting ${group.category}`);
       } else {
@@ -779,13 +777,15 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
       </Card>
       
       {/* Worksheet Dialog */}
-      <PrintRemediationQuestionsDialog
-        open={showWorksheetDialog}
-        onOpenChange={setShowWorksheetDialog}
-        questions={worksheetQuestions}
-        studentName="Class Group"
-        topicName={worksheetTopicName}
-      />
+      {showWorksheetDialog && worksheetQuestions.length > 0 && (
+        <PrintRemediationQuestionsDialog
+          open={showWorksheetDialog}
+          onOpenChange={setShowWorksheetDialog}
+          questions={worksheetQuestions}
+          studentName="Class Group"
+          topicName={selectedCategory || 'Remediation'}
+        />
+      )}
     </>
   );
 }

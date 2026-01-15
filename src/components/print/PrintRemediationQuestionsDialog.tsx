@@ -1,13 +1,12 @@
 import { useState, useRef } from 'react';
-import { Printer, Lightbulb, QrCode, Download, Loader2 } from 'lucide-react';
+import { Printer, Lightbulb, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { QRCodeSVG } from 'qrcode.react';
-import { jsPDF } from 'jspdf';
-import { toast } from 'sonner';
+
 interface RemediationQuestion {
   questionNumber: number;
   question: string;
@@ -40,7 +39,6 @@ export function PrintRemediationQuestionsDialog({
 }: PrintRemediationQuestionsDialogProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [worksheetTitle, setWorksheetTitle] = useState(topicName ? `${topicName} - Practice` : 'Practice Worksheet');
   const [includeHints, setIncludeHints] = useState(true);
   const [includeDifficulty, setIncludeDifficulty] = useState(true);
@@ -81,155 +79,6 @@ export function PrintRemediationQuestionsDialog({
 
   const handleClosePreview = () => {
     setShowPreview(false);
-  };
-
-  const handleDownloadPDF = async () => {
-    setIsDownloading(true);
-    setShowPreview(true);
-    
-    // Wait for preview to render
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    try {
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'pt',
-        format: 'letter',
-      });
-      
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 40;
-      const contentWidth = pageWidth - (margin * 2);
-      let yPosition = margin;
-      
-      // Helper for text wrapping
-      const addWrappedText = (text: string, x: number, y: number, maxWidth: number, fontSize: number, isBold = false) => {
-        pdf.setFontSize(fontSize);
-        pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
-        const lines = pdf.splitTextToSize(text, maxWidth);
-        pdf.text(lines, x, y);
-        return y + (lines.length * fontSize * 1.2);
-      };
-      
-      // Header
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(worksheetTitle, margin, yPosition);
-      yPosition += 24;
-      
-      // Student info line
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      const headerLine = `Name: ${includeStudentHeader && studentName ? studentName : '________________'}    Date: __________    Period: ______    Score: ___/${displayQuestions.length}`;
-      pdf.text(headerLine, margin, yPosition);
-      yPosition += 20;
-      
-      // Divider
-      pdf.setDrawColor(0);
-      pdf.setLineWidth(1);
-      pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-      yPosition += 15;
-      
-      // Instructions
-      pdf.setFillColor(243, 244, 246);
-      pdf.rect(margin, yPosition - 10, contentWidth, 22, 'F');
-      pdf.setFontSize(9);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Instructions: ', margin + 5, yPosition);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text('Show all work. Circle final answers.' + (includeHints ? ' Use hints if needed.' : ''), margin + 65, yPosition);
-      yPosition += 25;
-      
-      // Questions
-      const questionBoxHeight = useCompactLayout ? 120 : 150;
-      const colWidth = useCompactLayout ? (contentWidth - 10) / 2 : contentWidth;
-      let col = 0;
-      let rowY = yPosition;
-      
-      for (let i = 0; i < displayQuestions.length; i++) {
-        const q = displayQuestions[i];
-        const xOffset = useCompactLayout ? margin + (col * (colWidth + 10)) : margin;
-        
-        // Check if we need a new page
-        if (rowY + questionBoxHeight > pageHeight - margin) {
-          pdf.addPage();
-          rowY = margin;
-        }
-        
-        // Question box
-        pdf.setDrawColor(200);
-        pdf.setLineWidth(0.5);
-        pdf.rect(xOffset, rowY, colWidth, questionBoxHeight);
-        
-        // Question number circle
-        pdf.setFillColor(31, 41, 55);
-        pdf.circle(xOffset + 12, rowY + 15, 8, 'F');
-        pdf.setTextColor(255);
-        pdf.setFontSize(9);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(String(q.questionNumber || i + 1), xOffset + 12, rowY + 18, { align: 'center' });
-        pdf.setTextColor(0);
-        
-        // Difficulty badge
-        if (includeDifficulty) {
-          const diffLabel = getDifficultyLabel(q.difficulty);
-          pdf.setFontSize(7);
-          pdf.setFont('helvetica', 'normal');
-          pdf.text(diffLabel, xOffset + 25, rowY + 18);
-        }
-        
-        // Question text
-        const questionY = rowY + 32;
-        const newY = addWrappedText(q.question, xOffset + 8, questionY, colWidth - 16, 10);
-        
-        // Hint
-        if (includeHints && q.hint) {
-          const hintY = Math.min(newY + 5, rowY + questionBoxHeight - 40);
-          pdf.setFillColor(254, 243, 199);
-          pdf.rect(xOffset + 5, hintY - 8, colWidth - 10, 16, 'F');
-          pdf.setFontSize(7);
-          pdf.setFont('helvetica', 'italic');
-          pdf.text('💡 ' + q.hint.substring(0, 80), xOffset + 8, hintY);
-        }
-        
-        // Answer area label
-        pdf.setFontSize(6);
-        pdf.setTextColor(150);
-        pdf.text('Work:', xOffset + 8, rowY + questionBoxHeight - 8);
-        pdf.setTextColor(0);
-        
-        // Move to next position
-        if (useCompactLayout) {
-          col++;
-          if (col >= 2) {
-            col = 0;
-            rowY += questionBoxHeight + 10;
-          }
-        } else {
-          rowY += questionBoxHeight + 10;
-        }
-      }
-      
-      // Footer
-      const footerY = pageHeight - 25;
-      pdf.setFontSize(7);
-      pdf.setTextColor(150);
-      pdf.text(`${studentName || 'Student'} • ${worksheetTitle}`, margin, footerY);
-      pdf.text(new Date().toLocaleDateString(), pageWidth - margin, footerY, { align: 'right' });
-      
-      // Save PDF
-      const fileName = `${worksheetTitle.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-      pdf.save(fileName);
-      
-      toast.success('PDF downloaded successfully!');
-      setShowPreview(false);
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast.error('Failed to generate PDF');
-    } finally {
-      setIsDownloading(false);
-    }
   };
 
   // Limit to 8 questions for 2-page max
@@ -357,17 +206,9 @@ export function PrintRemediationQuestionsDialog({
             </div>
           </div>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
-            </Button>
-            <Button variant="outline" onClick={handleDownloadPDF} disabled={isDownloading}>
-              {isDownloading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              Download PDF
             </Button>
             <Button onClick={handlePrint}>
               <Printer className="h-4 w-4 mr-2" />
