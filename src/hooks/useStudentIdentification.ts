@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 export interface IdentificationResult {
   qrCodeDetected: boolean;
   qrCodeContent: string | null;
-  parsedQRCode: { studentId: string; questionId: string } | null;
+  parsedQRCode: { studentId: string; questionId?: string; version?: number } | null;
   handwrittenName: string | null;
   matchedStudentId: string | null;
   matchedStudentName: string | null;

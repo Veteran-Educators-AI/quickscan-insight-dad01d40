@@ -925,7 +925,7 @@ interface StudentRosterItem {
 interface IdentificationResult {
   qrCodeDetected: boolean;
   qrCodeContent: string | null;
-  parsedQRCode: { studentId: string; questionId: string } | null;
+  parsedQRCode: { studentId: string; questionId?: string; version?: number } | null;
   handwrittenName: string | null;
   matchedStudentId: string | null;
   matchedStudentName: string | null;
@@ -945,22 +945,32 @@ async function identifyStudent(
       ).join('\n')}`
     : '';
 
-  const prompt = `Analyze this image of student work to identify the student. Look for:
+const prompt = `Analyze this image of student work to identify the student. CRITICAL: Look carefully for QR codes!
 
-1. QR CODE: Check all corners and edges for any QR code. If found, extract its EXACT content.
-   - The QR code may contain JSON like: {"v":1,"s":"student-uuid","q":"question-uuid"}
-   - Extract the complete content exactly as encoded
+1. QR CODE: Check ALL corners and edges thoroughly for any QR code. Scan the ENTIRE image carefully.
+   - QR codes are typically small black-and-white square patterns, often in corners
+   - VERSION 1 FORMAT: {"v":1,"s":"student-uuid","q":"question-uuid"} - contains student AND question IDs
+   - VERSION 2 FORMAT: {"v":2,"type":"student","s":"student-uuid"} - contains ONLY student ID
+   - If you find a QR code, extract its EXACT content character-by-character
+   - The "s" field contains the student UUID that MUST match the roster
+   
 2. HANDWRITTEN NAME: Look for a handwritten student name, typically at the top of the page.
 3. STUDENT ID: Look for any printed or handwritten student ID number.
 ${rosterInfo}
 
+IMPORTANT MATCHING RULES:
+- If you find a QR code with an "s" field, that UUID must EXACTLY match an "id" from the roster
+- The roster IDs are UUIDs like "a1b2c3d4-e5f6-..." - match against these, NOT student_id numbers
+- QR code match = "high" confidence always
+
 Respond in this exact JSON format (no markdown, just raw JSON):
 {
   "qr_code_detected": true/false,
-  "qr_code_content": "exact content if found or null",
+  "qr_code_content": "exact JSON content if found or null",
+  "qr_code_version": 1 or 2 or null,
   "handwritten_name": "extracted name or null",
   "student_id_found": "ID if found or null",
-  "matched_student_id": "roster ID if matched or null",
+  "matched_student_id": "roster UUID if matched or null",
   "matched_student_name": "full name if matched or null",
   "confidence": "high/medium/low/none",
   "notes": "any relevant observations"
@@ -985,7 +995,7 @@ Respond in this exact JSON format (no markdown, just raw JSON):
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       
-      let parsedQRCode: { studentId: string; questionId: string } | null = null;
+      let parsedQRCode: { studentId: string; questionId?: string; version: number } | null = null;
       let matchedId = parsed.matched_student_id;
       let matchedName = parsed.matched_student_name;
       let matchedQuestionId: string | null = null;
@@ -993,10 +1003,13 @@ Respond in this exact JSON format (no markdown, just raw JSON):
       if (parsed.qr_code_content) {
         try {
           const qrData = JSON.parse(parsed.qr_code_content);
+          
+          // Version 1: Student + Question QR code
           if (qrData.v === 1 && qrData.s && qrData.q) {
             parsedQRCode = {
               studentId: qrData.s,
               questionId: qrData.q,
+              version: 1,
             };
             matchedId = qrData.s;
             matchedQuestionId = qrData.q;
@@ -1008,10 +1021,46 @@ Respond in this exact JSON format (no markdown, just raw JSON):
               }
             }
             
-            console.log('Parsed structured QR code:', parsedQRCode);
+            console.log('Parsed v1 QR code (student+question):', parsedQRCode);
+          }
+          // Version 2: Student-only QR code
+          else if (qrData.v === 2 && qrData.type === 'student' && qrData.s) {
+            parsedQRCode = {
+              studentId: qrData.s,
+              version: 2,
+            };
+            matchedId = qrData.s;
+            
+            if (studentRoster && studentRoster.length > 0) {
+              const student = studentRoster.find(s => s.id === qrData.s);
+              if (student) {
+                matchedName = `${student.first_name} ${student.last_name}`;
+              }
+            }
+            
+            console.log('Parsed v2 QR code (student-only):', parsedQRCode);
+          }
+          // Fallback: Try to extract student ID from any "s" field
+          else if (qrData.s) {
+            parsedQRCode = {
+              studentId: qrData.s,
+              questionId: qrData.q,
+              version: qrData.v || 0,
+            };
+            matchedId = qrData.s;
+            if (qrData.q) matchedQuestionId = qrData.q;
+            
+            if (studentRoster && studentRoster.length > 0) {
+              const student = studentRoster.find(s => s.id === qrData.s);
+              if (student) {
+                matchedName = `${student.first_name} ${student.last_name}`;
+              }
+            }
+            
+            console.log('Parsed generic QR code with student ID:', parsedQRCode);
           }
         } catch (qrParseError) {
-          console.log('QR content is not structured JSON, using raw content');
+          console.log('QR content is not structured JSON, using raw content:', parsed.qr_code_content);
         }
       }
       
