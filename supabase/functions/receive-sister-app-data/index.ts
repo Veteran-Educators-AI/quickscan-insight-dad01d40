@@ -73,6 +73,7 @@ interface IncomingData {
 interface StudentLearningProfile {
   student_id: string;
   student_name: string;
+  student_email: string | null;  // Email for auto-linking on Scholar signup
   class_id: string;
   class_name: string;
   overall_average: number;
@@ -253,13 +254,14 @@ serve(async (req) => {
       let remediationsCreated = 0;
 
       for (const profile of profiles) {
-        // Log each student's sync
+        // Log each student's sync (including email for auto-linking)
         await supabaseAdmin.from('sister_app_sync_log').insert({
           teacher_id: keyRecord.teacher_id,
           student_id: profile.student_id,
           action: 'batch_sync_student',
           data: {
             student_name: profile.student_name,
+            student_email: profile.student_email,  // Email for Scholar auto-linking
             overall_average: profile.overall_average,
             grades_count: profile.grades.length,
             misconceptions_count: profile.misconceptions.length,

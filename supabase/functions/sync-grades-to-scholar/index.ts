@@ -56,6 +56,7 @@ interface GradeEntry {
 interface StudentLearningProfile {
   student_id: string;
   student_name: string;
+  student_email: string | null;  // Email for auto-linking on Scholar signup
   class_id: string;
   class_name: string;
   overall_average: number;
@@ -206,10 +207,10 @@ serve(async (req) => {
     const xpMultiplier = settings?.sister_app_xp_multiplier || 1;
     const coinMultiplier = settings?.sister_app_coin_multiplier || 1;
 
-    // Get students to sync
+    // Get students to sync (including email for auto-linking on Scholar)
     let studentQuery = supabase
       .from('students')
-      .select('id, first_name, last_name, class_id, classes(name)')
+      .select('id, first_name, last_name, email, class_id, classes(name)')
       .eq('classes.teacher_id', user.id);
 
     if (student_ids && student_ids.length > 0) {
@@ -327,6 +328,7 @@ serve(async (req) => {
       studentProfiles.push({
         student_id: student.id,
         student_name: `${student.first_name} ${student.last_name}`,
+        student_email: student.email || null,  // Include email for auto-linking
         class_id: student.class_id,
         class_name: classData?.name || 'Unknown',
         overall_average: avgGrade,
@@ -458,6 +460,7 @@ serve(async (req) => {
         action: 'sync_student',
         student_id: profile.student_id,
         student_name: profile.student_name,
+        student_email: profile.student_email,  // Email for auto-linking on Scholar signup
         class_id: profile.class_id,
         class_name: profile.class_name,
         teacher_id: user.id,
