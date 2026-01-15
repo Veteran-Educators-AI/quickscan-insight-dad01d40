@@ -24,6 +24,9 @@ import {
   Sparkles,
   FileSpreadsheet,
   Loader2,
+  GraduationCap,
+  ArrowUp,
+  ArrowRight,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PrintRemediationQuestionsDialog } from '@/components/print/PrintRemediationQuestionsDialog';
@@ -92,6 +95,36 @@ const LEVEL_BG_COLORS: Record<string, string> = {
   D: 'bg-orange-500',
   E: 'bg-red-500',
   F: 'bg-red-700',
+};
+
+const LEVEL_ORDER = ['F', 'E', 'D', 'C', 'B', 'A'];
+
+const LEVEL_DESCRIPTIONS: Record<string, string> = {
+  A: 'Advanced Mastery - Ready for enrichment',
+  B: 'Proficient - Strong understanding',
+  C: 'Developing - Building competency',
+  D: 'Approaching - Needs reinforcement',
+  E: 'Beginning - Requires intervention',
+  F: 'Foundational - Needs intensive support',
+};
+
+// Calculate level from grade percentage
+const gradeToLevel = (grade: number): string => {
+  if (grade >= 95) return 'A';
+  if (grade >= 85) return 'B';
+  if (grade >= 75) return 'C';
+  if (grade >= 65) return 'D';
+  if (grade >= 55) return 'E';
+  return 'F';
+};
+
+// Get next level up
+const getNextLevel = (currentLevel: string): string | null => {
+  const idx = LEVEL_ORDER.indexOf(currentLevel);
+  if (idx < LEVEL_ORDER.length - 1) {
+    return LEVEL_ORDER[idx + 1];
+  }
+  return null; // Already at A
 };
 
 // Suggested remedies for common misconception patterns
@@ -164,6 +197,12 @@ export function StudentReportDialog({
   const [remediationQuestions, setRemediationQuestions] = useState<any[]>([]);
   const [showRemediationDialog, setShowRemediationDialog] = useState(false);
   const [remediationTopicName, setRemediationTopicName] = useState('');
+  
+  // Next level worksheet state
+  const [isGeneratingNextLevel, setIsGeneratingNextLevel] = useState(false);
+  const [nextLevelQuestions, setNextLevelQuestions] = useState<any[]>([]);
+  const [showNextLevelDialog, setShowNextLevelDialog] = useState(false);
+  const [nextLevelTopicName, setNextLevelTopicName] = useState('');
 
   // Fetch grade history
   const { data: gradeHistory, isLoading: gradesLoading } = useQuery({
@@ -319,6 +358,77 @@ export function StudentReportDialog({
     return extracted;
   }, [gradeHistory, allMisconceptions]);
 
+  // Derive diagnostic-like data from grade history when no formal diagnostics exist
+  const derivedDiagnostics = useMemo(() => {
+    if (diagnosticResults?.length) return []; // Use real diagnostics if they exist
+    
+    // Group grades by topic and calculate derived levels
+    const topicGrades: Record<string, { grades: number[]; latest: GradeEntry; standard: string | null }> = {};
+    
+    gradeHistory?.forEach(entry => {
+      if (!topicGrades[entry.topic_name]) {
+        topicGrades[entry.topic_name] = { grades: [], latest: entry, standard: entry.nys_standard };
+      }
+      topicGrades[entry.topic_name].grades.push(entry.grade);
+      // Keep the most recent entry
+      if (new Date(entry.created_at) > new Date(topicGrades[entry.topic_name].latest.created_at)) {
+        topicGrades[entry.topic_name].latest = entry;
+      }
+    });
+    
+    return Object.entries(topicGrades).map(([topic, data]) => {
+      const avgGrade = Math.round(data.grades.reduce((a, b) => a + b, 0) / data.grades.length);
+      const latestGrade = data.latest.grade;
+      const recommendedLevel = gradeToLevel(latestGrade);
+      
+      return {
+        id: `derived-${topic}`,
+        topic_name: topic,
+        recommended_level: recommendedLevel,
+        standard: data.standard,
+        notes: `Based on ${data.grades.length} assessment(s). Average: ${avgGrade}%, Latest: ${latestGrade}%`,
+        created_at: data.latest.created_at,
+        avgGrade,
+        latestGrade,
+        assessmentCount: data.grades.length,
+      };
+    });
+  }, [gradeHistory, diagnosticResults]);
+
+  // Combine real and derived diagnostics
+  const combinedDiagnostics = useMemo(() => {
+    if (diagnosticResults?.length) return diagnosticResults;
+    return derivedDiagnostics;
+  }, [diagnosticResults, derivedDiagnostics]);
+
+  // Determine current level and if student can advance
+  const levelProgressInfo = useMemo(() => {
+    // Get the most recent topic performance
+    const latestGrade = gradeHistory?.[0];
+    const latestDiagnostic = combinedDiagnostics[0];
+    
+    let currentLevel = latestDiagnostic?.recommended_level || (latestGrade ? gradeToLevel(latestGrade.grade) : 'C');
+    let topicName = latestDiagnostic?.topic_name || latestGrade?.topic_name || 'General Math';
+    let canAdvance = false;
+    let nextLevel = getNextLevel(currentLevel);
+    
+    // Student can advance if latest grade is 100% OR if they're at Level A
+    if (latestGrade?.grade === 100) {
+      canAdvance = true;
+    } else if (currentLevel === 'A') {
+      canAdvance = true; // Can move to enrichment or new topic
+      nextLevel = null;
+    }
+    
+    return {
+      currentLevel,
+      nextLevel,
+      canAdvance,
+      topicName,
+      latestGrade: latestGrade?.grade,
+    };
+  }, [gradeHistory, combinedDiagnostics]);
+
   // Calculate summary statistics
   const stats = {
     totalAssessments: (gradeHistory?.length || 0) + (diagnosticResults?.length || 0),
@@ -329,10 +439,10 @@ export function StudentReportDialog({
       ? (gradeHistory.filter(g => g.regents_score).reduce((sum, g) => sum + (g.regents_score || 0), 0) /
           gradeHistory.filter(g => g.regents_score).length).toFixed(1)
       : 'N/A',
-    currentLevel: diagnosticResults?.[0]?.recommended_level || 'N/A',
+    currentLevel: levelProgressInfo.currentLevel,
     topicsAssessed: new Set([
       ...(gradeHistory?.map(g => g.topic_name) || []),
-      ...(diagnosticResults?.map(d => d.topic_name) || []),
+      ...(combinedDiagnostics?.map(d => d.topic_name) || []),
     ]).size,
     misconceptionCount: allMisconceptions.length + extractedMisconceptions.length,
     pushedCount: pushedAssignments?.length || 0,
@@ -498,6 +608,77 @@ export function StudentReportDialog({
       });
     } finally {
       setIsGeneratingRemediation(false);
+    }
+  };
+
+  // Generate next level worksheet based on student progress
+  const handleGenerateNextLevelWorksheet = async () => {
+    const { currentLevel, nextLevel, canAdvance, topicName, latestGrade } = levelProgressInfo;
+    
+    setIsGeneratingNextLevel(true);
+    setNextLevelTopicName(topicName);
+
+    try {
+      // Determine worksheet type based on progress
+      let worksheetType: 'same_level' | 'next_level' | 'enrichment' = 'same_level';
+      let targetLevel = currentLevel;
+      let prompt = '';
+      
+      if (latestGrade === 100 || canAdvance) {
+        if (currentLevel === 'A') {
+          worksheetType = 'enrichment';
+          prompt = `Generate enrichment/challenge questions for a student who has mastered Level A in ${topicName}. Include real-world applications and advanced problem-solving.`;
+        } else if (nextLevel) {
+          worksheetType = 'next_level';
+          targetLevel = nextLevel;
+          prompt = `Generate questions at Level ${nextLevel} difficulty for ${topicName}. This student scored 100% and is ready to advance from Level ${currentLevel}. Include progressively challenging questions appropriate for Level ${nextLevel}.`;
+        }
+      } else {
+        prompt = `Generate practice questions at Level ${currentLevel} difficulty for ${topicName}. This student scored ${latestGrade}% and needs more practice at the current level before advancing. Focus on reinforcing understanding with varied question types.`;
+      }
+
+      const response = await supabase.functions.invoke('generate-worksheet-questions', {
+        body: {
+          topic: topicName,
+          level: targetLevel,
+          questionCount: 6,
+          includeHints: worksheetType === 'same_level',
+          customPrompt: prompt,
+          worksheetType,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to generate worksheet');
+      }
+
+      const questions = response.data?.questions || [];
+      if (questions.length === 0) {
+        throw new Error('No questions were generated');
+      }
+
+      setNextLevelQuestions(questions);
+      setShowNextLevelDialog(true);
+      
+      const typeMessage = worksheetType === 'next_level' 
+        ? `Level ${targetLevel} advancement worksheet` 
+        : worksheetType === 'enrichment' 
+          ? 'Enrichment challenge worksheet'
+          : `Level ${currentLevel} reinforcement worksheet`;
+      
+      toast({
+        title: `${typeMessage} generated!`,
+        description: `Created ${questions.length} questions for ${studentName}.`,
+      });
+    } catch (error: any) {
+      console.error('Error generating next level worksheet:', error);
+      toast({
+        title: 'Failed to generate worksheet',
+        description: error.message || 'An error occurred while generating questions.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingNextLevel(false);
     }
   };
 
@@ -743,15 +924,20 @@ export function StudentReportDialog({
                   <div className="flex items-center gap-2 font-semibold">
                     <Target className="h-5 w-5 text-blue-500" />
                     Diagnostic Results
-                    <Badge variant="secondary">{diagnosticResults?.length || 0}</Badge>
+                    <Badge variant="secondary">{combinedDiagnostics?.length || 0}</Badge>
+                    {!diagnosticResults?.length && derivedDiagnostics.length > 0 && (
+                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 border-blue-200">
+                        Derived from grades
+                      </Badge>
+                    )}
                   </div>
                   {sectionsExpanded.diagnostics ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </div>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="section space-y-2 mt-2">
-                  {diagnosticResults?.length ? (
-                    diagnosticResults.map(entry => (
+                  {combinedDiagnostics?.length ? (
+                    combinedDiagnostics.map((entry: any) => (
                       <div
                         key={entry.id}
                         className="diagnostic-entry p-3 rounded-lg border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20"
@@ -767,15 +953,34 @@ export function StudentReportDialog({
                           </div>
                           <div className="flex items-center gap-2">
                             {entry.recommended_level && (
-                              <Badge className={cn(LEVEL_BG_COLORS[entry.recommended_level], 'text-white')}>
-                                Level {entry.recommended_level}
-                              </Badge>
+                              <div className="flex flex-col items-end gap-1">
+                                <Badge className={cn(LEVEL_BG_COLORS[entry.recommended_level], 'text-white')}>
+                                  Level {entry.recommended_level}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {LEVEL_DESCRIPTIONS[entry.recommended_level]}
+                                </span>
+                              </div>
                             )}
                             <span className="text-xs text-muted-foreground">
                               {format(new Date(entry.created_at), 'MMM d, yyyy')}
                             </span>
                           </div>
                         </div>
+                        {/* Show derived info if available */}
+                        {entry.avgGrade !== undefined && (
+                          <div className="mt-2 flex items-center gap-3 text-sm">
+                            <span className={cn('font-medium', getGradeColor(entry.latestGrade))}>
+                              Latest: {entry.latestGrade}%
+                            </span>
+                            <span className="text-muted-foreground">
+                              Avg: {entry.avgGrade}%
+                            </span>
+                            <span className="text-muted-foreground">
+                              ({entry.assessmentCount} assessment{entry.assessmentCount !== 1 ? 's' : ''})
+                            </span>
+                          </div>
+                        )}
                         {entry.notes && (
                           <p className="text-sm text-muted-foreground mt-2">{entry.notes}</p>
                         )}
@@ -784,7 +989,7 @@ export function StudentReportDialog({
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      No diagnostic results available
+                      No diagnostic results available - Scan student work to generate level data
                     </div>
                   )}
                 </div>
@@ -1092,6 +1297,118 @@ export function StudentReportDialog({
                 </div>
               </CollapsibleContent>
             </Collapsible>
+
+            <Separator className="my-6" />
+
+            {/* Generate Next Level Worksheet Section */}
+            <Card className="border-2 border-dashed border-primary/30 bg-gradient-to-r from-primary/5 to-primary/10">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <GraduationCap className="h-6 w-6 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-lg">Generate Next Level Worksheet</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Based on {studentName}'s performance in {levelProgressInfo.topicName}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Level Progress Indicator */}
+                    <div className="mt-4 p-4 rounded-lg bg-card border">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Current Level:</span>
+                          <Badge className={cn(LEVEL_BG_COLORS[levelProgressInfo.currentLevel], 'text-white text-lg px-3')}>
+                            {levelProgressInfo.currentLevel}
+                          </Badge>
+                        </div>
+                        {levelProgressInfo.latestGrade !== undefined && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">Latest Score:</span>
+                            <span className={cn('font-bold text-lg', getGradeColor(levelProgressInfo.latestGrade))}>
+                              {levelProgressInfo.latestGrade}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Progress Arrow */}
+                      <div className="flex items-center gap-2 mt-3">
+                        <Badge className={cn(LEVEL_BG_COLORS[levelProgressInfo.currentLevel], 'text-white')}>
+                          Level {levelProgressInfo.currentLevel}
+                        </Badge>
+                        {levelProgressInfo.canAdvance && levelProgressInfo.nextLevel ? (
+                          <>
+                            <ArrowRight className="h-5 w-5 text-green-500" />
+                            <Badge className={cn(LEVEL_BG_COLORS[levelProgressInfo.nextLevel], 'text-white')}>
+                              Level {levelProgressInfo.nextLevel}
+                            </Badge>
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                              <ArrowUp className="h-3 w-3 mr-1" />
+                              Ready to Advance!
+                            </Badge>
+                          </>
+                        ) : levelProgressInfo.currentLevel === 'A' ? (
+                          <>
+                            <ArrowRight className="h-5 w-5 text-primary" />
+                            <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
+                              🌟 Enrichment
+                            </Badge>
+                          </>
+                        ) : (
+                          <span className="text-sm text-muted-foreground ml-2">
+                            Needs {100 - (levelProgressInfo.latestGrade || 0)}% more to advance
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Recommendation */}
+                      <p className="text-sm mt-3 p-2 rounded bg-muted/50">
+                        {levelProgressInfo.canAdvance 
+                          ? levelProgressInfo.currentLevel === 'A'
+                            ? "🎉 This student has mastered Level A! Generate enrichment challenges or move to a new topic."
+                            : `🎉 Scored 100%! Ready to advance to Level ${levelProgressInfo.nextLevel} challenges.`
+                          : `📚 Generate practice at Level ${levelProgressInfo.currentLevel} to reinforce understanding before advancing.`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    size="lg"
+                    className={cn(
+                      "gap-2 min-w-[180px]",
+                      levelProgressInfo.canAdvance 
+                        ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+                        : ""
+                    )}
+                    onClick={handleGenerateNextLevelWorksheet}
+                    disabled={isGeneratingNextLevel || !gradeHistory?.length}
+                  >
+                    {isGeneratingNextLevel ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : levelProgressInfo.canAdvance ? (
+                      <>
+                        <ArrowUp className="h-4 w-4" />
+                        Advance to {levelProgressInfo.nextLevel || 'Enrichment'}
+                      </>
+                    ) : (
+                      <>
+                        <FileSpreadsheet className="h-4 w-4" />
+                        Practice Level {levelProgressInfo.currentLevel}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </ScrollArea>
       </DialogContent>
@@ -1103,6 +1420,15 @@ export function StudentReportDialog({
         questions={remediationQuestions}
         studentName={studentName}
         topicName={remediationTopicName}
+      />
+      
+      {/* Next Level Worksheet Print Dialog */}
+      <PrintRemediationQuestionsDialog
+        open={showNextLevelDialog}
+        onOpenChange={setShowNextLevelDialog}
+        questions={nextLevelQuestions}
+        studentName={studentName}
+        topicName={`${nextLevelTopicName} - Level ${levelProgressInfo.canAdvance ? (levelProgressInfo.nextLevel || 'Enrichment') : levelProgressInfo.currentLevel}`}
       />
     </Dialog>
   );
