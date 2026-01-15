@@ -4,15 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, User, Calendar } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, User, Calendar, FileText, Printer } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useStudentNames } from '@/lib/StudentNameContext';
 import { GradeHistoryChart } from './GradeHistoryChart';
+import { StudentReportDialog } from './StudentReportDialog';
 
 interface StudentProgressTrackerProps {
   classId?: string;
@@ -58,6 +60,7 @@ export function StudentProgressTracker({ classId }: StudentProgressTrackerProps)
   const { user } = useAuth();
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const { getDisplayName } = useStudentNames();
+  const [showReportDialog, setShowReportDialog] = useState(false);
 
   // Fetch students
   const { data: students } = useQuery({
@@ -341,6 +344,14 @@ export function StudentProgressTracker({ classId }: StudentProgressTrackerProps)
                 </CardDescription>
               </div>
               <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowReportDialog(true)}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Full Report
+                </Button>
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Progress</p>
                   <div className="flex items-center gap-2">
@@ -489,6 +500,16 @@ export function StudentProgressTracker({ classId }: StudentProgressTrackerProps)
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Student Report Dialog */}
+      {selectedStudent && (
+        <StudentReportDialog
+          open={showReportDialog}
+          onOpenChange={setShowReportDialog}
+          studentId={selectedStudent.studentId}
+          studentName={selectedStudent.studentName}
+        />
       )}
     </div>
   );

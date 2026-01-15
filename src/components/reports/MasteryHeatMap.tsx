@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { FileText } from 'lucide-react';
+import { StudentReportDialog } from './StudentReportDialog';
 
 export interface TopicMastery {
   topicId: string;
@@ -54,6 +56,11 @@ export function MasteryHeatMap({
   description = "Student performance by topic",
   showStudentNames = true,
 }: MasteryHeatMapProps) {
+  const [selectedStudentForReport, setSelectedStudentForReport] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
   const sortedTopics = useMemo(() => {
     return [...topics].sort((a, b) => a.name.localeCompare(b.name));
   }, [topics]);
@@ -181,9 +188,18 @@ export function MasteryHeatMap({
               {sortedStudents.map((student) => (
                 <div key={student.studentId} className="flex items-center">
                   <div className="w-32 shrink-0 pr-2">
-                    <span className="text-sm font-medium truncate block">
-                      {showStudentNames ? student.studentName : `Student ${student.studentId.slice(0, 4)}`}
-                    </span>
+                    <button
+                      className="text-sm font-medium truncate block hover:text-primary hover:underline cursor-pointer text-left flex items-center gap-1"
+                      onClick={() => setSelectedStudentForReport({
+                        id: student.studentId,
+                        name: student.studentName
+                      })}
+                    >
+                      <FileText className="h-3 w-3 opacity-50 shrink-0" />
+                      <span className="truncate">
+                        {showStudentNames ? student.studentName : `Student ${student.studentId.slice(0, 4)}`}
+                      </span>
+                    </button>
                   </div>
                   {sortedTopics.map((topic) => {
                     const topicData = student.topics.find(t => t.topicId === topic.id);
@@ -292,6 +308,14 @@ export function MasteryHeatMap({
           </div>
         </div>
       </CardContent>
+
+      {/* Student Report Dialog */}
+      <StudentReportDialog
+        open={!!selectedStudentForReport}
+        onOpenChange={(open) => !open && setSelectedStudentForReport(null)}
+        studentId={selectedStudentForReport?.id || ''}
+        studentName={selectedStudentForReport?.name || ''}
+      />
     </Card>
   );
 }
