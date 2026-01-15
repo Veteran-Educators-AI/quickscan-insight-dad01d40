@@ -163,7 +163,7 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const { imageBase64, additionalImages, solutionBase64, questionId, rubricSteps, identifyOnly, detectPageType, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric, gradeFloor: customGradeFloor, gradeFloorWithEffort: customGradeFloorWithEffort } = await req.json();
+    const { imageBase64, additionalImages, solutionBase64, answerGuideBase64, questionId, rubricSteps, identifyOnly, detectPageType, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric, gradeFloor: customGradeFloor, gradeFloorWithEffort: customGradeFloorWithEffort } = await req.json();
     
     // Ensure teacherId matches authenticated user
     const effectiveTeacherId = teacherId || authenticatedUserId;
@@ -283,6 +283,28 @@ Apply these patterns when making similar interpretations in this student's work.
 
     // Build the analysis prompt based on assessment mode
     const isAIMode = assessmentMode === 'ai';
+    const isTeacherGuidedMode = assessmentMode === 'teacher-guided';
+    
+    // Teacher-guided mode context - when teacher provides an answer guide
+    const teacherGuideContext = answerGuideBase64 ? `
+TEACHER-GUIDED GRADING MODE:
+You have been provided with the teacher's answer guide/rubric image. 
+CRITICAL: Use the teacher's answer guide as the PRIMARY reference for grading.
+
+Instructions:
+1. First, analyze the teacher's answer guide to understand:
+   - The expected solution steps
+   - The correct final answer
+   - Any specific grading criteria or point distributions shown
+   - The teacher's preferred approach/method
+
+2. Grade the student's work based on how well it matches the teacher's expectations:
+   - Compare student's approach to the teacher's expected approach
+   - Award points based on matching the teacher's rubric if visible
+   - Identify deviations from the expected method
+
+3. Still apply NYS Regents standards, but prioritize the teacher's grading criteria.
+` : '';
     
     // NYS Regents scoring guide context - CONCEPT-BASED GRADING
     const regentsContext = `
@@ -425,11 +447,13 @@ ${regentsContext}
 ${customRubricContext}
 ${standardContext}
 
+${teacherGuideContext}
+
 CRITICAL: If you cannot clearly read something, make your best interpretation but flag it with "[INTERPRETATION - VERIFY: ...]" for teacher review. Never completely fabricate understanding with no basis in the work.`;
 
-      userPromptText = `Please analyze this student's handwritten math work using NYS Regents scoring standards.
+      userPromptText = `Please analyze this student's handwritten math work${isTeacherGuidedMode ? ' using the teacher\'s answer guide as reference' : ' using NYS Regents scoring standards'}.
 
-IMPORTANT: You must solve this problem yourself first to determine the correct answer, then evaluate the student's work against NYS standards.`;
+IMPORTANT: ${isTeacherGuidedMode ? 'Use the teacher\'s answer guide to determine correct answers and grading criteria.' : 'You must solve this problem yourself first to determine the correct answer, then evaluate the student\'s work against NYS standards.'}`;
 
       if (promptText) {
         userPromptText += `\n\nThe problem statement is: ${promptText}`;
@@ -528,6 +552,12 @@ Provide your analysis in the following structure:
       { type: 'text', text: userPromptText },
       formatImageForLovableAI(imageBase64),
     ];
+    
+    // Add teacher's answer guide if provided (teacher-guided mode)
+    if (answerGuideBase64) {
+      imageContent.push({ type: 'text', text: '\n\n[TEACHER\'S ANSWER GUIDE - Use this as the primary reference for grading:]' });
+      imageContent.push(formatImageForLovableAI(answerGuideBase64));
+    }
     
     // Add additional pages if this is a multi-page paper
     if (additionalImages && Array.isArray(additionalImages) && additionalImages.length > 0) {
