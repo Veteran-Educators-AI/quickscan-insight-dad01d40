@@ -15,8 +15,10 @@ import {
   Save,
   X,
   Send,
-  Sparkles
+  Sparkles,
+  FileText
 } from 'lucide-react';
+import { StudentReportDialog } from './StudentReportDialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -81,6 +83,12 @@ export function Gradebook({ classId }: GradebookProps) {
   const [editTopicName, setEditTopicName] = useState('');
   const [editNysStandard, setEditNysStandard] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Student report dialog state
+  const [selectedStudentForReport, setSelectedStudentForReport] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Fetch grade history
   const { data: grades, isLoading, refetch } = useQuery({
@@ -503,14 +511,28 @@ export function Gradebook({ classId }: GradebookProps) {
                     {filteredGrades.map((grade) => (
                       <TableRow key={grade.id}>
                         <TableCell className="font-medium">
-                          {grade.student 
-                            ? getDisplayName(
+                          {grade.student ? (
+                            <button
+                              className="flex items-center gap-1 hover:text-primary hover:underline cursor-pointer text-left"
+                              onClick={() => setSelectedStudentForReport({
+                                id: grade.student_id,
+                                name: getDisplayName(
+                                  grade.student_id,
+                                  grade.student.first_name,
+                                  grade.student.last_name
+                                )
+                              })}
+                            >
+                              <FileText className="h-3 w-3 opacity-50" />
+                              {getDisplayName(
                                 grade.student_id, 
                                 grade.student.first_name, 
                                 grade.student.last_name
-                              )
-                            : 'Unknown Student'
-                          }
+                              )}
+                            </button>
+                          ) : (
+                            'Unknown Student'
+                          )}
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate" title={grade.topic_name}>
                           {grade.topic_name}
@@ -737,6 +759,14 @@ export function Gradebook({ classId }: GradebookProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Student Report Dialog */}
+      <StudentReportDialog
+        open={!!selectedStudentForReport}
+        onOpenChange={(open) => !open && setSelectedStudentForReport(null)}
+        studentId={selectedStudentForReport?.id || ''}
+        studentName={selectedStudentForReport?.name || ''}
+      />
     </Collapsible>
   );
 }
