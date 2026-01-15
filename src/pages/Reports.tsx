@@ -19,6 +19,7 @@ import { LevelProgressionChart } from '@/components/reports/LevelProgressionChar
 import { RegentsScoreReport } from '@/components/reports/RegentsScoreReport';
 import { Gradebook } from '@/components/reports/Gradebook';
 import { ScholarSyncDashboard } from '@/components/reports/ScholarSyncDashboard';
+import { ClassMisconceptionSummary } from '@/components/reports/ClassMisconceptionSummary';
 import { useMasteryData } from '@/hooks/useMasteryData';
 import { toast } from 'sonner';
 
@@ -232,6 +233,9 @@ export default function Reports() {
 
             {/* Diagnostic Dashboard */}
             <DiagnosticDashboard classId={selectedClassId === 'all' ? undefined : selectedClassId} />
+
+            {/* Class Misconception Summary */}
+            <ClassMisconceptionSummary classId={selectedClassId === 'all' ? undefined : selectedClassId} />
 
             {/* Level Progression Chart */}
             <LevelProgressionChart classId={selectedClassId === 'all' ? undefined : selectedClassId} />
