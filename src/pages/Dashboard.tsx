@@ -17,6 +17,7 @@ import {
   FileText,
   Trash2
 } from 'lucide-react';
+import { VerificationStatsWidget } from '@/components/reports/VerificationStatsWidget';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -414,6 +415,9 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* AI Verification Stats Widget */}
+        <VerificationStatsWidget className="animate-slide-up" />
 
         {/* Getting Started */}
         {stats.classCount === 0 && (
