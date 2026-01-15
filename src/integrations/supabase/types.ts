@@ -496,6 +496,67 @@ export type Database = {
           },
         ]
       }
+      interpretation_verifications: {
+        Row: {
+          attempt_id: string | null
+          context: string | null
+          correct_interpretation: string | null
+          created_at: string
+          decision: string
+          id: string
+          interpretation: string
+          original_text: string
+          student_id: string | null
+          teacher_id: string
+        }
+        Insert: {
+          attempt_id?: string | null
+          context?: string | null
+          correct_interpretation?: string | null
+          created_at?: string
+          decision: string
+          id?: string
+          interpretation: string
+          original_text: string
+          student_id?: string | null
+          teacher_id: string
+        }
+        Update: {
+          attempt_id?: string | null
+          context?: string | null
+          correct_interpretation?: string | null
+          created_at?: string
+          decision?: string
+          id?: string
+          interpretation?: string
+          original_text?: string
+          student_id?: string | null
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interpretation_verifications_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interpretation_verifications_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interpretation_verifications_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lesson_plans: {
         Row: {
           class_id: string | null

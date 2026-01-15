@@ -1,20 +1,25 @@
-import { useState } from 'react';
-import { CheckCircle2, XCircle, AlertTriangle, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { CheckCircle2, XCircle, AlertTriangle, Eye, ChevronDown, ChevronUp, Save, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useVerificationDecisions, VerificationDecision } from '@/hooks/useVerificationDecisions';
 
 interface Interpretation {
   id: string;
   text: string;
   context: string;
   status: 'pending' | 'approved' | 'rejected';
+  correctInterpretation?: string;
 }
 
 interface TeacherVerificationPanelProps {
   rawAnalysis: string;
+  attemptId?: string;
+  studentId?: string;
   onVerificationComplete?: (interpretations: Interpretation[]) => void;
 }
 
@@ -58,12 +63,16 @@ function extractInterpretations(rawAnalysis: string): Interpretation[] {
 
 export function TeacherVerificationPanel({ 
   rawAnalysis, 
+  attemptId,
+  studentId,
   onVerificationComplete 
 }: TeacherVerificationPanelProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [interpretations, setInterpretations] = useState<Interpretation[]>(() => 
     extractInterpretations(rawAnalysis || '')
   );
+  const [hasSaved, setHasSaved] = useState(false);
+  const { saveVerificationDecisions, isSaving } = useVerificationDecisions();
 
   // Don't render if no interpretations need verification
   if (interpretations.length === 0) {
@@ -73,12 +82,14 @@ export function TeacherVerificationPanel({
   const pendingCount = interpretations.filter(i => i.status === 'pending').length;
   const approvedCount = interpretations.filter(i => i.status === 'approved').length;
   const rejectedCount = interpretations.filter(i => i.status === 'rejected').length;
+  const allReviewed = pendingCount === 0;
 
   const handleApprove = (id: string) => {
     const updated = interpretations.map(i => 
       i.id === id ? { ...i, status: 'approved' as const } : i
     );
     setInterpretations(updated);
+    setHasSaved(false);
     if (updated.every(i => i.status !== 'pending')) {
       onVerificationComplete?.(updated);
     }
@@ -89,21 +100,47 @@ export function TeacherVerificationPanel({
       i.id === id ? { ...i, status: 'rejected' as const } : i
     );
     setInterpretations(updated);
+    setHasSaved(false);
     if (updated.every(i => i.status !== 'pending')) {
       onVerificationComplete?.(updated);
     }
   };
 
+  const handleCorrectInterpretationChange = (id: string, value: string) => {
+    setInterpretations(prev => prev.map(i =>
+      i.id === id ? { ...i, correctInterpretation: value } : i
+    ));
+  };
+
   const handleApproveAll = () => {
     const updated = interpretations.map(i => ({ ...i, status: 'approved' as const }));
     setInterpretations(updated);
+    setHasSaved(false);
     onVerificationComplete?.(updated);
   };
 
   const handleRejectAll = () => {
     const updated = interpretations.map(i => ({ ...i, status: 'rejected' as const }));
     setInterpretations(updated);
+    setHasSaved(false);
     onVerificationComplete?.(updated);
+  };
+
+  const handleSaveDecisions = async () => {
+    const decisions: VerificationDecision[] = interpretations
+      .filter(i => i.status !== 'pending')
+      .map(i => ({
+        originalText: i.context,
+        interpretation: i.text,
+        decision: i.status as 'approved' | 'rejected',
+        correctInterpretation: i.correctInterpretation,
+        context: i.context,
+      }));
+
+    const success = await saveVerificationDecisions(decisions, attemptId, studentId);
+    if (success) {
+      setHasSaved(true);
+    }
   };
 
   const getStatusIcon = (status: Interpretation['status']) => {
@@ -195,6 +232,29 @@ export function TeacherVerificationPanel({
               </div>
             )}
 
+            {/* Save Decisions Button */}
+            {allReviewed && !hasSaved && (
+              <Button
+                size="sm"
+                onClick={handleSaveDecisions}
+                disabled={isSaving}
+                className="bg-primary"
+              >
+                {isSaving ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <Save className="h-3 w-3 mr-1" />
+                )}
+                Save Decisions to Improve AI
+              </Button>
+            )}
+            
+            {hasSaved && (
+              <Badge variant="outline" className="text-green-600 border-green-300">
+                ✓ Decisions saved - AI will learn from these
+              </Badge>
+            )}
+
             {/* Individual Interpretations */}
             <div className="space-y-3">
               {interpretations.map((interpretation) => (
@@ -240,6 +300,22 @@ export function TeacherVerificationPanel({
                         <XCircle className="h-3 w-3 mr-1" />
                         Reject
                       </Button>
+                    </div>
+                  )}
+
+                  {/* Show correction input for rejected interpretations */}
+                  {interpretation.status === 'rejected' && (
+                    <div className="mt-3 pt-2 border-t">
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                        What was the correct interpretation? (optional - helps AI learn)
+                      </label>
+                      <Input
+                        size={1}
+                        placeholder="Enter the correct interpretation..."
+                        value={interpretation.correctInterpretation || ''}
+                        onChange={(e) => handleCorrectInterpretationChange(interpretation.id, e.target.value)}
+                        className="text-sm"
+                      />
                     </div>
                   )}
                 </div>
