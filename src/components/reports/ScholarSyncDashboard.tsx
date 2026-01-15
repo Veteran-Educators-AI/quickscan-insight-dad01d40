@@ -110,11 +110,28 @@ export function ScholarSyncDashboard({ classId }: ScholarSyncDashboardProps) {
         throw new Error(response.error.message);
       }
 
-      toast.success('Successfully synced data to Scholar AI');
+      // Check if the response indicates failure
+      const data = response.data;
+      if (data && !data.success) {
+        const errorMsg = data.error || 'Unknown error';
+        const suggestion = data.suggestion || '';
+        console.error('Sync failed:', data);
+        toast.error(errorMsg, {
+          description: suggestion || undefined,
+          duration: 6000,
+        });
+        return;
+      }
+
+      toast.success('Successfully synced data to Scholar AI', {
+        description: `${data?.synced_students || 0} students synced`,
+      });
       refetch();
     } catch (err) {
       console.error('Sync error:', err);
-      toast.error('Failed to sync to Scholar AI');
+      toast.error('Failed to sync to Scholar AI', {
+        description: err instanceof Error ? err.message : 'Network or server error',
+      });
     } finally {
       setIsSyncing(false);
     }
