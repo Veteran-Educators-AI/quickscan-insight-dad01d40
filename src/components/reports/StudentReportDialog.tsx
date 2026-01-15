@@ -151,115 +151,220 @@ const REMEDIATION_SUGGESTIONS: Record<string, string[]> = {
   'default': ['Targeted practice problems', 'One-on-one tutoring session', 'Visual learning aids'],
 };
 
-// Extract misconceptions from grade justification text - improved to capture more patterns
-const extractMisconceptionsFromJustification = (justification: string): { text: string; severity: 'high' | 'medium' | 'low' }[] => {
-  const found: { text: string; severity: 'high' | 'medium' | 'low' }[] = [];
+// Interface for structured misconception
+interface StructuredMisconception {
+  title: string;
+  whatStudentDid: string;
+  whatWasExpected: string;
+  severity: 'high' | 'medium' | 'low';
+  topic: string;
+  grade: number;
+  date: string;
+  standard?: string | null;
+}
+
+// Extract structured misconceptions from grade justification text
+const extractStructuredMisconceptions = (justification: string, topic: string, grade: number, date: string, standard?: string | null): StructuredMisconception[] => {
+  const misconceptions: StructuredMisconception[] = [];
   
-  // Split into sentences for better analysis
-  const sentences = justification.split(/[.!?]+/).filter(s => s.trim().length > 10);
+  // Clean markdown artifacts
+  const cleanedJustification = justification
+    .replace(/\*\*/g, '')
+    .replace(/\*\s*/g, '')
+    .replace(/^\s*[-•]\s*/gm, '')
+    .trim();
   
-  // High severity patterns - critical errors
-  const highSeverityPatterns = [
-    /(?:major|critical|significant|serious)\s+(?:error|mistake|issue)/i,
-    /(?:completely|entirely|totally)\s+(?:wrong|incorrect|missed)/i,
-    /(?:fundamental|basic)\s+(?:misunderstanding|misconception)/i,
-    /(?:did not|didn't|failed to)\s+(?:understand|grasp|comprehend)/i,
-    /(?:no|zero|lacking)\s+(?:credit|points?|marks?)/i,
+  // Pattern-based extraction for "did X but should have Y" patterns
+  const contrastPatterns = [
+    /(?:student|they|work)\s+(?:wrote|used|applied|calculated|showed|gave|had|made|did|got)\s+(.+?)\s+(?:but|however|instead of|when|rather than)\s+(?:should have|it should be|the correct|needed|was supposed to be|expected)\s+(.+?)(?:\.|$)/gi,
+    /(?:incorrect|wrong|error)(?:ly)?\s+(.+?)\s+(?:instead of|should be|correct answer is)\s+(.+?)(?:\.|$)/gi,
+    /(.+?)\s+(?:is incorrect|was wrong|was an error)(?:,|\.)\s*(?:the correct|should be|expected)\s+(.+?)(?:\.|$)/gi,
   ];
   
-  // Medium severity patterns - partial understanding issues
-  const mediumSeverityPatterns = [
-    /(?:partial|incomplete|missing)\s+(?:work|solution|answer|steps?)/i,
-    /(?:error|mistake|incorrect|wrong)\s+(?:in|with|on)/i,
-    /(?:should have|needed to|was supposed to)/i,
-    /(?:forgot|omitted|skipped|missed)\s+(?:to|the)/i,
-    /(?:sign error|calculation error|arithmetic error)/i,
-    /(?:incorrect|wrong)\s+(?:formula|method|approach|setup)/i,
-    /(?:misread|misinterpreted|confused)/i,
-    /(?:lost|deducted)\s+\d+\s*(?:point|pt)/i,
-  ];
-  
-  // Low severity patterns - minor issues
-  const lowSeverityPatterns = [
-    /(?:minor|small|slight)\s+(?:error|mistake|issue)/i,
-    /(?:rounding|notation|formatting)\s+(?:error|issue)/i,
-    /(?:could have|should consider)/i,
-    /(?:almost|nearly|close to)\s+correct/i,
-  ];
-  
-  // Process each sentence
-  sentences.forEach(sentence => {
-    const trimmed = sentence.trim();
-    if (trimmed.length < 10) return;
-    
-    // Check for negative/issue indicators
-    const hasIssueIndicator = /(?:error|mistake|incorrect|wrong|missing|forgot|failed|did not|didn't|omitted|lost|deducted|issue|problem|misconception|confused|misunderstand)/i.test(trimmed);
-    
-    if (!hasIssueIndicator) return;
-    
-    // Determine severity
-    let severity: 'high' | 'medium' | 'low' = 'medium';
-    
-    if (highSeverityPatterns.some(p => p.test(trimmed))) {
-      severity = 'high';
-    } else if (lowSeverityPatterns.some(p => p.test(trimmed))) {
-      severity = 'low';
-    }
-    
-    // Clean up the sentence
-    let cleanText = trimmed
-      .replace(/^[-•*]\s*/, '') // Remove bullet points
-      .replace(/^\d+[.)]\s*/, '') // Remove numbered lists
-      .replace(/^(?:however|also|additionally|furthermore|moreover),?\s*/i, '')
-      .trim();
-    
-    // Capitalize first letter
-    if (cleanText.length > 0) {
-      cleanText = cleanText.charAt(0).toUpperCase() + cleanText.slice(1);
-      // Add period if missing
-      if (!/[.!?]$/.test(cleanText)) {
-        cleanText += '.';
+  contrastPatterns.forEach(pattern => {
+    let match;
+    while ((match = pattern.exec(cleanedJustification)) !== null) {
+      const whatStudentDid = match[1].trim().replace(/^to\s+/, '');
+      const whatWasExpected = match[2].trim();
+      
+      if (whatStudentDid.length > 5 && whatWasExpected.length > 3) {
+        misconceptions.push({
+          title: identifyMisconceptionType(whatStudentDid + ' ' + whatWasExpected),
+          whatStudentDid,
+          whatWasExpected,
+          severity: determineSeverity(whatStudentDid, grade),
+          topic,
+          grade,
+          date,
+          standard,
+        });
       }
-    }
-    
-    if (cleanText.length > 15 && cleanText.length < 300) {
-      found.push({ text: cleanText, severity });
     }
   });
   
-  // Also check for bullet points or numbered issues specifically
-  const bulletMatches = justification.match(/[-•*]\s*[^-•*\n]{15,}/g);
-  if (bulletMatches) {
-    bulletMatches.forEach(match => {
-      const cleanMatch = match.replace(/^[-•*]\s*/, '').trim();
-      if (cleanMatch.length > 15 && !found.some(f => f.text.includes(cleanMatch.substring(0, 30)))) {
-        const hasIssue = /(?:error|mistake|incorrect|wrong|missing|forgot|failed|issue)/i.test(cleanMatch);
-        if (hasIssue) {
-          found.push({ text: cleanMatch, severity: 'medium' });
+  // Extract from structured analysis (look for explicit error descriptions)
+  const errorPatterns = [
+    // Errors with point deductions
+    /(?:lost|deducted|minus)\s+(\d+)\s*(?:point|pt)s?\s+(?:for|because|due to)\s+(.+?)(?:\.|$)/gi,
+    // Missing work patterns
+    /(?:did not|didn't|failed to|forgot to|missing|omitted)\s+(.+?)(?:\.|$)/gi,
+    // Calculation/procedural errors
+    /(?:calculation error|arithmetic error|sign error|formula error|procedural error)(?:\s*[:\-])?\s*(.+?)(?:\.|$)/gi,
+    // Made a specific mistake
+    /(?:made|committed|had)\s+(?:a|an)\s+(.+?)\s+(?:error|mistake)(?:\s+(?:when|while|in|by)\s+(.+?))?(?:\.|$)/gi,
+  ];
+  
+  errorPatterns.forEach(pattern => {
+    let match;
+    while ((match = pattern.exec(cleanedJustification)) !== null) {
+      const errorDescription = match[2] || match[1];
+      if (errorDescription && errorDescription.length > 5) {
+        const alreadyExists = misconceptions.some(m => 
+          m.whatStudentDid.toLowerCase().includes(errorDescription.toLowerCase().substring(0, 20))
+        );
+        
+        if (!alreadyExists) {
+          const structured = parseErrorIntoStructure(errorDescription.trim(), cleanedJustification);
+          misconceptions.push({
+            title: structured.title,
+            whatStudentDid: structured.whatStudentDid,
+            whatWasExpected: structured.whatWasExpected,
+            severity: determineSeverity(errorDescription, grade),
+            topic,
+            grade,
+            date,
+            standard,
+          });
         }
       }
-    });
-  }
-  
-  // Dedupe by checking for similar text and limit
-  const unique: { text: string; severity: 'high' | 'medium' | 'low' }[] = [];
-  found.forEach(item => {
-    const isDupe = unique.some(u => 
-      u.text.toLowerCase().includes(item.text.toLowerCase().substring(0, 30)) ||
-      item.text.toLowerCase().includes(u.text.toLowerCase().substring(0, 30))
-    );
-    if (!isDupe) {
-      unique.push(item);
     }
   });
   
-  // Sort by severity (high first) and limit
-  return unique
-    .sort((a, b) => {
-      const order = { high: 0, medium: 1, low: 2 };
-      return order[a.severity] - order[b.severity];
-    })
-    .slice(0, 8);
+  // If no structured patterns found, try to parse the overall justification
+  if (misconceptions.length === 0 && cleanedJustification.length > 20) {
+    const parsed = parseJustificationIntoMisconception(cleanedJustification, grade);
+    if (parsed) {
+      misconceptions.push({
+        ...parsed,
+        topic,
+        date,
+        standard,
+      });
+    }
+  }
+  
+  return misconceptions.slice(0, 5); // Limit to 5 per grade entry
+};
+
+// Identify the type of misconception from text
+const identifyMisconceptionType = (text: string): string => {
+  const textLower = text.toLowerCase();
+  
+  if (/sign|negative|positive|minus|plus/.test(textLower)) return 'Sign Error';
+  if (/order.*operation|pemdas|bedmas/.test(textLower)) return 'Order of Operations Error';
+  if (/fraction|numerator|denominator/.test(textLower)) return 'Fraction Misconception';
+  if (/decimal|place.*value/.test(textLower)) return 'Decimal Place Value Error';
+  if (/variable|substitute|expression/.test(textLower)) return 'Variable/Expression Error';
+  if (/equation|solve|isolate/.test(textLower)) return 'Equation Solving Error';
+  if (/graph|coordinate|plot|slope/.test(textLower)) return 'Graphing Error';
+  if (/exponent|power|base/.test(textLower)) return 'Exponent Rule Error';
+  if (/calculation|arithmetic|compute|multiply|divide|add|subtract/.test(textLower)) return 'Calculation Error';
+  if (/formula|apply|use.*wrong/.test(textLower)) return 'Formula Application Error';
+  if (/unit|convert|measurement/.test(textLower)) return 'Unit Conversion Error';
+  if (/incomplete|missing.*work|show.*work/.test(textLower)) return 'Incomplete Work';
+  if (/setup|translate|word.*problem/.test(textLower)) return 'Problem Setup Error';
+  if (/concept|understand|misunderstand/.test(textLower)) return 'Conceptual Misunderstanding';
+  
+  return 'Mathematical Error';
+};
+
+// Determine severity based on error type and grade
+const determineSeverity = (errorText: string, grade: number): 'high' | 'medium' | 'low' => {
+  const textLower = errorText.toLowerCase();
+  
+  // High severity indicators
+  if (/fundamental|basic|completely|entirely|major|critical|no.*understanding|zero|failed/.test(textLower)) {
+    return 'high';
+  }
+  
+  // Low severity indicators
+  if (/minor|small|slight|almost|nearly|rounding|notation|formatting/.test(textLower)) {
+    return 'low';
+  }
+  
+  // Also use grade as indicator
+  if (grade < 50) return 'high';
+  if (grade >= 80) return 'low';
+  
+  return 'medium';
+};
+
+// Parse an error description into structured format
+const parseErrorIntoStructure = (errorDescription: string, fullJustification: string): { title: string; whatStudentDid: string; whatWasExpected: string } => {
+  const errorLower = errorDescription.toLowerCase();
+  
+  // Try to find the expected behavior from context
+  let whatWasExpected = 'Use the correct mathematical approach';
+  
+  // Look for "should" or "correct" phrases near this error in the full justification
+  const shouldMatch = fullJustification.match(new RegExp(errorDescription.substring(0, 20) + '.{0,50}(?:should|correct|expected|proper)\\s+(.{10,60})', 'i'));
+  if (shouldMatch) {
+    whatWasExpected = shouldMatch[1].trim().replace(/\.$/, '');
+  }
+  
+  // Common expected behaviors based on error type
+  if (/sign/.test(errorLower)) {
+    whatWasExpected = 'Apply correct sign rules when performing operations';
+  } else if (/order|pemdas/.test(errorLower)) {
+    whatWasExpected = 'Follow order of operations (PEMDAS) correctly';
+  } else if (/formula/.test(errorLower)) {
+    whatWasExpected = 'Apply the correct formula for this problem type';
+  } else if (/calculation|arithmetic/.test(errorLower)) {
+    whatWasExpected = 'Perform calculations accurately step-by-step';
+  } else if (/setup/.test(errorLower)) {
+    whatWasExpected = 'Set up the problem correctly before solving';
+  } else if (/unit/.test(errorLower)) {
+    whatWasExpected = 'Convert units properly before calculating';
+  } else if (/incomplete|missing/.test(errorLower)) {
+    whatWasExpected = 'Show complete work with all steps justified';
+  }
+  
+  return {
+    title: identifyMisconceptionType(errorDescription),
+    whatStudentDid: capitalizeFirst(errorDescription),
+    whatWasExpected,
+  };
+};
+
+// Parse overall justification when no structured patterns found
+const parseJustificationIntoMisconception = (justification: string, grade: number): Omit<StructuredMisconception, 'topic' | 'date' | 'standard'> | null => {
+  const sentences = justification.split(/[.!?]+/).filter(s => s.trim().length > 15);
+  
+  // Look for sentences that describe errors
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim();
+    const hasError = /error|mistake|incorrect|wrong|missing|forgot|failed|did not|didn't|omitted|lost|deducted|issue|problem/.test(trimmed.toLowerCase());
+    
+    if (hasError) {
+      // Try to parse into what they did vs expected
+      const parsed = parseErrorIntoStructure(trimmed, justification);
+      return {
+        title: parsed.title,
+        whatStudentDid: parsed.whatStudentDid,
+        whatWasExpected: parsed.whatWasExpected,
+        severity: determineSeverity(trimmed, grade),
+        grade,
+      };
+    }
+  }
+  
+  return null;
+};
+
+// Capitalize first letter
+const capitalizeFirst = (str: string): string => {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
 export function StudentReportDialog({
@@ -434,24 +539,21 @@ export function StudentReportDialog({
     return combined;
   }, [analysisMisconceptions, legacyMisconceptions]);
 
-  // Extract misconceptions from grade justifications - always extract from justifications
+  // Extract structured misconceptions from grade justifications
   const extractedMisconceptions = useMemo(() => {
-    const extracted: { text: string; topic: string; grade: number; date: string; severity: 'high' | 'medium' | 'low'; standard?: string | null }[] = [];
+    const extracted: StructuredMisconception[] = [];
     
     gradeHistory?.forEach(entry => {
-      // Extract from ANY grade that has a justification (not just < 80%)
+      // Extract from ANY grade that has a justification
       if (entry.grade_justification) {
-        const found = extractMisconceptionsFromJustification(entry.grade_justification);
-        found.forEach(item => {
-          extracted.push({
-            text: item.text,
-            severity: item.severity,
-            topic: entry.topic_name,
-            grade: entry.grade,
-            date: entry.created_at,
-            standard: entry.nys_standard,
-          });
-        });
+        const found = extractStructuredMisconceptions(
+          entry.grade_justification,
+          entry.topic_name,
+          entry.grade,
+          entry.created_at,
+          entry.nys_standard
+        );
+        extracted.push(...found);
       }
     });
     
@@ -698,10 +800,10 @@ export function StudentReportDialog({
 
   // Generate remediation worksheet from identified misconceptions
   const handleGenerateRemediation = async () => {
-    // Gather all misconceptions for generation
+    // Gather all misconceptions for generation - use whatStudentDid for structured misconceptions
     const misconceptionsToRemediate = allMisconceptions.length > 0 
       ? allMisconceptions.map(m => m.text)
-      : extractedMisconceptions.map(m => m.text);
+      : extractedMisconceptions.map(m => `${m.title}: ${m.whatStudentDid}`);
     
     if (misconceptionsToRemediate.length === 0) {
       toast({
@@ -1374,7 +1476,7 @@ export function StudentReportDialog({
                         </p>
                       </div>
                       {extractedMisconceptions.map((item, idx) => {
-                        const remedies = getSuggestedRemedies(item.text);
+                        const remedies = getSuggestedRemedies(item.whatStudentDid);
                         
                         return (
                           <Card 
@@ -1387,25 +1489,24 @@ export function StudentReportDialog({
                             )}
                           >
                             <CardContent className="p-4">
-                              <div className="flex items-start justify-between gap-3">
+                              {/* Misconception Title */}
+                              <div className="flex items-start gap-2 mb-3">
+                                <AlertTriangle className={cn(
+                                  "h-5 w-5 mt-0.5 shrink-0",
+                                  item.severity === 'high' && 'text-red-600',
+                                  item.severity === 'medium' && 'text-yellow-600',
+                                  item.severity === 'low' && 'text-green-600'
+                                )} />
                                 <div className="flex-1">
-                                  <div className="flex items-start gap-2">
-                                    <AlertTriangle className={cn(
-                                      "h-5 w-5 mt-0.5 shrink-0",
-                                      item.severity === 'high' && 'text-red-600',
-                                      item.severity === 'medium' && 'text-yellow-600',
-                                      item.severity === 'low' && 'text-green-600'
-                                    )} />
-                                    <p className={cn(
-                                      "font-medium text-sm",
-                                      item.severity === 'high' && 'text-red-900 dark:text-red-100',
-                                      item.severity === 'medium' && 'text-yellow-900 dark:text-yellow-100',
-                                      item.severity === 'low' && 'text-green-900 dark:text-green-100'
-                                    )}>
-                                      {item.text}
-                                    </p>
-                                  </div>
-                                  <div className="flex flex-wrap items-center gap-2 mt-2 ml-7">
+                                  <p className={cn(
+                                    "font-semibold",
+                                    item.severity === 'high' && 'text-red-900 dark:text-red-100',
+                                    item.severity === 'medium' && 'text-yellow-900 dark:text-yellow-100',
+                                    item.severity === 'low' && 'text-green-900 dark:text-green-100'
+                                  )}>
+                                    {item.title}
+                                  </p>
+                                  <div className="flex flex-wrap items-center gap-2 mt-1">
                                     <Badge 
                                       className={cn(
                                         'text-xs text-white',
@@ -1436,6 +1537,29 @@ export function StudentReportDialog({
                                       Score: {item.grade}%
                                     </Badge>
                                   </div>
+                                </div>
+                              </div>
+                              
+                              {/* What Student Did vs What Was Expected */}
+                              <div className="ml-7 space-y-2">
+                                <div className="p-3 bg-red-50/70 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                                  <div className="flex items-center gap-2 text-sm font-medium mb-1 text-red-700 dark:text-red-300">
+                                    <X className="h-4 w-4" />
+                                    What the Student Did Wrong
+                                  </div>
+                                  <p className="text-sm text-red-600 dark:text-red-400">
+                                    {item.whatStudentDid}
+                                  </p>
+                                </div>
+                                
+                                <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                                  <div className="flex items-center gap-2 text-sm font-medium mb-1 text-emerald-700 dark:text-emerald-300">
+                                    <Target className="h-4 w-4" />
+                                    What Was Expected
+                                  </div>
+                                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                                    {item.whatWasExpected}
+                                  </p>
                                 </div>
                               </div>
                               
@@ -1498,9 +1622,13 @@ export function StudentReportDialog({
                                 item.severity === 'medium' && 'text-yellow-500',
                                 item.severity === 'low' && 'text-green-500'
                               )} />
-                              <div>
-                                <p className="text-sm">{item.text}</p>
-                                <div className="flex flex-wrap items-center gap-1 mt-1">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">{item.title}</p>
+                                <div className="text-xs mt-1 space-y-1">
+                                  <p className="text-red-600 dark:text-red-400">❌ {item.whatStudentDid}</p>
+                                  <p className="text-green-600 dark:text-green-400">✓ {item.whatWasExpected}</p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1 mt-2">
                                   <Badge variant="outline" className="text-xs">{item.topic}</Badge>
                                   <Badge 
                                     className={cn(
