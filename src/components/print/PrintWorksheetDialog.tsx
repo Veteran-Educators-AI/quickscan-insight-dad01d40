@@ -7,9 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PrintableWorksheet } from './PrintableWorksheet';
+import { useAuth } from '@/lib/auth';
 
 interface Student {
   id: string;
@@ -25,14 +27,24 @@ interface Question {
   prompt_image_url: string | null;
 }
 
+type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+
+interface StudentLevel {
+  student_id: string;
+  level: AdvancementLevel;
+  topic_name: string;
+}
+
 interface PrintWorksheetDialogProps {
   classId: string;
   students: Student[];
   trigger?: React.ReactNode;
+  topicName?: string;
 }
 
-export function PrintWorksheetDialog({ classId, students, trigger }: PrintWorksheetDialogProps) {
+export function PrintWorksheetDialog({ classId, students, trigger, topicName }: PrintWorksheetDialogProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
   
   const [open, setOpen] = useState(false);
@@ -43,10 +55,13 @@ export function PrintWorksheetDialog({ classId, students, trigger }: PrintWorksh
   const [assessmentName, setAssessmentName] = useState('Geometry Assessment');
   const [showPreview, setShowPreview] = useState(false);
   const [includeQRCodes, setIncludeQRCodes] = useState(true);
+  const [includeLevels, setIncludeLevels] = useState(true);
+  const [studentLevels, setStudentLevels] = useState<Map<string, StudentLevel>>(new Map());
 
   useEffect(() => {
     if (open) {
       fetchQuestions();
+      fetchStudentLevels();
       // Select all students by default
       setSelectedStudents(new Set(students.map(s => s.id)));
     }
@@ -72,6 +87,40 @@ export function PrintWorksheetDialog({ classId, students, trigger }: PrintWorksh
       });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchStudentLevels() {
+    if (!user) return;
+    
+    try {
+      // Fetch most recent diagnostic results for each student
+      const studentIds = students.map(s => s.id);
+      const { data, error } = await supabase
+        .from('diagnostic_results')
+        .select('student_id, recommended_level, topic_name, created_at')
+        .eq('teacher_id', user.id)
+        .in('student_id', studentIds)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Get most recent level for each student
+      const levelsMap = new Map<string, StudentLevel>();
+      if (data) {
+        for (const result of data) {
+          if (!levelsMap.has(result.student_id) && result.recommended_level) {
+            levelsMap.set(result.student_id, {
+              student_id: result.student_id,
+              level: result.recommended_level as AdvancementLevel,
+              topic_name: result.topic_name,
+            });
+          }
+        }
+      }
+      setStudentLevels(levelsMap);
+    } catch (error) {
+      console.error('Error fetching student levels:', error);
     }
   }
 
@@ -174,6 +223,24 @@ export function PrintWorksheetDialog({ classId, students, trigger }: PrintWorksh
               />
             </div>
 
+            {/* Student Level Toggle */}
+            <div className="flex items-center justify-between rounded-lg border p-3 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20">
+              <div className="space-y-0.5">
+                <Label htmlFor="level-toggle" className="flex items-center gap-2 cursor-pointer">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white text-xs font-bold">A</span>
+                  Show Student Levels (A-F)
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Display each student's current advancement level on their worksheet (A = Best, F = Needs Support)
+                </p>
+              </div>
+              <Switch
+                id="level-toggle"
+                checked={includeLevels}
+                onCheckedChange={setIncludeLevels}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               {/* Students Selection */}
               <div className="space-y-2">
@@ -184,18 +251,36 @@ export function PrintWorksheetDialog({ classId, students, trigger }: PrintWorksh
                   </Button>
                 </div>
                 <ScrollArea className="h-48 border rounded-md p-2">
-                  {students.map((student) => (
-                    <div key={student.id} className="flex items-center gap-2 py-1">
-                      <Checkbox
-                        id={`student-${student.id}`}
-                        checked={selectedStudents.has(student.id)}
-                        onCheckedChange={() => toggleStudent(student.id)}
-                      />
-                      <Label htmlFor={`student-${student.id}`} className="text-sm cursor-pointer">
-                        {student.last_name}, {student.first_name}
-                      </Label>
-                    </div>
-                  ))}
+                  {students.map((student) => {
+                    const levelInfo = studentLevels.get(student.id);
+                    return (
+                      <div key={student.id} className="flex items-center gap-2 py-1">
+                        <Checkbox
+                          id={`student-${student.id}`}
+                          checked={selectedStudents.has(student.id)}
+                          onCheckedChange={() => toggleStudent(student.id)}
+                        />
+                        <Label htmlFor={`student-${student.id}`} className="text-sm cursor-pointer flex-1 flex items-center gap-2">
+                          {student.last_name}, {student.first_name}
+                          {levelInfo && (
+                            <Badge 
+                              variant="secondary" 
+                              className={`text-xs px-1.5 py-0 ${
+                                levelInfo.level === 'A' ? 'bg-green-100 text-green-800' :
+                                levelInfo.level === 'B' ? 'bg-teal-100 text-teal-800' :
+                                levelInfo.level === 'C' ? 'bg-yellow-100 text-yellow-800' :
+                                levelInfo.level === 'D' ? 'bg-orange-100 text-orange-800' :
+                                levelInfo.level === 'E' ? 'bg-red-100 text-red-800' :
+                                'bg-red-200 text-red-900'
+                              }`}
+                            >
+                              {levelInfo.level}
+                            </Badge>
+                          )}
+                        </Label>
+                      </div>
+                    );
+                  })}
                   {students.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-4">
                       No students in this class
@@ -273,15 +358,20 @@ export function PrintWorksheetDialog({ classId, students, trigger }: PrintWorksh
             </Button>
           </div>
           <div ref={printRef}>
-            {getSelectedStudents().map((student) => (
-              <PrintableWorksheet
-                key={student.id}
-                student={student}
-                questions={getSelectedQuestions()}
-                assessmentName={assessmentName}
-                showQRCodes={includeQRCodes}
-              />
-            ))}
+            {getSelectedStudents().map((student) => {
+              const levelInfo = studentLevels.get(student.id);
+              return (
+                <PrintableWorksheet
+                  key={student.id}
+                  student={student}
+                  questions={getSelectedQuestions()}
+                  assessmentName={assessmentName}
+                  showQRCodes={includeQRCodes}
+                  studentLevel={includeLevels ? levelInfo?.level : undefined}
+                  topicName={includeLevels ? (topicName || levelInfo?.topic_name) : undefined}
+                />
+              );
+            })}
           </div>
         </div>
       )}

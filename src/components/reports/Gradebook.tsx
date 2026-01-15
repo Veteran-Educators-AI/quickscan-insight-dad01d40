@@ -16,7 +16,8 @@ import {
   X,
   Send,
   Sparkles,
-  FileText
+  FileText,
+  Info
 } from 'lucide-react';
 import { StudentReportDialog } from './StudentReportDialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -32,11 +33,44 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useStudentNames } from '@/lib/StudentNameContext';
 import { toast } from 'sonner';
 import nycologicLogo from '@/assets/nycologic-logo.png';
+
+// Column info tooltips explaining what each column means
+const COLUMN_INFO = {
+  student: {
+    title: 'Student',
+    description: 'The name of the student who completed the assessment. Click to view their full performance report.',
+  },
+  topic: {
+    title: 'Topic',
+    description: 'The mathematical topic or concept being assessed (e.g., Linear Equations, Quadratic Functions).',
+  },
+  grade: {
+    title: 'Grade (%)',
+    description: 'The percentage score (0-100%) indicating overall performance. Green ≥80%, Yellow ≥60%, Red <60%.',
+  },
+  regents: {
+    title: 'Regents Score',
+    description: 'NY Regents-style rubric score (0-6 scale). Based on official NYS scoring criteria for extended response questions.',
+  },
+  standard: {
+    title: 'NYS Standard',
+    description: 'The New York State learning standard code (e.g., A-REI.B.4) that this assessment aligns to.',
+  },
+  date: {
+    title: 'Date',
+    description: 'When the student work was scanned and analyzed by the AI grading system.',
+  },
+  actions: {
+    title: 'Actions',
+    description: 'Edit grade details, adjust scores, or delete the entry if needed.',
+  },
+};
 
 interface GradeEntry {
   id: string;
@@ -467,44 +501,122 @@ export function Gradebook({ classId }: GradebookProps) {
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => handleSort('student')}
                       >
-                        <span className="flex items-center">
-                          Student <SortIcon field="student" />
-                        </span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex items-center gap-1">
+                                Student <Info className="h-3 w-3 text-muted-foreground" /> <SortIcon field="student" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[250px]">
+                              <p className="font-semibold">{COLUMN_INFO.student.title}</p>
+                              <p className="text-xs text-muted-foreground">{COLUMN_INFO.student.description}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableHead>
                       <TableHead 
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => handleSort('topic')}
                       >
-                        <span className="flex items-center">
-                          Topic <SortIcon field="topic" />
-                        </span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex items-center gap-1">
+                                Topic <Info className="h-3 w-3 text-muted-foreground" /> <SortIcon field="topic" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[250px]">
+                              <p className="font-semibold">{COLUMN_INFO.topic.title}</p>
+                              <p className="text-xs text-muted-foreground">{COLUMN_INFO.topic.description}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableHead>
                       <TableHead 
                         className="cursor-pointer hover:bg-muted/50 text-center"
                         onClick={() => handleSort('grade')}
                       >
-                        <span className="flex items-center justify-center">
-                          Grade <SortIcon field="grade" />
-                        </span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex items-center justify-center gap-1">
+                                Grade <Info className="h-3 w-3 text-muted-foreground" /> <SortIcon field="grade" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[250px]">
+                              <p className="font-semibold">{COLUMN_INFO.grade.title}</p>
+                              <p className="text-xs text-muted-foreground">{COLUMN_INFO.grade.description}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableHead>
                       <TableHead 
                         className="cursor-pointer hover:bg-muted/50 text-center"
                         onClick={() => handleSort('regents')}
                       >
-                        <span className="flex items-center justify-center">
-                          Regents <SortIcon field="regents" />
-                        </span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex items-center justify-center gap-1">
+                                Regents <Info className="h-3 w-3 text-muted-foreground" /> <SortIcon field="regents" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[250px]">
+                              <p className="font-semibold">{COLUMN_INFO.regents.title}</p>
+                              <p className="text-xs text-muted-foreground">{COLUMN_INFO.regents.description}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableHead>
-                      <TableHead>Standard</TableHead>
+                      <TableHead>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex items-center gap-1">
+                                Standard <Info className="h-3 w-3 text-muted-foreground" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[250px]">
+                              <p className="font-semibold">{COLUMN_INFO.standard.title}</p>
+                              <p className="text-xs text-muted-foreground">{COLUMN_INFO.standard.description}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableHead>
                       <TableHead 
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => handleSort('date')}
                       >
-                        <span className="flex items-center">
-                          Date <SortIcon field="date" />
-                        </span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex items-center gap-1">
+                                Date <Info className="h-3 w-3 text-muted-foreground" /> <SortIcon field="date" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[250px]">
+                              <p className="font-semibold">{COLUMN_INFO.date.title}</p>
+                              <p className="text-xs text-muted-foreground">{COLUMN_INFO.date.description}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableHead>
-                      <TableHead className="w-[80px]">Actions</TableHead>
+                      <TableHead className="w-[80px]">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex items-center gap-1">
+                                Actions <Info className="h-3 w-3 text-muted-foreground" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[250px]">
+                              <p className="font-semibold">{COLUMN_INFO.actions.title}</p>
+                              <p className="text-xs text-muted-foreground">{COLUMN_INFO.actions.description}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
