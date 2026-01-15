@@ -32,11 +32,12 @@ import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
 import { MultiStudentScanner } from '@/components/scan/MultiStudentScanner';
 import { ScannerImportMode } from '@/components/scan/ScannerImportMode';
 import { GradingModeSelector, GradingMode } from '@/components/scan/GradingModeSelector';
+import { GradingComparisonView } from '@/components/scan/GradingComparisonView';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
 
-type ScanState = 'idle' | 'camera' | 'preview' | 'choose-method' | 'upload-solution' | 'analyzed' | 'manual-scoring' | 'analyze-saved';
+type ScanState = 'idle' | 'camera' | 'preview' | 'choose-method' | 'upload-solution' | 'analyzed' | 'manual-scoring' | 'analyze-saved' | 'comparison';
 type ScanMode = 'single' | 'batch' | 'saved' | 'scanner';
 
 interface ManualResult {
@@ -60,6 +61,9 @@ export default function Scan() {
   const [gradingMode, setGradingMode] = useState<GradingMode>('ai');
   const [manualResult, setManualResult] = useState<ManualResult | null>(null);
   const [batchCameraMode, setBatchCameraMode] = useState(false);
+  const [answerGuideImage, setAnswerGuideImage] = useState<string | null>(null);
+  const [showComparisonView, setShowComparisonView] = useState(false);
+  const [selectedAnalysisResult, setSelectedAnalysisResult] = useState<'ai' | 'teacher-guided' | null>(null);
   const [batchSaving, setBatchSaving] = useState(false);
   const [batchSavedStudents, setBatchSavedStudents] = useState<Set<string>>(new Set());
   
@@ -300,20 +304,51 @@ export default function Scan() {
     analyzeImage();
   };
 
-  const handleChooseTeacherGuided = async (answerGuideImage: string) => {
+  const handleChooseTeacherGuided = async (guideImage: string) => {
     if (!finalImage) return;
     setGradingMode('teacher-guided');
+    setAnswerGuideImage(guideImage);
     
     toast.info('Analyzing with your answer guide...');
-    const result = await analyzeWithTeacherGuide(finalImage, answerGuideImage, {
+    const analysisResult = await analyzeWithTeacherGuide(finalImage, guideImage, {
       questionId: selectedQuestionIds[0] || detectedQR?.questionId,
       rubricSteps: mockRubricSteps,
       studentName: studentName || undefined,
     });
     
-    if (result) {
+    if (analysisResult) {
       setScanState('analyzed');
     }
+  };
+
+  const handleRunBothAnalyses = async (guideImage: string) => {
+    if (!finalImage) return;
+    setAnswerGuideImage(guideImage);
+    
+    toast.info('Running both AI and teacher-guided analysis for comparison...');
+    const { aiResult, teacherGuidedResult: tgResult } = await runBothAnalyses(finalImage, guideImage, {
+      questionId: selectedQuestionIds[0] || detectedQR?.questionId,
+      rubricSteps: mockRubricSteps,
+      studentName: studentName || undefined,
+    });
+    
+    if (aiResult && tgResult) {
+      setShowComparisonView(true);
+      setScanState('comparison');
+    } else if (aiResult) {
+      toast.warning('Teacher-guided analysis failed. Showing AI result only.');
+      setScanState('analyzed');
+    } else if (tgResult) {
+      toast.warning('AI analysis failed. Showing teacher-guided result only.');
+      setScanState('analyzed');
+    }
+  };
+
+  const handleSelectComparisonResult = (selectedResult: any, source: 'ai' | 'teacher-guided') => {
+    setSelectedAnalysisResult(source);
+    setShowComparisonView(false);
+    setScanState('analyzed');
+    toast.success(`Using ${source === 'ai' ? 'AI' : 'teacher-guided'} analysis result`);
   };
 
   const handleChooseTeacherManual = () => {
@@ -1182,6 +1217,7 @@ export default function Scan() {
                     onSelectAI={handleChooseAI}
                     onSelectTeacherGuided={handleChooseTeacherGuided}
                     onSelectTeacherManual={handleChooseTeacherManual}
+                    onRunBothAnalyses={handleRunBothAnalyses}
                     onCancel={() => {
                       cancelAnalysis();
                       toast.info('Analysis cancelled');
@@ -1191,18 +1227,53 @@ export default function Scan() {
                 </div>
               )}
 
-              {/* Analysis Results - AI or Manual */}
-              {scanState === 'analyzed' && (result || manualResult || Object.keys(multiQuestionResults).length > 0) && (
+              {/* Comparison View - Side by Side AI vs Teacher-Guided */}
+              {scanState === 'comparison' && result && teacherGuidedResult && finalImage && answerGuideImage && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">
-                      {manualResult 
-                        ? 'Teacher Scoring Results' 
-                        : Object.keys(multiQuestionResults).length > 0
-                          ? `AI Grading Results (${Object.keys(multiQuestionResults).length} Questions)`
-                          : 'AI Grading Results'
+                    <h2 className="text-lg font-semibold">Compare Analysis Results</h2>
+                    <Button variant="outline" size="sm" onClick={startNewScan}>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Start Over
+                    </Button>
+                  </div>
+                  
+                  <GradingComparisonView
+                    aiResult={result}
+                    teacherGuidedResult={teacherGuidedResult}
+                    studentImage={finalImage}
+                    answerGuideImage={answerGuideImage}
+                    onSelectResult={handleSelectComparisonResult}
+                    onRerunWithGuide={() => {
+                      if (answerGuideImage) {
+                        handleRunBothAnalyses(answerGuideImage);
                       }
-                    </h2>
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Analysis Results - AI or Manual */}
+              {scanState === 'analyzed' && (result || teacherGuidedResult || manualResult || Object.keys(multiQuestionResults).length > 0) && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-semibold">
+                        {manualResult 
+                          ? 'Teacher Scoring Results' 
+                          : Object.keys(multiQuestionResults).length > 0
+                            ? `AI Grading Results (${Object.keys(multiQuestionResults).length} Questions)`
+                            : selectedAnalysisResult === 'teacher-guided' || (teacherGuidedResult && !result)
+                            ? 'Teacher-Guided Results'
+                            : 'AI Grading Results'
+                        }
+                      </h2>
+                      {selectedAnalysisResult && (
+                        <Badge variant="secondary" className="text-xs">
+                          {selectedAnalysisResult === 'ai' ? 'AI Selected' : 'Teacher-Guided Selected'}
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
                       {/* Save to Database button - only show for multi-question with student assigned */}
                       {Object.keys(multiQuestionResults).length > 0 && analyzingScanStudentId && (
@@ -1258,90 +1329,102 @@ export default function Scan() {
                     </div>
                   )}
                   
-                  {/* Single result (legacy) */}
-                  {result && !manualResult && Object.keys(multiQuestionResults).length === 0 && (
-                    <>
-                      {/* Question Selector - show when no question is pre-selected */}
-                      {!selectedQuestionIds.length && !detectedQR?.questionId && (
-                        <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
-                          <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                              <FileQuestion className="h-5 w-5 text-amber-600 mt-0.5" />
-                              <div className="flex-1 space-y-3">
-                                <div>
-                                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                                    Select a Question to Save Analytics
-                                  </p>
-                                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                                    Associate this scan with a question from your library to track student progress
-                                  </p>
+                  {/* Single result - show either AI or Teacher-Guided based on selection */}
+                  {(() => {
+                    const displayResult = selectedAnalysisResult === 'teacher-guided' 
+                      ? teacherGuidedResult 
+                      : selectedAnalysisResult === 'ai' 
+                      ? result 
+                      : (result || teacherGuidedResult);
+                    
+                    if (!displayResult || manualResult || Object.keys(multiQuestionResults).length > 0) {
+                      return null;
+                    }
+                    
+                    return (
+                      <>
+                        {/* Question Selector - show when no question is pre-selected */}
+                        {!selectedQuestionIds.length && !detectedQR?.questionId && (
+                          <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
+                            <CardContent className="p-4">
+                              <div className="flex items-start gap-3">
+                                <FileQuestion className="h-5 w-5 text-amber-600 mt-0.5" />
+                                <div className="flex-1 space-y-3">
+                                  <div>
+                                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                                      Select a Question to Save Analytics
+                                    </p>
+                                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                                      Associate this scan with a question from your library to track student progress
+                                    </p>
+                                  </div>
+                                  <ScanQuestionSelector
+                                    selectedQuestionId={selectedQuestionIds[0] || null}
+                                    onQuestionChange={(questionId) => {
+                                      if (questionId) {
+                                        setSelectedQuestionIds([questionId]);
+                                      } else {
+                                        setSelectedQuestionIds([]);
+                                      }
+                                    }}
+                                    disabled={isSaving}
+                                    compact
+                                  />
                                 </div>
-                                <ScanQuestionSelector
-                                  selectedQuestionId={selectedQuestionIds[0] || null}
-                                  onQuestionChange={(questionId) => {
-                                    if (questionId) {
-                                      setSelectedQuestionIds([questionId]);
-                                    } else {
-                                      setSelectedQuestionIds([]);
-                                    }
-                                  }}
-                                  disabled={isSaving}
-                                  compact
-                                />
                               </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-                      
-                      {/* Show selected question badge if one is selected */}
-                      {(selectedQuestionIds.length > 0 || detectedQR?.questionId) && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Badge variant="secondary" className="gap-1">
-                            <FileQuestion className="h-3 w-3" />
-                            Question linked
-                          </Badge>
-                          {detectedQR?.questionId && (
-                            <Badge variant="outline" className="gap-1">
-                              <QrCode className="h-3 w-3" />
-                              Auto-detected
+                            </CardContent>
+                          </Card>
+                        )}
+                        
+                        {/* Show selected question badge if one is selected */}
+                        {(selectedQuestionIds.length > 0 || detectedQR?.questionId) && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Badge variant="secondary" className="gap-1">
+                              <FileQuestion className="h-3 w-3" />
+                              Question linked
                             </Badge>
-                          )}
-                        </div>
-                      )}
-                      
-                      <AnalysisResults 
-                        result={result} 
-                        rawAnalysis={rawAnalysis}
-                        onSaveAnalytics={currentStudentId && (selectedQuestionIds.length > 0 || detectedQR?.questionId) && !resultsSaved ? () => setShowSaveConfirm(true) : undefined}
-                        onAssociateStudent={() => setShowStudentPicker(true)}
-                        isSaving={isSaving}
-                        studentName={studentName}
-                        studentId={currentStudentId}
-                        classId={singleScanClassId}
-                        topicName={result.problemIdentified}
-                      />
-                      
-                      {/* Sync Status Indicator - shown after save */}
-                      {resultsSaved && (
-                        <SyncStatusIndicator status={syncStatus} className="mt-2" />
-                      )}
-                      
-                      <SaveAnalyticsConfirmDialog
-                        open={showSaveConfirm}
-                        onOpenChange={setShowSaveConfirm}
-                        onConfirm={async () => {
-                          await handleSaveSingleResult();
-                          setShowSaveConfirm(false);
-                        }}
-                        studentName={studentName}
-                        totalScore={result.totalScore}
-                        rubricScores={result.rubricScores}
-                        questionCount={1}
-                        isSaving={isSaving}
-                      />
-                    </>
-                  )}
+                            {detectedQR?.questionId && (
+                              <Badge variant="outline" className="gap-1">
+                                <QrCode className="h-3 w-3" />
+                                Auto-detected
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        
+                        <AnalysisResults 
+                          result={displayResult} 
+                          rawAnalysis={rawAnalysis}
+                          onSaveAnalytics={currentStudentId && (selectedQuestionIds.length > 0 || detectedQR?.questionId) && !resultsSaved ? () => setShowSaveConfirm(true) : undefined}
+                          onAssociateStudent={() => setShowStudentPicker(true)}
+                          isSaving={isSaving}
+                          studentName={studentName}
+                          studentId={currentStudentId}
+                          classId={singleScanClassId}
+                          topicName={displayResult.problemIdentified}
+                        />
+                        
+                        {/* Sync Status Indicator - shown after save */}
+                        {resultsSaved && (
+                          <SyncStatusIndicator status={syncStatus} className="mt-2" />
+                        )}
+                        
+                        <SaveAnalyticsConfirmDialog
+                          open={showSaveConfirm}
+                          onOpenChange={setShowSaveConfirm}
+                          onConfirm={async () => {
+                            await handleSaveSingleResult();
+                            setShowSaveConfirm(false);
+                          }}
+                          studentName={studentName}
+                          totalScore={displayResult.totalScore}
+                          rubricScores={displayResult.rubricScores}
+                          questionCount={1}
+                          isSaving={isSaving}
+                        />
+                      </>
+                    );
+                  })()}
                   
                   {manualResult && (
                     <>
