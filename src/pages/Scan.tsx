@@ -31,13 +31,13 @@ import { useCameraPermission } from '@/hooks/useCameraPermission';
 import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
 import { MultiStudentScanner } from '@/components/scan/MultiStudentScanner';
 import { ScannerImportMode } from '@/components/scan/ScannerImportMode';
+import { GradingModeSelector, GradingMode } from '@/components/scan/GradingModeSelector';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
 
 type ScanState = 'idle' | 'camera' | 'preview' | 'choose-method' | 'upload-solution' | 'analyzed' | 'manual-scoring' | 'analyze-saved';
 type ScanMode = 'single' | 'batch' | 'saved' | 'scanner';
-type GradingMethod = 'ai' | 'teacher';
 
 interface ManualResult {
   rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
@@ -57,7 +57,7 @@ export default function Scan() {
   const [finalImage, setFinalImage] = useState<string | null>(null);
   const [solutionImage, setSolutionImage] = useState<string | null>(null);
   const [showBatchReport, setShowBatchReport] = useState(false);
-  const [gradingMethod, setGradingMethod] = useState<GradingMethod>('ai');
+  const [gradingMode, setGradingMode] = useState<GradingMode>('ai');
   const [manualResult, setManualResult] = useState<ManualResult | null>(null);
   const [batchCameraMode, setBatchCameraMode] = useState(false);
   const [batchSaving, setBatchSaving] = useState(false);
@@ -76,7 +76,7 @@ export default function Scan() {
   const [showStudentPicker, setShowStudentPicker] = useState(false);
   const { students: singleScanStudents } = useClassStudents(singleScanClassId);
 
-  const { analyze, compareWithSolution, cancelAnalysis, isAnalyzing, isComparing, error, result, rawAnalysis, comparisonResult } = useAnalyzeStudentWork();
+  const { analyze, analyzeWithTeacherGuide, runBothAnalyses, compareWithSolution, cancelAnalysis, isAnalyzing, isComparing, error, result, teacherGuidedResult, rawAnalysis, comparisonResult } = useAnalyzeStudentWork();
   const batch = useBatchAnalysis();
   const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans();
   const { saveResults, saveMultiQuestionResults, isSaving, syncStatus, resetSyncStatus } = useSaveAnalysisResults();
@@ -296,12 +296,28 @@ export default function Scan() {
   };
 
   const handleChooseAI = () => {
-    setGradingMethod('ai');
+    setGradingMode('ai');
     analyzeImage();
   };
 
-  const handleChooseTeacher = () => {
-    setGradingMethod('teacher');
+  const handleChooseTeacherGuided = async (answerGuideImage: string) => {
+    if (!finalImage) return;
+    setGradingMode('teacher-guided');
+    
+    toast.info('Analyzing with your answer guide...');
+    const result = await analyzeWithTeacherGuide(finalImage, answerGuideImage, {
+      questionId: selectedQuestionIds[0] || detectedQR?.questionId,
+      rubricSteps: mockRubricSteps,
+      studentName: studentName || undefined,
+    });
+    
+    if (result) {
+      setScanState('analyzed');
+    }
+  };
+
+  const handleChooseTeacherManual = () => {
+    setGradingMode('teacher-manual');
     setScanState('upload-solution');
   };
 
@@ -1160,71 +1176,18 @@ export default function Scan() {
                     </Card>
                   )}
 
-                  <Card>
-                    <CardContent className="p-4">
-                      <img 
-                        src={finalImage} 
-                        alt="Student work" 
-                        className="w-full object-contain max-h-48 rounded-md" 
-                      />
-                    </CardContent>
-                  </Card>
-
-                  {isAnalyzing ? (
-                    <Card>
-                      <CardContent className="p-8">
-                        <div className="text-center space-y-4">
-                          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
-                          <div>
-                            <p className="font-medium">Analyzing with AI...</p>
-                            <p className="text-sm text-muted-foreground">Running OCR and auto-grading</p>
-                          </div>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => {
-                              cancelAnalysis();
-                              toast.info('Analysis cancelled');
-                              setScanState('choose-method');
-                            }}
-                            className="gap-2"
-                          >
-                            <XCircle className="h-4 w-4" />
-                            Cancel Analysis
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      <Button 
-                        variant="outline" 
-                        className="h-auto py-6 flex-col gap-3 border-2 hover:border-primary hover:bg-primary/5"
-                        onClick={handleChooseAI}
-                      >
-                        <Bot className="h-10 w-10 text-primary" />
-                        <div className="space-y-1">
-                          <span className="font-semibold text-base">AI Analysis</span>
-                          <p className="text-xs text-muted-foreground font-normal">
-                            Automatic grading using AI
-                          </p>
-                        </div>
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        className="h-auto py-6 flex-col gap-3 border-2 hover:border-primary hover:bg-primary/5"
-                        onClick={handleChooseTeacher}
-                      >
-                        <User className="h-10 w-10 text-muted-foreground" />
-                        <div className="space-y-1">
-                          <span className="font-semibold text-base">Teacher Analysis</span>
-                          <p className="text-xs text-muted-foreground font-normal">
-                            Upload solution to compare
-                          </p>
-                        </div>
-                      </Button>
-                    </div>
-                  )}
+                  <GradingModeSelector
+                    studentImage={finalImage}
+                    isAnalyzing={isAnalyzing}
+                    onSelectAI={handleChooseAI}
+                    onSelectTeacherGuided={handleChooseTeacherGuided}
+                    onSelectTeacherManual={handleChooseTeacherManual}
+                    onCancel={() => {
+                      cancelAnalysis();
+                      toast.info('Analysis cancelled');
+                      setScanState('choose-method');
+                    }}
+                  />
                 </div>
               )}
 
