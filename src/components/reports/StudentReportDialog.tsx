@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import {
@@ -100,7 +100,42 @@ const REMEDIATION_SUGGESTIONS: Record<string, string[]> = {
   'equation': ['Balance method practice', 'Inverse operation drills'],
   'graph': ['Coordinate plotting practice', 'Slope-intercept form exercises'],
   'exponent': ['Exponent rules flashcards', 'Scientific notation practice'],
+  'arithmetic': ['Basic operations drills', 'Mental math exercises', 'Calculator-free practice'],
+  'calculation': ['Step-by-step verification practice', 'Check work backwards technique'],
+  'setup': ['Problem translation exercises', 'Identify given vs. unknown practice'],
+  'formula': ['Formula reference sheet practice', 'Derivation understanding exercises'],
+  'notation': ['Mathematical notation drills', 'Symbol meaning flashcards'],
+  'conceptual': ['Visual representations', 'Real-world application examples'],
+  'procedural': ['Step-by-step algorithm practice', 'Flowchart problem solving'],
+  'incomplete': ['Showing all work practice', 'Justification writing exercises'],
   'default': ['Targeted practice problems', 'One-on-one tutoring session', 'Visual learning aids'],
+};
+
+// Extract misconceptions from grade justification text
+const extractMisconceptionsFromJustification = (justification: string): string[] => {
+  const misconceptionPatterns = [
+    /(?:error|mistake|incorrect|wrong|misconception|misunderstanding|confused|confusing)[:\s]+([^.!?]+[.!?])/gi,
+    /(?:student|learner)\s+(?:did not|didn't|failed to|struggled with|had difficulty)[^.!?]+[.!?]/gi,
+    /(?:points? (?:lost|deducted)|(?:lost|deducted) points?)\s+(?:for|because|due to)[^.!?]+[.!?]/gi,
+    /(?:should have|needed to|was supposed to|forgot to)[^.!?]+[.!?]/gi,
+    /(?:incorrect|wrong|improper)\s+(?:use|application|understanding|approach)[^.!?]+[.!?]/gi,
+  ];
+  
+  const found: string[] = [];
+  for (const pattern of misconceptionPatterns) {
+    const matches = justification.match(pattern);
+    if (matches) {
+      found.push(...matches.map(m => m.trim()));
+    }
+  }
+  
+  // Also check for bullet points or numbered issues
+  const bulletMatches = justification.match(/[-•]\s*[^-•\n]+(?:error|mistake|incorrect|wrong|issue)[^-•\n]*/gi);
+  if (bulletMatches) {
+    found.push(...bulletMatches.map(m => m.replace(/^[-•]\s*/, '').trim()));
+  }
+  
+  return [...new Set(found)].slice(0, 5); // Dedupe and limit
 };
 
 export function StudentReportDialog({
@@ -198,6 +233,27 @@ export function StudentReportDialog({
 
   const isLoading = gradesLoading || diagnosticsLoading;
 
+  // Extract misconceptions from grade justifications when no formal misconceptions exist
+  const extractedMisconceptions = useMemo(() => {
+    if (misconceptions?.length) return []; // Use formal misconceptions if they exist
+    
+    const extracted: { text: string; topic: string; grade: number; date: string }[] = [];
+    gradeHistory?.forEach(entry => {
+      if (entry.grade < 80 && entry.grade_justification) {
+        const found = extractMisconceptionsFromJustification(entry.grade_justification);
+        found.forEach(text => {
+          extracted.push({
+            text,
+            topic: entry.topic_name,
+            grade: entry.grade,
+            date: entry.created_at,
+          });
+        });
+      }
+    });
+    return extracted;
+  }, [gradeHistory, misconceptions]);
+
   // Calculate summary statistics
   const stats = {
     totalAssessments: (gradeHistory?.length || 0) + (diagnosticResults?.length || 0),
@@ -213,7 +269,7 @@ export function StudentReportDialog({
       ...(gradeHistory?.map(g => g.topic_name) || []),
       ...(diagnosticResults?.map(d => d.topic_name) || []),
     ]).size,
-    misconceptionCount: misconceptions?.length || 0,
+    misconceptionCount: (misconceptions?.length || 0) + extractedMisconceptions.length,
     pushedCount: pushedAssignments?.length || 0,
   };
 
@@ -691,6 +747,71 @@ export function StudentReportDialog({
                         </Card>
                       );
                     })
+                  ) : extractedMisconceptions.length > 0 ? (
+                    // Show extracted misconceptions from grade justifications
+                    <>
+                      <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800 mb-3">
+                        <p className="text-sm text-orange-700 dark:text-orange-300">
+                          <AlertTriangle className="h-4 w-4 inline mr-1" />
+                          The following issues were identified from grade justifications and may have contributed to lower scores:
+                        </p>
+                      </div>
+                      {extractedMisconceptions.map((item, idx) => {
+                        const remedies = getSuggestedRemedies(item.text);
+                        
+                        return (
+                          <Card key={idx} className="border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/20">
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                                    <p className="font-medium text-yellow-900 dark:text-yellow-100 text-sm">
+                                      {item.text}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <Badge variant="outline" className="text-xs">
+                                      Topic: {item.topic}
+                                    </Badge>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={cn(
+                                        'text-xs',
+                                        item.grade < 60 && 'border-red-300 text-red-600',
+                                        item.grade >= 60 && item.grade < 80 && 'border-yellow-300 text-yellow-600'
+                                      )}
+                                    >
+                                      Score: {item.grade}%
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Suggested Remedies */}
+                              <div className="mt-3 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                                <div className="flex items-center gap-2 text-sm font-medium mb-2 text-green-700 dark:text-green-300">
+                                  <Lightbulb className="h-4 w-4" />
+                                  Suggested Remediation Strategies
+                                </div>
+                                <ul className="space-y-1">
+                                  {remedies.map((remedy, rIdx) => (
+                                    <li key={rIdx} className="text-sm text-green-600 dark:text-green-400 flex items-start gap-2">
+                                      <span className="text-green-500 mt-0.5">•</span>
+                                      {remedy}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                              
+                              <p className="text-xs text-muted-foreground mt-2">
+                                From assessment on {format(new Date(item.date), 'MMM d, yyyy')}
+                              </p>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </>
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <Award className="h-8 w-8 mx-auto mb-2 opacity-50" />
