@@ -151,31 +151,115 @@ const REMEDIATION_SUGGESTIONS: Record<string, string[]> = {
   'default': ['Targeted practice problems', 'One-on-one tutoring session', 'Visual learning aids'],
 };
 
-// Extract misconceptions from grade justification text
-const extractMisconceptionsFromJustification = (justification: string): string[] => {
-  const misconceptionPatterns = [
-    /(?:error|mistake|incorrect|wrong|misconception|misunderstanding|confused|confusing)[:\s]+([^.!?]+[.!?])/gi,
-    /(?:student|learner)\s+(?:did not|didn't|failed to|struggled with|had difficulty)[^.!?]+[.!?]/gi,
-    /(?:points? (?:lost|deducted)|(?:lost|deducted) points?)\s+(?:for|because|due to)[^.!?]+[.!?]/gi,
-    /(?:should have|needed to|was supposed to|forgot to)[^.!?]+[.!?]/gi,
-    /(?:incorrect|wrong|improper)\s+(?:use|application|understanding|approach)[^.!?]+[.!?]/gi,
+// Extract misconceptions from grade justification text - improved to capture more patterns
+const extractMisconceptionsFromJustification = (justification: string): { text: string; severity: 'high' | 'medium' | 'low' }[] => {
+  const found: { text: string; severity: 'high' | 'medium' | 'low' }[] = [];
+  
+  // Split into sentences for better analysis
+  const sentences = justification.split(/[.!?]+/).filter(s => s.trim().length > 10);
+  
+  // High severity patterns - critical errors
+  const highSeverityPatterns = [
+    /(?:major|critical|significant|serious)\s+(?:error|mistake|issue)/i,
+    /(?:completely|entirely|totally)\s+(?:wrong|incorrect|missed)/i,
+    /(?:fundamental|basic)\s+(?:misunderstanding|misconception)/i,
+    /(?:did not|didn't|failed to)\s+(?:understand|grasp|comprehend)/i,
+    /(?:no|zero|lacking)\s+(?:credit|points?|marks?)/i,
   ];
   
-  const found: string[] = [];
-  for (const pattern of misconceptionPatterns) {
-    const matches = justification.match(pattern);
-    if (matches) {
-      found.push(...matches.map(m => m.trim()));
+  // Medium severity patterns - partial understanding issues
+  const mediumSeverityPatterns = [
+    /(?:partial|incomplete|missing)\s+(?:work|solution|answer|steps?)/i,
+    /(?:error|mistake|incorrect|wrong)\s+(?:in|with|on)/i,
+    /(?:should have|needed to|was supposed to)/i,
+    /(?:forgot|omitted|skipped|missed)\s+(?:to|the)/i,
+    /(?:sign error|calculation error|arithmetic error)/i,
+    /(?:incorrect|wrong)\s+(?:formula|method|approach|setup)/i,
+    /(?:misread|misinterpreted|confused)/i,
+    /(?:lost|deducted)\s+\d+\s*(?:point|pt)/i,
+  ];
+  
+  // Low severity patterns - minor issues
+  const lowSeverityPatterns = [
+    /(?:minor|small|slight)\s+(?:error|mistake|issue)/i,
+    /(?:rounding|notation|formatting)\s+(?:error|issue)/i,
+    /(?:could have|should consider)/i,
+    /(?:almost|nearly|close to)\s+correct/i,
+  ];
+  
+  // Process each sentence
+  sentences.forEach(sentence => {
+    const trimmed = sentence.trim();
+    if (trimmed.length < 10) return;
+    
+    // Check for negative/issue indicators
+    const hasIssueIndicator = /(?:error|mistake|incorrect|wrong|missing|forgot|failed|did not|didn't|omitted|lost|deducted|issue|problem|misconception|confused|misunderstand)/i.test(trimmed);
+    
+    if (!hasIssueIndicator) return;
+    
+    // Determine severity
+    let severity: 'high' | 'medium' | 'low' = 'medium';
+    
+    if (highSeverityPatterns.some(p => p.test(trimmed))) {
+      severity = 'high';
+    } else if (lowSeverityPatterns.some(p => p.test(trimmed))) {
+      severity = 'low';
     }
-  }
+    
+    // Clean up the sentence
+    let cleanText = trimmed
+      .replace(/^[-•*]\s*/, '') // Remove bullet points
+      .replace(/^\d+[.)]\s*/, '') // Remove numbered lists
+      .replace(/^(?:however|also|additionally|furthermore|moreover),?\s*/i, '')
+      .trim();
+    
+    // Capitalize first letter
+    if (cleanText.length > 0) {
+      cleanText = cleanText.charAt(0).toUpperCase() + cleanText.slice(1);
+      // Add period if missing
+      if (!/[.!?]$/.test(cleanText)) {
+        cleanText += '.';
+      }
+    }
+    
+    if (cleanText.length > 15 && cleanText.length < 300) {
+      found.push({ text: cleanText, severity });
+    }
+  });
   
-  // Also check for bullet points or numbered issues
-  const bulletMatches = justification.match(/[-•]\s*[^-•\n]+(?:error|mistake|incorrect|wrong|issue)[^-•\n]*/gi);
+  // Also check for bullet points or numbered issues specifically
+  const bulletMatches = justification.match(/[-•*]\s*[^-•*\n]{15,}/g);
   if (bulletMatches) {
-    found.push(...bulletMatches.map(m => m.replace(/^[-•]\s*/, '').trim()));
+    bulletMatches.forEach(match => {
+      const cleanMatch = match.replace(/^[-•*]\s*/, '').trim();
+      if (cleanMatch.length > 15 && !found.some(f => f.text.includes(cleanMatch.substring(0, 30)))) {
+        const hasIssue = /(?:error|mistake|incorrect|wrong|missing|forgot|failed|issue)/i.test(cleanMatch);
+        if (hasIssue) {
+          found.push({ text: cleanMatch, severity: 'medium' });
+        }
+      }
+    });
   }
   
-  return [...new Set(found)].slice(0, 5); // Dedupe and limit
+  // Dedupe by checking for similar text and limit
+  const unique: { text: string; severity: 'high' | 'medium' | 'low' }[] = [];
+  found.forEach(item => {
+    const isDupe = unique.some(u => 
+      u.text.toLowerCase().includes(item.text.toLowerCase().substring(0, 30)) ||
+      item.text.toLowerCase().includes(u.text.toLowerCase().substring(0, 30))
+    );
+    if (!isDupe) {
+      unique.push(item);
+    }
+  });
+  
+  // Sort by severity (high first) and limit
+  return unique
+    .sort((a, b) => {
+      const order = { high: 0, medium: 1, low: 2 };
+      return order[a.severity] - order[b.severity];
+    })
+    .slice(0, 8);
 };
 
 export function StudentReportDialog({
@@ -350,39 +434,60 @@ export function StudentReportDialog({
     return combined;
   }, [analysisMisconceptions, legacyMisconceptions]);
 
-  // Extract misconceptions from grade justifications when no formal misconceptions exist
+  // Extract misconceptions from grade justifications - always extract from justifications
   const extractedMisconceptions = useMemo(() => {
-    if (allMisconceptions.length > 0) return []; // Use stored misconceptions if they exist
+    const extracted: { text: string; topic: string; grade: number; date: string; severity: 'high' | 'medium' | 'low'; standard?: string | null }[] = [];
     
-    const extracted: { text: string; topic: string; grade: number; date: string }[] = [];
     gradeHistory?.forEach(entry => {
-      if (entry.grade < 80 && entry.grade_justification) {
+      // Extract from ANY grade that has a justification (not just < 80%)
+      if (entry.grade_justification) {
         const found = extractMisconceptionsFromJustification(entry.grade_justification);
-        found.forEach(text => {
+        found.forEach(item => {
           extracted.push({
-            text,
+            text: item.text,
+            severity: item.severity,
             topic: entry.topic_name,
             grade: entry.grade,
             date: entry.created_at,
+            standard: entry.nys_standard,
           });
         });
       }
     });
-    return extracted;
-  }, [gradeHistory, allMisconceptions]);
-
-  // Derive diagnostic-like data from grade history when no formal diagnostics exist
-  const derivedDiagnostics = useMemo(() => {
-    if (diagnosticResults?.length) return []; // Use real diagnostics if they exist
     
+    // Sort by severity then by date (most recent first)
+    return extracted.sort((a, b) => {
+      const severityOrder = { high: 0, medium: 1, low: 2 };
+      if (severityOrder[a.severity] !== severityOrder[b.severity]) {
+        return severityOrder[a.severity] - severityOrder[b.severity];
+      }
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+  }, [gradeHistory]);
+
+  // Derive diagnostic-like data from grade history - ALWAYS derive from grades to ensure data shows
+  const derivedDiagnostics = useMemo(() => {
     // Group grades by topic and calculate derived levels
-    const topicGrades: Record<string, { grades: number[]; latest: GradeEntry; standard: string | null }> = {};
+    const topicGrades: Record<string, { 
+      grades: number[]; 
+      latest: GradeEntry; 
+      standard: string | null;
+      justifications: string[];
+    }> = {};
     
     gradeHistory?.forEach(entry => {
       if (!topicGrades[entry.topic_name]) {
-        topicGrades[entry.topic_name] = { grades: [], latest: entry, standard: entry.nys_standard };
+        topicGrades[entry.topic_name] = { 
+          grades: [], 
+          latest: entry, 
+          standard: entry.nys_standard,
+          justifications: []
+        };
       }
       topicGrades[entry.topic_name].grades.push(entry.grade);
+      if (entry.grade_justification) {
+        topicGrades[entry.topic_name].justifications.push(entry.grade_justification);
+      }
       // Keep the most recent entry
       if (new Date(entry.created_at) > new Date(topicGrades[entry.topic_name].latest.created_at)) {
         topicGrades[entry.topic_name].latest = entry;
@@ -392,25 +497,54 @@ export function StudentReportDialog({
     return Object.entries(topicGrades).map(([topic, data]) => {
       const avgGrade = Math.round(data.grades.reduce((a, b) => a + b, 0) / data.grades.length);
       const latestGrade = data.latest.grade;
+      const highestGrade = Math.max(...data.grades);
+      const lowestGrade = Math.min(...data.grades);
       const recommendedLevel = gradeToLevel(latestGrade);
+      
+      // Generate summary notes
+      let notes = `Based on ${data.grades.length} assessment(s). `;
+      notes += `Latest: ${latestGrade}% | Average: ${avgGrade}%`;
+      if (data.grades.length > 1) {
+        notes += ` | Range: ${lowestGrade}%-${highestGrade}%`;
+      }
+      
+      // Determine level description based on grade pattern
+      let levelDescription = LEVEL_DESCRIPTIONS[recommendedLevel];
+      if (data.grades.length >= 2) {
+        const trend = data.grades[0] - data.grades[data.grades.length - 1];
+        if (trend > 10) {
+          levelDescription += ' (Improving trend)';
+        } else if (trend < -10) {
+          levelDescription += ' (Needs attention)';
+        }
+      }
       
       return {
         id: `derived-${topic}`,
         topic_name: topic,
         recommended_level: recommendedLevel,
         standard: data.standard,
-        notes: `Based on ${data.grades.length} assessment(s). Average: ${avgGrade}%, Latest: ${latestGrade}%`,
+        notes,
         created_at: data.latest.created_at,
         avgGrade,
         latestGrade,
+        highestGrade,
+        lowestGrade,
         assessmentCount: data.grades.length,
+        levelDescription,
+        hasJustifications: data.justifications.length > 0,
       };
-    });
-  }, [gradeHistory, diagnosticResults]);
+    }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [gradeHistory]);
 
-  // Combine real and derived diagnostics
+  // Combine real and derived diagnostics - always include derived for more complete picture
   const combinedDiagnostics = useMemo(() => {
-    if (diagnosticResults?.length) return diagnosticResults;
+    // If we have real diagnostics, use them but supplement with derived ones for any missing topics
+    if (diagnosticResults?.length) {
+      const realTopics = new Set(diagnosticResults.map(d => d.topic_name));
+      const supplemental = derivedDiagnostics.filter(d => !realTopics.has(d.topic_name));
+      return [...diagnosticResults, ...supplemental];
+    }
     return derivedDiagnostics;
   }, [diagnosticResults, derivedDiagnostics]);
 
@@ -1202,36 +1336,70 @@ export function StudentReportDialog({
                   ) : extractedMisconceptions.length > 0 ? (
                     // Show extracted misconceptions from grade justifications
                     <>
-                      <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800 mb-3">
-                        <p className="text-sm text-orange-700 dark:text-orange-300">
-                          <AlertTriangle className="h-4 w-4 inline mr-1" />
-                          The following issues were identified from grade justifications and may have contributed to lower scores:
+                      <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800 mb-3">
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          <FileText className="h-4 w-4 inline mr-1" />
+                          The following issues were identified from AI analysis of student work:
                         </p>
                       </div>
                       {extractedMisconceptions.map((item, idx) => {
                         const remedies = getSuggestedRemedies(item.text);
                         
                         return (
-                          <Card key={idx} className="border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/20">
+                          <Card 
+                            key={idx} 
+                            className={cn(
+                              "border-l-4",
+                              item.severity === 'high' && 'border-l-red-500 bg-red-50/50 dark:bg-red-950/20',
+                              item.severity === 'medium' && 'border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/20',
+                              item.severity === 'low' && 'border-l-green-500 bg-green-50/50 dark:bg-green-950/20'
+                            )}
+                          >
                             <CardContent className="p-4">
-                              <div className="flex items-start justify-between">
+                              <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                                    <p className="font-medium text-yellow-900 dark:text-yellow-100 text-sm">
+                                  <div className="flex items-start gap-2">
+                                    <AlertTriangle className={cn(
+                                      "h-5 w-5 mt-0.5 shrink-0",
+                                      item.severity === 'high' && 'text-red-600',
+                                      item.severity === 'medium' && 'text-yellow-600',
+                                      item.severity === 'low' && 'text-green-600'
+                                    )} />
+                                    <p className={cn(
+                                      "font-medium text-sm",
+                                      item.severity === 'high' && 'text-red-900 dark:text-red-100',
+                                      item.severity === 'medium' && 'text-yellow-900 dark:text-yellow-100',
+                                      item.severity === 'low' && 'text-green-900 dark:text-green-100'
+                                    )}>
                                       {item.text}
                                     </p>
                                   </div>
-                                  <div className="flex items-center gap-2 mt-2">
-                                    <Badge variant="outline" className="text-xs">
-                                      Topic: {item.topic}
+                                  <div className="flex flex-wrap items-center gap-2 mt-2 ml-7">
+                                    <Badge 
+                                      className={cn(
+                                        'text-xs text-white',
+                                        item.severity === 'high' && 'bg-red-500',
+                                        item.severity === 'medium' && 'bg-yellow-500',
+                                        item.severity === 'low' && 'bg-green-500'
+                                      )}
+                                    >
+                                      {item.severity === 'high' ? '⚠️ High' : item.severity === 'medium' ? '⚡ Medium' : '✓ Low'} Priority
                                     </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                      {item.topic}
+                                    </Badge>
+                                    {item.standard && (
+                                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300">
+                                        {item.standard}
+                                      </Badge>
+                                    )}
                                     <Badge 
                                       variant="outline" 
                                       className={cn(
                                         'text-xs',
                                         item.grade < 60 && 'border-red-300 text-red-600',
-                                        item.grade >= 60 && item.grade < 80 && 'border-yellow-300 text-yellow-600'
+                                        item.grade >= 60 && item.grade < 80 && 'border-yellow-300 text-yellow-600',
+                                        item.grade >= 80 && 'border-green-300 text-green-600'
                                       )}
                                     >
                                       Score: {item.grade}%
@@ -1241,7 +1409,7 @@ export function StudentReportDialog({
                               </div>
                               
                               {/* Suggested Remedies */}
-                              <div className="mt-3 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                              <div className="mt-3 ml-7 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
                                 <div className="flex items-center gap-2 text-sm font-medium mb-2 text-green-700 dark:text-green-300">
                                   <Lightbulb className="h-4 w-4" />
                                   Suggested Remediation Strategies
@@ -1256,7 +1424,7 @@ export function StudentReportDialog({
                                 </ul>
                               </div>
                               
-                              <p className="text-xs text-muted-foreground mt-2">
+                              <p className="text-xs text-muted-foreground mt-2 ml-7">
                                 From assessment on {format(new Date(item.date), 'MMM d, yyyy')}
                               </p>
                             </CardContent>
@@ -1269,6 +1437,57 @@ export function StudentReportDialog({
                       <Award className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       No misconceptions identified - Great work!
                     </div>
+                  )}
+
+                  {/* Show extracted misconceptions as supplemental even if allMisconceptions exist */}
+                  {allMisconceptions.length > 0 && extractedMisconceptions.length > 0 && (
+                    <>
+                      <Separator className="my-4" />
+                      <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800 mb-3">
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          <FileText className="h-4 w-4 inline mr-1" />
+                          Additional issues from grade justifications:
+                        </p>
+                      </div>
+                      {extractedMisconceptions.slice(0, 5).map((item, idx) => (
+                        <Card 
+                          key={`ext-${idx}`} 
+                          className={cn(
+                            "border-l-4",
+                            item.severity === 'high' && 'border-l-red-500 bg-red-50/30 dark:bg-red-950/10',
+                            item.severity === 'medium' && 'border-l-yellow-500 bg-yellow-50/30 dark:bg-yellow-950/10',
+                            item.severity === 'low' && 'border-l-green-500 bg-green-50/30 dark:bg-green-950/10'
+                          )}
+                        >
+                          <CardContent className="p-3">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className={cn(
+                                "h-4 w-4 mt-0.5 shrink-0",
+                                item.severity === 'high' && 'text-red-500',
+                                item.severity === 'medium' && 'text-yellow-500',
+                                item.severity === 'low' && 'text-green-500'
+                              )} />
+                              <div>
+                                <p className="text-sm">{item.text}</p>
+                                <div className="flex flex-wrap items-center gap-1 mt-1">
+                                  <Badge variant="outline" className="text-xs">{item.topic}</Badge>
+                                  <Badge 
+                                    className={cn(
+                                      'text-xs text-white',
+                                      item.severity === 'high' && 'bg-red-500',
+                                      item.severity === 'medium' && 'bg-yellow-500',
+                                      item.severity === 'low' && 'bg-green-500'
+                                    )}
+                                  >
+                                    {item.severity}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </>
                   )}
                 </div>
               </CollapsibleContent>
