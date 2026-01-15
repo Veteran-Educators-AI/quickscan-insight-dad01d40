@@ -15,6 +15,7 @@ import { AIWorkDetector } from './AIWorkDetector';
 import { GradeOverrideDialog } from './GradeOverrideDialog';
 import { RemediationActions } from './RemediationActions';
 import { RecommendedNextSteps } from './RecommendedNextSteps';
+import { TeacherVerificationPanel } from './TeacherVerificationPanel';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 
 interface RubricScore {
@@ -272,6 +273,17 @@ export function AnalysisResults({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Teacher Verification Panel - Shows flagged interpretations */}
+      {rawAnalysis && (
+        <TeacherVerificationPanel
+          rawAnalysis={rawAnalysis}
+          onVerificationComplete={(interpretations) => {
+            console.log('Verification complete:', interpretations);
+            // Could trigger re-grading or save verification state
+          }}
+        />
       )}
 
       {result.rubricScores.length > 0 && (
