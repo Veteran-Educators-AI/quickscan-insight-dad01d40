@@ -398,12 +398,30 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
     setSelectedCategory(group.category);
     
     try {
-      const topics = group.commonTopics.map(t => ({
-        topicName: t,
-        standard: group.instances.find(i => i.topic === t)?.standard || '',
-        subject: 'Mathematics',
-        category: group.category,
-      }));
+      // Map topics to the correct format expected by the edge function
+      const topics = group.commonTopics.map(t => {
+        const instance = group.instances.find(i => i.topic === t);
+        // Clean up topic name - remove any markdown or special chars
+        const cleanTopicName = t.replace(/\*\*/g, '').replace(/\*/g, '').trim();
+        return {
+          topicName: cleanTopicName,
+          standard: instance?.standard || 'N/A',
+          subject: 'Mathematics',
+          category: group.category,
+        };
+      });
+      
+      // Ensure we have at least one topic
+      if (topics.length === 0) {
+        topics.push({
+          topicName: group.category,
+          standard: 'N/A',
+          subject: 'Mathematics',
+          category: group.category,
+        });
+      }
+      
+      console.log('Generating worksheet with topics:', topics);
       
       const response = await supabase.functions.invoke('generate-worksheet-questions', {
         body: {
@@ -412,12 +430,14 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
           difficultyLevels: group.severity === 'high' ? ['easy', 'medium'] : ['medium', 'hard'],
           includeHints: true,
           includeAnswerKey: true,
-          worksheetMode: 'remediation',
-          targetMisconception: group.title,
+          worksheetMode: 'practice', // Use 'practice' mode - valid worksheet mode
         },
       });
       
-      if (response.error) throw new Error(response.error.message);
+      if (response.error) {
+        console.error('Edge function error:', response.error);
+        throw new Error(response.error.message || 'Failed to generate worksheet');
+      }
       
       const questions = response.data?.questions || [];
       if (questions.length > 0) {
@@ -425,9 +445,11 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
         setShowWorksheetDialog(true);
         toast.success(`Generated ${questions.length} questions targeting ${group.category}`);
       } else {
-        throw new Error('No questions generated');
+        console.error('No questions in response:', response.data);
+        throw new Error('No questions generated - please try again');
       }
     } catch (error: any) {
+      console.error('Worksheet generation error:', error);
       toast.error(`Failed to generate worksheet: ${error.message}`);
     } finally {
       setIsGeneratingWorksheet(false);
