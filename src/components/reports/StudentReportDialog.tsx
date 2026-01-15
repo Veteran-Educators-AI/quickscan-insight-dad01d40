@@ -22,7 +22,11 @@ import {
   Lightbulb,
   Send,
   Sparkles,
+  FileSpreadsheet,
+  Loader2,
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { PrintRemediationQuestionsDialog } from '@/components/print/PrintRemediationQuestionsDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -145,6 +149,7 @@ export function StudentReportDialog({
   studentName,
 }: StudentReportDialogProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [zoom, setZoom] = useState(100);
   const [sectionsExpanded, setSectionsExpanded] = useState({
     grades: true,
@@ -153,6 +158,12 @@ export function StudentReportDialog({
     pushedAssignments: true,
   });
   const reportRef = useRef<HTMLDivElement>(null);
+  
+  // Remediation worksheet state
+  const [isGeneratingRemediation, setIsGeneratingRemediation] = useState(false);
+  const [remediationQuestions, setRemediationQuestions] = useState<any[]>([]);
+  const [showRemediationDialog, setShowRemediationDialog] = useState(false);
+  const [remediationTopicName, setRemediationTopicName] = useState('');
 
   // Fetch grade history
   const { data: gradeHistory, isLoading: gradesLoading } = useQuery({
@@ -426,6 +437,68 @@ export function StudentReportDialog({
 
   const toggleSection = (section: keyof typeof sectionsExpanded) => {
     setSectionsExpanded(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // Generate remediation worksheet from identified misconceptions
+  const handleGenerateRemediation = async () => {
+    // Gather all misconceptions for generation
+    const misconceptionsToRemediate = allMisconceptions.length > 0 
+      ? allMisconceptions.map(m => m.text)
+      : extractedMisconceptions.map(m => m.text);
+    
+    if (misconceptionsToRemediate.length === 0) {
+      toast({
+        title: 'No misconceptions found',
+        description: 'There are no misconceptions to generate remediation questions for.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Get the primary topic from misconceptions
+    const primaryTopic = allMisconceptions[0]?.topic || 
+                         extractedMisconceptions[0]?.topic || 
+                         'Math Practice';
+    
+    setIsGeneratingRemediation(true);
+    setRemediationTopicName(primaryTopic);
+
+    try {
+      const response = await supabase.functions.invoke('generate-remediation-questions', {
+        body: {
+          misconceptions: misconceptionsToRemediate.slice(0, 5), // Limit to 5 misconceptions
+          studentName,
+          problemContext: `Generating targeted remediation for student ${studentName} based on identified misconceptions from their assessments.`,
+          questionsPerMisconception: 3,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to generate remediation questions');
+      }
+
+      const questions = response.data?.questions || [];
+      if (questions.length === 0) {
+        throw new Error('No questions were generated');
+      }
+
+      setRemediationQuestions(questions);
+      setShowRemediationDialog(true);
+      
+      toast({
+        title: 'Remediation worksheet generated!',
+        description: `Created ${questions.length} targeted questions addressing ${misconceptionsToRemediate.length} misconception(s).`,
+      });
+    } catch (error: any) {
+      console.error('Error generating remediation:', error);
+      toast({
+        title: 'Failed to generate remediation',
+        description: error.message || 'An error occurred while generating questions.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingRemediation(false);
+    }
   };
 
   return (
@@ -722,16 +795,44 @@ export function StudentReportDialog({
 
             {/* Misconceptions Section */}
             <Collapsible open={sectionsExpanded.misconceptions} onOpenChange={() => toggleSection('misconceptions')}>
-              <CollapsibleTrigger className="w-full">
-                <div className="section-title flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer">
-                  <div className="flex items-center gap-2 font-semibold">
-                    <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                    Identified Misconceptions
-                    <Badge variant="secondary">{stats.misconceptionCount}</Badge>
+              <div className="flex items-center justify-between">
+                <CollapsibleTrigger className="flex-1">
+                  <div className="section-title flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <div className="flex items-center gap-2 font-semibold">
+                      <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                      Identified Misconceptions
+                      <Badge variant="secondary">{stats.misconceptionCount}</Badge>
+                    </div>
+                    {sectionsExpanded.misconceptions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </div>
-                  {sectionsExpanded.misconceptions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </div>
-              </CollapsibleTrigger>
+                </CollapsibleTrigger>
+                
+                {/* Generate Remediation Button */}
+                {stats.misconceptionCount > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mr-3 gap-2 text-green-600 border-green-300 hover:bg-green-50 dark:hover:bg-green-950"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleGenerateRemediation();
+                    }}
+                    disabled={isGeneratingRemediation}
+                  >
+                    {isGeneratingRemediation ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FileSpreadsheet className="h-4 w-4" />
+                        Generate Remediation
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
               <CollapsibleContent>
                 <div className="section space-y-3 mt-2">
                   {allMisconceptions.length > 0 ? (
@@ -994,6 +1095,15 @@ export function StudentReportDialog({
           </div>
         </ScrollArea>
       </DialogContent>
+
+      {/* Remediation Questions Print Dialog */}
+      <PrintRemediationQuestionsDialog
+        open={showRemediationDialog}
+        onOpenChange={setShowRemediationDialog}
+        questions={remediationQuestions}
+        studentName={studentName}
+        topicName={remediationTopicName}
+      />
     </Dialog>
   );
 }
