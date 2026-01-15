@@ -15,6 +15,7 @@ interface GradingModeSelectorProps {
   onSelectAI: () => void;
   onSelectTeacherGuided: (answerGuideImage: string) => void;
   onSelectTeacherManual: () => void;
+  onRunBothAnalyses?: (answerGuideImage: string) => void;
   onCancel: () => void;
 }
 
@@ -24,9 +25,10 @@ export function GradingModeSelector({
   onSelectAI,
   onSelectTeacherGuided,
   onSelectTeacherManual,
+  onRunBothAnalyses,
   onCancel,
 }: GradingModeSelectorProps) {
-  const [selectedMode, setSelectedMode] = useState<GradingMode | null>(null);
+  const [selectedMode, setSelectedMode] = useState<GradingMode | 'compare' | null>(null);
   const [answerGuideImage, setAnswerGuideImage] = useState<string | null>(null);
   const answerGuideInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,10 +59,14 @@ export function GradingModeSelector({
       onSelectAI();
     } else if (selectedMode === 'teacher-guided' && answerGuideImage) {
       onSelectTeacherGuided(answerGuideImage);
+    } else if (selectedMode === 'compare' && answerGuideImage && onRunBothAnalyses) {
+      onRunBothAnalyses(answerGuideImage);
     } else if (selectedMode === 'teacher-manual') {
       onSelectTeacherManual();
     }
   };
+
+  const needsGuide = selectedMode === 'teacher-guided' || selectedMode === 'compare';
 
   if (isAnalyzing) {
     return (
@@ -72,11 +78,15 @@ export function GradingModeSelector({
               <p className="font-medium">
                 {selectedMode === 'teacher-guided' 
                   ? 'Analyzing with your answer guide...' 
+                  : selectedMode === 'compare'
+                  ? 'Running both AI and teacher-guided analysis...'
                   : 'Analyzing with AI...'}
               </p>
               <p className="text-sm text-muted-foreground">
                 {selectedMode === 'teacher-guided'
                   ? 'AI is using your grading criteria to evaluate the student\'s work'
+                  : selectedMode === 'compare'
+                  ? 'This may take a moment as we run both analyses in parallel'
                   : 'Running OCR and auto-grading'}
               </p>
             </div>
@@ -117,23 +127,24 @@ export function GradingModeSelector({
         <CardContent className="space-y-4">
           <Tabs 
             value={selectedMode || ''} 
-            onValueChange={(v) => setSelectedMode(v as GradingMode)}
+            onValueChange={(v) => setSelectedMode(v as GradingMode | 'compare')}
           >
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="ai" className="gap-2">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="ai" className="gap-1 text-xs px-2">
                 <Bot className="h-4 w-4" />
-                <span className="hidden sm:inline">AI Only</span>
-                <span className="sm:hidden">AI</span>
+                <span className="hidden sm:inline">AI</span>
               </TabsTrigger>
-              <TabsTrigger value="teacher-guided" className="gap-2">
+              <TabsTrigger value="teacher-guided" className="gap-1 text-xs px-2">
                 <BookOpen className="h-4 w-4" />
-                <span className="hidden sm:inline">Guided AI</span>
-                <span className="sm:hidden">Guide</span>
+                <span className="hidden sm:inline">Guide</span>
               </TabsTrigger>
-              <TabsTrigger value="teacher-manual" className="gap-2">
+              <TabsTrigger value="compare" className="gap-1 text-xs px-2">
+                <Scale className="h-4 w-4" />
+                <span className="hidden sm:inline">Compare</span>
+              </TabsTrigger>
+              <TabsTrigger value="teacher-manual" className="gap-1 text-xs px-2">
                 <User className="h-4 w-4" />
                 <span className="hidden sm:inline">Manual</span>
-                <span className="sm:hidden">Manual</span>
               </TabsTrigger>
             </TabsList>
 
@@ -169,59 +180,40 @@ export function GradingModeSelector({
                     <h4 className="font-medium">Teacher-Guided AI</h4>
                     <p className="text-sm text-muted-foreground">
                       Upload your answer key or rubric. AI will grade based on YOUR criteria, 
-                      not just standards. Best for customized assessments.
+                      not just standards.
                     </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="secondary">Your Rubric</Badge>
                   <Badge variant="secondary">Custom Grading</Badge>
-                  <Badge variant="secondary">Compare Later</Badge>
                 </div>
                 
-                <div className="pt-2 border-t">
-                  <p className="text-sm font-medium mb-2">Upload Your Answer Guide</p>
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    ref={answerGuideInputRef}
-                    onChange={handleAnswerGuideUpload}
-                    className="hidden"
-                  />
-                  
-                  {answerGuideImage ? (
-                    <div className="space-y-2">
-                      <div className="relative">
-                        <img 
-                          src={answerGuideImage} 
-                          alt="Answer guide" 
-                          className="w-full max-h-32 object-contain rounded-md border"
-                        />
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-2 right-2 h-6 w-6"
-                          onClick={() => setAnswerGuideImage(null)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-green-600">
-                        <CheckCircle className="h-4 w-4" />
-                        Answer guide ready
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2"
-                      onClick={() => answerGuideInputRef.current?.click()}
-                    >
-                      <Upload className="h-4 w-4" />
-                      Upload Answer Key / Rubric Image
-                    </Button>
-                  )}
+                {renderAnswerGuideUpload()}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="compare" className="mt-4">
+              <div className="space-y-4 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-primary/10 rounded-full">
+                    <Scale className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Compare Both Analyses</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Run AI and teacher-guided analysis in parallel, then compare 
+                      results side-by-side to choose the best one.
+                    </p>
+                  </div>
                 </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="default" className="bg-primary">Recommended</Badge>
+                  <Badge variant="secondary">Side-by-Side</Badge>
+                  <Badge variant="secondary">Choose Best</Badge>
+                </div>
+                
+                {renderAnswerGuideUpload()}
               </div>
             </TabsContent>
 
@@ -235,7 +227,7 @@ export function GradingModeSelector({
                     <h4 className="font-medium">Manual Scoring</h4>
                     <p className="text-sm text-muted-foreground">
                       Upload your solution and score manually. AI will provide 
-                      suggestions but you have full control. Best for detailed feedback.
+                      suggestions but you have full control.
                     </p>
                   </div>
                 </div>
@@ -251,14 +243,17 @@ export function GradingModeSelector({
           {selectedMode && (
             <Button 
               onClick={handleProceed}
-              disabled={selectedMode === 'teacher-guided' && !answerGuideImage}
+              disabled={needsGuide && !answerGuideImage}
               className="w-full gap-2"
             >
-              {selectedMode === 'teacher-guided' && !answerGuideImage ? (
+              {needsGuide && !answerGuideImage ? (
                 'Upload Answer Guide to Continue'
               ) : (
                 <>
-                  Proceed with {selectedMode === 'ai' ? 'AI Analysis' : selectedMode === 'teacher-guided' ? 'Guided AI' : 'Manual Scoring'}
+                  {selectedMode === 'ai' && 'Proceed with AI Analysis'}
+                  {selectedMode === 'teacher-guided' && 'Proceed with Guided AI'}
+                  {selectedMode === 'compare' && 'Run Both & Compare'}
+                  {selectedMode === 'teacher-manual' && 'Proceed with Manual Scoring'}
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
@@ -268,4 +263,52 @@ export function GradingModeSelector({
       </Card>
     </div>
   );
+
+  function renderAnswerGuideUpload() {
+    return (
+      <div className="pt-2 border-t">
+        <p className="text-sm font-medium mb-2">Upload Your Answer Guide</p>
+        <input 
+          type="file" 
+          accept="image/*"
+          ref={answerGuideInputRef}
+          onChange={handleAnswerGuideUpload}
+          className="hidden"
+        />
+        
+        {answerGuideImage ? (
+          <div className="space-y-2">
+            <div className="relative">
+              <img 
+                src={answerGuideImage} 
+                alt="Answer guide" 
+                className="w-full max-h-32 object-contain rounded-md border"
+              />
+              <Button
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2 h-6 w-6"
+                onClick={() => setAnswerGuideImage(null)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-green-600">
+              <CheckCircle className="h-4 w-4" />
+              Answer guide ready
+            </div>
+          </div>
+        ) : (
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() => answerGuideInputRef.current?.click()}
+          >
+            <Upload className="h-4 w-4" />
+            Upload Answer Key / Rubric Image
+          </Button>
+        )}
+      </div>
+    );
+  }
 }
