@@ -70,24 +70,6 @@ export function PrintRemediationQuestionsDialog({
     }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'scaffolded':
-      case 'super-easy':
-      case 'easy':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'practice':
-      case 'medium':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'challenge':
-      case 'hard':
-      case 'challenging':
-        return 'bg-purple-100 text-purple-800 border-purple-300';
-      default: 
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const handlePrint = () => {
     setShowPreview(true);
     setTimeout(() => {
@@ -98,6 +80,10 @@ export function PrintRemediationQuestionsDialog({
   const handleClosePreview = () => {
     setShowPreview(false);
   };
+
+  // Limit to 8 questions for 2-page max
+  const displayQuestions = questions.slice(0, 8);
+  const useCompactLayout = displayQuestions.length > 4;
 
   // Group questions by difficulty for summary
   const questionCounts = {
@@ -113,11 +99,12 @@ export function PrintRemediationQuestionsDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Printer className="h-5 w-5" />
-              Print Personalized Worksheet
+              Print Practice Worksheet
             </DialogTitle>
             <DialogDescription>
-              Create a printable worksheet with {questions.length} questions
+              Create a printable worksheet with {Math.min(questions.length, 8)} questions
               {studentName && ` for ${studentName}`}
+              {questions.length > 8 && ` (max 8 for 2-page limit)`}
             </DialogDescription>
           </DialogHeader>
 
@@ -138,10 +125,10 @@ export function PrintRemediationQuestionsDialog({
               <div className="flex items-center justify-between rounded-lg border p-3">
                 <div className="space-y-0.5">
                   <Label htmlFor="student-header-toggle" className="cursor-pointer">
-                    Personalized Student Header
+                    Student Name Header
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Show student name prominently at the top
+                    Show student name at the top
                   </p>
                 </div>
                 <Switch
@@ -158,7 +145,7 @@ export function PrintRemediationQuestionsDialog({
                     Include QR Code
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Add scannable QR code for easy tracking
+                    Add scannable QR for tracking
                   </p>
                 </div>
                 <Switch
@@ -175,7 +162,7 @@ export function PrintRemediationQuestionsDialog({
                     Include Hints
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Show helpful hints for each question
+                    Show hints for each question
                   </p>
                 </div>
                 <Switch
@@ -188,10 +175,10 @@ export function PrintRemediationQuestionsDialog({
               <div className="flex items-center justify-between rounded-lg border p-3">
                 <div className="space-y-0.5">
                   <Label htmlFor="difficulty-toggle" className="cursor-pointer">
-                    Show Difficulty Levels
+                    Show Difficulty
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Display difficulty badges on each question
+                    Display difficulty badges
                   </p>
                 </div>
                 <Switch
@@ -207,15 +194,14 @@ export function PrintRemediationQuestionsDialog({
               <p className="font-medium">Worksheet includes:</p>
               <ul className="list-disc list-inside mt-1 text-muted-foreground space-y-1">
                 {questionCounts.scaffolded > 0 && (
-                  <li>{questionCounts.scaffolded} basic/scaffolded question(s)</li>
+                  <li>{Math.min(questionCounts.scaffolded, 8)} basic question(s)</li>
                 )}
                 {questionCounts.practice > 0 && (
-                  <li>{questionCounts.practice} practice question(s)</li>
+                  <li>{Math.min(questionCounts.practice, 8)} practice question(s)</li>
                 )}
                 {questionCounts.challenge > 0 && (
-                  <li>{questionCounts.challenge} challenge question(s)</li>
+                  <li>{Math.min(questionCounts.challenge, 8)} challenge question(s)</li>
                 )}
-                {includeQRCode && <li>Tracking QR code</li>}
               </ul>
             </div>
           </div>
@@ -232,7 +218,7 @@ export function PrintRemediationQuestionsDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Print Preview */}
+      {/* Print Preview - Matching Diagnostic Worksheet Format */}
       {showPreview && (
         <div className="fixed inset-0 bg-white z-50 overflow-auto print:static print:overflow-visible">
           <div className="print:hidden p-4 bg-muted border-b flex items-center justify-between">
@@ -242,272 +228,236 @@ export function PrintRemediationQuestionsDialog({
             </Button>
           </div>
           
-          <div ref={printRef} className="remediation-questions-worksheet bg-white text-black" style={{
-            padding: '0.5in 0.75in',
-            maxWidth: '8.5in',
-            margin: '0 auto',
-            boxSizing: 'border-box',
-          }}>
-            {/* Personalized Header with QR Code */}
-            <div style={{ 
-              borderBottom: '3px solid #1f2937', 
-              paddingBottom: '1rem', 
-              marginBottom: '1.5rem',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start'
-            }}>
-              <div style={{ flex: 1 }}>
-                {/* Student Name Banner */}
-                {includeStudentHeader && studentName && (
-                  <div style={{
-                    backgroundColor: '#1f2937',
-                    color: 'white',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '0.5rem',
-                    marginBottom: '0.75rem',
-                    display: 'inline-block',
-                  }}>
-                    <p style={{ 
-                      margin: 0, 
-                      fontSize: '1.5rem', 
-                      fontWeight: 'bold',
-                      letterSpacing: '0.5px'
-                    }}>
-                      📝 {studentName}'s Worksheet
+          <div 
+            ref={printRef} 
+            className="print-worksheet bg-white text-black" 
+            style={{ 
+              padding: '0.5in 0.75in',
+              maxWidth: '8.5in',
+              margin: '0 auto',
+              boxSizing: 'border-box',
+            }}
+          >
+            {/* Header - Matching Diagnostic Format */}
+            <div className="flex items-start justify-between border-b-2 border-black pb-3 mb-4">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                {/* QR Code for Tracking */}
+                {includeQRCode && (
+                  <div style={{ flexShrink: 0, textAlign: 'center' }}>
+                    <QRCodeSVG value={qrCodeData} size={56} level="M" />
+                    <p style={{ fontSize: '0.55rem', color: '#666', marginTop: '0.125rem', fontFamily: 'monospace' }}>
+                      {worksheetId}
                     </p>
                   </div>
                 )}
-                
-                <h1 style={{ 
-                  fontSize: '1.25rem', 
-                  fontWeight: 'bold', 
-                  margin: includeStudentHeader && studentName ? '0.5rem 0 0 0' : 0,
-                  color: '#374151'
-                }}>
-                  {worksheetTitle}
-                </h1>
-                
-                {!includeStudentHeader && studentName && (
-                  <p style={{ marginTop: '0.5rem', fontSize: '1rem' }}>
-                    <strong>Name:</strong> {studentName}
-                  </p>
-                )}
-                
-                <div style={{ 
-                  marginTop: '0.75rem', 
-                  display: 'flex', 
-                  gap: '1.5rem',
-                  fontSize: '0.875rem',
-                  color: '#6b7280'
-                }}>
-                  <span>Date: _______________</span>
-                  <span>Period: ____________</span>
-                  <span>Score: ______ / {questions.length}</span>
+                <div>
+                  <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0 }}>{worksheetTitle}</h1>
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                    {includeStudentHeader && studentName ? (
+                      <p style={{ margin: '0.25rem 0' }}><strong>Name:</strong> {studentName}</p>
+                    ) : (
+                      <p style={{ margin: '0.25rem 0' }}><strong>Name:</strong> ____________________</p>
+                    )}
+                  </div>
                 </div>
               </div>
-              
-              {/* QR Code Section */}
-              {includeQRCode && (
-                <div style={{ 
-                  textAlign: 'center',
-                  marginLeft: '1rem',
-                  padding: '0.5rem',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#f9fafb',
-                }}>
-                  <QRCodeSVG 
-                    value={qrCodeData} 
-                    size={80}
-                    level="M"
-                    includeMargin={false}
-                  />
-                  <p style={{ 
-                    fontSize: '0.65rem', 
-                    color: '#9ca3af', 
-                    margin: '0.25rem 0 0 0',
-                    fontFamily: 'monospace'
-                  }}>
-                    {worksheetId}
-                  </p>
-                </div>
-              )}
+              <div style={{ textAlign: 'right', fontSize: '0.8rem', color: '#666' }}>
+                <p style={{ margin: 0 }}>Date: _______________</p>
+                <p style={{ margin: '0.25rem 0 0 0' }}>Period: ____________</p>
+                <p style={{ margin: '0.25rem 0 0 0' }}>Score: _____ / {displayQuestions.length}</p>
+              </div>
             </div>
 
-            {/* Instructions */}
+            {/* Instructions - Compact */}
             <div style={{ 
               backgroundColor: '#f3f4f6', 
-              padding: '0.75rem 1rem', 
-              borderRadius: '0.5rem',
-              marginBottom: '1.5rem',
-              fontSize: '0.875rem',
-              borderLeft: '4px solid #3b82f6'
+              padding: '0.4rem 0.6rem', 
+              borderRadius: '0.25rem',
+              marginBottom: '0.75rem',
+              fontSize: '0.75rem',
+              borderLeft: '3px solid #3b82f6'
             }}>
               <p style={{ margin: 0 }}>
-                <strong>Instructions:</strong> Show all your work for each problem. 
-                {includeHints && ' Use the hints provided if you need help.'}
-                {' Circle your final answer.'}
+                <strong>Instructions:</strong> Show all work. Circle final answers.
+                {includeHints && ' Use hints if needed.'}
               </p>
             </div>
 
-            {/* Questions */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {questions.map((q, index) => (
+            {/* Questions - Compact Layout */}
+            <div style={{ 
+              display: 'grid',
+              gridTemplateColumns: useCompactLayout ? 'repeat(2, 1fr)' : '1fr',
+              gap: '0.6rem',
+            }}>
+              {displayQuestions.map((q, index) => (
                 <div 
                   key={index} 
                   className="question-block"
                   style={{ 
                     pageBreakInside: 'avoid',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.5rem',
-                    padding: '1rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.25rem',
+                    padding: '0.5rem',
                   }}
                 >
-                  {/* Question Header */}
+                  {/* Question Header - Compact */}
                   <div style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
-                    gap: '0.75rem',
-                    marginBottom: '0.75rem' 
+                    gap: '0.4rem',
+                    marginBottom: '0.4rem',
+                    flexWrap: 'wrap',
                   }}>
                     <span style={{ 
                       fontWeight: 'bold', 
                       backgroundColor: '#1f2937',
                       color: 'white',
-                      width: '2rem',
-                      height: '2rem',
+                      width: '1.25rem',
+                      height: '1.25rem',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '0.875rem'
+                      fontSize: '0.7rem',
+                      flexShrink: 0,
                     }}>
                       {q.questionNumber || index + 1}
                     </span>
                     {includeDifficulty && (
-                      <span className={getDifficultyColor(q.difficulty)} style={{
-                        padding: '0.25rem 0.75rem',
+                      <span style={{
+                        padding: '0.1rem 0.4rem',
                         borderRadius: '9999px',
-                        fontSize: '0.75rem',
+                        fontSize: '0.6rem',
                         fontWeight: '500',
-                        border: '1px solid'
+                        backgroundColor: q.difficulty === 'easy' || q.difficulty === 'scaffolded' || q.difficulty === 'super-easy' 
+                          ? '#dcfce7' 
+                          : q.difficulty === 'medium' || q.difficulty === 'practice'
+                            ? '#dbeafe'
+                            : '#f3e8ff',
+                        color: q.difficulty === 'easy' || q.difficulty === 'scaffolded' || q.difficulty === 'super-easy'
+                          ? '#166534'
+                          : q.difficulty === 'medium' || q.difficulty === 'practice'
+                            ? '#1e40af'
+                            : '#6b21a8',
+                        border: '1px solid',
+                        borderColor: q.difficulty === 'easy' || q.difficulty === 'scaffolded' || q.difficulty === 'super-easy'
+                          ? '#86efac'
+                          : q.difficulty === 'medium' || q.difficulty === 'practice'
+                            ? '#93c5fd'
+                            : '#c4b5fd',
                       }}>
                         {getDifficultyLabel(q.difficulty)}
                       </span>
                     )}
                     {q.advancementLevel && (
                       <span style={{
-                        padding: '0.25rem 0.5rem',
+                        padding: '0.1rem 0.3rem',
                         borderRadius: '0.25rem',
-                        fontSize: '0.7rem',
+                        fontSize: '0.55rem',
                         fontWeight: '600',
                         backgroundColor: '#dbeafe',
                         color: '#1e40af',
                         border: '1px solid #93c5fd'
                       }}>
-                        Level {q.advancementLevel}
+                        Lvl {q.advancementLevel}
                       </span>
                     )}
                   </div>
 
-                  {/* Question Text */}
+                  {/* Question Text - Compact */}
                   <p style={{ 
-                    fontSize: '1rem',
-                    lineHeight: 1.6,
+                    fontSize: useCompactLayout ? '0.8rem' : '0.9rem',
+                    lineHeight: 1.4,
                     fontFamily: 'Georgia, serif',
-                    marginBottom: '0.75rem',
+                    marginBottom: '0.4rem',
+                    wordWrap: 'break-word',
                   }}>
                     {q.question}
                   </p>
 
-                  {/* Hint */}
+                  {/* Hint - Compact */}
                   {includeHints && q.hint && (
                     <div style={{ 
                       backgroundColor: '#fef3c7',
                       border: '1px solid #fcd34d',
-                      borderRadius: '0.375rem',
-                      padding: '0.5rem 0.75rem',
-                      marginBottom: '0.75rem',
-                      fontSize: '0.875rem',
+                      borderRadius: '0.2rem',
+                      padding: '0.2rem 0.4rem',
+                      marginBottom: '0.4rem',
+                      fontSize: '0.65rem',
                     }}>
-                      <span style={{ fontWeight: '600', color: '#92400e' }}>💡 Hint: </span>
+                      <span style={{ fontWeight: '600', color: '#92400e' }}>💡 </span>
                       <span style={{ color: '#78350f', fontStyle: 'italic' }}>{q.hint}</span>
                     </div>
                   )}
 
-                  {/* Answer Box */}
+                  {/* Answer Box - Compact */}
                   <div style={{ 
-                    border: '2px solid #d1d5db',
-                    borderRadius: '0.25rem',
-                    padding: '1rem',
-                    minHeight: '120px',
+                    border: '1.5px solid #d1d5db',
+                    borderRadius: '0.2rem',
+                    padding: '0.4rem',
+                    minHeight: useCompactLayout ? '50px' : '70px',
+                    backgroundColor: '#fafafa',
                   }}>
-                    <p style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '0.5rem' }}>
-                      Show your work:
+                    <p style={{ fontSize: '0.6rem', color: '#9ca3af', margin: 0 }}>
+                      Work:
                     </p>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Footer */}
+            {/* Truncation notice */}
+            {questions.length > 8 && (
+              <p style={{ 
+                marginTop: '0.5rem', 
+                fontSize: '0.7rem', 
+                color: '#6b7280',
+                textAlign: 'center',
+                fontStyle: 'italic',
+              }}>
+                Showing 8 of {questions.length} questions (2-page limit)
+              </p>
+            )}
+
+            {/* Footer - Compact */}
             <div style={{ 
-              marginTop: '2rem',
-              paddingTop: '1rem',
-              borderTop: '2px solid #e5e7eb',
+              marginTop: '0.75rem',
+              paddingTop: '0.4rem',
+              borderTop: '1px solid #d1d5db',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              fontSize: '0.75rem',
-              color: '#6b7280',
+              fontSize: '0.65rem',
+              color: '#9ca3af',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                {includeQRCode && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <QRCodeSVG value={qrCodeData} size={40} level="L" />
-                    <span style={{ fontFamily: 'monospace', fontSize: '0.65rem' }}>{worksheetId}</span>
-                  </div>
-                )}
-                <span style={{ fontWeight: '500' }}>{studentName || 'Student'}</span>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <span>{worksheetTitle}</span>
-                <span style={{ marginLeft: '1rem' }}>
-                  Generated: {new Date().toLocaleDateString()}
-                </span>
-              </div>
+              <span>{studentName || 'Student'} • {worksheetTitle}</span>
+              <span>{new Date().toLocaleDateString()}</span>
             </div>
           </div>
+
+          {/* Print Styles */}
+          <style>{`
+            @media print {
+              @page {
+                size: letter;
+                margin: 0.5in;
+              }
+              body {
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+              }
+              .print\\:hidden { display: none !important; }
+              .print-worksheet {
+                page-break-after: avoid;
+              }
+              .question-block {
+                page-break-inside: avoid;
+                break-inside: avoid;
+              }
+            }
+          `}</style>
         </div>
       )}
-
-      {/* Print Styles */}
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          .remediation-questions-worksheet, .remediation-questions-worksheet * {
-            visibility: visible;
-          }
-          .remediation-questions-worksheet {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            max-width: 8.5in;
-          }
-          @page {
-            size: letter;
-            margin: 0.5in 0.75in;
-          }
-          .question-block {
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-        }
-      `}</style>
     </>
   );
 }
