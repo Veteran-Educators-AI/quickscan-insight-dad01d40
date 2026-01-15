@@ -179,7 +179,7 @@ export function useSaveAnalysisResults() {
       const finalGrade = Math.max(55, Math.min(100, grade));
       
       if (params.topicName) {
-        const { error: gradeHistoryError } = await supabase
+        const { data: gradeHistoryData, error: gradeHistoryError } = await supabase
           .from('grade_history')
           .insert({
             student_id: params.studentId,
@@ -194,11 +194,72 @@ export function useSaveAnalysisResults() {
             regents_score: params.result.regentsScore ?? null,
             nys_standard: params.result.nysStandard ?? null,
             regents_justification: params.result.regentsScoreJustification ?? null,
-          });
+          })
+          .select('id')
+          .single();
 
         if (gradeHistoryError) {
           console.error('Error saving grade history:', gradeHistoryError);
           // Don't throw - grade history is secondary
+        }
+
+        // 5. Save misconceptions to dedicated table if any were identified
+        if (params.result.misconceptions && params.result.misconceptions.length > 0 && gradeHistoryData?.id) {
+          const misconceptionRecords = params.result.misconceptions.map(misconception => {
+            // Determine severity based on grade
+            let severity = 'medium';
+            if (finalGrade < 60) severity = 'high';
+            else if (finalGrade >= 80) severity = 'low';
+
+            // Match remediation suggestions
+            const nameLower = misconception.toLowerCase();
+            let suggestedRemedies: string[] = [];
+            const remedyMap: Record<string, string[]> = {
+              'sign error': ['Practice signed number operations with number lines', 'Use color coding for positive/negative values'],
+              'order of operations': ['PEMDAS mnemonic practice', 'Stepwise problem breakdown exercises'],
+              'fraction': ['Visual fraction models', 'Equivalent fraction practice'],
+              'decimal': ['Place value reinforcement', 'Decimal-fraction conversion drills'],
+              'variable': ['Substitution practice', 'Variable definition exercises'],
+              'equation': ['Balance method practice', 'Inverse operation drills'],
+              'graph': ['Coordinate plotting practice', 'Slope-intercept form exercises'],
+              'exponent': ['Exponent rules flashcards', 'Scientific notation practice'],
+              'arithmetic': ['Basic operations drills', 'Mental math exercises'],
+              'calculation': ['Step-by-step verification practice', 'Check work backwards technique'],
+            };
+            
+            for (const [key, remedies] of Object.entries(remedyMap)) {
+              if (nameLower.includes(key)) {
+                suggestedRemedies = remedies;
+                break;
+              }
+            }
+            if (suggestedRemedies.length === 0) {
+              suggestedRemedies = ['Targeted practice problems', 'One-on-one tutoring session'];
+            }
+
+            return {
+              student_id: params.studentId,
+              teacher_id: user.id,
+              attempt_id: attempt.id,
+              grade_history_id: gradeHistoryData.id,
+              topic_name: params.topicName!,
+              misconception_text: misconception,
+              suggested_remedies: suggestedRemedies,
+              severity,
+              grade_impact: 100 - finalGrade,
+            };
+          });
+
+          const { error: misconceptionError } = await supabase
+            .from('analysis_misconceptions')
+            .insert(misconceptionRecords);
+
+          if (misconceptionError) {
+            console.error('Error saving misconceptions:', misconceptionError);
+            // Don't throw - misconceptions are secondary
+          } else {
+            console.log(`Saved ${misconceptionRecords.length} misconceptions for student`);
+          }
         }
 
         // Check if we need to send a low Regents score alert

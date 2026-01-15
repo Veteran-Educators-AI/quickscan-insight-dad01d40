@@ -47,6 +47,77 @@ export type Database = {
         }
         Relationships: []
       }
+      analysis_misconceptions: {
+        Row: {
+          attempt_id: string | null
+          created_at: string
+          grade_history_id: string | null
+          grade_impact: number | null
+          id: string
+          misconception_text: string
+          severity: string | null
+          student_id: string
+          suggested_remedies: string[] | null
+          teacher_id: string
+          topic_name: string
+        }
+        Insert: {
+          attempt_id?: string | null
+          created_at?: string
+          grade_history_id?: string | null
+          grade_impact?: number | null
+          id?: string
+          misconception_text: string
+          severity?: string | null
+          student_id: string
+          suggested_remedies?: string[] | null
+          teacher_id: string
+          topic_name: string
+        }
+        Update: {
+          attempt_id?: string | null
+          created_at?: string
+          grade_history_id?: string | null
+          grade_impact?: number | null
+          id?: string
+          misconception_text?: string
+          severity?: string | null
+          student_id?: string
+          suggested_remedies?: string[] | null
+          teacher_id?: string
+          topic_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_misconceptions_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_misconceptions_grade_history_id_fkey"
+            columns: ["grade_history_id"]
+            isOneToOne: false
+            referencedRelation: "grade_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_misconceptions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_misconceptions_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assessment_questions: {
         Row: {
           assessment_id: string
