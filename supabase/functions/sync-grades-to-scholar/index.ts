@@ -305,144 +305,184 @@ serve(async (req) => {
 
     console.log('Syncing comprehensive data to Scholar:', JSON.stringify(batchPayload.summary));
 
-    // First, try to detect if we're syncing to our own receive-sister-app-data function
-    // or to an external Scholar API that might have a different format
-    let response: Response;
-    let responseText: string;
+    // Determine the endpoint - check if it ends with /sync-student or needs it appended
+    let baseEndpoint = sisterAppEndpoint;
+    const isSyncStudentEndpoint = sisterAppEndpoint.includes('/sync-student');
     
-    try {
-      // Attempt the sync with batch_sync format first
-      response = await fetch(sisterAppEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': sisterAppApiKey,
-        },
-        body: JSON.stringify(batchPayload),
-      });
+    // Track sync results
+    const syncResults = {
+      successful: 0,
+      failed: 0,
+      errors: [] as string[],
+    };
 
-      responseText = await response.text();
-      
-      // If we get "Unknown payload type", try alternative format for external Scholar APIs
-      if (!response.ok && responseText.includes('Unknown payload type')) {
-        console.log('External Scholar API detected, trying alternative sync format...');
-        
-        // Try sending individual student syncs in a format external Scholar might expect
-        const alternativePayload = {
-          type: 'learning_data_sync',
-          source: 'nycologic_ai',
-          teacher_id: user.id,
-          teacher_name: teacherProfile?.full_name || null,
-          timestamp: new Date().toISOString(),
-          students: studentProfiles.map(profile => ({
-            id: profile.student_id,
-            name: profile.student_name,
-            class_id: profile.class_id,
-            class_name: profile.class_name,
-            average_grade: profile.overall_average,
-            recent_grades: profile.grades.slice(0, 10).map(g => ({
-              topic: g.topic_name,
-              score: g.grade,
-              regents: g.regents_score,
-              standard: g.nys_standard,
-              date: g.created_at,
-            })),
-            identified_misconceptions: profile.misconceptions.map(m => ({
-              name: m.name,
-              description: m.description,
-              topic: m.topic_name,
-              confidence: m.confidence,
-            })),
-            weak_areas: profile.weak_topics,
-            remediation_recommendations: profile.recommended_remediation,
-            rewards: {
-              xp_potential: profile.xp_potential,
-              coin_potential: profile.coin_potential,
-            },
-          })),
-          summary: batchPayload.summary,
-        };
-        
-        response = await fetch(sisterAppEndpoint, {
+    // Try batch sync first to our own receiver, otherwise sync students individually
+    const isOwnReceiver = sisterAppEndpoint.includes('receive-sister-app-data');
+    
+    if (isOwnReceiver) {
+      // Use batch sync for our own receiver
+      try {
+        const response = await fetch(sisterAppEndpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'x-api-key': sisterAppApiKey,
           },
-          body: JSON.stringify(alternativePayload),
+          body: JSON.stringify(batchPayload),
         });
+
+        const responseText = await response.text();
         
-        responseText = await response.text();
+        if (!response.ok) {
+          console.error('Batch sync failed:', response.status, responseText);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'Batch sync failed',
+              details: responseText,
+              status: response.status 
+            }),
+            { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        let responseData;
+        try {
+          responseData = JSON.parse(responseText);
+        } catch {
+          responseData = { raw: responseText };
+        }
+
+        // Log the sync action
+        await supabase.from('sister_app_sync_log').insert({
+          teacher_id: user.id,
+          action: 'batch_sync',
+          data: {
+            ...batchPayload.summary,
+            class_id,
+            response: responseData,
+          },
+        });
+
+        return new Response(
+          JSON.stringify({ 
+            success: true,
+            synced_students: studentProfiles.length,
+            synced_grades: (grades || []).length,
+            misconceptions_synced: totalMisconceptions,
+            weak_topics_synced: totalWeakTopics,
+            response: responseData,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (fetchError) {
+        console.error('Network error:', fetchError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Network error: ${fetchError instanceof Error ? fetchError.message : 'Connection failed'}`,
+          }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
-    } catch (fetchError) {
-      console.error('Network error syncing to Scholar:', fetchError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: `Network error: ${fetchError instanceof Error ? fetchError.message : 'Connection failed'}. Please check NYCOLOGIC_API_URL is correct.`,
-        }),
-        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
 
-    if (!response.ok) {
-      console.error('Scholar app error:', response.status, responseText);
-      
-      // Provide helpful error messages based on the error
-      let errorMessage = `Scholar sync failed (${response.status})`;
-      let suggestion = '';
-      
-      if (responseText.includes('Unknown payload type')) {
-        errorMessage = 'Scholar API does not recognize the sync format';
-        suggestion = 'The external Scholar API may require a different payload format. Please check the Scholar API documentation or contact support.';
-      } else if (responseText.includes('Invalid API key') || response.status === 401) {
-        errorMessage = 'Authentication failed';
-        suggestion = 'Please verify the SISTER_APP_API_KEY is correct for the target Scholar instance.';
-      } else if (response.status === 404) {
-        errorMessage = 'Scholar API endpoint not found';
-        suggestion = 'Please verify NYCOLOGIC_API_URL points to the correct Scholar API endpoint.';
-      }
-      
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: errorMessage,
-          details: responseText,
-          suggestion,
-          status: response.status 
-        }),
-        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // For external Scholar API - sync students individually to /sync-student endpoint
+    console.log('Syncing to external Scholar API - sending students individually...');
+    
+    for (const profile of studentProfiles) {
+      const studentPayload = {
+        action: 'sync_student',
+        student_id: profile.student_id,
+        student_name: profile.student_name,
+        class_id: profile.class_id,
+        class_name: profile.class_name,
+        teacher_id: user.id,
+        teacher_name: teacherProfile?.full_name || null,
+        overall_average: profile.overall_average,
+        grades: profile.grades.slice(0, 20).map(g => ({
+          topic: g.topic_name,
+          score: g.grade,
+          regents_score: g.regents_score,
+          standard: g.nys_standard,
+          justification: g.grade_justification,
+          date: g.created_at,
+        })),
+        misconceptions: profile.misconceptions.map(m => ({
+          name: m.name,
+          description: m.description,
+          topic: m.topic_name,
+          confidence: m.confidence,
+        })),
+        weak_topics: profile.weak_topics,
+        remediation_recommendations: profile.recommended_remediation,
+        xp_potential: profile.xp_potential,
+        coin_potential: profile.coin_potential,
+        sync_timestamp: new Date().toISOString(),
+      };
 
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch {
-      responseData = { raw: responseText };
+      try {
+        const response = await fetch(baseEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': sisterAppApiKey,
+          },
+          body: JSON.stringify(studentPayload),
+        });
+
+        if (response.ok) {
+          syncResults.successful++;
+        } else {
+          syncResults.failed++;
+          const errorText = await response.text();
+          if (syncResults.errors.length < 5) {
+            syncResults.errors.push(`${profile.student_name}: ${response.status} - ${errorText.slice(0, 100)}`);
+          }
+          console.error(`Failed to sync ${profile.student_name}:`, response.status, errorText);
+        }
+      } catch (fetchError) {
+        syncResults.failed++;
+        if (syncResults.errors.length < 5) {
+          syncResults.errors.push(`${profile.student_name}: Network error`);
+        }
+        console.error(`Network error syncing ${profile.student_name}:`, fetchError);
+      }
     }
 
     // Log the sync action
     await supabase.from('sister_app_sync_log').insert({
       teacher_id: user.id,
-      action: 'batch_sync',
+      action: 'individual_sync',
       data: {
         ...batchPayload.summary,
         class_id,
-        response: responseData,
+        sync_results: syncResults,
       },
     });
 
+    const allSucceeded = syncResults.failed === 0;
+    const partialSuccess = syncResults.successful > 0 && syncResults.failed > 0;
+
     return new Response(
       JSON.stringify({ 
-        success: true,
-        synced_students: studentProfiles.length,
+        success: allSucceeded || partialSuccess,
+        synced_students: syncResults.successful,
+        failed_students: syncResults.failed,
         synced_grades: (grades || []).length,
         misconceptions_synced: totalMisconceptions,
         weak_topics_synced: totalWeakTopics,
-        response: responseData,
+        errors: syncResults.errors.length > 0 ? syncResults.errors : undefined,
+        message: allSucceeded 
+          ? `Successfully synced ${syncResults.successful} students to Scholar`
+          : partialSuccess
+            ? `Synced ${syncResults.successful} students, ${syncResults.failed} failed`
+            : `Failed to sync all ${syncResults.failed} students`,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: allSucceeded ? 200 : partialSuccess ? 207 : 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   } catch (error) {
     console.error('Error in sync-grades-to-scholar:', error);
