@@ -446,8 +446,10 @@ serve(async (req) => {
     }
 
     // For external Scholar API - sync students in parallel batches for speed
+    // Use the dedicated /sync-student endpoint for bulk student syncing
     const BATCH_SIZE = 10; // Process 10 students concurrently
-    console.log(`Syncing to external Scholar API - processing ${studentProfiles.length} students in batches of ${BATCH_SIZE}...`);
+    const syncStudentEndpoint = baseEndpoint.replace('/nycologic-webhook', '/sync-student');
+    console.log(`Syncing to Scholar API at ${syncStudentEndpoint} - processing ${studentProfiles.length} students in batches of ${BATCH_SIZE}...`);
     
     // Build all payloads first
     const studentPayloads = studentProfiles.map(profile => ({
@@ -489,7 +491,7 @@ serve(async (req) => {
       
       const batchResults = await Promise.allSettled(
         batch.map(async ({ profile, payload }) => {
-          const response = await fetch(baseEndpoint, {
+          const response = await fetch(syncStudentEndpoint, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
