@@ -387,11 +387,14 @@ serve(async (req) => {
       }
     }
 
-    // For external Scholar API - sync students individually to /sync-student endpoint
-    console.log('Syncing to external Scholar API - sending students individually...');
+    // For external Scholar API - sync students in parallel batches for speed
+    const BATCH_SIZE = 10; // Process 10 students concurrently
+    console.log(`Syncing to external Scholar API - processing ${studentProfiles.length} students in batches of ${BATCH_SIZE}...`);
     
-    for (const profile of studentProfiles) {
-      const studentPayload = {
+    // Build all payloads first
+    const studentPayloads = studentProfiles.map(profile => ({
+      profile,
+      payload: {
         action: 'sync_student',
         student_id: profile.student_id,
         student_name: profile.student_name,
@@ -419,35 +422,46 @@ serve(async (req) => {
         xp_potential: profile.xp_potential,
         coin_potential: profile.coin_potential,
         sync_timestamp: new Date().toISOString(),
-      };
+      },
+    }));
 
-      try {
-        const response = await fetch(baseEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': sisterAppApiKey,
-          },
-          body: JSON.stringify(studentPayload),
-        });
+    // Process in parallel batches
+    for (let i = 0; i < studentPayloads.length; i += BATCH_SIZE) {
+      const batch = studentPayloads.slice(i, i + BATCH_SIZE);
+      
+      const batchResults = await Promise.allSettled(
+        batch.map(async ({ profile, payload }) => {
+          const response = await fetch(baseEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': sisterAppApiKey,
+            },
+            body: JSON.stringify(payload),
+          });
 
-        if (response.ok) {
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`${profile.student_name}: ${response.status} - ${errorText.slice(0, 100)}`);
+          }
+          return profile.student_name;
+        })
+      );
+
+      // Process batch results
+      for (const result of batchResults) {
+        if (result.status === 'fulfilled') {
           syncResults.successful++;
         } else {
           syncResults.failed++;
-          const errorText = await response.text();
           if (syncResults.errors.length < 5) {
-            syncResults.errors.push(`${profile.student_name}: ${response.status} - ${errorText.slice(0, 100)}`);
+            syncResults.errors.push(result.reason?.message || 'Unknown error');
           }
-          console.error(`Failed to sync ${profile.student_name}:`, response.status, errorText);
+          console.error('Sync failed:', result.reason?.message);
         }
-      } catch (fetchError) {
-        syncResults.failed++;
-        if (syncResults.errors.length < 5) {
-          syncResults.errors.push(`${profile.student_name}: Network error`);
-        }
-        console.error(`Network error syncing ${profile.student_name}:`, fetchError);
       }
+      
+      console.log(`Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(studentPayloads.length / BATCH_SIZE)} complete: ${syncResults.successful} synced, ${syncResults.failed} failed`);
     }
 
     // Log the sync action
