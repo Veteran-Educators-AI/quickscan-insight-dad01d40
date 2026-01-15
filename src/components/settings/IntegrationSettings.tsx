@@ -293,8 +293,8 @@ export function IntegrationSettings() {
   // TEST SISTER APP CONNECTION
   // ============================================================================
   /**
-   * Tests the connection to NYClogic Scholar by calling the push-to-sister-app
-   * edge function with a test payload.
+   * Tests the connection to NYClogic Scholar by calling the sync-grades-to-scholar
+   * edge function with a test_connection flag to verify API key and endpoint.
    */
   const testSisterAppConnection = async () => {
     setIsTestingSisterApp(true);
@@ -302,9 +302,9 @@ export function IntegrationSettings() {
     setSisterAppTestMessage("");
 
     try {
-      const response = await supabase.functions.invoke('push-to-sister-app', {
+      const response = await supabase.functions.invoke('sync-grades-to-scholar', {
         body: {
-          type: 'ping',
+          test_connection: true,
         },
       });
 
@@ -316,21 +316,31 @@ export function IntegrationSettings() {
           description: response.error.message || "Could not connect to NYClogic Scholar.",
           variant: "destructive",
         });
+      } else if (response.data?.success === false) {
+        // The function returned but Scholar rejected the request
+        setSisterAppTestResult('error');
+        setSisterAppTestMessage(response.data.error || 'Scholar API rejected the connection');
+        toast({
+          title: "Connection failed",
+          description: response.data.error || "Scholar API rejected the connection.",
+          variant: "destructive",
+        });
       } else {
         setSisterAppTestResult('success');
-        setSisterAppTestMessage('Successfully connected to NYClogic Scholar!');
+        setSisterAppTestMessage(response.data?.message || 'Successfully connected to NYClogic Scholar!');
         toast({
           title: "Connection successful",
           description: "NYClogic Scholar API is responding correctly.",
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Sister app test error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Connection test failed';
       setSisterAppTestResult('error');
-      setSisterAppTestMessage(error.message || 'Connection test failed');
+      setSisterAppTestMessage(errorMessage);
       toast({
         title: "Connection failed",
-        description: error.message || "Could not connect to NYClogic Scholar.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

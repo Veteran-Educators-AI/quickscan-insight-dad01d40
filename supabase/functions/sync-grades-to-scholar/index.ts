@@ -34,6 +34,7 @@ interface SyncRequest {
   class_id?: string;
   student_ids?: string[];
   sync_all?: boolean;
+  test_connection?: boolean;
 }
 
 interface MisconceptionData {
@@ -129,7 +130,64 @@ serve(async (req) => {
     }
 
     const requestData: SyncRequest = await req.json();
-    const { class_id, student_ids } = requestData;
+    const { class_id, student_ids, test_connection } = requestData;
+
+    // Handle test connection request - ping Scholar API directly
+    if (test_connection) {
+      console.log('Testing connection to Scholar API...');
+      const baseEndpoint = sisterAppEndpoint.replace(/\/$/, '');
+      
+      try {
+        const testPayload = {
+          action: 'ping',
+          timestamp: new Date().toISOString(),
+        };
+        
+        const testResponse = await fetch(baseEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': sisterAppApiKey,
+          },
+          body: JSON.stringify(testPayload),
+        });
+
+        const responseText = await testResponse.text();
+        console.log('Scholar API response:', testResponse.status, responseText);
+
+        if (testResponse.ok) {
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              message: 'Successfully connected to Scholar API!',
+              endpoint: baseEndpoint,
+              status: testResponse.status,
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: `Scholar API returned ${testResponse.status}: ${responseText.slice(0, 200)}`,
+              endpoint: baseEndpoint,
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } catch (fetchError: unknown) {
+        const errorMessage = fetchError instanceof Error ? fetchError.message : 'Unknown error';
+        console.error('Connection test failed:', fetchError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Network error: ${errorMessage}`,
+            endpoint: sisterAppEndpoint,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     // Get teacher info
     const { data: teacherProfile } = await supabase
