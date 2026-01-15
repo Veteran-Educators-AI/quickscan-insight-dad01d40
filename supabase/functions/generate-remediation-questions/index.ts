@@ -29,7 +29,14 @@ async function callLovableAI(prompt: string): Promise<string> {
     body: JSON.stringify({
       model: 'google/gemini-3-flash-preview',
       messages: [
-        { role: 'system', content: `You are an expert math educator specializing in remediation and addressing student misconceptions. Your goal is to create targeted practice questions that help students overcome specific misconceptions.
+        { role: 'system', content: `You are a precise and factual math educator specializing in remediation. Your goal is to create targeted practice questions based STRICTLY on verified misconceptions.
+
+HALLUCINATION-SHIELD PROTOCOL:
+1. GROUNDING: Base questions ONLY on the specific misconceptions provided. Do NOT invent or assume additional misconceptions.
+2. ADMISSION OF UNCERTAINTY: If a misconception description is unclear, state "CLARIFICATION NEEDED: [what is unclear]" rather than guessing.
+3. SOURCE ATTRIBUTION: Each question MUST clearly target the EXACT misconception provided - reference it directly.
+4. NO CREATIVE EXPANSION: Do NOT add misconceptions the student "might also have" - work only with what's provided.
+5. VERIFICATION: Before including a question, verify it directly addresses the stated misconception.
 
 CRITICAL FORMATTING REQUIREMENTS:
 - Use proper mathematical Unicode symbols:
@@ -44,12 +51,12 @@ CRITICAL FORMATTING REQUIREMENTS:
   • Use θ for angle theta
   • Use ½ ⅓ ¼ ⅔ ¾ for common fractions
 
-Create questions that directly target and remediate the identified misconceptions. Include scaffolded questions that break down concepts, practice questions for reinforcement, and challenge questions to ensure mastery.
+Create questions that directly target and remediate ONLY the identified misconceptions. Include scaffolded questions that break down concepts, practice questions for reinforcement, and challenge questions to ensure mastery.
 
 Return only valid JSON arrays when asked for questions.` },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.7,
+      temperature: 0.3, // Lower temperature for more precise, less creative output
       max_tokens: 4000,
     }),
   });

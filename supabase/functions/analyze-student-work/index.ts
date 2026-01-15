@@ -325,22 +325,55 @@ Evaluate the student's work specifically against this NYS standard. Consider:
     let systemPrompt: string;
     let userPromptText: string;
 
+    // HALLUCINATION-SHIELD CORE PRINCIPLES - Applied to all AI analysis
+    const hallucinationShieldContext = `
+CRITICAL ANALYSIS CONSTRAINTS (Hallucination-Shield Protocol):
+
+1. GROUNDING REQUIREMENT: Base your analysis ONLY on what you can directly observe in the student's work. 
+   - Do NOT infer intent or understanding beyond what is explicitly written/shown
+   - If work is unclear or illegible, state "UNCLEAR: [what you cannot read]"
+
+2. ADMISSION OF UNCERTAINTY: If you cannot determine something with confidence, state clearly:
+   - "INSUFFICIENT EVIDENCE to determine [X]"
+   - "CANNOT VERIFY [claim] because [reason]"
+   - Do NOT guess or fabricate details about student understanding
+
+3. SOURCE ATTRIBUTION: For EVERY claim you make, cite the specific evidence:
+   - "Based on student's work in step 2 where they wrote '[exact quote]'..."
+   - "The equation on line 3 shows..."
+   - "No evidence found for [X] in the visible work"
+
+4. VERIFICATION STEP: Before finalizing your assessment:
+   - Double-check each claim against the actual visible work
+   - Remove any statement that cannot be directly verified from the image
+   - Mark confidence level: HIGH (clearly visible), MEDIUM (partially visible), LOW (inferred)
+
+5. NO CREATIVE INTERPRETATION: 
+   - Do NOT assume student "probably meant" something
+   - Do NOT fill in gaps with what a correct solution would show
+   - Report ONLY what is actually present
+`;
+
     if (isAIMode) {
-      systemPrompt = `You are an expert NYS Regents mathematics teacher and grader with deep knowledge of New York State learning standards. Your task is to:
-1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions
+      systemPrompt = `You are a precise and factual NYS Regents mathematics grader. Your goal is to provide assessment based STRICTLY on verified observations from student work.
+
+${hallucinationShieldContext}
+
+Your task is to:
+1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions - cite exactly what you see
 2. Identify the mathematical problem the student is solving and which NYS standard it aligns with
 3. SOLVE THE PROBLEM YOURSELF to determine the correct answer and approach
 4. Compare the student's work against the correct solution using NYS Regents scoring guidelines
-5. Determine if the student's answer is mathematically correct
-6. Identify any misconceptions or errors in the student's reasoning
+5. Determine if the student's answer is mathematically correct - with specific evidence
+6. Identify any misconceptions or errors in the student's reasoning - cite the exact work showing this
 7. Score using the NYS Regents 0-4 rubric and convert to 55-100 scale
-8. Provide constructive, standards-aligned feedback
+8. Provide constructive, standards-aligned feedback based only on observed work
 
 ${regentsContext}
 ${customRubricContext}
 ${standardContext}
 
-Be accurate, fair, and educational in your assessment. Always reference specific NYS standards when providing feedback.`;
+CRITICAL: If you cannot read or verify something, say so. Never fabricate or assume understanding that isn't explicitly demonstrated.`;
 
       userPromptText = `Please analyze this student's handwritten math work using NYS Regents scoring standards.
 
@@ -361,18 +394,22 @@ Steps to follow:
 6. Convert to 55-100 grade scale`;
 
     } else {
-      systemPrompt = `You are an expert NYS Regents mathematics teacher and grader with deep knowledge of New York State learning standards. Your task is to:
-1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions
+      systemPrompt = `You are a precise and factual NYS Regents mathematics grader. Your goal is to provide assessment based STRICTLY on verified observations from student work.
+
+${hallucinationShieldContext}
+
+Your task is to:
+1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions - cite exactly what you see
 2. Analyze the student's problem-solving approach using NYS Regents scoring guidelines
 3. Score using the NYS Regents 0-4 rubric and convert to 55-100 scale
-4. Identify any misconceptions or errors in the student's reasoning
-5. Provide constructive, standards-aligned feedback
+4. Identify any misconceptions or errors in the student's reasoning - cite the exact work showing this
+5. Provide constructive, standards-aligned feedback based only on observed work
 
 ${regentsContext}
 ${customRubricContext}
 ${standardContext}
 
-Be accurate, fair, and educational in your assessment. Always reference specific NYS standards when providing feedback.`;
+CRITICAL: If you cannot read or verify something, say so. Never fabricate or assume understanding that isn't explicitly demonstrated.`;
 
       userPromptText = `Please analyze this student's handwritten math work using NYS Regents scoring standards.
 
@@ -387,25 +424,39 @@ Identify the problem being solved, its related NYS standard, and evaluate the st
       });
     }
 
-    userPromptText += `\n\nIMPORTANT - CONCEPT-BASED GRADING:
-1. Identify ALL concepts the student demonstrates understanding of
+    userPromptText += `\n\nIMPORTANT - HALLUCINATION-SHIELD GRADING PROTOCOL:
+
+STEP 1 - EVIDENCE COLLECTION (cite exactly what you see):
+1. Extract and quote the EXACT text/equations from the student's work
+2. Note anything that is UNCLEAR or ILLEGIBLE with "UNCLEAR: [description]"
+3. Do NOT infer or assume content that isn't visible
+
+STEP 2 - CONCEPT-BASED GRADING (with source attribution):
+1. Identify ALL concepts the student demonstrates - CITE the specific work showing each
 2. Look for COHERENT work that shows logical thinking (even if basic)
 3. ANY understanding shown = minimum grade of 65
 4. 55 is ONLY for completely blank/no work at all
 5. More concepts understood with coherent justification = higher grade
 
+STEP 3 - VERIFICATION (before finalizing):
+1. Double-check each claim against the visible work
+2. For each misconception identified, cite the EXACT student work showing it
+3. Mark confidence: HIGH (clearly visible), MEDIUM (partially visible), LOW (inferred - minimize these)
+
 Provide your analysis in the following structure:
-- OCR Text: (extracted handwritten content)
-- Problem Identified: (what problem the student is solving)
+- OCR Text: (extracted handwritten content - quote exactly what you see, mark unclear portions)
+- Evidence Confidence: (HIGH/MEDIUM/LOW - how clearly could you read the work?)
+- Problem Identified: (what problem the student is solving - cite evidence)
 - NYS Standard: (the most relevant NYS standard code and name, e.g., "A.REI.B.4 - Solving Quadratic Equations")${isAIMode ? '\n- Correct Solution: (your step-by-step solution to the problem)' : ''}
-- Concepts Demonstrated: (LIST each concept the student shows understanding of, even basic ones)
-- Coherent Work Shown: (YES or NO - does the student show logical thinking/work, even if simple?)
-- Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND, not just errors)
-- Is Correct: (YES or NO - is the final answer mathematically correct?)
+- Concepts Demonstrated: (LIST each concept with SPECIFIC CITATION: "Student shows [concept] as evidenced by [exact quote from their work]")
+- Coherent Work Shown: (YES or NO - does the student show logical thinking/work, even if simple? CITE evidence)
+- Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND, cite specific work)
+- Is Correct: (YES or NO - is the final answer mathematically correct? CITE the answer you observed)
 - Regents Score: (0, 1, 2, 3, or 4 - remember: ANY understanding = Score 1 minimum)
-- Regents Score Justification: (why this score - focus on concepts understood)
-- Rubric Scores: (if teacher rubric provided, score each criterion)
-- Misconceptions: (any errors or misunderstandings identified, with NYS standard references)
+- Regents Score Justification: (why this score - cite specific evidence for each point given or withheld)
+- Rubric Scores: (if teacher rubric provided, score each criterion WITH citations)
+- Misconceptions: (ONLY if clearly evidenced: "[Misconception] as shown when student wrote '[exact quote]'")
+- Insufficient Evidence: (list anything you could NOT determine due to unclear/missing work)
 - Total Score: (points earned / total possible from teacher rubric)
 - Standards Met: (YES or NO - does work show ANY understanding of the standards?)
 - Grade: (55-100 scale based on concepts understood:
@@ -414,8 +465,8 @@ Provide your analysis in the following structure:
     • 70-79 = Partial understanding, some concepts grasped
     • 65-69 = Basic/limited understanding shown (DEFAULT if ANY work with understanding)
     • 55 = ONLY if completely blank or NO understanding whatsoever)
-- Grade Justification: (explain what concepts the student understands and how the grade reflects their understanding level)
-- Feedback: (constructive suggestions referencing specific concepts to strengthen)`;
+- Grade Justification: (explain with SPECIFIC CITATIONS what concepts the student understands)
+- Feedback: (constructive suggestions - only reference issues you can directly cite from their work)`;
 
     // Build messages for Lovable AI
     // If additionalImages provided, include all pages as a multi-page paper
@@ -566,17 +617,24 @@ async function compareWithSolution(
     });
   }
 
-  const systemPrompt = `You are an expert math teacher helping grade student work by comparing it to a provided solution.
+  const systemPrompt = `You are a precise and factual math grader comparing student work to a provided solution.
+
+HALLUCINATION-SHIELD PROTOCOL:
+1. GROUNDING: Base your comparison ONLY on what you can directly observe in BOTH images. Do NOT assume or infer.
+2. ADMISSION OF UNCERTAINTY: If either image is unclear, state "CANNOT VERIFY: [what is unclear]". Do NOT guess.
+3. SOURCE ATTRIBUTION: For every score decision, cite EXACT evidence: "Student wrote '[quote]' which matches/differs from solution step [X]"
+4. NO CREATIVE INTERPRETATION: Compare ONLY visible work. Do NOT assume student "probably meant" something.
+5. VERIFICATION: Before finalizing, verify each claim against visible content in both images.
 
 Your task is to:
-1. Perform OCR on both images to extract all text, equations, and mathematical expressions
-2. Compare the student's work step-by-step against the correct solution
-3. Identify where the student's approach matches or differs from the solution
-4. Score each rubric criterion based on how well the student's work aligns with the solution
-5. Identify specific misconceptions or errors
-6. Provide constructive feedback for improvement
+1. Perform OCR on both images to extract all text, equations, and mathematical expressions - QUOTE exactly what you see
+2. Compare the student's work step-by-step against the correct solution - CITE specific matches/differences
+3. Identify where the student's approach matches or differs from the solution - with exact quotes
+4. Score each rubric criterion based on OBSERVABLE alignment with the solution
+5. Identify specific misconceptions - ONLY if clearly evidenced in the visible work
+6. Provide constructive feedback for improvement based on observed differences
 
-Be fair, accurate, and educational in your assessment.`;
+CRITICAL: If you cannot read or verify something in either image, say "UNCLEAR" rather than assuming.`;
 
   const userPrompt = `Compare the student's work (first image) against the correct solution (second image).
 ${rubricPrompt}
