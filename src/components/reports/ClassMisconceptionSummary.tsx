@@ -196,7 +196,7 @@ const getRemediesForCategory = (category: string): string[] => {
   return remedies[category] || remedies['Other Errors'];
 };
 
-// Extract structured misconception from justification
+// Extract structured misconception from justification with specific actionable details
 const extractMisconceptionFromJustification = (
   justification: string,
   studentName: string,
@@ -218,48 +218,123 @@ const extractMisconceptionFromJustification = (
   const { category, title } = identifyMisconceptionCategory(cleaned);
   const exactQuote = extractExactQuote(cleaned);
   
-  // Determine what student did vs expected
+  // Extract SPECIFIC what student did vs expected with detailed patterns
   let whatStudentDid = '';
   let whatWasExpected = '';
   
-  // Pattern matching for contrast
-  const contrastPatterns = [
-    /(?:student|they|work)\s+(?:wrote|used|applied|calculated|showed|gave|had|made|did|got)\s+(.+?)\s+(?:but|however|instead of|when|rather than)\s+(?:should have|it should be|the correct|needed|was supposed to be|expected)\s+(.+?)(?:\.|$)/gi,
-    /(.+?)\s+(?:is incorrect|was wrong)\.?\s*(?:the correct|should be|expected|proper)\s+(?:answer|approach|method)?\s*(?:is|was|would be)?\s*(.+?)(?:\.|$)/gi,
+  // More specific extraction patterns for actionable data
+  const specificPatterns = [
+    // Pattern: "wrote X instead of Y"
+    /(?:wrote|calculated|got|obtained|gave|answered|put|stated)\s+["']?([^"'\n,]{5,80})["']?\s+(?:instead of|rather than|but should (?:have )?(?:been|wrote|calculated))\s+["']?([^"'\n,]{5,80})["']?/i,
+    // Pattern: "used X but should have used Y"
+    /(?:used|applied|chose)\s+(.+?)\s+(?:but|when|instead of)\s+(?:should have|the correct|proper|needed to)\s+(?:used?|applied?|chosen?)?\s*(.+?)(?:\.|,|$)/i,
+    // Pattern: "X is incorrect, correct answer is Y"
+    /["']?([^"'\n]{5,60})["']?\s+(?:is|was)\s+(?:incorrect|wrong)\.?\s*(?:the )?correct\s+(?:answer|solution|value)?\s*(?:is|was|should be)\s*["']?([^"'\n]{5,60})["']?/i,
+    // Pattern: "forgot to X"
+    /(?:forgot|failed|neglected|omitted|missed)\s+(?:to\s+)?(.{10,80}?)(?:\.|,|$)/i,
+    // Pattern: "did not X"
+    /(?:did not|didn't|failed to)\s+(.{10,80}?)(?:\.|,|$)/i,
   ];
   
-  for (const pattern of contrastPatterns) {
-    const match = pattern.exec(cleaned);
+  for (const pattern of specificPatterns) {
+    const match = cleaned.match(pattern);
     if (match) {
-      whatStudentDid = match[1].trim();
-      whatWasExpected = match[2].trim();
+      if (match[2]) {
+        whatStudentDid = match[1].trim();
+        whatWasExpected = match[2].trim();
+      } else if (match[1]) {
+        // Single capture (forgot/failed patterns)
+        whatStudentDid = `Did not ${match[1].trim().toLowerCase()}`;
+        whatWasExpected = `Should have ${match[1].trim().toLowerCase()}`;
+      }
       break;
     }
   }
   
-  // If no contrast found, use generic extraction
+  // Extract specific numbers/expressions if present
+  const numberPattern = /(\d+(?:\.\d+)?|\-?\d+(?:\/\d+)?|[xyz]\s*[=<>]\s*\-?\d+)/g;
+  const numbers = cleaned.match(numberPattern);
+  
+  // If no specific contrast found, build from context
   if (!whatStudentDid) {
-    // Find the error description
-    const errorMatch = cleaned.match(/(?:error|mistake|incorrect|wrong)(?:\s*[:\-])?\s*(.{15,100}?)(?:\.|$)/i);
-    whatStudentDid = errorMatch ? errorMatch[1].trim() : 'Made an error in their approach';
-    whatWasExpected = 'Apply the correct mathematical procedure';
+    // Look for specific error descriptions
+    const errorTypes: Record<string, { did: string; expected: string }> = {
+      'sign': { 
+        did: 'Made a sign error (positive/negative confusion)', 
+        expected: 'Carefully track positive and negative signs through each step' 
+      },
+      'order.*operation|pemdas': { 
+        did: 'Applied operations in wrong order', 
+        expected: 'Follow PEMDAS: Parentheses, Exponents, Multiplication/Division, Addition/Subtraction' 
+      },
+      'distribut': { 
+        did: 'Failed to distribute correctly across all terms', 
+        expected: 'Multiply every term inside the parentheses by the outside factor' 
+      },
+      'cancel|simplif': { 
+        did: 'Incorrectly simplified or cancelled terms', 
+        expected: 'Only cancel common factors, not terms in a sum' 
+      },
+      'formula': { 
+        did: 'Applied the wrong formula for this problem type', 
+        expected: 'Identify the problem type first, then select the appropriate formula' 
+      },
+      'unit|conversion': { 
+        did: 'Made a unit conversion error', 
+        expected: 'Set up conversion factors with units that cancel properly' 
+      },
+      'fraction': { 
+        did: 'Made an error with fraction operations', 
+        expected: 'Find common denominators for addition/subtraction; multiply across for multiplication' 
+      },
+      'decimal|place': { 
+        did: 'Misaligned decimal places', 
+        expected: 'Line up decimal points vertically; count places when multiplying/dividing' 
+      },
+      'exponent|power': { 
+        did: 'Misapplied exponent rules', 
+        expected: 'Add exponents when multiplying same base; multiply exponents for power of power' 
+      },
+      'slope|intercept': { 
+        did: 'Confused slope and y-intercept or calculated incorrectly', 
+        expected: 'Slope = rise/run = (y₂-y₁)/(x₂-x₁); y-intercept is where x=0' 
+      },
+      'substitute|variable': { 
+        did: 'Made a substitution error with variables', 
+        expected: 'Replace the variable everywhere it appears; use parentheses around substituted values' 
+      },
+      'isolate|solve': { 
+        did: 'Made an error isolating the variable', 
+        expected: 'Perform the same operation on both sides; work to get variable alone' 
+      },
+    };
     
-    // Try to find "should" statements for expected behavior
-    const shouldMatch = cleaned.match(/should\s+(?:have\s+)?(.{10,80}?)(?:\.|$)/i);
-    if (shouldMatch) {
-      whatWasExpected = shouldMatch[1].trim();
+    for (const [pattern, messages] of Object.entries(errorTypes)) {
+      if (new RegExp(pattern, 'i').test(cleaned)) {
+        whatStudentDid = messages.did;
+        whatWasExpected = messages.expected;
+        break;
+      }
+    }
+    
+    // Still nothing? Use a more generic but still actionable message
+    if (!whatStudentDid) {
+      // Extract any number comparisons
+      if (numbers && numbers.length >= 2) {
+        whatStudentDid = `Calculated ${numbers[0]} instead of the correct value`;
+        whatWasExpected = `The correct answer should be ${numbers[1]}`;
+      } else {
+        whatStudentDid = 'Made a procedural or calculation error';
+        whatWasExpected = 'Review the problem-solving steps and verify each calculation';
+      }
     }
   }
   
-  // Determine severity
+  // Determine severity based on grade and keywords
   let severity: 'high' | 'medium' | 'low' = 'medium';
-  if (/fundamental|basic|completely|entirely|major|critical|no.*understanding|zero|failed/i.test(cleaned)) {
+  if (/fundamental|basic|completely|entirely|major|critical|no.*understanding|zero|failed|serious/i.test(cleaned) || grade < 50) {
     severity = 'high';
-  } else if (/minor|small|slight|almost|nearly|rounding|notation/i.test(cleaned)) {
-    severity = 'low';
-  } else if (grade < 50) {
-    severity = 'high';
-  } else if (grade >= 80) {
+  } else if (/minor|small|slight|almost|nearly|rounding|notation|careless/i.test(cleaned) || grade >= 80) {
     severity = 'low';
   }
   
@@ -654,36 +729,27 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
                                   </span>
                                 </div>
                                 
-                                {/* Exact Quote */}
-                                <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded border border-amber-200 dark:border-amber-800">
-                                  <div className="flex items-start gap-2">
-                                    <Quote className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                                    <div>
-                                      <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">
-                                        Student's Exact Response:
-                                      </p>
-                                      <p className="text-sm text-amber-800 dark:text-amber-200 italic">
-                                        {instance.exactQuote}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                                
-                                {/* What they did vs expected */}
+                                {/* What they did vs expected - actionable and specific */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                   <div className="p-2 bg-red-50/70 dark:bg-red-950/30 rounded border border-red-200 dark:border-red-800">
                                     <div className="flex items-center gap-1 text-xs font-medium text-red-700 dark:text-red-300 mb-1">
                                       <X className="h-3 w-3" />
-                                      What Student Did Wrong
+                                      What Went Wrong
                                     </div>
                                     <p className="text-sm text-red-600 dark:text-red-400">
                                       {instance.whatStudentDid}
                                     </p>
+                                    {/* Show the quote inline as supporting evidence */}
+                                    {instance.exactQuote && instance.exactQuote !== instance.whatStudentDid && (
+                                      <p className="text-xs text-red-500/70 dark:text-red-400/70 italic mt-1 border-t border-red-200 dark:border-red-800 pt-1">
+                                        Evidence: {instance.exactQuote.length > 80 ? instance.exactQuote.substring(0, 80) + '...' : instance.exactQuote}
+                                      </p>
+                                    )}
                                   </div>
                                   <div className="p-2 bg-emerald-50/70 dark:bg-emerald-950/30 rounded border border-emerald-200 dark:border-emerald-800">
                                     <div className="flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 mb-1">
                                       <Target className="h-3 w-3" />
-                                      What Was Expected
+                                      Corrective Action
                                     </div>
                                     <p className="text-sm text-emerald-600 dark:text-emerald-400">
                                       {instance.whatWasExpected}
