@@ -51,6 +51,7 @@ interface RemediationQuestion {
 interface AnalysisResultsProps {
   result: AnalysisResult;
   rawAnalysis?: string | null;
+  attemptId?: string | null;
   onSaveAnalytics?: () => void;
   onAssociateStudent?: () => void;
   onGradeOverride?: (grade: number, justification: string) => void;
@@ -65,7 +66,8 @@ interface AnalysisResultsProps {
 
 export function AnalysisResults({ 
   result, 
-  rawAnalysis, 
+  rawAnalysis,
+  attemptId,
   onSaveAnalytics, 
   onAssociateStudent,
   onGradeOverride,
@@ -279,9 +281,10 @@ export function AnalysisResults({
       {rawAnalysis && (
         <TeacherVerificationPanel
           rawAnalysis={rawAnalysis}
+          attemptId={attemptId || undefined}
+          studentId={studentId || undefined}
           onVerificationComplete={(interpretations) => {
             console.log('Verification complete:', interpretations);
-            // Could trigger re-grading or save verification state
           }}
         />
       )}

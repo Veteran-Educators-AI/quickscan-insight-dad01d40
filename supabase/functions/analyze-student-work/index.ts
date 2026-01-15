@@ -233,6 +233,54 @@ serve(async (req) => {
     console.log('Assessment mode:', assessmentMode || 'teacher');
     console.log('Rubric steps provided:', rubricSteps?.length || 0);
 
+    // Fetch past verification decisions to improve AI grading accuracy
+    let verificationContext = '';
+    if (supabase && effectiveTeacherId) {
+      try {
+        const { data: verifications } = await supabase
+          .from('interpretation_verifications')
+          .select('interpretation, decision, correct_interpretation')
+          .eq('teacher_id', effectiveTeacherId)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (verifications && verifications.length > 0) {
+          const approvedPatterns = verifications
+            .filter((v: any) => v.decision === 'approved')
+            .map((v: any) => v.interpretation)
+            .slice(0, 20);
+          
+          const rejectedPatterns = verifications
+            .filter((v: any) => v.decision === 'rejected')
+            .map((v: any) => ({
+              wrong: v.interpretation,
+              correct: v.correct_interpretation
+            }))
+            .filter((v: any) => v.correct)
+            .slice(0, 20);
+
+          if (approvedPatterns.length > 0 || rejectedPatterns.length > 0) {
+            verificationContext = `
+TEACHER'S VERIFIED INTERPRETATION PATTERNS (Use these to improve accuracy):
+
+${approvedPatterns.length > 0 ? `APPROVED INTERPRETATIONS - These interpretations were confirmed correct by the teacher:
+${approvedPatterns.map((p: string) => `✓ "${p}"`).join('\n')}
+` : ''}
+
+${rejectedPatterns.length > 0 ? `REJECTED INTERPRETATIONS - These were wrong, use the corrections instead:
+${rejectedPatterns.map((p: any) => `✗ Wrong: "${p.wrong}" → Correct: "${p.correct}"`).join('\n')}
+` : ''}
+
+Apply these patterns when making similar interpretations in this student's work.
+`;
+            console.log(`Loaded ${approvedPatterns.length} approved and ${rejectedPatterns.length} rejected verification patterns`);
+          }
+        }
+      } catch (verifyError) {
+        console.error('Error fetching verification patterns:', verifyError);
+      }
+    }
+
     // Build the analysis prompt based on assessment mode
     const isAIMode = assessmentMode === 'ai';
     
@@ -361,6 +409,7 @@ CRITICAL ANALYSIS CONSTRAINTS (Hallucination-Shield Protocol):
       systemPrompt = `You are a precise and factual NYS Regents mathematics grader. Your goal is to provide assessment based STRICTLY on verified observations from student work.
 
 ${hallucinationShieldContext}
+${verificationContext}
 
 Your task is to:
 1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions - cite exactly what you see
@@ -400,6 +449,7 @@ Steps to follow:
       systemPrompt = `You are a precise and factual NYS Regents mathematics grader. Your goal is to provide assessment based STRICTLY on verified observations from student work.
 
 ${hallucinationShieldContext}
+${verificationContext}
 
 Your task is to:
 1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions - cite exactly what you see
