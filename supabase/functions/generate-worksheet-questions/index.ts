@@ -92,10 +92,26 @@ Return only valid JSON arrays when asked for questions.` },
     throw new Error(`AI API error: ${response.status}`);
   }
 
-  const data = await response.json();
+  // Get the response text first to handle empty responses
+  const responseText = await response.text();
+  
+  if (!responseText || responseText.trim() === '') {
+    console.error('Empty response from Lovable AI');
+    throw new Error('AI returned empty response. Please try again.');
+  }
+  
+  let data;
+  try {
+    data = JSON.parse(responseText);
+  } catch (parseError) {
+    console.error('Failed to parse AI response:', responseText.substring(0, 500));
+    throw new Error('Invalid response format from AI. Please try again.');
+  }
+  
   const content = data.choices?.[0]?.message?.content;
   
   if (!content) {
+    console.error('No content in AI response data:', JSON.stringify(data).substring(0, 500));
     throw new Error('No content in AI response');
   }
   
