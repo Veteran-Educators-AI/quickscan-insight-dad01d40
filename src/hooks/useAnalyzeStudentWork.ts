@@ -43,6 +43,7 @@ interface AnalysisResult {
   grade?: number;
   gradeJustification?: string;
   feedback: string;
+  gradingSource?: 'ai' | 'teacher-guided';
 }
 
 interface ComparisonResult {
@@ -54,6 +55,11 @@ interface ComparisonResult {
   rawComparison: string;
 }
 
+interface TeacherGuidedAnalysisOptions {
+  answerGuideImage: string;
+  runParallelAI?: boolean; // Also run standard AI for comparison
+}
+
 interface UseAnalyzeStudentWorkReturn {
   analyze: (
     imageDataUrl: string, 
@@ -61,8 +67,34 @@ interface UseAnalyzeStudentWorkReturn {
     rubricSteps?: RubricStep[], 
     studentName?: string,
     assessmentMode?: 'teacher' | 'ai',
-    promptText?: string
+    promptText?: string,
+    standardCode?: string,
+    topicName?: string
   ) => Promise<AnalysisResult | null>;
+  analyzeWithTeacherGuide: (
+    imageDataUrl: string,
+    answerGuideImage: string,
+    options?: {
+      questionId?: string;
+      rubricSteps?: RubricStep[];
+      studentName?: string;
+      promptText?: string;
+      standardCode?: string;
+      topicName?: string;
+    }
+  ) => Promise<AnalysisResult | null>;
+  runBothAnalyses: (
+    imageDataUrl: string,
+    answerGuideImage: string,
+    options?: {
+      questionId?: string;
+      rubricSteps?: RubricStep[];
+      studentName?: string;
+      promptText?: string;
+      standardCode?: string;
+      topicName?: string;
+    }
+  ) => Promise<{ aiResult: AnalysisResult | null; teacherGuidedResult: AnalysisResult | null }>;
   compareWithSolution: (
     studentImage: string,
     solutionImage: string,
@@ -73,6 +105,7 @@ interface UseAnalyzeStudentWorkReturn {
   isComparing: boolean;
   error: string | null;
   result: AnalysisResult | null;
+  teacherGuidedResult: AnalysisResult | null;
   comparisonResult: ComparisonResult | null;
   rawAnalysis: string | null;
 }
@@ -83,6 +116,7 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
   const [isComparing, setIsComparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [teacherGuidedResult, setTeacherGuidedResult] = useState<AnalysisResult | null>(null);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
   const [rawAnalysis, setRawAnalysis] = useState<string | null>(null);
   const [customRubric, setCustomRubric] = useState<CustomRubric | null>(null);
@@ -162,14 +196,164 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
         return null;
       }
 
-      setResult(data.analysis);
+      const analysisResult = { ...data.analysis, gradingSource: 'ai' as const };
+      setResult(analysisResult);
       setRawAnalysis(data.rawAnalysis);
-      return data.analysis;
+      return analysisResult;
 
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(message);
       return null;
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const analyzeWithTeacherGuide = async (
+    imageDataUrl: string,
+    answerGuideImage: string,
+    options?: {
+      questionId?: string;
+      rubricSteps?: RubricStep[];
+      studentName?: string;
+      promptText?: string;
+      standardCode?: string;
+      topicName?: string;
+    }
+  ): Promise<AnalysisResult | null> => {
+    setIsAnalyzing(true);
+    setError(null);
+    setTeacherGuidedResult(null);
+    setIsCancelled(false);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('analyze-student-work', {
+        body: {
+          imageBase64: imageDataUrl,
+          answerGuideBase64: answerGuideImage,
+          questionId: options?.questionId,
+          rubricSteps: options?.rubricSteps,
+          studentName: options?.studentName,
+          teacherId: user?.id,
+          assessmentMode: 'teacher-guided',
+          promptText: options?.promptText,
+          standardCode: options?.standardCode,
+          topicName: options?.topicName,
+          customRubric,
+        },
+      });
+
+      if (isCancelled) {
+        return null;
+      }
+
+      if (fnError) {
+        handleApiError(fnError, 'Teacher-Guided Analysis');
+        return null;
+      }
+
+      if (checkResponseForApiError(data)) {
+        return null;
+      }
+
+      if (!data?.success || !data?.analysis) {
+        throw new Error('Invalid response from teacher-guided analysis');
+      }
+
+      if (isCancelled) {
+        return null;
+      }
+
+      const analysisResult = { ...data.analysis, gradingSource: 'teacher-guided' as const };
+      setTeacherGuidedResult(analysisResult);
+      setRawAnalysis(data.rawAnalysis);
+      return analysisResult;
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(message);
+      return null;
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const runBothAnalyses = async (
+    imageDataUrl: string,
+    answerGuideImage: string,
+    options?: {
+      questionId?: string;
+      rubricSteps?: RubricStep[];
+      studentName?: string;
+      promptText?: string;
+      standardCode?: string;
+      topicName?: string;
+    }
+  ): Promise<{ aiResult: AnalysisResult | null; teacherGuidedResult: AnalysisResult | null }> => {
+    setIsAnalyzing(true);
+    setError(null);
+    setResult(null);
+    setTeacherGuidedResult(null);
+    setIsCancelled(false);
+
+    try {
+      // Run both analyses in parallel
+      const [aiResponse, teacherGuidedResponse] = await Promise.all([
+        supabase.functions.invoke('analyze-student-work', {
+          body: {
+            imageBase64: imageDataUrl,
+            questionId: options?.questionId,
+            rubricSteps: options?.rubricSteps,
+            studentName: options?.studentName,
+            teacherId: user?.id,
+            assessmentMode: 'ai',
+            promptText: options?.promptText,
+            standardCode: options?.standardCode,
+            topicName: options?.topicName,
+            customRubric,
+          },
+        }),
+        supabase.functions.invoke('analyze-student-work', {
+          body: {
+            imageBase64: imageDataUrl,
+            answerGuideBase64: answerGuideImage,
+            questionId: options?.questionId,
+            rubricSteps: options?.rubricSteps,
+            studentName: options?.studentName,
+            teacherId: user?.id,
+            assessmentMode: 'teacher-guided',
+            promptText: options?.promptText,
+            standardCode: options?.standardCode,
+            topicName: options?.topicName,
+            customRubric,
+          },
+        }),
+      ]);
+
+      if (isCancelled) {
+        return { aiResult: null, teacherGuidedResult: null };
+      }
+
+      let aiResult: AnalysisResult | null = null;
+      let teacherGuidedResultData: AnalysisResult | null = null;
+
+      if (!aiResponse.error && aiResponse.data?.success && aiResponse.data?.analysis) {
+        aiResult = { ...aiResponse.data.analysis, gradingSource: 'ai' as const };
+        setResult(aiResult);
+      }
+
+      if (!teacherGuidedResponse.error && teacherGuidedResponse.data?.success && teacherGuidedResponse.data?.analysis) {
+        teacherGuidedResultData = { ...teacherGuidedResponse.data.analysis, gradingSource: 'teacher-guided' as const };
+        setTeacherGuidedResult(teacherGuidedResultData);
+      }
+
+      return { aiResult, teacherGuidedResult: teacherGuidedResultData };
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(message);
+      return { aiResult: null, teacherGuidedResult: null };
     } finally {
       setIsAnalyzing(false);
     }
@@ -219,5 +403,18 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
     }
   };
 
-  return { analyze, compareWithSolution, cancelAnalysis, isAnalyzing, isComparing, error, result, comparisonResult, rawAnalysis };
+  return { 
+    analyze, 
+    analyzeWithTeacherGuide,
+    runBothAnalyses,
+    compareWithSolution, 
+    cancelAnalysis, 
+    isAnalyzing, 
+    isComparing, 
+    error, 
+    result, 
+    teacherGuidedResult,
+    comparisonResult, 
+    rawAnalysis 
+  };
 }
