@@ -15,6 +15,7 @@ import { EmailResponsesReport } from '@/components/reports/EmailResponsesReport'
 import { ScanAnalysisHistory } from '@/components/reports/ScanAnalysisHistory';
 import { DiagnosticDashboard } from '@/components/reports/DiagnosticDashboard';
 import { StudentProgressTracker } from '@/components/reports/StudentProgressTracker';
+import { LevelProgressionChart } from '@/components/reports/LevelProgressionChart';
 import { RegentsScoreReport } from '@/components/reports/RegentsScoreReport';
 import { Gradebook } from '@/components/reports/Gradebook';
 import { ScholarSyncDashboard } from '@/components/reports/ScholarSyncDashboard';
@@ -231,6 +232,9 @@ export default function Reports() {
 
             {/* Diagnostic Dashboard */}
             <DiagnosticDashboard classId={selectedClassId === 'all' ? undefined : selectedClassId} />
+
+            {/* Level Progression Chart */}
+            <LevelProgressionChart classId={selectedClassId === 'all' ? undefined : selectedClassId} />
 
             {/* Student Progress Tracker */}
             <StudentProgressTracker classId={selectedClassId === 'all' ? undefined : selectedClassId} />
