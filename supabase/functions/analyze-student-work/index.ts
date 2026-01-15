@@ -329,29 +329,32 @@ Evaluate the student's work specifically against this NYS standard. Consider:
     const hallucinationShieldContext = `
 CRITICAL ANALYSIS CONSTRAINTS (Hallucination-Shield Protocol):
 
-1. GROUNDING REQUIREMENT: Base your analysis ONLY on what you can directly observe in the student's work. 
-   - Do NOT infer intent or understanding beyond what is explicitly written/shown
-   - If work is unclear or illegible, state "UNCLEAR: [what you cannot read]"
+1. GROUNDING REQUIREMENT: Base your analysis primarily on what you can directly observe in the student's work. 
+   - Clearly distinguish between OBSERVED facts and INTERPRETATIONS
+   - If work is unclear or illegible, still attempt to interpret but mark as "[INTERPRETATION - VERIFY: probable meaning is X]"
 
-2. ADMISSION OF UNCERTAINTY: If you cannot determine something with confidence, state clearly:
-   - "INSUFFICIENT EVIDENCE to determine [X]"
-   - "CANNOT VERIFY [claim] because [reason]"
-   - Do NOT guess or fabricate details about student understanding
+2. SMART INTERPRETATION WITH FLAGGING: When student work is unclear, messy, or has minor errors:
+   - Make a reasonable interpretation of what the student likely meant
+   - BUT ALWAYS flag interpretations for teacher review: "[INTERPRETATION - VERIFY: Student appears to have meant X]"
+   - Consider common student shorthand, notation mistakes, and handwriting variations
+   - Give benefit of the doubt to students - a "5" that looks like an "S" is probably a "5" in math context
 
 3. SOURCE ATTRIBUTION: For EVERY claim you make, cite the specific evidence:
    - "Based on student's work in step 2 where they wrote '[exact quote]'..."
    - "The equation on line 3 shows..."
-   - "No evidence found for [X] in the visible work"
+   - For interpretations: "[INTERPRETATION - VERIFY: This appears to be X based on context]"
 
-4. VERIFICATION STEP: Before finalizing your assessment:
-   - Double-check each claim against the actual visible work
-   - Remove any statement that cannot be directly verified from the image
-   - Mark confidence level: HIGH (clearly visible), MEDIUM (partially visible), LOW (inferred)
+4. VERIFICATION FLAGS: Mark claims that need teacher confirmation:
+   - HIGH CONFIDENCE: Clearly visible and unambiguous
+   - MEDIUM CONFIDENCE: Readable but may have alternative interpretations  
+   - NEEDS VERIFICATION: "[INTERPRETATION - VERIFY: ...]" - flag for teacher to confirm
 
-5. NO CREATIVE INTERPRETATION: 
-   - Do NOT assume student "probably meant" something
-   - Do NOT fill in gaps with what a correct solution would show
-   - Report ONLY what is actually present
+5. BALANCED INTERPRETATION (Not overly restrictive):
+   - DO interpret what student "probably meant" when context makes it clear
+   - DO consider mathematical context (e.g., a variable that looks like a number)
+   - DO give students credit for reasonable interpretations of their work
+   - BUT flag significant interpretations so teachers can verify: "[INTERPRETATION - VERIFY: ...]"
+   - Do NOT fabricate entire solutions or understanding that has no basis in visible work
 `;
 
     if (isAIMode) {
@@ -373,7 +376,7 @@ ${regentsContext}
 ${customRubricContext}
 ${standardContext}
 
-CRITICAL: If you cannot read or verify something, say so. Never fabricate or assume understanding that isn't explicitly demonstrated.`;
+CRITICAL: If you cannot clearly read something, make your best interpretation but flag it with "[INTERPRETATION - VERIFY: ...]" for teacher review. Never completely fabricate understanding with no basis in the work.`;
 
       userPromptText = `Please analyze this student's handwritten math work using NYS Regents scoring standards.
 
@@ -409,7 +412,7 @@ ${regentsContext}
 ${customRubricContext}
 ${standardContext}
 
-CRITICAL: If you cannot read or verify something, say so. Never fabricate or assume understanding that isn't explicitly demonstrated.`;
+CRITICAL: If you cannot clearly read something, make your best interpretation but flag it with "[INTERPRETATION - VERIFY: ...]" for teacher review. Never completely fabricate understanding with no basis in the work.`;
 
       userPromptText = `Please analyze this student's handwritten math work using NYS Regents scoring standards.
 
@@ -424,39 +427,40 @@ Identify the problem being solved, its related NYS standard, and evaluate the st
       });
     }
 
-    userPromptText += `\n\nIMPORTANT - HALLUCINATION-SHIELD GRADING PROTOCOL:
+    userPromptText += `\n\nIMPORTANT - BALANCED GRADING PROTOCOL:
 
-STEP 1 - EVIDENCE COLLECTION (cite exactly what you see):
-1. Extract and quote the EXACT text/equations from the student's work
-2. Note anything that is UNCLEAR or ILLEGIBLE with "UNCLEAR: [description]"
-3. Do NOT infer or assume content that isn't visible
+STEP 1 - EVIDENCE COLLECTION (with smart interpretation):
+1. Extract all text/equations from the student's work
+2. For unclear portions, interpret what student likely meant using context
+3. Mark interpretations with "[INTERPRETATION - VERIFY: X]" so teacher can confirm
+4. Consider mathematical context - give students benefit of the doubt
 
-STEP 2 - CONCEPT-BASED GRADING (with source attribution):
-1. Identify ALL concepts the student demonstrates - CITE the specific work showing each
+STEP 2 - CONCEPT-BASED GRADING (cite your sources):
+1. Identify ALL concepts the student demonstrates - cite the specific work showing each
 2. Look for COHERENT work that shows logical thinking (even if basic)
 3. ANY understanding shown = minimum grade of 65
 4. 55 is ONLY for completely blank/no work at all
 5. More concepts understood with coherent justification = higher grade
 
-STEP 3 - VERIFICATION (before finalizing):
-1. Double-check each claim against the visible work
-2. For each misconception identified, cite the EXACT student work showing it
-3. Mark confidence: HIGH (clearly visible), MEDIUM (partially visible), LOW (inferred - minimize these)
+STEP 3 - FLAG FOR TEACHER VERIFICATION:
+1. Mark any significant interpretations with "[INTERPRETATION - VERIFY: ...]"
+2. For unclear/ambiguous work, provide your best interpretation BUT flag it
+3. Teacher will review and confirm flagged items
 
 Provide your analysis in the following structure:
-- OCR Text: (extracted handwritten content - quote exactly what you see, mark unclear portions)
-- Evidence Confidence: (HIGH/MEDIUM/LOW - how clearly could you read the work?)
-- Problem Identified: (what problem the student is solving - cite evidence)
+- OCR Text: (extracted content - include interpretations marked as "[INTERPRETATION - VERIFY: probable reading is X]")
+- Interpretations Made: (LIST any interpretations that need teacher verification)
+- Problem Identified: (what problem the student is solving)
 - NYS Standard: (the most relevant NYS standard code and name, e.g., "A.REI.B.4 - Solving Quadratic Equations")${isAIMode ? '\n- Correct Solution: (your step-by-step solution to the problem)' : ''}
-- Concepts Demonstrated: (LIST each concept with SPECIFIC CITATION: "Student shows [concept] as evidenced by [exact quote from their work]")
-- Coherent Work Shown: (YES or NO - does the student show logical thinking/work, even if simple? CITE evidence)
-- Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND, cite specific work)
-- Is Correct: (YES or NO - is the final answer mathematically correct? CITE the answer you observed)
+- Concepts Demonstrated: (LIST each concept with citation from their work)
+- Coherent Work Shown: (YES or NO - does the student show logical thinking/work, even if simple?)
+- Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND)
+- Is Correct: (YES or NO - is the final answer mathematically correct?)
 - Regents Score: (0, 1, 2, 3, or 4 - remember: ANY understanding = Score 1 minimum)
-- Regents Score Justification: (why this score - cite specific evidence for each point given or withheld)
-- Rubric Scores: (if teacher rubric provided, score each criterion WITH citations)
-- Misconceptions: (ONLY if clearly evidenced: "[Misconception] as shown when student wrote '[exact quote]'")
-- Insufficient Evidence: (list anything you could NOT determine due to unclear/missing work)
+- Regents Score Justification: (why this score - cite evidence)
+- Rubric Scores: (if teacher rubric provided, score each criterion)
+- Misconceptions: (errors identified with citations - use "[INTERPRETATION - VERIFY]" if uncertain)
+- Needs Teacher Review: (list items flagged for verification)
 - Total Score: (points earned / total possible from teacher rubric)
 - Standards Met: (YES or NO - does work show ANY understanding of the standards?)
 - Grade: (55-100 scale based on concepts understood:
@@ -465,8 +469,8 @@ Provide your analysis in the following structure:
     • 70-79 = Partial understanding, some concepts grasped
     • 65-69 = Basic/limited understanding shown (DEFAULT if ANY work with understanding)
     • 55 = ONLY if completely blank or NO understanding whatsoever)
-- Grade Justification: (explain with SPECIFIC CITATIONS what concepts the student understands)
-- Feedback: (constructive suggestions - only reference issues you can directly cite from their work)`;
+- Grade Justification: (explain what concepts the student understands - flag interpretations)
+- Feedback: (constructive suggestions for the student)`;
 
     // Build messages for Lovable AI
     // If additionalImages provided, include all pages as a multi-page paper
