@@ -154,7 +154,26 @@ serve(async (req) => {
       });
     }
 
-    const { topics, questionCount, difficultyLevels, bloomLevels, includeGeometry, includeFormulas, includeGraphPaper, includeCoordinateGeometry, useAIImages, worksheetMode, variationSeed, studentName, formVariation, formSeed, includeHints, includeAnswerKey } = await req.json() as {
+    const { 
+      topics, 
+      questionCount, 
+      difficultyLevels, 
+      bloomLevels, 
+      includeGeometry, 
+      includeFormulas, 
+      includeGraphPaper, 
+      includeCoordinateGeometry, 
+      useAIImages, 
+      worksheetMode, 
+      variationSeed, 
+      studentName, 
+      formVariation, 
+      formSeed, 
+      includeHints, 
+      includeAnswerKey,
+      studentContext,
+      targetMisconceptions,
+    } = await req.json() as {
       topics: TopicInput[];
       questionCount: number;
       difficultyLevels?: string[];
@@ -171,6 +190,14 @@ serve(async (req) => {
       formSeed?: number;
       includeHints?: boolean;
       includeAnswerKey?: boolean;
+      studentContext?: {
+        studentLevel?: string;
+        trend?: 'improving' | 'stable' | 'declining';
+        weakTopics?: string[];
+        misconceptions?: string[];
+        averageScore?: number;
+      };
+      targetMisconceptions?: string[];
     };
 
     if (!topics || topics.length === 0) {
@@ -393,7 +420,32 @@ DIAGNOSTIC ASSESSMENT MODE:
 - Level F = Foundational (entry-level, basic recall and recognition)
 - Distribute questions across ALL levels (A through F) to diagnose student abilities
 - Questions should progressively increase in complexity from F to A
-- This diagnostic data will be used to create differentiated follow-up worksheets`
+- This diagnostic data will be used to create differentiated follow-up worksheets${studentContext ? `
+
+ADAPTIVE PERSONALIZATION (CRITICAL):
+This worksheet is being generated for a specific student with the following performance profile:
+- Current Level: ${studentContext.studentLevel || 'C'}
+- Performance Trend: ${studentContext.trend || 'stable'}
+- Average Score: ${studentContext.averageScore || 70}%
+${studentContext.weakTopics?.length ? `- Weak Topics: ${studentContext.weakTopics.join(', ')}` : ''}
+${studentContext.misconceptions?.length ? `- Known Misconceptions: ${studentContext.misconceptions.join('; ')}` : ''}
+
+PERSONALIZATION REQUIREMENTS:
+1. Focus questions on the student's weak areas to build mastery
+2. Start with questions slightly below their current level to build confidence
+3. Include questions that directly address their specific misconceptions
+4. For students with declining trends, include more scaffolded questions with hints
+5. For students with improving trends, include stretch questions to challenge growth
+6. Make questions feel personalized - vary contexts, numbers, and scenarios uniquely` : ''}${targetMisconceptions?.length ? `
+
+TARGET MISCONCEPTIONS (MUST ADDRESS):
+The following specific misconceptions have been identified in this student's work. Create questions that DIRECTLY address and remediate these misunderstandings:
+${targetMisconceptions.map((m, i) => `${i + 1}. "${m}"`).join('\n')}
+
+For each misconception, include at least one question designed to:
+- Test whether the student still holds this misconception
+- Guide them toward the correct understanding
+- Provide opportunities to demonstrate corrected thinking` : ''}`
       : worksheetMode === 'warmup'
       ? `
 WARM-UP MODE (Confidence Building):
