@@ -206,20 +206,20 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
     });
   };
 
-  if (showPresentation && presentation) {
-    return (
-      <NycologicPresents
-        presentation={presentation}
-        onClose={() => setShowPresentation(false)}
-        onSave={handlePresentationSave}
-        isEditable={true}
-      />
-    );
-  }
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+    <>
+      {/* Presentation viewer - renders above everything when active */}
+      {showPresentation && presentation && (
+        <NycologicPresents
+          presentation={presentation}
+          onClose={() => setShowPresentation(false)}
+          onSave={handlePresentationSave}
+          isEditable={true}
+        />
+      )}
+
+      <Dialog open={open && !showPresentation} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col z-50">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <img src={nyclogicLogo} alt="NYClogic" className="h-6 w-6" />
@@ -500,5 +500,6 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }
