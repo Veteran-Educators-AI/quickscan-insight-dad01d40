@@ -40,7 +40,71 @@ import { useStudentNames } from '@/lib/StudentNameContext';
 import { toast } from 'sonner';
 import nycologicLogo from '@/assets/nycologic-logo.png';
 
-// Column info tooltips explaining what each column means
+// Helper function to extract clean standard code from verbose text
+const extractStandardCode = (text: string | null): string | null => {
+  if (!text) return null;
+  
+  // Match patterns like G.GMD.B.4, A.REI.B.3, F.IF.C.7, 7.G.B.6, CCSS.MATH.CONTENT.7.G.B.6
+  const patterns = [
+    /\b([A-Z])\.(CO|SRT|GPE|GMD|MG|C|SSE|APR|REI|CED|IF|BF|LE|TF|CN|RN|ID|IC|CP|MD)\.[A-Z]?\.\d+\b/gi,
+    /\b([A-Z])-([A-Z]{2,3})\.[A-Z]\.\d+\b/gi,
+    /\b\d\.[A-Z]{1,3}\.[A-Z]\.\d+\b/gi,
+    /\bCCSS\.MATH\.CONTENT\.\d\.[A-Z]+\.[A-Z]\.\d+\b/gi,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      return match[0].replace('CCSS.MATH.CONTENT.', '');
+    }
+  }
+  
+  // If text is already short and looks like a standard, return it
+  if (text.length <= 15 && /^[A-Z0-9.-]+$/i.test(text.trim())) {
+    return text.trim();
+  }
+  
+  return null;
+};
+
+// Helper function to extract clean topic name
+const extractTopicName = (text: string): string => {
+  if (!text) return 'Unknown Topic';
+  
+  // If it's a short, clean topic name, return as-is
+  if (text.length <= 50 && !text.includes('**') && !text.includes('the student')) {
+    return text;
+  }
+  
+  // Try to extract topic from markdown-style bold text like **Topic Name**
+  const boldMatch = text.match(/\*\*([^*]+)\*\*/);
+  if (boldMatch) {
+    const extracted = boldMatch[1].trim();
+    // If extracted text looks like a topic (not a standard code)
+    if (extracted.length > 3 && !/^[A-Z]\.[A-Z]+\.[A-Z]\.\d+$/.test(extracted)) {
+      return extracted.length > 50 ? extracted.substring(0, 47) + '...' : extracted;
+    }
+  }
+  
+  // Try to find common topic indicators
+  const topicIndicators = [
+    /topic:\s*([^,.\n]+)/i,
+    /about\s+([^,.\n]+)/i,
+    /concept:\s*([^,.\n]+)/i,
+  ];
+  
+  for (const pattern of topicIndicators) {
+    const match = text.match(pattern);
+    if (match) {
+      const extracted = match[1].trim();
+      return extracted.length > 50 ? extracted.substring(0, 47) + '...' : extracted;
+    }
+  }
+  
+  // Fallback: return first 50 chars
+  const cleaned = text.replace(/\*\*/g, '').trim();
+  return cleaned.length > 50 ? cleaned.substring(0, 47) + '...' : cleaned;
+};
 const COLUMN_INFO = {
   student: {
     title: 'Student',
@@ -712,8 +776,19 @@ export function Gradebook({ classId }: GradebookProps) {
                             'Unknown Student'
                           )}
                         </TableCell>
-                        <TableCell className="max-w-[200px] truncate" title={grade.topic_name}>
-                          {grade.topic_name}
+                        <TableCell className="max-w-[200px]">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block truncate cursor-help">
+                                  {extractTopicName(grade.topic_name)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[300px]">
+                                <p className="text-xs">{grade.topic_name}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </TableCell>
                         <TableCell className="text-center">
                           <span className={`font-bold ${getGradeColor(grade.grade)}`}>
@@ -730,13 +805,28 @@ export function Gradebook({ classId }: GradebookProps) {
                           )}
                         </TableCell>
                         <TableCell>
-                          {grade.nys_standard ? (
-                            <Badge variant="outline" className="text-xs">
-                              {grade.nys_standard}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
+                          {(() => {
+                            const standardCode = extractStandardCode(grade.nys_standard);
+                            if (standardCode) {
+                              return (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="outline" className="text-xs font-mono cursor-help">
+                                        {standardCode}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    {grade.nys_standard && grade.nys_standard.length > standardCode.length && (
+                                      <TooltipContent side="top" className="max-w-[350px]">
+                                        <p className="text-xs">{grade.nys_standard}</p>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            }
+                            return <span className="text-muted-foreground">-</span>;
+                          })()}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {format(new Date(grade.created_at), 'MMM d, yyyy')}
