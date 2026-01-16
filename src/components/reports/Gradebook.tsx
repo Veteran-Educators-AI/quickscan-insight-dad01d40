@@ -41,28 +41,61 @@ import { toast } from 'sonner';
 import nycologicLogo from '@/assets/nycologic-logo.png';
 import { GEOMETRY_TOPICS, ALGEBRA1_TOPICS, ALGEBRA2_TOPICS } from '@/data/nysTopics';
 
-// Build a lookup map of all known topics from NYS standards
-const buildTopicLookup = () => {
-  const lookup: { standard: string; name: string; keywords: string[] }[] = [];
+// Build a lookup map of topics by subject
+const buildTopicLookupBySubject = () => {
+  const lookup: Record<string, { standard: string; name: string; keywords: string[] }[]> = {
+    geometry: [],
+    algebra1: [],
+    algebra2: [],
+    all: []
+  };
   
-  const allTopicCategories = [...GEOMETRY_TOPICS, ...ALGEBRA1_TOPICS, ...ALGEBRA2_TOPICS];
-  
-  for (const category of allTopicCategories) {
+  // Geometry topics
+  for (const category of GEOMETRY_TOPICS) {
     for (const topic of category.topics) {
-      // Create keywords from the topic name for matching
       const keywords = topic.name.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-      lookup.push({
-        standard: topic.standard,
-        name: topic.name,
-        keywords
-      });
+      const entry = { standard: topic.standard, name: topic.name, keywords };
+      lookup.geometry.push(entry);
+      lookup.all.push(entry);
+    }
+  }
+  
+  // Algebra 1 topics
+  for (const category of ALGEBRA1_TOPICS) {
+    for (const topic of category.topics) {
+      const keywords = topic.name.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      const entry = { standard: topic.standard, name: topic.name, keywords };
+      lookup.algebra1.push(entry);
+      lookup.all.push(entry);
+    }
+  }
+  
+  // Algebra 2 topics
+  for (const category of ALGEBRA2_TOPICS) {
+    for (const topic of category.topics) {
+      const keywords = topic.name.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      const entry = { standard: topic.standard, name: topic.name, keywords };
+      lookup.algebra2.push(entry);
+      lookup.all.push(entry);
     }
   }
   
   return lookup;
 };
 
-const TOPIC_LOOKUP = buildTopicLookup();
+const TOPIC_LOOKUP_BY_SUBJECT = buildTopicLookupBySubject();
+
+// Determine subject from class name
+const getSubjectFromClassName = (className: string | undefined): string => {
+  if (!className) return 'all';
+  const lower = className.toLowerCase();
+  
+  if (lower.includes('geometry') || lower.includes('geo')) return 'geometry';
+  if (lower.includes('algebra 2') || lower.includes('algebra ii') || lower.includes('alg 2') || lower.includes('alg2')) return 'algebra2';
+  if (lower.includes('algebra 1') || lower.includes('algebra i') || lower.includes('alg 1') || lower.includes('alg1') || lower.includes('algebra')) return 'algebra1';
+  
+  return 'all';
+};
 
 // Helper function to extract clean standard code from verbose text
 const extractStandardCode = (text: string | null): string | null => {
@@ -91,25 +124,31 @@ const extractStandardCode = (text: string | null): string | null => {
   return null;
 };
 
-// Helper function to extract clean topic name by matching against known standards
-const extractTopicName = (text: string, standardText?: string | null): string => {
+// Helper function to extract clean topic name by matching against known standards for a subject
+const extractTopicName = (text: string, standardText?: string | null, subject: string = 'all'): string => {
   if (!text) return 'Unknown Topic';
   
   const lowerText = text.toLowerCase();
+  const topicLookup = TOPIC_LOOKUP_BY_SUBJECT[subject] || TOPIC_LOOKUP_BY_SUBJECT.all;
   
   // First, try to find a standard code and match it to a known topic
   const standardCode = extractStandardCode(standardText || text);
   if (standardCode) {
-    const matchedTopic = TOPIC_LOOKUP.find(t => t.standard === standardCode);
+    const matchedTopic = topicLookup.find(t => t.standard === standardCode);
     if (matchedTopic) {
       return matchedTopic.name;
+    }
+    // Try all subjects if not found in specific subject
+    if (subject !== 'all') {
+      const allMatch = TOPIC_LOOKUP_BY_SUBJECT.all.find(t => t.standard === standardCode);
+      if (allMatch) return allMatch.name;
     }
   }
   
   // Try to match keywords from the text against known topics
   let bestMatch: { name: string; score: number } | null = null;
   
-  for (const topic of TOPIC_LOOKUP) {
+  for (const topic of topicLookup) {
     let score = 0;
     for (const keyword of topic.keywords) {
       if (lowerText.includes(keyword)) {
@@ -197,6 +236,9 @@ interface GradeEntry {
     first_name: string;
     last_name: string;
     class_id: string;
+    class?: {
+      name: string;
+    };
   };
 }
 
@@ -233,7 +275,7 @@ export function Gradebook({ classId }: GradebookProps) {
     name: string;
   } | null>(null);
 
-  // Fetch grade history
+  // Fetch grade history with class names
   const { data: grades, isLoading, refetch } = useQuery({
     queryKey: ['gradebook', user?.id, classId],
     queryFn: async () => {
@@ -241,7 +283,12 @@ export function Gradebook({ classId }: GradebookProps) {
         .from('grade_history')
         .select(`
           *,
-          student:students(first_name, last_name, class_id)
+          student:students(
+            first_name, 
+            last_name, 
+            class_id,
+            class:classes(name)
+          )
         `)
         .eq('teacher_id', user!.id)
         .order('created_at', { ascending: false });
@@ -265,6 +312,12 @@ export function Gradebook({ classId }: GradebookProps) {
     },
     enabled: !!user,
   });
+
+  // Helper to get subject for a grade entry based on class name
+  const getSubjectForGrade = (grade: GradeEntry): string => {
+    const className = grade.student?.class?.name;
+    return getSubjectFromClassName(className);
+  };
 
   // Get unique topics for filter, grouped by standard
   const topicsGroupedByStandard = useMemo(() => {
@@ -822,21 +875,30 @@ export function Gradebook({ classId }: GradebookProps) {
                           )}
                         </TableCell>
                         <TableCell className="max-w-[200px]">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="block truncate cursor-help font-medium">
-                                  {extractTopicName(grade.topic_name, grade.nys_standard)}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-[350px]">
-                                <p className="text-xs font-medium mb-1">{extractTopicName(grade.topic_name, grade.nys_standard)}</p>
-                                {grade.topic_name !== extractTopicName(grade.topic_name, grade.nys_standard) && (
-                                  <p className="text-xs text-muted-foreground">{grade.topic_name}</p>
-                                )}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          {(() => {
+                            const subject = getSubjectForGrade(grade);
+                            const topicName = extractTopicName(grade.topic_name, grade.nys_standard, subject);
+                            return (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="block truncate cursor-help font-medium">
+                                      {topicName}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[350px]">
+                                    <p className="text-xs font-medium mb-1">{topicName}</p>
+                                    {grade.student?.class?.name && (
+                                      <p className="text-xs text-primary mb-1">Class: {grade.student.class.name}</p>
+                                    )}
+                                    {grade.topic_name !== topicName && (
+                                      <p className="text-xs text-muted-foreground">{grade.topic_name}</p>
+                                    )}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="text-center">
                           <span className={`font-bold ${getGradeColor(grade.grade)}`}>
