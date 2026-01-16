@@ -1889,6 +1889,13 @@ export default function Scan() {
                               toast.success(`Found QR codes in ${result.matched} of ${result.total} papers!`, {
                                 icon: <QrCode className="h-4 w-4" />,
                               });
+                              // Auto-group pages by the same student (handles front/back automatically)
+                              const groupResult = batch.groupPagesByStudent();
+                              if (groupResult.pagesLinked > 0) {
+                                toast.success(`Auto-linked ${groupResult.pagesLinked} front/back pages for ${groupResult.studentsGrouped} students`, {
+                                  icon: <FileStack className="h-4 w-4" />,
+                                });
+                              }
                             } else {
                               toast.info('No QR codes detected. Try AI identification instead.');
                             }
@@ -1914,9 +1921,16 @@ export default function Scan() {
                         <Button
                           variant="outline"
                           className="w-full"
-                          onClick={() => {
+                          onClick={async () => {
                             toast.info('Auto-identifying students from handwritten names...');
-                            batch.autoIdentifyAll(students);
+                            await batch.autoIdentifyAll(students);
+                            // Auto-group pages by the same student (handles front/back automatically)
+                            const groupResult = batch.groupPagesByStudent();
+                            if (groupResult.pagesLinked > 0) {
+                              toast.success(`Auto-linked ${groupResult.pagesLinked} front/back pages for ${groupResult.studentsGrouped} students`, {
+                                icon: <FileStack className="h-4 w-4" />,
+                              });
+                            }
                           }}
                           disabled={batch.isProcessing || batch.isIdentifying}
                         >
@@ -1934,8 +1948,8 @@ export default function Scan() {
                         </Button>
                       )}
 
-                      {/* Two-sided scanning / Multi-page grouping by handwriting */}
-                      {batch.items.length >= 2 && batch.items.some(item => !item.pageType) && (
+                      {/* Manual grouping button - fallback if auto-grouping missed some */}
+                      {batch.items.length >= 2 && batch.items.some(item => item.studentId) && batch.items.some(item => !item.pageType) && (
                         <Button
                           variant="outline"
                           className="w-full border-blue-500/50 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10"
