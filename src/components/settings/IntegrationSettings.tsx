@@ -216,13 +216,8 @@ export function IntegrationSettings() {
   // TEST WEBHOOK CONNECTION
   // ============================================================================
   /**
-   * Sends a test payload to the configured webhook URL.
-   * This helps teachers verify their Zapier/n8n connection is working
-   * before enabling it for real student data.
-   * 
-   * Note: Uses 'no-cors' mode because most webhook services don't return
-   * proper CORS headers. This means we can't actually check the response,
-   * so we just tell the user to check their Zapier/n8n task history.
+   * Sends a test payload to the configured webhook URL via edge function.
+   * This allows us to get a real response from Nyclogic Sentry.
    */
   const testWebhook = async () => {
     // Validate that a URL has been entered
@@ -239,52 +234,36 @@ export function IntegrationSettings() {
     setTestResult(null); // Clear any previous test result
 
     try {
-      // Send a test payload to the webhook
-      // This simulates what real data would look like
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // no-cors allows us to send to external domains without CORS issues
-        // Trade-off: We can't read the response, so we can't know if it truly succeeded
-        mode: 'no-cors',
-        body: JSON.stringify({
-          // Identify this as a test event
-          event_type: 'test',
-          timestamp: new Date().toISOString(),
-          source: 'nyclogic-ai',
-          message: 'This is a test webhook from NYCLogic Ai',
-          // Sample student data so they can see the structure
-          student: {
-            id: 'test-student-id',
-            name: 'Test Student',
-            class_id: 'test-class-id',
-            class_name: 'Test Class',
-          },
-          // Sample grade/analysis data
-          data: {
-            sample_score: 85,
-            sample_topic: 'Algebra',
-            sample_level: 'B',
-          },
-        }),
+      // Use edge function to test the connection and get a real response
+      const response = await supabase.functions.invoke('test-sentry-connection', {
+        body: { webhookUrl },
       });
 
-      // If we got here without throwing, consider it a success
-      // (we can't actually check response due to no-cors)
-      setTestResult('success');
-      toast({
-        title: "Test sent",
-        description: "Check your Zapier/n8n history to confirm receipt.",
-      });
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      if (response.data?.success) {
+        setTestResult('success');
+        toast({
+          title: "✅ Connection Successful!",
+          description: response.data.message || "Nyclogic Sentry is receiving data correctly.",
+        });
+      } else {
+        setTestResult('error');
+        toast({
+          title: "Connection Failed",
+          description: response.data?.error || "Could not connect to Sentry.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       // Network error or invalid URL
       console.error('Webhook test error:', error);
       setTestResult('error');
       toast({
         title: "Test failed",
-        description: "Could not send test webhook. Please check the URL.",
+        description: error instanceof Error ? error.message : "Could not send test webhook.",
         variant: "destructive",
       });
     } finally {
@@ -501,8 +480,8 @@ export function IntegrationSettings() {
             )}
             <AlertDescription>
               {testResult === 'success'
-                ? "Test webhook sent! Check your Zapier/n8n task history to confirm it was received."
-                : "Failed to send test webhook. Please verify the URL is correct."}
+                ? "✅ Nyclogic Sentry confirmed receipt! Your integration is working correctly."
+                : "❌ Could not connect to Sentry. Please verify the URL is correct and the service is running."}
             </AlertDescription>
           </Alert>
         )}
@@ -521,7 +500,7 @@ export function IntegrationSettings() {
             ) : (
               <TestTube className="h-4 w-4 mr-2" />
             )}
-            Test Webhook
+            Test Sentry Connection
           </Button>
           {/* Save button - persists all settings to the database */}
           <Button onClick={saveSettings} disabled={isSaving}>
@@ -535,15 +514,28 @@ export function IntegrationSettings() {
         {/* --- Data Documentation --- */}
         {/* Explains what data is sent when the webhook is triggered */}
         <div className="border-t pt-4">
-          <h4 className="font-medium mb-2">Data Sent to Webhook</h4>
+          <h4 className="font-medium mb-2">Data Sent to Sentry</h4>
           <p className="text-sm text-muted-foreground mb-2">
-            When triggered, the webhook receives:
+            When triggered, Nyclogic Sentry receives:
           </p>
           <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
             <li><strong>Scan Analysis:</strong> Student name, scores, topic performance, misconceptions, recommended level</li>
             <li><strong>Diagnostic Results:</strong> Student name, level scores (A-F), recommended advancement level</li>
+            <li><strong>Alert Flags:</strong> Low score warnings (below 65%), misconception counts for intervention</li>
           </ul>
         </div>
+
+        {/* --- Real-time Alerts Info --- */}
+        <Alert className="bg-primary/5 border-primary/20">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Real-time Alerts:</strong> When enabled, you'll receive push notifications for:
+            <ul className="list-disc list-inside mt-1 text-xs">
+              <li>⚠️ Low scores (below 65%) - immediate intervention needed</li>
+              <li>📝 Multiple misconceptions detected (2+) - review student understanding</li>
+            </ul>
+          </AlertDescription>
+        </Alert>
 
         {/* Visual separator between webhook and sister app sections */}
         <Separator className="my-6" />
