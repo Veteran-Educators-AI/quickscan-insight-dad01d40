@@ -19,10 +19,12 @@ import {
   BookOpen,
   TrendingUp,
   RefreshCw,
-  Clock
+  Clock,
+  Eye
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { ScholarSyncPreviewDialog } from './ScholarSyncPreviewDialog';
 
 interface SyncLogData {
   total_students?: number;
@@ -70,6 +72,7 @@ export function ScholarSyncDashboard({ classId }: ScholarSyncDashboardProps) {
   const { user } = useAuth();
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
 
   const { data: syncLogs, isLoading, refetch } = useQuery({
     queryKey: ['scholar-sync-logs', user?.id, classId],
@@ -190,27 +193,45 @@ export function ScholarSyncDashboard({ classId }: ScholarSyncDashboardProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Cloud className="h-5 w-5 text-primary" />
-            <CardTitle>Scholar AI Sync Dashboard</CardTitle>
+    <>
+      <ScholarSyncPreviewDialog
+        open={showPreviewDialog}
+        onOpenChange={setShowPreviewDialog}
+        classId={classId}
+        onConfirmSync={handleManualSync}
+      />
+      
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Cloud className="h-5 w-5 text-primary" />
+              <CardTitle>Scholar AI Sync Dashboard</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowPreviewDialog(true)}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Preview Sync
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleManualSync}
+                disabled={isSyncing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                {isSyncing ? 'Syncing...' : 'Sync Now'}
+              </Button>
+            </div>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleManualSync}
-            disabled={isSyncing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Syncing...' : 'Sync Now'}
-          </Button>
-        </div>
-        <CardDescription>
-          Track data synced to Scholar AI including misconceptions and remediation assignments
-        </CardDescription>
-      </CardHeader>
+          <CardDescription>
+            Track data synced to Scholar AI including misconceptions and remediation assignments
+          </CardDescription>
+        </CardHeader>
       <CardContent className="space-y-6">
         {/* Summary Stats */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -359,5 +380,6 @@ export function ScholarSyncDashboard({ classId }: ScholarSyncDashboardProps) {
         )}
       </CardContent>
     </Card>
+    </>
   );
 }
