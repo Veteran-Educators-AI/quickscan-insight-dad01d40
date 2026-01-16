@@ -47,6 +47,7 @@ export interface NycologicPresentation {
 interface NycologicPresentsProps {
   presentation: NycologicPresentation;
   onClose: () => void;
+  onMinimize?: () => void;
   onSave?: (presentation: NycologicPresentation) => void;
   isEditable?: boolean;
 }
@@ -81,7 +82,8 @@ const themeAccentColors: Record<string, string> = {
 
 export function NycologicPresents({ 
   presentation: initialPresentation, 
-  onClose, 
+  onClose,
+  onMinimize,
   onSave,
   isEditable = true 
 }: NycologicPresentsProps) {
@@ -286,14 +288,31 @@ export function NycologicPresents({
         className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 md:px-12 py-6 z-20"
       >
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="text-white/80 hover:text-white hover:bg-white/20 h-12 w-12"
-          >
-            <X className="h-6 w-6" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="text-white/80 hover:text-white hover:bg-white/20 h-12 w-12"
+              title="Close presentation"
+            >
+              <X className="h-6 w-6" />
+            </Button>
+            {onMinimize && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  onSave?.(presentation);
+                  onMinimize();
+                }}
+                className="text-white/80 hover:text-white hover:bg-white/20 h-12 w-12"
+                title="Minimize to builder"
+              >
+                <Minimize2 className="h-5 w-5" />
+              </Button>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <img src={nyclogicLogo} alt="NYClogic" className="h-12 w-12 drop-shadow-lg" />
             <div>
