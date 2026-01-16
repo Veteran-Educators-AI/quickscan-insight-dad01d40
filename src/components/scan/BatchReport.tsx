@@ -209,10 +209,19 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
     setIsSavingAll(true);
     let successCount = 0;
     let failCount = 0;
+    const failedStudentNames: string[] = [];
+    const notLinkedStudents: string[] = [];
 
     try {
       for (const item of completedItems) {
-        if (!item.studentId || savedStudents.has(item.studentId)) continue;
+        // Skip if no student ID assigned
+        if (!item.studentId) {
+          notLinkedStudents.push(item.studentName || 'Unknown');
+          continue;
+        }
+        
+        // Skip if already saved
+        if (savedStudents.has(item.studentId)) continue;
         
         const effectiveGrade = getEffectiveGrade(item.result);
         const topicName = item.result?.problemIdentified || 'General Assessment';
@@ -238,6 +247,12 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
         if (gradeError) {
           console.error('Error saving grade for', item.studentName, ':', gradeError);
           failCount++;
+          // Check if it's a foreign key error (student doesn't exist in database)
+          if (gradeError.code === '23503' || gradeError.message?.includes('foreign key')) {
+            failedStudentNames.push(`${item.studentName || 'Unknown'} (not in roster)`);
+          } else {
+            failedStudentNames.push(item.studentName || 'Unknown');
+          }
           continue;
         }
 
@@ -280,13 +295,30 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
         setSavedStudents(prev => new Set([...prev, item.studentId!]));
       }
 
-      if (successCount > 0 && failCount === 0) {
+      // Show detailed feedback
+      if (successCount > 0 && failCount === 0 && notLinkedStudents.length === 0) {
         toast.success(`Saved ${successCount} student grade(s) to gradebook!`);
         onSaveComplete?.();
       } else if (successCount > 0) {
-        toast.warning(`${successCount} saved, ${failCount} failed`);
+        toast.success(`Saved ${successCount} grade(s) to gradebook`, {
+          description: failCount > 0 
+            ? `${failCount} failed: ${failedStudentNames.slice(0, 3).join(', ')}${failedStudentNames.length > 3 ? '...' : ''}`
+            : undefined,
+        });
+        if (notLinkedStudents.length > 0) {
+          toast.warning(`${notLinkedStudents.length} paper(s) not linked to students`, {
+            description: `Link students first: ${notLinkedStudents.slice(0, 3).join(', ')}${notLinkedStudents.length > 3 ? '...' : ''}`,
+          });
+        }
+        onSaveComplete?.();
       } else if (failCount > 0) {
-        toast.error('Failed to save grades to gradebook');
+        toast.error(`Failed to save ${failCount} grade(s)`, {
+          description: failedStudentNames.slice(0, 3).join(', ') + (failedStudentNames.length > 3 ? '...' : ''),
+        });
+      } else if (notLinkedStudents.length > 0) {
+        toast.warning('No grades saved - papers not linked to students', {
+          description: 'Use the student dropdown to link each paper to a student from your roster',
+        });
       } else {
         toast.info('No new grades to save');
       }
