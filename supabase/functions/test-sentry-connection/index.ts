@@ -36,11 +36,18 @@ serve(async (req) => {
       );
     }
 
-    const { webhookUrl } = await req.json();
+    const { webhookUrl, apiKey } = await req.json();
 
     if (!webhookUrl) {
       return new Response(
         JSON.stringify({ success: false, error: 'No webhook URL provided' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'No API key provided. Please enter your Sentry API key.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -63,11 +70,12 @@ serve(async (req) => {
 
     console.log('Testing connection to:', webhookUrl);
 
-    // Send test to Sentry
+    // Send test to Sentry with API key
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-api-key': apiKey,
       },
       body: JSON.stringify(testPayload),
     });
