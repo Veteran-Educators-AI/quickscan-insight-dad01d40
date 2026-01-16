@@ -88,14 +88,14 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
   const { user } = useAuth();
   const { toast } = useToast();
   
-  const [step, setStep] = useState<'select' | 'configure' | 'preview'>('select');
+  const [step, setStep] = useState<'topic' | 'students' | 'configure' | 'preview'>('topic');
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [selectedStudents, setSelectedStudents] = useState<MasteryStudent[]>([]);
   const [challengeType, setChallengeType] = useState<ChallengeType>('deeper');
   const [questionCount, setQuestionCount] = useState('5');
   const [includeHints, setIncludeHints] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestion[]>([]);
-  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
 
   // Fetch students with Level A on any topic (high achievers)
   const { data: masteryStudents, isLoading } = useQuery({
@@ -195,14 +195,24 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
     return grouped;
   }, [masteryStudents]);
 
-  const toggleStudent = (studentId: string, topicName: string) => {
+  const handleSelectTopic = (topic: string) => {
+    setSelectedTopic(topic);
+    // Auto-select all students in this topic
+    const topicStudents = studentsByTopic[topic] || [];
+    setSelectedStudents(topicStudents.map(s => ({ ...s, selected: true })));
+    setStep('students');
+  };
+
+  const toggleStudent = (studentId: string) => {
+    if (!selectedTopic) return;
+    
     setSelectedStudents(prev => {
-      const exists = prev.find(s => s.id === studentId && s.topicName === topicName);
+      const exists = prev.find(s => s.id === studentId);
       if (exists) {
-        return prev.filter(s => !(s.id === studentId && s.topicName === topicName));
+        return prev.filter(s => s.id !== studentId);
       }
       
-      const student = masteryStudents?.find(s => s.id === studentId && s.topicName === topicName);
+      const student = masteryStudents?.find(s => s.id === studentId && s.topicName === selectedTopic);
       if (student) {
         return [...prev, { ...student, selected: true }];
       }
@@ -210,34 +220,19 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
     });
   };
 
-  const toggleAllInTopic = (topicName: string) => {
-    const topicStudents = studentsByTopic[topicName] || [];
+  const toggleAllStudents = () => {
+    if (!selectedTopic) return;
+    
+    const topicStudents = studentsByTopic[selectedTopic] || [];
     const allSelected = topicStudents.every(s => 
-      selectedStudents.some(sel => sel.id === s.id && sel.topicName === s.topicName)
+      selectedStudents.some(sel => sel.id === s.id)
     );
 
     if (allSelected) {
-      setSelectedStudents(prev => 
-        prev.filter(s => s.topicName !== topicName)
-      );
+      setSelectedStudents([]);
     } else {
-      setSelectedStudents(prev => {
-        const existing = prev.filter(s => s.topicName !== topicName);
-        return [...existing, ...topicStudents.map(s => ({ ...s, selected: true }))];
-      });
+      setSelectedStudents(topicStudents.map(s => ({ ...s, selected: true })));
     }
-  };
-
-  const toggleTopicExpanded = (topic: string) => {
-    setExpandedTopics(prev => {
-      const next = new Set(prev);
-      if (next.has(topic)) {
-        next.delete(topic);
-      } else {
-        next.add(topic);
-      }
-      return next;
-    });
   };
 
   const handleGenerate = async () => {
@@ -306,13 +301,15 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
   };
 
   const handleClose = () => {
-    setStep('select');
+    setStep('topic');
+    setSelectedTopic(null);
     setSelectedStudents([]);
     setGeneratedQuestions([]);
     onOpenChange(false);
   };
 
-  const selectedTopics = [...new Set(selectedStudents.map(s => s.topicName))];
+  const studentsForSelectedTopic = selectedTopic ? (studentsByTopic[selectedTopic] || []) : [];
+  const topics = Object.keys(studentsByTopic);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -327,132 +324,157 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
           </DialogDescription>
         </DialogHeader>
 
-        {step === 'select' && (
+        {/* Step 1: Select Topic */}
+        {step === 'topic' && (
           <>
             <ScrollArea className="flex-1 pr-4">
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-              ) : Object.keys(studentsByTopic).length === 0 ? (
+              ) : topics.length === 0 ? (
                 <Card className="text-center py-12">
                   <CardContent>
                     <GraduationCap className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                    <h3 className="font-medium text-lg mb-2">No Mastery Students Yet</h3>
+                    <h3 className="font-medium text-lg mb-2">No Mastery Topics Yet</h3>
                     <p className="text-muted-foreground">
-                      Students will appear here once they achieve Level A on diagnostic assessments or score 95%+ on topic assessments.
+                      Topics will appear here once students achieve Level A on diagnostic assessments or score 95%+ on topic assessments.
                     </p>
                   </CardContent>
                 </Card>
               ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between mb-4">
+                <div className="space-y-4">
+                  <div className="mb-4">
+                    <h3 className="font-medium text-base mb-1">Step 1: Select a Topic</h3>
                     <p className="text-sm text-muted-foreground">
-                      Select students who have mastered topics to generate challenge worksheets
+                      Choose a topic where students have demonstrated mastery. All students who achieved Level A or 95%+ will be shown.
                     </p>
-                    {selectedStudents.length > 0 && (
-                      <Badge variant="default" className="bg-amber-500">
-                        {selectedStudents.length} selected
-                      </Badge>
-                    )}
                   </div>
 
-                  {Object.entries(studentsByTopic).map(([topic, students]) => {
-                    const isExpanded = expandedTopics.has(topic);
-                    const selectedInTopic = students.filter(s => 
-                      selectedStudents.some(sel => sel.id === s.id && sel.topicName === s.topicName)
-                    ).length;
-                    const allSelected = selectedInTopic === students.length;
-
-                    return (
-                      <Collapsible key={topic} open={isExpanded} onOpenChange={() => toggleTopicExpanded(topic)}>
-                        <Card>
-                          <CollapsibleTrigger className="w-full">
-                            <CardHeader className="py-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <Checkbox
-                                    checked={allSelected}
-                                    onCheckedChange={() => toggleAllInTopic(topic)}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                  {isExpanded ? (
-                                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                                  ) : (
-                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                  )}
-                                  <div className="text-left">
-                                    <CardTitle className="text-sm font-medium">{topic}</CardTitle>
-                                    <CardDescription className="text-xs">
-                                      {students.length} student{students.length !== 1 ? 's' : ''} at mastery level
-                                    </CardDescription>
-                                  </div>
+                  <div className="grid gap-3">
+                    {topics.map((topic) => {
+                      const studentCount = studentsByTopic[topic]?.length || 0;
+                      return (
+                        <Card 
+                          key={topic}
+                          className="cursor-pointer hover:border-amber-500 transition-colors"
+                          onClick={() => handleSelectTopic(topic)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                                  <BookOpen className="h-5 w-5 text-amber-600" />
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  {selectedInTopic > 0 && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      {selectedInTopic} selected
-                                    </Badge>
-                                  )}
-                                  <Badge className={cn('text-xs', LEVEL_COLORS['A'])}>
-                                    Level A
-                                  </Badge>
+                                <div>
+                                  <h4 className="font-medium">{topic}</h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    {studentCount} student{studentCount !== 1 ? 's' : ''} at mastery level
+                                  </p>
                                 </div>
                               </div>
-                            </CardHeader>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <CardContent className="pt-0">
-                              <div className="grid gap-2">
-                                {students.map(student => {
-                                  const isSelected = selectedStudents.some(
-                                    s => s.id === student.id && s.topicName === student.topicName
-                                  );
-
-                                  return (
-                                    <div
-                                      key={`${student.id}-${student.topicName}`}
-                                      className={cn(
-                                        'flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors',
-                                        isSelected 
-                                          ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800'
-                                          : 'hover:bg-muted/50'
-                                      )}
-                                      onClick={() => toggleStudent(student.id, student.topicName)}
-                                    >
-                                      <div className="flex items-center gap-3">
-                                        <Checkbox
-                                          checked={isSelected}
-                                          onCheckedChange={() => toggleStudent(student.id, student.topicName)}
-                                        />
-                                        <div>
-                                          <p className="font-medium text-sm">
-                                            {student.firstName} {student.lastName}
-                                          </p>
-                                          <p className="text-xs text-muted-foreground">
-                                            {student.latestGrade !== null && `Score: ${student.latestGrade}%`}
-                                          </p>
-                                        </div>
-                                      </div>
-                                      {isSelected && (
-                                        <Check className="h-4 w-4 text-amber-600" />
-                                      )}
-                                    </div>
-                                  );
-                                })}
+                              <div className="flex items-center gap-2">
+                                <Badge className={cn('text-xs', LEVEL_COLORS['A'])}>
+                                  Level A
+                                </Badge>
+                                <ArrowRight className="h-4 w-4 text-muted-foreground" />
                               </div>
-                            </CardContent>
-                          </CollapsibleContent>
+                            </div>
+                          </CardContent>
                         </Card>
-                      </Collapsible>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </ScrollArea>
 
             <DialogFooter>
               <Button variant="outline" onClick={handleClose}>Cancel</Button>
+            </DialogFooter>
+          </>
+        )}
+
+        {/* Step 2: Select Students from Topic */}
+        {step === 'students' && selectedTopic && (
+          <>
+            <ScrollArea className="flex-1 pr-4">
+              <div className="space-y-4">
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge className="bg-amber-500">{selectedTopic}</Badge>
+                    <Badge variant="outline">{studentsForSelectedTopic.length} students</Badge>
+                  </div>
+                  <h3 className="font-medium text-base mb-1">Step 2: Select Students</h3>
+                  <p className="text-sm text-muted-foreground">
+                    All students who mastered this topic are pre-selected. Uncheck any you want to exclude.
+                  </p>
+                </div>
+
+                <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          checked={selectedStudents.length === studentsForSelectedTopic.length}
+                          onCheckedChange={toggleAllStudents}
+                        />
+                        <span className="font-medium">Select All ({studentsForSelectedTopic.length})</span>
+                      </div>
+                      <Badge variant="secondary">
+                        {selectedStudents.length} selected
+                      </Badge>
+                    </div>
+                    
+                    <div className="grid gap-2">
+                      {studentsForSelectedTopic.map(student => {
+                        const isSelected = selectedStudents.some(s => s.id === student.id);
+                        
+                        return (
+                          <div
+                            key={student.id}
+                            className={cn(
+                              'flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors',
+                              isSelected 
+                                ? 'bg-white dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700'
+                                : 'bg-muted/30 hover:bg-muted/50'
+                            )}
+                            onClick={() => toggleStudent(student.id)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleStudent(student.id)}
+                              />
+                              <div>
+                                <p className="font-medium">
+                                  {student.firstName} {student.lastName}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {student.latestGrade !== null ? `Score: ${student.latestGrade}%` : 'Level A achieved'}
+                                </p>
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <Check className="h-5 w-5 text-amber-600" />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </ScrollArea>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setStep('topic');
+                setSelectedTopic(null);
+                setSelectedStudents([]);
+              }}>
+                Back
+              </Button>
               <Button 
                 onClick={() => setStep('configure')}
                 disabled={selectedStudents.length === 0}
@@ -477,11 +499,11 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
                       <span className="font-medium">Challenge for {selectedStudents.length} student(s)</span>
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {selectedTopics.map(topic => (
-                        <Badge key={topic} variant="outline" className="text-xs">
-                          {topic}
+                      {selectedTopic && (
+                        <Badge variant="outline" className="text-xs">
+                          {selectedTopic}
                         </Badge>
-                      ))}
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -578,7 +600,7 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
             </ScrollArea>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setStep('select')}>
+              <Button variant="outline" onClick={() => setStep('students')}>
                 Back
               </Button>
               <Button 
@@ -611,7 +633,7 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
                   <div className="flex items-center justify-between">
                     <div>
                       <h1 className="text-xl font-bold">Mastery Challenge</h1>
-                      <p className="text-sm text-gray-600">{selectedTopics.join(', ')}</p>
+                      <p className="text-sm text-gray-600">{selectedTopic || 'Mathematics'}</p>
                     </div>
                     <Badge className={cn('text-sm', LEVEL_COLORS['A'])}>
                       Level A - Advanced
@@ -665,7 +687,7 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
 
                 {/* Footer */}
                 <div className="mt-6 pt-4 border-t text-center text-xs text-gray-500">
-                  Mastery Challenge • {selectedTopics[0] || 'Mathematics'}
+                  Mastery Challenge • {selectedTopic || 'Mathematics'}
                 </div>
               </div>
             </ScrollArea>
