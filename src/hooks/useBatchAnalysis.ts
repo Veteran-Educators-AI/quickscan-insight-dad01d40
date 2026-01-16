@@ -110,6 +110,7 @@ interface UseBatchAnalysisReturn {
   scanAllQRCodes: (studentRoster: Student[]) => Promise<{ matched: number; total: number }>;
   detectPageTypes: () => Promise<{ newPapers: number; continuations: number }>;
   detectMultiPageByHandwriting: () => Promise<{ groupsCreated: number; pagesLinked: number }>;
+  groupPagesByStudent: () => { studentsGrouped: number; pagesLinked: number };
   linkContinuation: (continuationId: string, primaryId: string) => void;
   unlinkContinuation: (continuationId: string) => void;
   startBatchAnalysis: (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string, answerGuideImage?: string) => Promise<void>;
@@ -779,6 +780,65 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     });
   }, []);
 
+  // Group pages by the same student - automatically links front/back pages
+  const groupPagesByStudent = useCallback((): { studentsGrouped: number; pagesLinked: number } => {
+    // Build a map of studentId -> list of item indices (in order)
+    const studentPages: Map<string, number[]> = new Map();
+    
+    items.forEach((item, index) => {
+      const studentId = item.studentId || item.identification?.matchedStudentId;
+      if (studentId) {
+        const existing = studentPages.get(studentId) || [];
+        existing.push(index);
+        studentPages.set(studentId, existing);
+      }
+    });
+
+    let studentsGrouped = 0;
+    let pagesLinked = 0;
+
+    // For each student with multiple pages, link them
+    setItems(prev => {
+      const updated = [...prev];
+      
+      studentPages.forEach((indices, studentId) => {
+        if (indices.length <= 1) return; // Only one page, nothing to group
+        
+        studentsGrouped++;
+        const primaryIndex = indices[0]; // First page becomes primary
+        const primaryId = updated[primaryIndex].id;
+        const primaryItem = updated[primaryIndex];
+        
+        // Mark primary as 'new' with continuation pages
+        const continuationIds = indices.slice(1).map(idx => updated[idx].id);
+        updated[primaryIndex] = {
+          ...primaryItem,
+          pageType: 'new',
+          continuationOf: undefined,
+          continuationPages: continuationIds,
+        };
+
+        // Mark subsequent pages as continuations
+        indices.slice(1).forEach(idx => {
+          pagesLinked++;
+          updated[idx] = {
+            ...updated[idx],
+            pageType: 'continuation',
+            continuationOf: primaryId,
+            continuationPages: undefined,
+            // Ensure student info is consistent
+            studentId: primaryItem.studentId,
+            studentName: primaryItem.studentName,
+          };
+        });
+      });
+
+      return updated;
+    });
+
+    return { studentsGrouped, pagesLinked };
+  }, [items]);
+
   // Reorder items (drag and drop)
   const reorderItems = useCallback((activeId: string, overId: string) => {
     setItems(prev => {
@@ -1254,6 +1314,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     scanAllQRCodes,
     detectPageTypes,
     detectMultiPageByHandwriting,
+    groupPagesByStudent,
     linkContinuation,
     unlinkContinuation,
     startBatchAnalysis,
