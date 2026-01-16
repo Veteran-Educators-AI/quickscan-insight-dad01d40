@@ -42,6 +42,10 @@ interface MisconceptionData {
   description: string | null;
   confidence: number | null;
   topic_name: string | null;
+  standard: string | null;  // NYS standard code (e.g., "A.REI.4")
+  problem_set: string | null;  // Worksheet/problem set title
+  severity: string | null;  // high, medium, low
+  suggested_remedies: string[] | null;
 }
 
 interface GradeEntry {
@@ -248,6 +252,19 @@ serve(async (req) => {
       .select('student_id, attempt_misconceptions(misconception_id, confidence, misconception_tags(name, description, topics(name)))')
       .in('student_id', studentIds);
 
+    // Fetch analysis_misconceptions which have structured data including standards and remedies
+    const { data: analysisMisconceptions } = await supabase
+      .from('analysis_misconceptions')
+      .select('student_id, topic_name, misconception_text, severity, suggested_remedies, grade_history_id, grade_history(nys_standard, topic_name)')
+      .in('student_id', studentIds)
+      .eq('teacher_id', user.id);
+
+    // Fetch worksheets for problem set names
+    const { data: worksheets } = await supabase
+      .from('worksheets')
+      .select('id, title')
+      .eq('teacher_id', user.id);
+
     // Build comprehensive learning profiles for each student
     const studentProfiles: StudentLearningProfile[] = [];
     let totalMisconceptions = 0;
@@ -262,7 +279,7 @@ serve(async (req) => {
         ? Math.round(studentGrades.reduce((sum, g) => sum + g.grade, 0) / studentGrades.length)
         : 0;
 
-      // Extract misconceptions
+      // Extract misconceptions from attempt_misconceptions
       const misconceptions: MisconceptionData[] = [];
       const misconceptionSet = new Set<string>();
       
@@ -278,11 +295,43 @@ serve(async (req) => {
                 description: tag.description,
                 confidence: am.confidence,
                 topic_name: tag.topics?.name || null,
+                standard: null,
+                problem_set: null,
+                severity: null,
+                suggested_remedies: null,
               });
             }
           }
         }
       }
+
+      // Add misconceptions from analysis_misconceptions (has standards and remedies)
+      const studentAnalysisMisconceptions = (analysisMisconceptions || []).filter(m => m.student_id === student.id);
+      for (const am of studentAnalysisMisconceptions) {
+        const gradeHistory = am.grade_history as any;
+        const standard = gradeHistory?.nys_standard || null;
+        
+        // Find associated worksheet/problem set from grade history topic
+        const topicName = am.topic_name;
+        const associatedWorksheet = (worksheets || []).find(w => 
+          w.title?.toLowerCase().includes(topicName?.toLowerCase() || '')
+        );
+
+        if (!misconceptionSet.has(am.misconception_text)) {
+          misconceptionSet.add(am.misconception_text);
+          misconceptions.push({
+            name: am.misconception_text,
+            description: am.misconception_text,
+            confidence: null,
+            topic_name: am.topic_name,
+            standard: standard,
+            problem_set: associatedWorksheet?.title || null,
+            severity: am.severity,
+            suggested_remedies: am.suggested_remedies,
+          });
+        }
+      }
+
       totalMisconceptions += misconceptions.length;
 
       // Calculate weak topics (topics with avg < 70%)
@@ -479,6 +528,10 @@ serve(async (req) => {
           description: m.description,
           topic: m.topic_name,
           confidence: m.confidence,
+          standard: m.standard,
+          problem_set: m.problem_set,
+          severity: m.severity,
+          suggested_remedies: m.suggested_remedies,
         })),
         weak_topics: profile.weak_topics,
         remediation_recommendations: profile.recommended_remediation,
