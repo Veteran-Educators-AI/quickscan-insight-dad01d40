@@ -222,6 +222,8 @@ Return ONLY the JSON object, no markdown formatting or code blocks.`;
     
     // Clean up the response
     let cleanedResponse = aiResponse.trim();
+    
+    // Remove markdown code blocks
     if (cleanedResponse.startsWith("```json")) {
       cleanedResponse = cleanedResponse.slice(7);
     }
@@ -231,6 +233,13 @@ Return ONLY the JSON object, no markdown formatting or code blocks.`;
     if (cleanedResponse.endsWith("```")) {
       cleanedResponse = cleanedResponse.slice(0, -3);
     }
+    cleanedResponse = cleanedResponse.trim();
+    
+    // Remove JavaScript-style comments that AI sometimes includes
+    // Remove single-line comments like // comment
+    cleanedResponse = cleanedResponse.replace(/\/\/[^\n]*\n?/g, '');
+    // Remove multi-line comments like /* comment */
+    cleanedResponse = cleanedResponse.replace(/\/\*[\s\S]*?\*\//g, '');
     cleanedResponse = cleanedResponse.trim();
 
     let presentation: NycologicPresentation;
@@ -249,7 +258,7 @@ Return ONLY the JSON object, no markdown formatting or code blocks.`;
       }
       
     } catch (parseError) {
-      console.error("Failed to parse AI response:", cleanedResponse);
+      console.error("Failed to parse AI response:", cleanedResponse.substring(0, 1000));
       throw new Error("Failed to parse presentation from AI response");
     }
 
