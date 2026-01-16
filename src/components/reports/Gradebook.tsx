@@ -157,12 +157,48 @@ export function Gradebook({ classId }: GradebookProps) {
     enabled: !!user,
   });
 
-  // Get unique topics for filter
-  const uniqueTopics = useMemo(() => {
-    if (!grades) return [];
-    const topics = [...new Set(grades.map(g => g.topic_name))];
-    return topics.sort();
+  // Get unique topics for filter, grouped by standard
+  const topicsGroupedByStandard = useMemo(() => {
+    if (!grades) return { ungrouped: [], byStandard: {} as Record<string, { topic: string; standard: string }[]> };
+    
+    const topicMap = new Map<string, string>();
+    grades.forEach(g => {
+      if (!topicMap.has(g.topic_name)) {
+        topicMap.set(g.topic_name, g.nys_standard || '');
+      }
+    });
+    
+    const byStandard: Record<string, { topic: string; standard: string }[]> = {};
+    const ungrouped: { topic: string; standard: string }[] = [];
+    
+    topicMap.forEach((standard, topic) => {
+      const entry = { topic, standard };
+      if (standard) {
+        // Extract the standard prefix (e.g., "G.CO" from "G.CO.A.1")
+        const parts = standard.split('.');
+        const prefix = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : standard;
+        if (!byStandard[prefix]) {
+          byStandard[prefix] = [];
+        }
+        byStandard[prefix].push(entry);
+      } else {
+        ungrouped.push(entry);
+      }
+    });
+    
+    // Sort topics within each group
+    Object.keys(byStandard).forEach(key => {
+      byStandard[key].sort((a, b) => a.topic.localeCompare(b.topic));
+    });
+    ungrouped.sort((a, b) => a.topic.localeCompare(b.topic));
+    
+    return { ungrouped, byStandard };
   }, [grades]);
+
+  // Get sorted standard prefixes for display
+  const sortedStandardPrefixes = useMemo(() => {
+    return Object.keys(topicsGroupedByStandard.byStandard).sort();
+  }, [topicsGroupedByStandard]);
 
   // Filter and sort grades
   const filteredGrades = useMemo(() => {
@@ -410,15 +446,45 @@ export function Gradebook({ classId }: GradebookProps) {
                 />
               </div>
               <Select value={topicFilter} onValueChange={setTopicFilter}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger className="w-[280px]">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Filter by topic" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[400px]">
                   <SelectItem value="all">All Topics</SelectItem>
-                  {uniqueTopics.map(topic => (
-                    <SelectItem key={topic} value={topic}>{topic}</SelectItem>
+                  
+                  {/* Topics grouped by NYS Standard */}
+                  {sortedStandardPrefixes.map(prefix => (
+                    <div key={prefix}>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-primary bg-muted/50 sticky top-0">
+                        {prefix} Standards
+                      </div>
+                      {topicsGroupedByStandard.byStandard[prefix].map(({ topic, standard }) => (
+                        <SelectItem key={topic} value={topic} className="pl-4">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs font-mono shrink-0">
+                              {standard}
+                            </Badge>
+                            <span className="truncate">{topic}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </div>
                   ))}
+                  
+                  {/* Ungrouped topics (no standard) */}
+                  {topicsGroupedByStandard.ungrouped.length > 0 && (
+                    <div>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 sticky top-0">
+                        Other Topics
+                      </div>
+                      {topicsGroupedByStandard.ungrouped.map(({ topic }) => (
+                        <SelectItem key={topic} value={topic} className="pl-4">
+                          {topic}
+                        </SelectItem>
+                      ))}
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
               <Button variant="outline" onClick={handleExportCSV} disabled={!filteredGrades.length}>
