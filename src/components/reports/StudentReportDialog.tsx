@@ -156,11 +156,19 @@ interface StructuredMisconception {
   title: string;
   whatStudentDid: string;
   whatWasExpected: string;
+  whyItMatters: string;
   severity: 'high' | 'medium' | 'low';
   topic: string;
   grade: number;
   date: string;
   standard?: string | null;
+}
+
+interface MisconceptionDetailTemplate {
+  error: string;
+  expected: string;
+  why: string;
+  expectedKeywords?: string[];
 }
 
 // Extract structured misconceptions from grade justification text
@@ -188,10 +196,13 @@ const extractStructuredMisconceptions = (justification: string, topic: string, g
       const whatWasExpected = match[2].trim();
       
       if (whatStudentDid.length > 5 && whatWasExpected.length > 3) {
+        const title = identifyMisconceptionType(whatStudentDid + ' ' + whatWasExpected);
+        const detailed = buildDetailedMisconception(whatStudentDid, whatWasExpected, title);
         misconceptions.push({
-          title: identifyMisconceptionType(whatStudentDid + ' ' + whatWasExpected),
-          whatStudentDid,
-          whatWasExpected,
+          title,
+          whatStudentDid: detailed.whatStudentDid,
+          whatWasExpected: detailed.whatWasExpected,
+          whyItMatters: detailed.whyItMatters,
           severity: determineSeverity(whatStudentDid, grade),
           topic,
           grade,
@@ -229,6 +240,7 @@ const extractStructuredMisconceptions = (justification: string, topic: string, g
             title: structured.title,
             whatStudentDid: structured.whatStudentDid,
             whatWasExpected: structured.whatWasExpected,
+            whyItMatters: structured.whyItMatters,
             severity: determineSeverity(errorDescription, grade),
             topic,
             grade,
@@ -270,12 +282,169 @@ const identifyMisconceptionType = (text: string): string => {
   if (/exponent|power|base/.test(textLower)) return 'Exponent Rule Error';
   if (/calculation|arithmetic|compute|multiply|divide|add|subtract/.test(textLower)) return 'Calculation Error';
   if (/formula|apply|use.*wrong/.test(textLower)) return 'Formula Application Error';
-  if (/unit|convert|measurement/.test(textLower)) return 'Unit Conversion Error';
+  if (/convert|conversion/.test(textLower)) return 'Unit Conversion Error';
+  if (/unit|units|measurement|format|formatted|label|notation|percent|percentage|dollar|usd|\$/.test(textLower)) {
+    return 'Unit/Format Error';
+  }
   if (/incomplete|missing.*work|show.*work/.test(textLower)) return 'Incomplete Work';
   if (/setup|translate|word.*problem/.test(textLower)) return 'Problem Setup Error';
   if (/concept|understand|misunderstand/.test(textLower)) return 'Conceptual Misunderstanding';
   
   return 'Mathematical Error';
+};
+
+const MISCONCEPTION_DETAIL_TEMPLATES: Record<string, MisconceptionDetailTemplate> = {
+  'Sign Error': {
+    error: 'Applied the wrong sign when combining terms, which changes the direction or value of the result.',
+    expected: 'Track signs at each step and apply sign rules (negative x negative = positive, negative x positive = negative).',
+    why: 'A sign mistake flips the value even if the setup is correct.',
+    expectedKeywords: ['sign', 'negative', 'positive'],
+  },
+  'Order of Operations Error': {
+    error: 'Performed operations in the wrong sequence when simplifying the expression.',
+    expected: 'Use PEMDAS: parentheses, exponents, multiply/divide left to right, then add/subtract left to right.',
+    why: 'Changing the order of operations produces a different result even with correct numbers.',
+    expectedKeywords: ['pemdas', 'order', 'operations'],
+  },
+  'Fraction Misconception': {
+    error: 'Used an incorrect procedure for fraction operations (such as adding denominators directly).',
+    expected: 'Add or subtract by finding a common denominator; multiply across; divide by multiplying by the reciprocal.',
+    why: 'Each fraction operation has specific rules; skipping them changes the value.',
+    expectedKeywords: ['denominator', 'reciprocal', 'fraction'],
+  },
+  'Decimal Place Value Error': {
+    error: 'Misplaced the decimal point or misread place value during computation.',
+    expected: 'Align decimals, track place value in each step, and check reasonableness with estimation.',
+    why: 'A decimal shift changes the magnitude, so the final value is incorrect.',
+    expectedKeywords: ['decimal', 'place'],
+  },
+  'Variable/Expression Error': {
+    error: 'Manipulated the algebraic expression incorrectly (combined unlike terms or distributed incompletely).',
+    expected: 'Combine only like terms and distribute to every term in the parentheses.',
+    why: 'Expression errors propagate and invalidate the final answer.',
+    expectedKeywords: ['like terms', 'distribute'],
+  },
+  'Equation Solving Error': {
+    error: 'Applied inverse operations inconsistently while isolating the variable.',
+    expected: 'Perform the same inverse operation on both sides and verify by substitution.',
+    why: 'Unequal operations lead to an incorrect solution value.',
+    expectedKeywords: ['both sides', 'inverse', 'substitution'],
+  },
+  'Graphing Error': {
+    error: 'Plotted points incorrectly or misidentified slope/intercept.',
+    expected: 'Compute slope as rise/run and plot the correct intercept before drawing the line.',
+    why: 'Graphing mistakes misrepresent the relationship.',
+    expectedKeywords: ['slope', 'intercept'],
+  },
+  'Exponent Rule Error': {
+    error: 'Applied exponent rules incorrectly.',
+    expected: 'Use exponent laws: multiply same base -> add exponents; power of a power -> multiply exponents; distribute to each factor.',
+    why: 'Exponent rule mistakes change the magnitude quickly.',
+    expectedKeywords: ['exponent', 'base', 'power'],
+  },
+  'Calculation Error': {
+    error: 'Made an arithmetic error during computation.',
+    expected: 'Recalculate step-by-step, check with estimation, and verify using inverse operations.',
+    why: 'A single arithmetic slip invalidates an otherwise correct method.',
+    expectedKeywords: ['recalculate', 'inverse', 'estimate'],
+  },
+  'Formula Application Error': {
+    error: 'Selected or applied the wrong formula for the problem.',
+    expected: 'Identify the quantity being asked, choose the correct formula, and substitute values carefully.',
+    why: 'The wrong formula guarantees an incorrect result.',
+    expectedKeywords: ['formula', 'substitute'],
+  },
+  'Unit Conversion Error': {
+    error: 'Converted between units incorrectly or used the wrong conversion factor.',
+    expected: 'Use the correct conversion factor and carry units through each step.',
+    why: 'An incorrect conversion produces the wrong magnitude.',
+    expectedKeywords: ['conversion', 'factor', 'units'],
+  },
+  'Unit/Format Error': {
+    error: 'Reported the final answer in the wrong unit or format (for example, percent instead of dollars).',
+    expected: 'Convert to the requested unit and label the final answer clearly.',
+    why: 'Scoring requires the final response to match the requested units and format; otherwise the solution is incomplete.',
+    expectedKeywords: ['unit', 'format', 'percent', 'dollar'],
+  },
+  'Incomplete Work': {
+    error: 'Omitted required steps or stopped before completing the solution.',
+    expected: 'Show all steps, calculations, and units, then state the final answer clearly.',
+    why: 'Without complete work, full credit cannot be awarded.',
+    expectedKeywords: ['show', 'steps', 'work'],
+  },
+  'Problem Setup Error': {
+    error: 'Set up the equation or model incorrectly based on the prompt.',
+    expected: 'Translate the prompt into an accurate equation or model using the given quantities.',
+    why: 'A wrong setup leads to a wrong solution even with correct arithmetic.',
+    expectedKeywords: ['equation', 'model', 'translate'],
+  },
+  'Conceptual Misunderstanding': {
+    error: 'Applied the wrong concept or misinterpreted the underlying idea.',
+    expected: 'Select the concept that matches the problem type and justify the choice.',
+    why: 'Using the wrong concept leads to the wrong method and answer.',
+    expectedKeywords: ['concept', 'justify'],
+  },
+  'Mathematical Error': {
+    error: 'Work contains a mathematical error that changes the final result.',
+    expected: 'Re-check each step, confirm operations, and verify the final answer.',
+    why: 'Any incorrect step causes point deductions.',
+    expectedKeywords: ['re-check', 'verify'],
+  },
+  default: {
+    error: 'Work contains a mathematical error that changes the final result.',
+    expected: 'Re-check each step, confirm operations, and verify the final answer.',
+    why: 'Any incorrect step causes point deductions.',
+    expectedKeywords: ['re-check', 'verify'],
+  },
+};
+
+const cleanDetailText = (text: string): string => {
+  return text.replace(/\s+/g, ' ').replace(/^["']+|["']+$/g, '').trim();
+};
+
+const ensureSentence = (text: string): string => {
+  if (!text) return '';
+  const cleaned = cleanDetailText(text);
+  if (!cleaned) return '';
+  const normalized = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  return /[.!?]$/.test(normalized) ? normalized : `${normalized}.`;
+};
+
+const isGenericDetail = (text: string): boolean => {
+  if (!text) return true;
+  const lower = text.toLowerCase();
+  const hasSpecificCue = /(\d|%|\$|instead of|rather than|because|when|while)/.test(lower);
+  if (hasSpecificCue) return false;
+  return text.length < 30 || /use (the )?correct|correct answer|correct approach|mathematical error|calculation error|procedural error|made a mistake|made an error|was wrong|is incorrect/.test(lower);
+};
+
+const containsAnyKeyword = (text: string, keywords: string[] = []): boolean => {
+  const lower = text.toLowerCase();
+  return keywords.some((keyword) => lower.includes(keyword));
+};
+
+const buildDetailedMisconception = (
+  rawDid: string,
+  rawExpected: string,
+  misconceptionType: string
+): { whatStudentDid: string; whatWasExpected: string; whyItMatters: string } => {
+  const template = MISCONCEPTION_DETAIL_TEMPLATES[misconceptionType] || MISCONCEPTION_DETAIL_TEMPLATES.default;
+  const cleanedDid = cleanDetailText(rawDid);
+  const cleanedExpected = cleanDetailText(rawExpected);
+
+  const whatStudentDid = isGenericDetail(cleanedDid) ? template.error : ensureSentence(cleanedDid);
+  const expectedIsGeneric = isGenericDetail(cleanedExpected);
+  let whatWasExpected = expectedIsGeneric ? template.expected : ensureSentence(cleanedExpected);
+
+  if (!expectedIsGeneric && template.expected && !containsAnyKeyword(whatWasExpected, template.expectedKeywords)) {
+    whatWasExpected = `${whatWasExpected} ${template.expected}`;
+  }
+
+  return {
+    whatStudentDid,
+    whatWasExpected,
+    whyItMatters: template.why,
+  };
 };
 
 // Determine severity based on error type and grade
@@ -300,7 +469,10 @@ const determineSeverity = (errorText: string, grade: number): 'high' | 'medium' 
 };
 
 // Parse an error description into structured format
-const parseErrorIntoStructure = (errorDescription: string, fullJustification: string): { title: string; whatStudentDid: string; whatWasExpected: string } => {
+const parseErrorIntoStructure = (
+  errorDescription: string,
+  fullJustification: string
+): { title: string; whatStudentDid: string; whatWasExpected: string; whyItMatters: string } => {
   const errorLower = errorDescription.toLowerCase();
   
   // Try to find the expected behavior from context
@@ -329,10 +501,14 @@ const parseErrorIntoStructure = (errorDescription: string, fullJustification: st
     whatWasExpected = 'Show complete work with all steps justified';
   }
   
+  const title = identifyMisconceptionType(errorDescription);
+  const detailed = buildDetailedMisconception(errorDescription, whatWasExpected, title);
+
   return {
-    title: identifyMisconceptionType(errorDescription),
-    whatStudentDid: capitalizeFirst(errorDescription),
-    whatWasExpected,
+    title,
+    whatStudentDid: detailed.whatStudentDid,
+    whatWasExpected: detailed.whatWasExpected,
+    whyItMatters: detailed.whyItMatters,
   };
 };
 
@@ -352,6 +528,7 @@ const parseJustificationIntoMisconception = (justification: string, grade: numbe
         title: parsed.title,
         whatStudentDid: parsed.whatStudentDid,
         whatWasExpected: parsed.whatWasExpected,
+        whyItMatters: parsed.whyItMatters,
         severity: determineSeverity(trimmed, grade),
         grade,
       };
@@ -359,12 +536,6 @@ const parseJustificationIntoMisconception = (justification: string, grade: numbe
   }
   
   return null;
-};
-
-// Capitalize first letter
-const capitalizeFirst = (str: string): string => {
-  if (!str) return str;
-  return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
 export function StudentReportDialog({
@@ -1501,7 +1672,7 @@ export function StudentReportDialog({
                                   item.severity === 'medium' && 'text-yellow-600',
                                   item.severity === 'low' && 'text-green-600'
                                 )} />
-                                <div className="flex-1">
+                                <div className="flex-1 min-w-0">
                                   <p className={cn(
                                     "font-semibold",
                                     item.severity === 'high' && 'text-red-900 dark:text-red-100',
@@ -1545,25 +1716,38 @@ export function StudentReportDialog({
                               </div>
                               
                               {/* What Student Did vs What Was Expected */}
-                              <div className="ml-7 space-y-2">
-                                <div className="p-3 bg-red-50/70 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
-                                  <div className="flex items-center gap-2 text-sm font-medium mb-1 text-red-700 dark:text-red-300">
-                                    <X className="h-4 w-4" />
-                                    What the Student Did Wrong
+                              <div className="ml-7 space-y-3">
+                                <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50/70 dark:bg-red-950/30 p-3">
+                                  <div className="flex items-start gap-2">
+                                    <X className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+                                    <div className="min-w-0 space-y-1.5">
+                                      <p className="text-xs font-semibold text-red-700 dark:text-red-300">
+                                        What the Student Did Wrong
+                                      </p>
+                                      <p className="text-sm text-red-700/90 dark:text-red-200/90 leading-relaxed break-words whitespace-normal">
+                                        {item.whatStudentDid}
+                                      </p>
+                                      {item.whyItMatters && (
+                                        <p className="text-xs text-red-600/80 dark:text-red-300/80 italic border-t border-red-200/60 dark:border-red-800/60 pt-2">
+                                          Reasoning: {item.whyItMatters}
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
-                                  <p className="text-sm text-red-600 dark:text-red-400">
-                                    {item.whatStudentDid}
-                                  </p>
                                 </div>
                                 
-                                <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                                  <div className="flex items-center gap-2 text-sm font-medium mb-1 text-emerald-700 dark:text-emerald-300">
-                                    <Target className="h-4 w-4" />
-                                    What Was Expected
+                                <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/30 p-3">
+                                  <div className="flex items-start gap-2">
+                                    <Target className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
+                                    <div className="min-w-0 space-y-1.5">
+                                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                        What Was Expected
+                                      </p>
+                                      <p className="text-sm text-emerald-700/90 dark:text-emerald-200/90 leading-relaxed break-words whitespace-normal">
+                                        {item.whatWasExpected}
+                                      </p>
+                                    </div>
                                   </div>
-                                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                                    {item.whatWasExpected}
-                                  </p>
                                 </div>
                               </div>
                               
@@ -1626,11 +1810,20 @@ export function StudentReportDialog({
                                 item.severity === 'medium' && 'text-yellow-500',
                                 item.severity === 'low' && 'text-green-500'
                               )} />
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium">{item.title}</p>
                                 <div className="text-xs mt-1 space-y-1">
-                                  <p className="text-red-600 dark:text-red-400">❌ {item.whatStudentDid}</p>
-                                  <p className="text-green-600 dark:text-green-400">✓ {item.whatWasExpected}</p>
+                                  <p className="text-red-600 dark:text-red-400 break-words whitespace-normal leading-relaxed">
+                                    ❌ {item.whatStudentDid}
+                                  </p>
+                                  <p className="text-green-600 dark:text-green-400 break-words whitespace-normal leading-relaxed">
+                                    ✓ {item.whatWasExpected}
+                                  </p>
+                                  {item.whyItMatters && (
+                                    <p className="text-muted-foreground break-words whitespace-normal leading-relaxed">
+                                      Why this matters: {item.whyItMatters}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-1 mt-2">
                                   <Badge variant="outline" className="text-xs">{item.topic}</Badge>
