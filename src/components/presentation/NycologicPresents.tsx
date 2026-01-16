@@ -60,19 +60,19 @@ const slideIcons = {
   sparkles: Sparkles,
 };
 
-// Default slide type colors (used as fallback)
-const defaultSlideTypeColors: Record<PresentationSlide['type'], { bg: string; accent: string }> = {
-  title: { bg: 'from-slate-900 via-slate-800 to-slate-900', accent: 'text-amber-400' },
-  content: { bg: 'from-slate-900 via-blue-950 to-slate-900', accent: 'text-sky-400' },
-  question: { bg: 'from-slate-900 via-purple-950 to-slate-900', accent: 'text-violet-400' },
-  reveal: { bg: 'from-slate-900 via-emerald-950 to-slate-900', accent: 'text-emerald-400' },
-  summary: { bg: 'from-slate-900 via-amber-950 to-slate-900', accent: 'text-amber-400' },
-  interactive: { bg: 'from-slate-900 via-rose-950 to-slate-900', accent: 'text-rose-400' },
+// Default presentation colors - deep navy with gold accents (like reference site)
+const defaultSlideTypeColors: Record<PresentationSlide['type'], { bg: string; accent: string; bgStyle: string }> = {
+  title: { bg: 'from-[#0a1628] via-[#0f1f3a] to-[#0a1628]', accent: 'text-amber-400', bgStyle: '#0f172a' },
+  content: { bg: 'from-[#0a1628] via-[#0f1f3a] to-[#0a1628]', accent: 'text-amber-400', bgStyle: '#0f172a' },
+  question: { bg: 'from-[#0a1628] via-[#0f1f3a] to-[#0a1628]', accent: 'text-amber-400', bgStyle: '#0f172a' },
+  reveal: { bg: 'from-[#0a1628] via-[#0f1f3a] to-[#0a1628]', accent: 'text-emerald-400', bgStyle: '#0f172a' },
+  summary: { bg: 'from-[#0a1628] via-[#0f1f3a] to-[#0a1628]', accent: 'text-amber-400', bgStyle: '#0f172a' },
+  interactive: { bg: 'from-[#0a1628] via-[#0f1f3a] to-[#0a1628]', accent: 'text-rose-400', bgStyle: '#0f172a' },
 };
 
-// Theme accent color mapping
+// Theme accent color mapping - updated for premium look
 const themeAccentColors: Record<string, string> = {
-  'neon-city': 'text-pink-400',
+  'neon-city': 'text-amber-400',
   'ocean-wave': 'text-cyan-400',
   'sunset-glow': 'text-amber-400',
   'forest-zen': 'text-emerald-400',
@@ -237,25 +237,32 @@ export function NycologicPresents({
 
   return (
     <div 
-      className={cn(
-        "fixed inset-0 z-[9999] w-screen h-screen",
-        visualTheme ? `bg-gradient-to-br ${visualTheme.gradient}` : `bg-gradient-to-br ${colors.bg}`
-      )}
+      className="fixed inset-0 z-[9999] w-screen h-screen overflow-hidden"
       style={{ 
-        ...(visualTheme ? { backgroundImage: visualTheme.pattern } : {}),
+        background: visualTheme 
+          ? `linear-gradient(135deg, ${visualTheme.gradient.includes('purple') ? '#1a0a2e' : '#0a1628'} 0%, ${visualTheme.gradient.includes('purple') ? '#2d1b4e' : '#0f1f3a'} 50%, ${visualTheme.gradient.includes('purple') ? '#1a0a2e' : '#0a1628'} 100%)`
+          : 'linear-gradient(135deg, #0a1628 0%, #0f1f3a 50%, #0a1628 100%)',
         minHeight: '100vh',
         minWidth: '100vw',
       }}
     >
-      {/* Animated background particles - larger and more visible */}
+      {/* Subtle radial glow effect */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(251, 191, 36, 0.08) 0%, transparent 60%), radial-gradient(ellipse at 50% 100%, rgba(251, 191, 36, 0.05) 0%, transparent 50%)',
+        }}
+      />
+
+      {/* Minimal floating particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(30)].map((_, i) => (
+        {[...Array(15)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute rounded-full bg-white/20"
+            className="absolute rounded-full bg-amber-400/10"
             style={{
-              width: `${4 + Math.random() * 8}px`,
-              height: `${4 + Math.random() * 8}px`,
+              width: `${2 + Math.random() * 4}px`,
+              height: `${2 + Math.random() * 4}px`,
             }}
             initial={{ 
               x: `${Math.random() * 100}%`, 
@@ -263,40 +270,56 @@ export function NycologicPresents({
               opacity: 0 
             }}
             animate={{ 
-              y: [`${Math.random() * 100}%`, `${Math.random() * 100 - 20}%`],
-              opacity: [0, 0.6, 0],
+              y: [`${Math.random() * 100}%`, `${Math.random() * 100 - 30}%`],
+              opacity: [0, 0.4, 0],
             }}
             transition={{ 
-              duration: 4 + Math.random() * 3, 
+              duration: 6 + Math.random() * 4, 
               repeat: Infinity,
-              delay: Math.random() * 3 
+              delay: Math.random() * 4 
             }}
           />
         ))}
       </div>
 
-      {/* Decorative gradient orbs */}
+      {/* Subtle corner accents */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 rounded-full bg-white/5 blur-3xl" />
-        <div className="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 rounded-full bg-white/5 blur-3xl" />
+        <div className="absolute -top-1/3 -left-1/4 w-1/2 h-1/2 rounded-full bg-amber-500/5 blur-[120px]" />
+        <div className="absolute -bottom-1/3 -right-1/4 w-1/2 h-1/2 rounded-full bg-amber-500/5 blur-[120px]" />
       </div>
 
-      {/* Header - more prominent */}
+      {/* Header - clean and minimal */}
       <motion.header 
-        initial={{ y: -50, opacity: 0 }}
+        initial={{ y: -30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 md:px-12 py-6 z-20"
+        transition={{ duration: 0.5 }}
+        className="absolute top-0 left-0 right-0 flex items-center justify-between px-8 md:px-16 py-6 z-20"
       >
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center gap-6">
+          {/* Logo and brand */}
+          <div className="flex items-center gap-4">
+            <img 
+              src={nyclogicLogo} 
+              alt="NYClogic" 
+              className="h-14 w-14 md:h-16 md:w-16 drop-shadow-2xl"
+            />
+            <div className="hidden sm:block">
+              <p className="text-amber-400 text-xs md:text-sm font-bold tracking-[0.3em] uppercase">
+                NYClogic PRESENTS
+              </p>
+            </div>
+          </div>
+          
+          {/* Control buttons */}
+          <div className="flex items-center gap-1 ml-4">
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="text-white/80 hover:text-white hover:bg-white/20 h-12 w-12"
+              className="text-white/60 hover:text-white hover:bg-white/10 h-10 w-10 rounded-full"
               title="Close presentation"
             >
-              <X className="h-6 w-6" />
+              <X className="h-5 w-5" />
             </Button>
             {onMinimize && (
               <Button
@@ -306,25 +329,16 @@ export function NycologicPresents({
                   onSave?.(presentation);
                   onMinimize();
                 }}
-                className="text-white/80 hover:text-white hover:bg-white/20 h-12 w-12"
+                className="text-white/60 hover:text-white hover:bg-white/10 h-10 w-10 rounded-full"
                 title="Minimize to builder"
               >
-                <Minimize2 className="h-5 w-5" />
+                <Minimize2 className="h-4 w-4" />
               </Button>
             )}
           </div>
-          <div className="flex items-center gap-3">
-            <img src={nyclogicLogo} alt="NYClogic" className="h-12 w-12 drop-shadow-lg" />
-            <div>
-              <p className={cn("text-sm font-bold tracking-[0.2em] uppercase drop-shadow-md", colors.accent)}>
-                NYClogic PRESENTS
-              </p>
-              <h1 className="text-white font-serif text-xl md:text-2xl drop-shadow-lg">{presentation.title}</h1>
-            </div>
-          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Export dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -332,10 +346,10 @@ export function NycologicPresents({
                 variant="ghost"
                 size="sm"
                 disabled={isExporting}
-                className="text-white/80 hover:text-white hover:bg-white/20 h-10 px-4"
+                className="text-white/60 hover:text-white hover:bg-white/10 h-10 px-3 rounded-full"
               >
-                <Download className="h-5 w-5 mr-2" />
-                {isExporting ? 'Exporting...' : 'Export'}
+                <Download className="h-4 w-4 mr-2" />
+                <span className="hidden md:inline">{isExporting ? 'Exporting...' : 'Export'}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -355,17 +369,17 @@ export function NycologicPresents({
               variant="ghost"
               size="sm"
               onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-              className="text-white/80 hover:text-white hover:bg-white/20 h-10 px-4"
+              className="text-white/60 hover:text-white hover:bg-white/10 h-10 px-3 rounded-full"
             >
               {isEditing ? (
                 <>
-                  <Check className="h-5 w-5 mr-2" />
-                  Save
+                  <Check className="h-4 w-4 mr-2" />
+                  <span className="hidden md:inline">Save</span>
                 </>
               ) : (
                 <>
-                  <Edit3 className="h-5 w-5 mr-2" />
-                  Edit
+                  <Edit3 className="h-4 w-4 mr-2" />
+                  <span className="hidden md:inline">Edit</span>
                 </>
               )}
             </Button>
@@ -374,85 +388,82 @@ export function NycologicPresents({
             variant="ghost"
             size="icon"
             onClick={() => setIsMuted(!isMuted)}
-            className="text-white/80 hover:text-white hover:bg-white/20 h-12 w-12"
+            className="text-white/60 hover:text-white hover:bg-white/10 h-10 w-10 rounded-full"
           >
-            {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleFullscreen}
-            className="text-white/80 hover:text-white hover:bg-white/20 h-12 w-12"
+            className="text-white/60 hover:text-white hover:bg-white/10 h-10 w-10 rounded-full"
           >
-            {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </Button>
         </div>
       </motion.header>
 
-      {/* Navigation arrows - larger and more visible */}
+      {/* Navigation arrows - elegant circular design */}
       <button
         onClick={prevSlide}
         disabled={currentSlide === 0}
         className={cn(
-          "absolute left-6 md:left-12 top-1/2 -translate-y-1/2 z-20",
-          "w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center",
-          "transition-all duration-300 backdrop-blur-sm",
+          "absolute left-8 md:left-16 top-1/2 -translate-y-1/2 z-20",
+          "w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center",
+          "transition-all duration-300 border-2",
           currentSlide === 0 
-            ? "opacity-20 cursor-not-allowed" 
-            : "bg-white/10 hover:bg-white/20 text-white/80 hover:text-white hover:scale-110 shadow-2xl"
+            ? "opacity-20 cursor-not-allowed border-white/20" 
+            : "border-white/30 hover:border-amber-400/60 text-white/70 hover:text-amber-400 hover:scale-105"
         )}
       >
-        <ChevronLeft className="h-8 w-8 md:h-10 md:w-10" />
+        <ChevronLeft className="h-6 w-6 md:h-7 md:w-7" />
       </button>
 
       <button
         onClick={nextSlide}
         disabled={currentSlide === totalSlides - 1}
         className={cn(
-          "absolute right-6 md:right-12 top-1/2 -translate-y-1/2 z-20",
-          "w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center",
-          "transition-all duration-300 backdrop-blur-sm",
+          "absolute right-8 md:right-16 top-1/2 -translate-y-1/2 z-20",
+          "w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center",
+          "transition-all duration-300 border-2",
           currentSlide === totalSlides - 1 
-            ? "opacity-20 cursor-not-allowed" 
-            : "bg-white/10 hover:bg-white/20 text-white/80 hover:text-white hover:scale-110 shadow-2xl"
+            ? "opacity-20 cursor-not-allowed border-white/20" 
+            : "border-white/30 hover:border-amber-400/60 text-white/70 hover:text-amber-400 hover:scale-105"
         )}
       >
-        <ChevronRight className="h-8 w-8 md:h-10 md:w-10" />
+        <ChevronRight className="h-6 w-6 md:h-7 md:w-7" />
       </button>
 
-      {/* Main content - truly fullscreen */}
-      <main className="absolute inset-0 flex items-center justify-center px-24 md:px-32 lg:px-40 py-28 md:py-32">
+      {/* Main content - centered fullscreen */}
+      <main className="absolute inset-0 flex items-center justify-center px-28 md:px-36 lg:px-48 py-24 md:py-28">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentSlide}
-            initial={{ opacity: 0, y: 30, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -30, scale: 0.95 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
             className="w-full h-full flex flex-col items-center justify-center text-center"
           >
-            {/* Icon - larger */}
+            {/* Icon - subtle */}
             {IconComponent && (
               <motion.div 
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: "spring" }}
-                className={cn(
-                  "mx-auto mb-8 w-24 h-24 md:w-28 md:h-28 rounded-3xl flex items-center justify-center",
-                  "bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-md shadow-2xl"
-                )}
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="mx-auto mb-6"
               >
-                <IconComponent className={cn("h-12 w-12 md:h-14 md:w-14", colors.accent)} />
+                <IconComponent className="h-10 w-10 md:h-12 md:w-12 text-amber-400/80" />
               </motion.div>
             )}
 
-            {/* Subtitle/Topic tag - larger */}
+            {/* Subtitle tag */}
             {slide.subtitle && (
               <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={{ delay: 0.1 }}
-                className={cn("text-base md:text-lg font-bold tracking-[0.25em] uppercase mb-6 drop-shadow-lg", colors.accent)}
+                className="text-amber-400 text-sm md:text-base font-semibold tracking-[0.25em] uppercase mb-4"
               >
                 {isEditing && editingField === 'subtitle' ? (
                   <Input
@@ -460,7 +471,7 @@ export function NycologicPresents({
                     onChange={(e) => updateSlide('subtitle', e.target.value)}
                     onBlur={() => setEditingField(null)}
                     autoFocus
-                    className="bg-white/10 border-white/20 text-white text-center max-w-lg mx-auto text-lg"
+                    className="bg-white/10 border-white/20 text-white text-center max-w-lg mx-auto"
                   />
                 ) : (
                   <span 
@@ -473,12 +484,12 @@ export function NycologicPresents({
               </motion.p>
             )}
 
-            {/* Title - much larger */}
+            {/* Title - elegant serif with gold highlights */}
             <motion.h2
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="font-serif text-5xl md:text-6xl lg:text-7xl xl:text-8xl text-white mb-10 leading-tight drop-shadow-2xl"
+              transition={{ delay: 0.15 }}
+              className="font-serif text-4xl md:text-5xl lg:text-6xl xl:text-7xl text-white mb-8 leading-tight max-w-5xl"
             >
               {isEditing && editingField === 'title' ? (
                 <Textarea
@@ -486,7 +497,7 @@ export function NycologicPresents({
                   onChange={(e) => updateSlide('title', e.target.value)}
                   onBlur={() => setEditingField(null)}
                   autoFocus
-                  className="bg-white/10 border-white/20 text-white text-center text-5xl font-serif resize-none"
+                  className="bg-white/10 border-white/20 text-white text-center text-4xl font-serif resize-none"
                   rows={2}
                 />
               ) : (
@@ -496,7 +507,7 @@ export function NycologicPresents({
                   dangerouslySetInnerHTML={{ 
                     __html: slide.title.replace(
                       /\*\*(.*?)\*\*/g, 
-                      `<span class="${colors.accent}">$1</span>`
+                      '<span class="text-amber-400">$1</span>'
                     )
                   }}
                 />
