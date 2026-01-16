@@ -213,6 +213,7 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
         <NycologicPresents
           presentation={presentation}
           onClose={() => setShowPresentation(false)}
+          onMinimize={() => setShowPresentation(false)}
           onSave={handlePresentationSave}
           isEditable={true}
         />
