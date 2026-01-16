@@ -13,6 +13,8 @@ import {
   FileSpreadsheet,
   Loader2,
   GraduationCap,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -47,9 +49,10 @@ interface GradeWithStudent {
 interface ExtractedMisconception {
   title: string;
   category: string;
-  whatStudentDid: string;
-  whatWasExpected: string;
-  exactQuote: string;
+  specificError: string; // What exactly the student did wrong - with evidence
+  evidenceQuote: string; // Direct quote or citation from student work
+  expectedAction: string; // What they should have done instead - specific correction
+  whyItMatters: string; // Why this error caused point deduction
   severity: 'high' | 'medium' | 'low';
   studentName: string;
   studentId: string;
@@ -68,48 +71,6 @@ interface GroupedMisconception {
   commonTopics: string[];
   suggestedRemedies: string[];
 }
-
-// Extract exact quote from justification
-const extractExactQuote = (justification: string): string => {
-  // Look for quoted text
-  const quotePatterns = [
-    /"([^"]{10,200})"/,
-    /'([^']{10,200})'/,
-    /student (?:wrote|answered|said|responded)(?:\s*:)?\s*["']?([^"'\n.]{10,150})["']?/i,
-    /(?:their|the) (?:answer|response|work|solution)(?:\s*(?:was|is|reads?|stated?|showed?))?\s*[:"]?\s*["']?([^"'\n.]{10,150})["']?/i,
-    /(?:wrote|stated|answered|responded)\s*[:"]?\s*["']?([^"'\n.]{10,150})["']?/i,
-  ];
-  
-  for (const pattern of quotePatterns) {
-    const match = justification.match(pattern);
-    if (match && match[1]) {
-      return `"${match[1].trim()}"`;
-    }
-  }
-  
-  // If no explicit quote, try to find the error description
-  const errorDescPatterns = [
-    /(?:error|mistake|incorrect)(?:\s*[:\-])?\s*(.{15,100}?)(?:\.|$)/i,
-    /(?:student)?\s*(?:incorrectly|wrongly)\s+(.{15,100}?)(?:\.|$)/i,
-  ];
-  
-  for (const pattern of errorDescPatterns) {
-    const match = justification.match(pattern);
-    if (match && match[1]) {
-      return match[1].trim();
-    }
-  }
-  
-  // Extract a meaningful sentence that contains error indicators
-  const sentences = justification.split(/[.!?]+/).filter(s => s.trim().length > 15);
-  for (const sentence of sentences) {
-    if (/error|mistake|incorrect|wrong|forgot|missed|omit/i.test(sentence)) {
-      return sentence.trim().substring(0, 150);
-    }
-  }
-  
-  return justification.substring(0, 100).trim() + '...';
-};
 
 // Identify misconception category
 const identifyMisconceptionCategory = (text: string): { category: string; title: string } => {
@@ -149,7 +110,7 @@ const identifyMisconceptionCategory = (text: string): { category: string; title:
     return { category: 'Ratios & Proportions', title: 'Ratio and proportion errors' };
   }
   if (/calculation|arithmetic|compute|multiply|divide|add|subtract/.test(textLower)) {
-    return { category: 'Arithmetic', title: 'Basic calculation errors' };
+    return { category: 'Calculation Error', title: 'Arithmetic or calculation mistakes' };
   }
   if (/formula|apply|use.*wrong|incorrect.*formula/.test(textLower)) {
     return { category: 'Formula Application', title: 'Incorrect formula usage' };
@@ -184,7 +145,7 @@ const getRemediesForCategory = (category: string): string[] => {
     'Measurement': ['Formula reference sheets', 'Unit analysis practice', 'Real-world measurement applications'],
     'Geometry Concepts': ['Geometric constructions', 'Angle relationship practice', 'Visual proofs'],
     'Ratios & Proportions': ['Proportion tables', 'Cross-multiplication practice', 'Real-world ratio problems'],
-    'Arithmetic': ['Timed basic facts practice', 'Mental math strategies', 'Error checking techniques'],
+    'Calculation Error': ['Timed basic facts practice', 'Mental math strategies', 'Error checking techniques'],
     'Formula Application': ['Formula derivation activities', 'When-to-use decision trees', 'Formula matching exercises'],
     'Unit Conversion': ['Conversion factor practice', 'Dimensional analysis', 'Unit relationship charts'],
     'Incomplete Work': ['Structured solution templates', 'Justification sentence starters', 'Work verification checklists'],
@@ -196,7 +157,7 @@ const getRemediesForCategory = (category: string): string[] => {
   return remedies[category] || remedies['Other Errors'];
 };
 
-// Extract structured misconception from justification with specific actionable details
+// Extract structured misconception with DISTINCT specific error vs expected correction
 const extractMisconceptionFromJustification = (
   justification: string,
   studentName: string,
@@ -216,118 +177,154 @@ const extractMisconceptionFromJustification = (
   if (!hasError) return null;
   
   const { category, title } = identifyMisconceptionCategory(cleaned);
-  const exactQuote = extractExactQuote(cleaned);
   
-  // Extract SPECIFIC what student did vs expected with detailed patterns
-  let whatStudentDid = '';
-  let whatWasExpected = '';
+  // Extract specific evidence from student work
+  let evidenceQuote = '';
+  let specificError = '';
+  let expectedAction = '';
+  let whyItMatters = '';
   
-  // More specific extraction patterns for actionable data
-  const specificPatterns = [
-    // Pattern: "wrote X instead of Y"
-    /(?:wrote|calculated|got|obtained|gave|answered|put|stated)\s+["']?([^"'\n,]{5,80})["']?\s+(?:instead of|rather than|but should (?:have )?(?:been|wrote|calculated))\s+["']?([^"'\n,]{5,80})["']?/i,
-    // Pattern: "used X but should have used Y"
-    /(?:used|applied|chose)\s+(.+?)\s+(?:but|when|instead of)\s+(?:should have|the correct|proper|needed to)\s+(?:used?|applied?|chosen?)?\s*(.+?)(?:\.|,|$)/i,
-    // Pattern: "X is incorrect, correct answer is Y"
-    /["']?([^"'\n]{5,60})["']?\s+(?:is|was)\s+(?:incorrect|wrong)\.?\s*(?:the )?correct\s+(?:answer|solution|value)?\s*(?:is|was|should be)\s*["']?([^"'\n]{5,60})["']?/i,
-    // Pattern: "forgot to X"
-    /(?:forgot|failed|neglected|omitted|missed)\s+(?:to\s+)?(.{10,80}?)(?:\.|,|$)/i,
-    // Pattern: "did not X"
-    /(?:did not|didn't|failed to)\s+(.{10,80}?)(?:\.|,|$)/i,
+  // Look for direct quotes or specific values the student wrote
+  const quotePatterns = [
+    /"([^"]{5,150})"/,
+    /'([^']{5,150})'/,
+    /student (?:wrote|answered|calculated|got|gave)\s*[:"]?\s*["']?([^"'\n.]{5,100})["']?/i,
+    /(?:their|the) (?:answer|response|calculation|result)\s*(?:was|is|reads?|showed?)?\s*[:"]?\s*["']?([^"'\n.]{5,100})["']?/i,
+    /(?:obtained|calculated|arrived at|got)\s+["']?([0-9][^"'\n.]{0,50})["']?/i,
   ];
   
-  for (const pattern of specificPatterns) {
+  for (const pattern of quotePatterns) {
     const match = cleaned.match(pattern);
-    if (match) {
-      if (match[2]) {
-        whatStudentDid = match[1].trim();
-        whatWasExpected = match[2].trim();
-      } else if (match[1]) {
-        // Single capture (forgot/failed patterns)
-        whatStudentDid = `Did not ${match[1].trim().toLowerCase()}`;
-        whatWasExpected = `Should have ${match[1].trim().toLowerCase()}`;
-      }
+    if (match && match[1]) {
+      evidenceQuote = match[1].trim();
       break;
     }
   }
   
-  // Extract specific numbers/expressions if present
-  const numberPattern = /(\d+(?:\.\d+)?|\-?\d+(?:\/\d+)?|[xyz]\s*[=<>]\s*\-?\d+)/g;
-  const numbers = cleaned.match(numberPattern);
+  // Extract specific error patterns - what EXACTLY went wrong
+  const errorExtractionPatterns = [
+    // Pattern: "X instead of Y"
+    {
+      pattern: /(?:wrote|calculated|got|used|applied)\s+["']?([^"'\n,]{3,60})["']?\s+(?:instead of|rather than|but should (?:have )?(?:been|used))\s+["']?([^"'\n,]{3,60})["']?/i,
+      extract: (m: RegExpMatchArray) => ({
+        error: `Wrote "${m[1].trim()}" when the calculation should yield a different result`,
+        expected: `The correct approach would produce "${m[2].trim()}"`,
+        why: `This error resulted in an incorrect final answer`
+      })
+    },
+    // Pattern: forgot/failed/omitted to X
+    {
+      pattern: /(?:forgot|failed|neglected|omitted|did not|didn't)\s+(?:to\s+)?(.{10,80}?)(?:\.|,|which|resulting|causing|$)/i,
+      extract: (m: RegExpMatchArray) => ({
+        error: `Failed to ${m[1].trim().toLowerCase()}`,
+        expected: `Must ${m[1].trim().toLowerCase()} to complete the problem correctly`,
+        why: `Omitting this step leads to an incomplete or incorrect solution`
+      })
+    },
+    // Pattern: incorrectly X
+    {
+      pattern: /(?:incorrectly|wrongly)\s+(.{10,80}?)(?:\.|,|when|instead|$)/i,
+      extract: (m: RegExpMatchArray) => ({
+        error: `Incorrectly ${m[1].trim().toLowerCase()}`,
+        expected: `This operation must be performed correctly following standard procedure`,
+        why: `This procedural error propagates through the solution`
+      })
+    },
+    // Pattern: made a X error
+    {
+      pattern: /made (?:a|an)\s+(.{5,40}?)\s*error/i,
+      extract: (m: RegExpMatchArray) => ({
+        error: `Made a ${m[1].trim().toLowerCase()} error in the work`,
+        expected: `Careful attention to ${m[1].trim().toLowerCase()} is required`,
+        why: `This type of error affects the accuracy of the final answer`
+      })
+    },
+    // Pattern: confused X with Y
+    {
+      pattern: /(?:confused|mixed up)\s+(.{5,40}?)\s+(?:with|and)\s+(.{5,40}?)(?:\.|,|$)/i,
+      extract: (m: RegExpMatchArray) => ({
+        error: `Confused ${m[1].trim()} with ${m[2].trim()}`,
+        expected: `${m[1].trim()} and ${m[2].trim()} are distinct concepts that must be applied differently`,
+        why: `This conceptual confusion led to applying the wrong approach`
+      })
+    },
+  ];
   
-  // If no specific contrast found, build from context
-  if (!whatStudentDid) {
-    // Look for specific error descriptions
-    const errorTypes: Record<string, { did: string; expected: string }> = {
-      'sign': { 
-        did: 'Made a sign error (positive/negative confusion)', 
-        expected: 'Carefully track positive and negative signs through each step' 
+  for (const { pattern, extract } of errorExtractionPatterns) {
+    const match = cleaned.match(pattern);
+    if (match) {
+      const extracted = extract(match);
+      specificError = extracted.error;
+      expectedAction = extracted.expected;
+      whyItMatters = extracted.why;
+      break;
+    }
+  }
+  
+  // If no specific pattern matched, build from category-based templates
+  if (!specificError) {
+    // Extract any numbers mentioned
+    const numberPattern = /(\d+(?:\.\d+)?|\-?\d+(?:\/\d+)?)/g;
+    const numbers = cleaned.match(numberPattern);
+    
+    // Category-specific error templates with distinct error vs expected
+    const categoryTemplates: Record<string, { error: string; expected: string; why: string }> = {
+      'Sign Errors': { 
+        error: 'Applied incorrect sign (positive/negative) during calculation',
+        expected: 'Track signs through each operation: negative × negative = positive, negative × positive = negative',
+        why: 'Sign errors flip the answer to wrong direction/value'
       },
-      'order.*operation|pemdas': { 
-        did: 'Applied operations in wrong order', 
-        expected: 'Follow PEMDAS: Parentheses, Exponents, Multiplication/Division, Addition/Subtraction' 
+      'Order of Operations': { 
+        error: 'Performed operations in incorrect sequence',
+        expected: 'Follow PEMDAS strictly: Parentheses → Exponents → Multiplication/Division (L→R) → Addition/Subtraction (L→R)',
+        why: 'Wrong order produces entirely different result'
       },
-      'distribut': { 
-        did: 'Failed to distribute correctly across all terms', 
-        expected: 'Multiply every term inside the parentheses by the outside factor' 
+      'Fraction Operations': { 
+        error: 'Applied incorrect procedure for fraction operation',
+        expected: 'For add/subtract: find common denominator first. For multiply: multiply across. For divide: multiply by reciprocal',
+        why: 'Each fraction operation has specific required steps'
       },
-      'cancel|simplif': { 
-        did: 'Incorrectly simplified or cancelled terms', 
-        expected: 'Only cancel common factors, not terms in a sum' 
+      'Calculation Error': { 
+        error: numbers ? `Calculation yielded ${numbers[0]} but arithmetic check shows different value` : 'Made an arithmetic error in computation',
+        expected: 'Double-check arithmetic by working backwards or using estimation',
+        why: 'Calculation errors invalidate otherwise correct procedure'
       },
-      'formula': { 
-        did: 'Applied the wrong formula for this problem type', 
-        expected: 'Identify the problem type first, then select the appropriate formula' 
+      'Algebraic Expressions': { 
+        error: 'Made an error manipulating the algebraic expression',
+        expected: 'Combine only like terms; apply distributive property completely',
+        why: 'Expression errors carry through to final answer'
       },
-      'unit|conversion': { 
-        did: 'Made a unit conversion error', 
-        expected: 'Set up conversion factors with units that cancel properly' 
+      'Equation Solving': { 
+        error: 'Made procedural error while isolating the variable',
+        expected: 'Apply inverse operations to both sides equally; work systematically',
+        why: 'Equation solving errors produce incorrect solution value'
       },
-      'fraction': { 
-        did: 'Made an error with fraction operations', 
-        expected: 'Find common denominators for addition/subtraction; multiply across for multiplication' 
+      'Graphing': { 
+        error: 'Error in graphing or interpreting coordinate data',
+        expected: 'Slope = rise/run = (y₂-y₁)/(x₂-x₁); y-intercept is where x=0',
+        why: 'Graphing errors misrepresent the relationship'
       },
-      'decimal|place': { 
-        did: 'Misaligned decimal places', 
-        expected: 'Line up decimal points vertically; count places when multiplying/dividing' 
-      },
-      'exponent|power': { 
-        did: 'Misapplied exponent rules', 
-        expected: 'Add exponents when multiplying same base; multiply exponents for power of power' 
-      },
-      'slope|intercept': { 
-        did: 'Confused slope and y-intercept or calculated incorrectly', 
-        expected: 'Slope = rise/run = (y₂-y₁)/(x₂-x₁); y-intercept is where x=0' 
-      },
-      'substitute|variable': { 
-        did: 'Made a substitution error with variables', 
-        expected: 'Replace the variable everywhere it appears; use parentheses around substituted values' 
-      },
-      'isolate|solve': { 
-        did: 'Made an error isolating the variable', 
-        expected: 'Perform the same operation on both sides; work to get variable alone' 
+      'Incomplete Work': { 
+        error: 'Did not show complete work or justify the answer',
+        expected: 'Show all steps clearly; write final answer with units if applicable',
+        why: 'Without shown work, partial credit cannot be awarded'
       },
     };
     
-    for (const [pattern, messages] of Object.entries(errorTypes)) {
-      if (new RegExp(pattern, 'i').test(cleaned)) {
-        whatStudentDid = messages.did;
-        whatWasExpected = messages.expected;
-        break;
-      }
-    }
+    const template = categoryTemplates[category] || {
+      error: 'Made a mathematical error in solving this problem',
+      expected: 'Review the problem-solving steps and verify each calculation',
+      why: 'This error resulted in point deduction'
+    };
     
-    // Still nothing? Use a more generic but still actionable message
-    if (!whatStudentDid) {
-      // Extract any number comparisons
-      if (numbers && numbers.length >= 2) {
-        whatStudentDid = `Calculated ${numbers[0]} instead of the correct value`;
-        whatWasExpected = `The correct answer should be ${numbers[1]}`;
-      } else {
-        whatStudentDid = 'Made a procedural or calculation error';
-        whatWasExpected = 'Review the problem-solving steps and verify each calculation';
-      }
-    }
+    specificError = template.error;
+    expectedAction = template.expected;
+    whyItMatters = template.why;
+  }
+  
+  // If we found a quote but no specific error description uses it, incorporate it
+  if (evidenceQuote && !specificError.includes(evidenceQuote)) {
+    specificError = `${specificError}. Student wrote: "${evidenceQuote}"`;
   }
   
   // Determine severity based on grade and keywords
@@ -341,9 +338,10 @@ const extractMisconceptionFromJustification = (
   return {
     title,
     category,
-    whatStudentDid: whatStudentDid.charAt(0).toUpperCase() + whatStudentDid.slice(1),
-    whatWasExpected: whatWasExpected.charAt(0).toUpperCase() + whatWasExpected.slice(1),
-    exactQuote,
+    specificError,
+    evidenceQuote,
+    expectedAction,
+    whyItMatters,
     severity,
     studentName,
     studentId,
@@ -473,10 +471,8 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
     setSelectedCategory(group.category);
     
     try {
-      // Map topics to the correct format expected by the edge function
       const topics = group.commonTopics.map(t => {
         const instance = group.instances.find(i => i.topic === t);
-        // Clean up topic name - remove any markdown or special chars
         const cleanTopicName = t.replace(/\*\*/g, '').replace(/\*/g, '').trim();
         return {
           topicName: cleanTopicName,
@@ -486,7 +482,6 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
         };
       });
       
-      // Ensure we have at least one topic
       if (topics.length === 0) {
         topics.push({
           topicName: group.category,
@@ -496,8 +491,6 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
         });
       }
       
-      console.log('Generating worksheet with topics:', topics);
-      
       const response = await supabase.functions.invoke('generate-worksheet-questions', {
         body: {
           topics,
@@ -505,12 +498,11 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
           difficultyLevels: group.severity === 'high' ? ['easy', 'medium'] : ['medium', 'hard'],
           includeHints: true,
           includeAnswerKey: true,
-          worksheetMode: 'practice', // Use 'practice' mode - valid worksheet mode
+          worksheetMode: 'practice',
         },
       });
       
       if (response.error) {
-        console.error('Edge function error:', response.error);
         throw new Error(response.error.message || 'Failed to generate worksheet');
       }
       
@@ -520,11 +512,9 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
         setShowWorksheetDialog(true);
         toast.success(`Generated ${questions.length} questions targeting ${group.category}`);
       } else {
-        console.error('No questions in response:', response.data);
         throw new Error('No questions generated - please try again');
       }
     } catch (error: any) {
-      console.error('Worksheet generation error:', error);
       toast.error(`Failed to generate worksheet: ${error.message}`);
     } finally {
       setIsGeneratingWorksheet(false);
@@ -539,9 +529,9 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <AlertTriangle className="h-5 w-5 text-yellow-500" />
             Class Misconception Summary
           </CardTitle>
@@ -557,91 +547,81 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <AlertTriangle className="h-5 w-5 text-yellow-500" />
                 Class Misconception Summary
               </CardTitle>
-              <CardDescription>
-                Common errors across all students for targeted group instruction
+              <CardDescription className="mt-1">
+                Common errors for targeted group instruction
               </CardDescription>
             </div>
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className="text-sm">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
                 <Users className="h-3 w-3 mr-1" />
-                {totalStudentsAffected} students affected
+                {totalStudentsAffected} students
               </Badge>
-              <Badge variant="secondary" className="text-sm">
-                {totalMisconceptions} misconceptions identified
+              <Badge variant="secondary" className="text-xs">
+                {totalMisconceptions} issues
               </Badge>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {groupedMisconceptions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <GraduationCap className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p className="font-medium">No misconceptions identified yet</p>
-              <p className="text-sm">Scan and grade student work to identify common errors</p>
+              <GraduationCap className="h-10 w-10 mx-auto mb-2 opacity-50" />
+              <p className="font-medium text-sm">No misconceptions identified</p>
+              <p className="text-xs">Scan student work to identify errors</p>
             </div>
           ) : (
-            <ScrollArea className="max-h-[800px]">
-              <div className="space-y-4">
+            <ScrollArea className="max-h-[700px]">
+              <div className="space-y-3">
                 {groupedMisconceptions.map((group) => (
                   <Collapsible
                     key={group.category}
                     open={expandedCategories.has(group.category)}
                     onOpenChange={() => toggleCategory(group.category)}
                   >
-                    <Card className={cn(
-                      "border-l-4",
-                      group.severity === 'high' && 'border-l-red-500',
-                      group.severity === 'medium' && 'border-l-yellow-500',
-                      group.severity === 'low' && 'border-l-green-500'
+                    <div className={cn(
+                      "rounded-lg border overflow-hidden",
+                      group.severity === 'high' && 'border-l-4 border-l-destructive',
+                      group.severity === 'medium' && 'border-l-4 border-l-yellow-500',
+                      group.severity === 'low' && 'border-l-4 border-l-green-500'
                     )}>
                       <CollapsibleTrigger className="w-full">
-                        <div className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "p-2 rounded-lg",
-                              group.severity === 'high' && 'bg-red-100 dark:bg-red-950',
-                              group.severity === 'medium' && 'bg-yellow-100 dark:bg-yellow-950',
-                              group.severity === 'low' && 'bg-green-100 dark:bg-green-950'
-                            )}>
-                              <AlertTriangle className={cn(
-                                "h-5 w-5",
-                                group.severity === 'high' && 'text-red-600',
-                                group.severity === 'medium' && 'text-yellow-600',
-                                group.severity === 'low' && 'text-green-600'
-                              )} />
-                            </div>
+                        <div className="p-3 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className={cn(
+                              "h-4 w-4",
+                              group.severity === 'high' && 'text-destructive',
+                              group.severity === 'medium' && 'text-yellow-600',
+                              group.severity === 'low' && 'text-green-600'
+                            )} />
                             <div className="text-left">
-                              <p className="font-semibold">{group.category}</p>
-                              <p className="text-sm text-muted-foreground">{group.title}</p>
+                              <p className="font-medium text-sm">{group.category}</p>
+                              <p className="text-xs text-muted-foreground">{group.studentCount} students affected</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <Badge variant="outline">
-                              <Users className="h-3 w-3 mr-1" />
-                              {group.studentCount} students
-                            </Badge>
+                          <div className="flex items-center gap-2">
                             <Badge 
+                              variant="outline"
                               className={cn(
-                                'text-white',
-                                group.severity === 'high' && 'bg-red-500',
-                                group.severity === 'medium' && 'bg-yellow-500',
-                                group.severity === 'low' && 'bg-green-500'
+                                'text-xs capitalize',
+                                group.severity === 'high' && 'border-destructive text-destructive',
+                                group.severity === 'medium' && 'border-yellow-500 text-yellow-600',
+                                group.severity === 'low' && 'border-green-500 text-green-600'
                               )}
                             >
-                              {group.severity} priority
+                              {group.severity}
                             </Badge>
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
-                              className="gap-1"
+                              className="h-7 px-2 gap-1 text-xs"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleGenerateGroupWorksheet(group);
@@ -653,121 +633,125 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
                               ) : (
                                 <FileSpreadsheet className="h-3 w-3" />
                               )}
-                              Group Worksheet
+                              Worksheet
                             </Button>
                             {expandedCategories.has(group.category) ? (
-                              <ChevronUp className="h-4 w-4" />
+                              <ChevronUp className="h-4 w-4 text-muted-foreground" />
                             ) : (
-                              <ChevronDown className="h-4 w-4" />
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
                             )}
                           </div>
                         </div>
                       </CollapsibleTrigger>
                       
                       <CollapsibleContent>
-                        <div className="px-4 pb-4 space-y-4">
-                          <Separator />
-                          
-                          {/* Remediation Strategies */}
-                          <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-                            <div className="flex items-center gap-2 font-medium text-green-700 dark:text-green-300 mb-2">
-                              <Lightbulb className="h-4 w-4" />
-                              Recommended Group Instruction Strategies
+                        <div className="px-3 pb-3 space-y-3 border-t bg-muted/20">
+                          {/* Suggested Remediation - Compact */}
+                          <div className="pt-3">
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-green-700 dark:text-green-400 mb-1.5">
+                              <Lightbulb className="h-3.5 w-3.5" />
+                              Suggested Remediation Strategies
                             </div>
-                            <ul className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            <div className="flex flex-wrap gap-1.5">
                               {group.suggestedRemedies.map((remedy, idx) => (
-                                <li key={idx} className="text-sm text-green-600 dark:text-green-400 flex items-start gap-2">
-                                  <span className="text-green-500 mt-0.5">•</span>
-                                  {remedy}
-                                </li>
+                                <Badge key={idx} variant="outline" className="text-xs font-normal bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300">
+                                  • {remedy}
+                                </Badge>
                               ))}
-                            </ul>
+                            </div>
                           </div>
                           
                           {/* Common Topics */}
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm text-muted-foreground">Common topics:</span>
-                            {group.commonTopics.map((topic, idx) => (
-                              <Badge key={idx} variant="outline" className="text-xs">
-                                {topic}
-                              </Badge>
-                            ))}
-                          </div>
+                          {group.commonTopics.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs text-muted-foreground">Topics:</span>
+                              {group.commonTopics.map((topic, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-xs font-normal">
+                                  {topic.length > 30 ? topic.substring(0, 30) + '...' : topic}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                           
-                          {/* Student Instances */}
-                          <div className="space-y-3">
-                            <p className="text-sm font-medium text-muted-foreground">
-                              Student-Specific Evidence ({group.instances.length} instances):
+                          <Separator />
+                          
+                          {/* Student Evidence - Cleaner Cards */}
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground">
+                              Evidence ({group.instances.length} instances):
                             </p>
                             
-                            {group.instances.slice(0, 10).map((instance, idx) => (
+                            {group.instances.slice(0, 8).map((instance, idx) => (
                               <div 
                                 key={idx} 
-                                className="p-3 border rounded-lg bg-muted/30 space-y-2"
+                                className="rounded-md border bg-background p-2.5 space-y-2"
                               >
+                                {/* Header Row */}
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
-                                    <Users className="h-4 w-4 text-muted-foreground" />
-                                    <span className="font-medium">{instance.studentName}</span>
-                                    <Badge variant="outline" className="text-xs">
-                                      {instance.topic}
-                                    </Badge>
+                                    <span className="font-medium text-sm">{instance.studentName}</span>
                                     <Badge 
                                       variant="outline" 
                                       className={cn(
-                                        'text-xs',
-                                        instance.grade < 60 && 'border-red-300 text-red-600',
-                                        instance.grade >= 60 && instance.grade < 80 && 'border-yellow-300 text-yellow-600',
-                                        instance.grade >= 80 && 'border-green-300 text-green-600'
+                                        'text-xs h-5',
+                                        instance.grade < 60 && 'border-destructive/50 text-destructive',
+                                        instance.grade >= 60 && instance.grade < 80 && 'border-yellow-400 text-yellow-600',
+                                        instance.grade >= 80 && 'border-green-400 text-green-600'
                                       )}
                                     >
-                                      {instance.grade}%
+                                      Score: {instance.grade}%
                                     </Badge>
                                   </div>
                                   <span className="text-xs text-muted-foreground">
-                                    {format(new Date(instance.date), 'MMM d, yyyy')}
+                                    {format(new Date(instance.date), 'MMM d')}
                                   </span>
                                 </div>
                                 
-                                {/* What they did vs expected - actionable and specific */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                  <div className="p-2 bg-red-50/70 dark:bg-red-950/30 rounded border border-red-200 dark:border-red-800">
-                                    <div className="flex items-center gap-1 text-xs font-medium text-red-700 dark:text-red-300 mb-1">
-                                      <X className="h-3 w-3" />
-                                      What Went Wrong
+                                {/* Error Analysis - Two Distinct Sections */}
+                                <div className="space-y-2">
+                                  {/* What Went Wrong - Red Section */}
+                                  <div className="rounded border border-destructive/30 bg-destructive/5 p-2">
+                                    <div className="flex items-start gap-1.5">
+                                      <AlertCircle className="h-3.5 w-3.5 text-destructive mt-0.5 shrink-0" />
+                                      <div className="space-y-1 flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-destructive">Error Identified</p>
+                                        <p className="text-xs text-destructive/90 leading-relaxed">
+                                          {instance.specificError}
+                                        </p>
+                                        {instance.whyItMatters && (
+                                          <p className="text-xs text-destructive/70 italic">
+                                            Impact: {instance.whyItMatters}
+                                          </p>
+                                        )}
+                                      </div>
                                     </div>
-                                    <p className="text-sm text-red-600 dark:text-red-400">
-                                      {instance.whatStudentDid}
-                                    </p>
-                                    {/* Show the quote inline as supporting evidence */}
-                                    {instance.exactQuote && instance.exactQuote !== instance.whatStudentDid && (
-                                      <p className="text-xs text-red-500/70 dark:text-red-400/70 italic mt-1 border-t border-red-200 dark:border-red-800 pt-1">
-                                        Evidence: {instance.exactQuote.length > 80 ? instance.exactQuote.substring(0, 80) + '...' : instance.exactQuote}
-                                      </p>
-                                    )}
                                   </div>
-                                  <div className="p-2 bg-emerald-50/70 dark:bg-emerald-950/30 rounded border border-emerald-200 dark:border-emerald-800">
-                                    <div className="flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 mb-1">
-                                      <Target className="h-3 w-3" />
-                                      Corrective Action
+                                  
+                                  {/* Corrective Action - Green Section */}
+                                  <div className="rounded border border-green-500/30 bg-green-50 dark:bg-green-950/20 p-2">
+                                    <div className="flex items-start gap-1.5">
+                                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mt-0.5 shrink-0" />
+                                      <div className="space-y-1 flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-green-700 dark:text-green-400">Correct Approach</p>
+                                        <p className="text-xs text-green-700/90 dark:text-green-300/90 leading-relaxed">
+                                          {instance.expectedAction}
+                                        </p>
+                                      </div>
                                     </div>
-                                    <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                                      {instance.whatWasExpected}
-                                    </p>
                                   </div>
                                 </div>
                               </div>
                             ))}
                             
-                            {group.instances.length > 10 && (
-                              <p className="text-sm text-muted-foreground text-center py-2">
-                                + {group.instances.length - 10} more instances
+                            {group.instances.length > 8 && (
+                              <p className="text-xs text-muted-foreground text-center py-1">
+                                + {group.instances.length - 8} more instances
                               </p>
                             )}
                           </div>
                         </div>
                       </CollapsibleContent>
-                    </Card>
+                    </div>
                   </Collapsible>
                 ))}
               </div>
