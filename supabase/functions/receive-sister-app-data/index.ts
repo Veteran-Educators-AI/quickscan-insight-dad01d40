@@ -90,6 +90,10 @@ interface StudentLearningProfile {
     description: string | null;
     confidence: number | null;
     topic_name: string | null;
+    standard: string | null;  // NYS standard code (e.g., "A.REI.4")
+    problem_set: string | null;  // Worksheet/problem set title
+    severity: string | null;  // high, medium, low
+    suggested_remedies: string[] | null;
   }[];
   weak_topics: { topic_name: string; avg_score: number }[];
   recommended_remediation: string[];
