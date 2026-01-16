@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2, Save, CheckCircle, BookOpen } from 'lucide-react';
+import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2, Save, CheckCircle, BookOpen, Link, Unlink, FileStack } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface BatchReportProps {
   items: BatchItem[];
@@ -31,9 +37,10 @@ interface BatchReportProps {
   onExport: () => void;
   onUpdateNotes?: (itemId: string, notes: string) => void;
   onSaveComplete?: () => void;
+  onUnlinkContinuation?: (continuationId: string) => void;
 }
 
-export function BatchReport({ items, summary, classId, questionId, onExport, onUpdateNotes, onSaveComplete }: BatchReportProps) {
+export function BatchReport({ items, summary, classId, questionId, onExport, onUpdateNotes, onSaveComplete, onUnlinkContinuation }: BatchReportProps) {
   const { user } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState<BatchItem | null>(null);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
@@ -595,10 +602,11 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
                   <span className="sr-only">Compare</span>
                 </TableHead>
                 <TableHead>Student</TableHead>
+                <TableHead className="text-center w-[60px]">Pages</TableHead>
                 <TableHead className="text-center">Score</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
                 <TableHead className="hidden md:table-cell">Feedback</TableHead>
-                <TableHead className="w-[80px]"></TableHead>
+                <TableHead className="w-[100px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -631,7 +639,56 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
                       onClick={(e) => e.stopPropagation()}
                     />
                   </TableCell>
-                  <TableCell className="font-medium">{item.studentName}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {item.studentName}
+                      {item.pageType === 'continuation' && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-600">
+                                <Link className="h-3 w-3 mr-1" />
+                                Linked
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">This page was linked as a continuation</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {(() => {
+                      const continuationCount = item.continuationPages?.length || 0;
+                      const isContinuation = item.pageType === 'continuation';
+                      
+                      if (continuationCount > 0) {
+                        return (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center justify-center gap-1">
+                                  <FileStack className="h-4 w-4 text-blue-600" />
+                                  <span className="text-xs font-medium text-blue-600">{continuationCount + 1}</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">{continuationCount + 1} pages combined</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        );
+                      }
+                      if (isContinuation) {
+                        return (
+                          <Badge variant="outline" className="text-xs">+1</Badge>
+                        );
+                      }
+                      return <span className="text-xs text-muted-foreground">1</span>;
+                    })()}
+                  </TableCell>
                   <TableCell className="text-center">
                     {(() => {
                       const effectiveGrade = getEffectiveGrade(item.result);
@@ -656,16 +713,43 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
                     {item.result!.feedback || 'No feedback'}
                   </TableCell>
                   <TableCell>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedStudent(item);
-                      }}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {/* Unlink button for continuation pages */}
+                      {item.pageType === 'continuation' && onUnlinkContinuation && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onUnlinkContinuation(item.id);
+                                  toast.success('Page unlinked', { description: 'This page is now a separate paper' });
+                                }}
+                              >
+                                <Unlink className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">Unlink this page (was linked by accident)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedStudent(item);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

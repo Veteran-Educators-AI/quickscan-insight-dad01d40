@@ -1795,6 +1795,7 @@ export default function Scan() {
                     onSaveComplete={() => {
                       toast.success('All grades saved to gradebook');
                     }}
+                    onUnlinkContinuation={batch.unlinkContinuation}
                   />
                 </div>
               ) : (
