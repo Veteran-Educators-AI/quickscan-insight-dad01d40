@@ -514,16 +514,22 @@ export function NycologicPresents({
               )}
             </motion.h2>
 
-            {/* Content - larger text */}
+            {/* Content - premium styled text */}
             {slide.content.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="text-white/80 text-xl md:text-2xl lg:text-3xl leading-relaxed max-w-5xl mx-auto space-y-6"
+                className="text-white/90 text-xl md:text-2xl lg:text-3xl leading-relaxed max-w-5xl mx-auto space-y-8"
               >
                 {slide.content.map((item, index) => (
-                  <p key={index} className="drop-shadow-md">
+                  <motion.div 
+                    key={index} 
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 + index * 0.1 }}
+                    className="relative pl-8 border-l-2 border-amber-400/40"
+                  >
                     {isEditing && editingField === `content-${index}` ? (
                       <Textarea
                         value={item}
@@ -534,56 +540,68 @@ export function NycologicPresents({
                         }}
                         onBlur={() => setEditingField(null)}
                         autoFocus
-                        className="bg-white/10 border-white/20 text-white text-center resize-none text-xl"
+                        className="bg-white/10 border-white/20 text-white resize-none text-xl"
                         rows={3}
                       />
                     ) : (
-                      <span 
+                      <p 
                         onClick={() => isEditing && setEditingField(`content-${index}`)}
-                        className={isEditing ? 'cursor-text hover:underline' : ''}
+                        className={cn(
+                          "text-white/85 leading-relaxed",
+                          isEditing ? 'cursor-text hover:text-white' : ''
+                        )}
                       >
                         {item}
-                      </span>
+                      </p>
                     )}
-                  </p>
+                  </motion.div>
                 ))}
               </motion.div>
             )}
 
-            {/* Question section - larger */}
+            {/* Question section - premium styling */}
             {slide.type === 'question' && slide.question && (
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="mt-12 space-y-8 w-full max-w-4xl mx-auto"
+                className="mt-12 space-y-10 w-full max-w-4xl mx-auto"
               >
-                <p className="text-2xl md:text-3xl text-white font-medium drop-shadow-lg">{slide.question.prompt}</p>
+                <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+                  <p className="text-2xl md:text-3xl text-white font-medium leading-relaxed">{slide.question.prompt}</p>
+                </div>
                 
                 {slide.question.options && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {slide.question.options.map((option, index) => (
                       <motion.button
                         key={index}
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.97 }}
+                        whileHover={{ scale: 1.02, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => handleOptionSelect(index)}
                         className={cn(
-                          "p-6 rounded-2xl text-left transition-all duration-300",
-                          "border-2 border-white/20 backdrop-blur-sm",
+                          "p-5 rounded-xl text-left transition-all duration-300 relative overflow-hidden",
+                          "border border-white/10",
                           selectedOption === index
                             ? showAnswer && slide.question?.answer === option
-                              ? "bg-emerald-500/40 border-emerald-400 shadow-lg shadow-emerald-500/20"
+                              ? "bg-gradient-to-r from-emerald-500/30 to-emerald-600/20 border-emerald-400/60 shadow-lg shadow-emerald-500/20"
                               : showAnswer
-                              ? "bg-red-500/40 border-red-400 shadow-lg shadow-red-500/20"
-                              : "bg-white/25 border-white/50"
-                            : "bg-white/10 hover:bg-white/15"
+                              ? "bg-gradient-to-r from-red-500/30 to-red-600/20 border-red-400/60 shadow-lg shadow-red-500/20"
+                              : "bg-amber-400/20 border-amber-400/50"
+                            : "bg-white/5 hover:bg-white/10 hover:border-white/20"
                         )}
                       >
-                        <span className={cn("font-bold mr-3 text-xl", colors.accent)}>
-                          {String.fromCharCode(65 + index)}.
-                        </span>
-                        <span className="text-white text-lg md:text-xl">{option}</span>
+                        <div className="flex items-start gap-4">
+                          <span className={cn(
+                            "w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg shrink-0",
+                            selectedOption === index 
+                              ? "bg-amber-400 text-slate-900" 
+                              : "bg-white/10 text-white/70"
+                          )}>
+                            {String.fromCharCode(65 + index)}
+                          </span>
+                          <span className="text-white text-lg md:text-xl leading-relaxed pt-1.5">{option}</span>
+                        </div>
                       </motion.button>
                     ))}
                   </div>
@@ -593,7 +611,7 @@ export function NycologicPresents({
                   <Button
                     variant="outline"
                     onClick={() => setShowAnswer(!showAnswer)}
-                    className="border-2 border-white/30 text-white hover:bg-white/15 text-lg px-8 py-6 h-auto"
+                    className="border border-amber-400/50 text-amber-400 hover:bg-amber-400/10 text-lg px-10 py-6 h-auto rounded-xl"
                   >
                     {showAnswer ? 'Hide Answer' : 'Reveal Answer'}
                   </Button>
@@ -602,19 +620,24 @@ export function NycologicPresents({
                 <AnimatePresence>
                   {showAnswer && slide.question.answer && (
                     <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
                       className="overflow-hidden"
                     >
-                      <div className="bg-white/15 backdrop-blur-md rounded-3xl p-8 border-2 border-white/20 shadow-2xl">
-                        <p className={cn("font-bold mb-3 text-xl", colors.accent)}>Answer:</p>
-                        <p className="text-white text-xl md:text-2xl">{slide.question.answer}</p>
+                      <div className="bg-gradient-to-br from-amber-400/10 to-amber-600/5 backdrop-blur-md rounded-2xl p-8 border border-amber-400/30 shadow-xl">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center">
+                            <span className="text-slate-900 font-bold text-sm">✓</span>
+                          </div>
+                          <p className="text-amber-400 font-semibold text-xl">Answer</p>
+                        </div>
+                        <p className="text-white text-xl md:text-2xl leading-relaxed">{slide.question.answer}</p>
                         {slide.question.explanation && (
-                          <>
-                            <p className={cn("font-bold mt-6 mb-3 text-xl", colors.accent)}>Explanation:</p>
-                            <p className="text-white/90 text-lg md:text-xl">{slide.question.explanation}</p>
-                          </>
+                          <div className="mt-6 pt-6 border-t border-white/10">
+                            <p className="text-amber-400/80 font-medium mb-3 text-lg">Explanation</p>
+                            <p className="text-white/80 text-lg md:text-xl leading-relaxed">{slide.question.explanation}</p>
+                          </div>
                         )}
                       </div>
                     </motion.div>
@@ -626,38 +649,59 @@ export function NycologicPresents({
         </AnimatePresence>
       </main>
 
-      {/* Footer with progress - larger */}
+      {/* Footer with premium dot-based progress */}
       <motion.footer 
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="absolute bottom-0 left-0 right-0 px-8 py-8 z-20"
+        className="absolute bottom-0 left-0 right-0 px-8 py-10 z-20"
       >
-        <div className="flex items-center justify-center gap-6">
-          {/* Slide dots - larger */}
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col items-center gap-4">
+          {/* Premium dot indicators */}
+          <div className="flex items-center gap-2.5">
             {presentation.slides.map((_, index) => (
               <button
                 key={index}
                 onClick={() => goToSlide(index)}
-                className={cn(
-                  "transition-all duration-300 rounded-full",
-                  index === currentSlide 
-                    ? "w-12 h-3 bg-white shadow-lg" 
-                    : "w-3 h-3 bg-white/40 hover:bg-white/60"
+                className="group relative p-1"
+              >
+                <motion.div
+                  animate={{
+                    scale: index === currentSlide ? 1 : 0.7,
+                    opacity: index === currentSlide ? 1 : 0.4,
+                  }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className={cn(
+                    "w-2.5 h-2.5 rounded-full transition-all duration-300",
+                    index === currentSlide 
+                      ? "bg-amber-400 shadow-lg shadow-amber-400/50" 
+                      : "bg-white/60 group-hover:bg-white/80"
+                  )}
+                />
+                {/* Active indicator ring */}
+                {index === currentSlide && (
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    <div className="w-5 h-5 rounded-full border-2 border-amber-400/50 animate-pulse" />
+                  </motion.div>
                 )}
-              />
+              </button>
             ))}
           </div>
           
-          {/* Slide counter - larger */}
-          <p className="text-white/60 text-lg font-medium ml-6">
-            {currentSlide + 1} / {totalSlides}
+          {/* Slide counter with subtle styling */}
+          <p className="text-white/40 text-sm font-light tracking-wider">
+            <span className="text-amber-400/80 font-medium">{currentSlide + 1}</span>
+            <span className="mx-2">of</span>
+            <span>{totalSlides}</span>
           </p>
         </div>
 
-        {/* Navigation hint */}
-        <p className="text-center text-white/40 text-sm mt-4">
-          Press ← → arrow keys or click to navigate • Press F for fullscreen
+        {/* Navigation hint - more subtle */}
+        <p className="text-center text-white/25 text-xs mt-4 tracking-wide">
+          ← → to navigate • F for fullscreen • ESC to exit
         </p>
       </motion.footer>
     </div>
