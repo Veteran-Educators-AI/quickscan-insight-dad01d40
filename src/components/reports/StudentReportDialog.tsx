@@ -415,7 +415,7 @@ const isGenericDetail = (text: string): boolean => {
   const lower = text.toLowerCase();
   const hasSpecificCue = /(\d|%|\$|instead of|rather than|because|when|while)/.test(lower);
   if (hasSpecificCue) return false;
-  return text.length < 30 || /use (the )?correct|correct answer|correct approach|mathematical error|calculation error|procedural error|made a mistake|made an error|was wrong|is incorrect/.test(lower);
+  return text.length < 30 || /use (the )?correct|correct answer|correct approach|correctly|properly|accurately|mathematical error|calculation error|procedural error|made a mistake|made an error|was wrong|is incorrect/.test(lower);
 };
 
 const containsAnyKeyword = (text: string, keywords: string[] = []): boolean => {
