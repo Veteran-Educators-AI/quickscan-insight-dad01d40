@@ -1672,6 +1672,21 @@ export function StudentReportDialog({
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="section space-y-3 mt-2">
+                  {/* Explanation of what gets pushed */}
+                  <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-sm">
+                    <p className="font-medium text-purple-800 dark:text-purple-200 mb-1">
+                      📱 What gets sent to Scholar App?
+                    </p>
+                    <ul className="text-purple-700 dark:text-purple-300 space-y-1 text-xs list-disc list-inside">
+                      <li><strong>Remediation Worksheets:</strong> Practice problems targeting student's misconceptions</li>
+                      <li><strong>Level-Up Challenges:</strong> Next-level problems when student masters current level</li>
+                      <li><strong>Auto-Pushed Work:</strong> Automatically sent when grade drops below threshold</li>
+                    </ul>
+                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-2 italic">
+                      Students earn XP and Coins when they complete these in the Scholar App!
+                    </p>
+                  </div>
+                  
                   {pushedAssignments?.length ? (
                     pushedAssignments.map(assignment => {
                       const topics = Array.isArray(assignment.topics) ? assignment.topics : [];
@@ -1744,9 +1759,10 @@ export function StudentReportDialog({
                       );
                     })
                   ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Send className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      No problem sets pushed to Scholar App yet
+                    <div className="text-center py-6 text-muted-foreground border rounded-lg bg-muted/30">
+                      <Send className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm font-medium">No problem sets pushed yet</p>
+                      <p className="text-xs mt-1">Push remediation worksheets or level-up challenges from the scan results</p>
                     </div>
                   )}
                 </div>
@@ -1772,14 +1788,39 @@ export function StudentReportDialog({
                       </div>
                     </div>
                     
+                    {/* Level Legend */}
+                    <div className="mt-4 p-3 rounded-lg bg-muted/50 border">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">📊 Level Guide (Based on Score %)</p>
+                      <div className="grid grid-cols-3 md:grid-cols-6 gap-1.5 text-xs">
+                        {LEVEL_ORDER.slice().reverse().map(level => (
+                          <div key={level} className="flex items-center gap-1.5 p-1.5 rounded bg-background border">
+                            <Badge className={cn(LEVEL_BG_COLORS[level], 'text-white h-5 w-5 p-0 flex items-center justify-center text-xs')}>
+                              {level}
+                            </Badge>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-medium truncate">
+                                {level === 'A' ? '95%+' : level === 'B' ? '85-94%' : level === 'C' ? '75-84%' : level === 'D' ? '65-74%' : level === 'E' ? '55-64%' : '<55%'}
+                              </span>
+                              <span className="text-muted-foreground text-[10px] truncate">
+                                {LEVEL_DESCRIPTIONS[level].split(' - ')[0]}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Level Progress Indicator */}
-                    <div className="mt-4 p-4 rounded-lg bg-card border">
+                    <div className="mt-3 p-4 rounded-lg bg-card border">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">Current Level:</span>
                           <Badge className={cn(LEVEL_BG_COLORS[levelProgressInfo.currentLevel], 'text-white text-lg px-3')}>
                             {levelProgressInfo.currentLevel}
                           </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            ({LEVEL_DESCRIPTIONS[levelProgressInfo.currentLevel]})
+                          </span>
                         </div>
                         {levelProgressInfo.latestGrade !== undefined && (
                           <div className="flex items-center gap-2">

@@ -533,7 +533,7 @@ Provide your analysis in the following structure:
 - Regents Score: (0, 1, 2, 3, or 4 - remember: ANY understanding = Score 1 minimum)
 - Regents Score Justification: (why this score - cite evidence)
 - Rubric Scores: (if teacher rubric provided, score each criterion)
-- Misconceptions: (errors identified with citations - use "[INTERPRETATION - VERIFY]" if uncertain)
+- Misconceptions: (SPECIFIC errors with EVIDENCE - format each as: "ERROR: [what student did wrong - cite exact quote]. EXPECTED: [correct approach]. IMPACT: [why this caused point loss]")
 - Needs Teacher Review: (list items flagged for verification)
 - Total Score: (points earned / total possible from teacher rubric)
 - Standards Met: (YES or NO - does work show ANY understanding of the standards?)
@@ -543,7 +543,7 @@ Provide your analysis in the following structure:
     • 70-79 = Partial understanding, some concepts grasped
     • 65-69 = Basic/limited understanding shown (DEFAULT if ANY work with understanding)
     • 55 = ONLY if completely blank or NO understanding whatsoever)
-- Grade Justification: (explain what concepts the student understands - flag interpretations)
+- Grade Justification: (CRITICAL: Be SPECIFIC and DISTINCT. Include: 1) WHAT the student did wrong with exact citation, 2) WHY this is incorrect with mathematical reasoning, 3) WHAT the correct approach should be. Never repeat the same information in both "what went wrong" and "what was expected".)
 - Feedback: (constructive suggestions for the student)`;
 
     // Build messages for Lovable AI
