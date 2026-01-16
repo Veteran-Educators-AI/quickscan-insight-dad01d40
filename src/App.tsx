@@ -24,6 +24,7 @@ import Scan from "./pages/Scan";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Help from "./pages/Help";
+import FeatureDocumentation from "./pages/FeatureDocumentation";
 import ResetPassword from "./pages/ResetPassword";
 import SharedWorksheet from "./pages/SharedWorksheet";
 import StudentResults from "./pages/StudentResults";
@@ -106,6 +107,7 @@ function AppRoutes() {
       <Route path="/scan" element={<ProtectedRoute><Scan /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
+      <Route path="/documentation" element={<ProtectedRoute><FeatureDocumentation /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/worksheet/:shareCode" element={<SharedWorksheet />} />
       <Route path="/results/:studentId/:questionId" element={<StudentResults />} />
