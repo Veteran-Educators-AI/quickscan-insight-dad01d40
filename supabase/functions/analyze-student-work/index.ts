@@ -233,16 +233,17 @@ serve(async (req) => {
     console.log('Assessment mode:', assessmentMode || 'teacher');
     console.log('Rubric steps provided:', rubricSteps?.length || 0);
 
-    // Fetch teacher settings early (for verbosity and grade floor)
+    // Fetch teacher settings early (for verbosity, grade floor, and training mode)
     let feedbackVerbosity = 'concise';
     let gradeFloor = customGradeFloor || 55;
     let gradeFloorWithEffort = customGradeFloorWithEffort || 65;
+    let aiTrainingMode = 'learning';
     
     if (effectiveTeacherId && supabase) {
       try {
         const { data: settingsData } = await supabase
           .from('settings')
-          .select('grade_floor, grade_floor_with_effort, ai_feedback_verbosity')
+          .select('grade_floor, grade_floor_with_effort, ai_feedback_verbosity, ai_training_mode')
           .eq('teacher_id', effectiveTeacherId)
           .maybeSingle();
         
@@ -252,12 +253,72 @@ serve(async (req) => {
             gradeFloorWithEffort = settingsData.grade_floor_with_effort ?? 65;
           }
           feedbackVerbosity = settingsData.ai_feedback_verbosity ?? 'concise';
+          aiTrainingMode = settingsData.ai_training_mode ?? 'learning';
         }
       } catch (settingsError) {
         console.error('Error fetching teacher settings:', settingsError);
       }
     }
     console.log('Feedback verbosity:', feedbackVerbosity);
+    console.log('AI training mode:', aiTrainingMode);
+
+    // Fetch grading corrections for AI training (if training mode is enabled)
+    let gradingStyleContext = '';
+    if (supabase && effectiveTeacherId && aiTrainingMode !== 'off') {
+      try {
+        const { data: corrections } = await supabase
+          .from('grading_corrections')
+          .select('ai_grade, corrected_grade, correction_reason, grading_focus, strictness_indicator, topic_name')
+          .eq('teacher_id', effectiveTeacherId)
+          .order('created_at', { ascending: false })
+          .limit(30);
+
+        if (corrections && corrections.length > 0) {
+          // Analyze teacher's grading patterns
+          const avgDiff = corrections.reduce((sum: number, c: any) => sum + (c.corrected_grade - c.ai_grade), 0) / corrections.length;
+          const strictnessPatterns = corrections.filter((c: any) => c.strictness_indicator).map((c: any) => c.strictness_indicator);
+          const mostCommonStrictness = strictnessPatterns.length > 0 
+            ? strictnessPatterns.sort((a: string, b: string) =>
+                strictnessPatterns.filter((v: string) => v === a).length - strictnessPatterns.filter((v: string) => v === b).length
+              ).pop()
+            : null;
+
+          // Get common grading focuses
+          const allFocuses = corrections.flatMap((c: any) => c.grading_focus || []);
+          const focusCounts: Record<string, number> = {};
+          allFocuses.forEach((f: string) => { focusCounts[f] = (focusCounts[f] || 0) + 1; });
+          const topFocuses = Object.entries(focusCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([focus]) => focus);
+
+          // Get specific correction examples
+          const recentExamples = corrections.slice(0, 5).map((c: any) => 
+            `• AI gave ${c.ai_grade}, teacher corrected to ${c.corrected_grade}${c.correction_reason ? `: "${c.correction_reason}"` : ''}`
+          ).join('\n');
+
+          gradingStyleContext = `
+TEACHER'S GRADING STYLE (Learned from ${corrections.length} corrections):
+
+GRADING TENDENCY:
+- Teacher typically ${avgDiff > 3 ? 'gives HIGHER grades than AI' : avgDiff < -3 ? 'gives LOWER grades than AI' : 'agrees with AI grading'}
+- Average grade adjustment: ${avgDiff > 0 ? '+' : ''}${avgDiff.toFixed(1)} points
+${mostCommonStrictness ? `- Overall style: ${mostCommonStrictness === 'more_lenient' ? 'More LENIENT than standard' : mostCommonStrictness === 'more_strict' ? 'More STRICT than standard' : 'Standard strictness'}` : ''}
+
+${topFocuses.length > 0 ? `TEACHER PRIORITIES (What they focus on when grading):
+${topFocuses.map(f => `• ${f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`).join('\n')}` : ''}
+
+RECENT CORRECTION EXAMPLES:
+${recentExamples}
+
+APPLY THIS STYLE: Grade in a way that aligns with this teacher's demonstrated preferences. ${avgDiff > 3 ? 'Be more generous with partial credit.' : avgDiff < -3 ? 'Be stricter about showing complete work.' : ''}
+`;
+          console.log(`Loaded ${corrections.length} grading corrections for training context`);
+        }
+      } catch (correctionError) {
+        console.error('Error fetching grading corrections:', correctionError);
+      }
+    }
 
     // Fetch past verification decisions to improve AI grading accuracy
     let verificationContext = '';
@@ -458,6 +519,7 @@ CRITICAL ANALYSIS CONSTRAINTS (Hallucination-Shield Protocol):
 
 ${hallucinationShieldContext}
 ${verificationContext}
+${gradingStyleContext}
 
 Your task is to:
 1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions - cite exactly what you see
@@ -500,7 +562,7 @@ Steps to follow:
 
 ${hallucinationShieldContext}
 ${verificationContext}
-
+${gradingStyleContext}
 Your task is to:
 1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions - cite exactly what you see
 2. Analyze the student's problem-solving approach using NYS Regents scoring guidelines

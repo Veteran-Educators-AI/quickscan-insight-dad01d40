@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Bot, ShieldAlert, Loader2, Save, Mail, MessageSquare } from 'lucide-react';
+import { Bot, ShieldAlert, Loader2, Save, Mail, MessageSquare, GraduationCap, Brain, Sparkles, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
@@ -18,12 +20,14 @@ interface AIDetectionSettingsData {
   level_drop_notifications: boolean;
   level_a_notifications: boolean;
   ai_feedback_verbosity: 'concise' | 'detailed';
+  ai_training_mode: 'off' | 'learning' | 'trained';
 }
 
 export function AIDetectionSettings() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [correctionCount, setCorrectionCount] = useState(0);
   const [settings, setSettings] = useState<AIDetectionSettingsData>({
     ai_detection_enabled: true,
     ai_detection_threshold: 80,
@@ -32,6 +36,7 @@ export function AIDetectionSettings() {
     level_drop_notifications: true,
     level_a_notifications: true,
     ai_feedback_verbosity: 'concise',
+    ai_training_mode: 'learning',
   });
 
   useEffect(() => {
@@ -42,25 +47,34 @@ export function AIDetectionSettings() {
 
   const fetchSettings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('ai_detection_enabled, ai_detection_threshold, ai_auto_reject_enabled, parent_ai_notifications, level_drop_notifications, level_a_notifications, ai_feedback_verbosity')
-        .eq('teacher_id', user!.id)
-        .maybeSingle();
+      const [settingsResult, correctionsResult] = await Promise.all([
+        supabase
+          .from('settings')
+          .select('ai_detection_enabled, ai_detection_threshold, ai_auto_reject_enabled, parent_ai_notifications, level_drop_notifications, level_a_notifications, ai_feedback_verbosity, ai_training_mode')
+          .eq('teacher_id', user!.id)
+          .maybeSingle(),
+        supabase
+          .from('grading_corrections')
+          .select('id', { count: 'exact', head: true })
+          .eq('teacher_id', user!.id)
+      ]);
 
-      if (error) throw error;
+      if (settingsResult.error) throw settingsResult.error;
 
-      if (data) {
+      if (settingsResult.data) {
         setSettings({
-          ai_detection_enabled: data.ai_detection_enabled ?? true,
-          ai_detection_threshold: data.ai_detection_threshold ?? 80,
-          ai_auto_reject_enabled: data.ai_auto_reject_enabled ?? true,
-          parent_ai_notifications: data.parent_ai_notifications ?? true,
-          level_drop_notifications: data.level_drop_notifications ?? true,
-          level_a_notifications: data.level_a_notifications ?? true,
-          ai_feedback_verbosity: (data.ai_feedback_verbosity as 'concise' | 'detailed') ?? 'concise',
+          ai_detection_enabled: settingsResult.data.ai_detection_enabled ?? true,
+          ai_detection_threshold: settingsResult.data.ai_detection_threshold ?? 80,
+          ai_auto_reject_enabled: settingsResult.data.ai_auto_reject_enabled ?? true,
+          parent_ai_notifications: settingsResult.data.parent_ai_notifications ?? true,
+          level_drop_notifications: settingsResult.data.level_drop_notifications ?? true,
+          level_a_notifications: settingsResult.data.level_a_notifications ?? true,
+          ai_feedback_verbosity: (settingsResult.data.ai_feedback_verbosity as 'concise' | 'detailed') ?? 'concise',
+          ai_training_mode: (settingsResult.data.ai_training_mode as 'off' | 'learning' | 'trained') ?? 'learning',
         });
       }
+
+      setCorrectionCount(correctionsResult.count || 0);
     } catch (error) {
       console.error('Error fetching settings:', error);
     } finally {
@@ -84,6 +98,7 @@ export function AIDetectionSettings() {
           level_drop_notifications: settings.level_drop_notifications,
           level_a_notifications: settings.level_a_notifications,
           ai_feedback_verbosity: settings.ai_feedback_verbosity,
+          ai_training_mode: settings.ai_training_mode,
         }, { onConflict: 'teacher_id' });
 
       if (error) throw error;
@@ -95,6 +110,22 @@ export function AIDetectionSettings() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const getTrainingProgress = () => {
+    // 50 corrections = fully trained
+    const targetCorrections = 50;
+    return Math.min(100, (correctionCount / targetCorrections) * 100);
+  };
+
+  const getTrainingStatusBadge = () => {
+    if (settings.ai_training_mode === 'off') {
+      return <Badge variant="secondary">Disabled</Badge>;
+    }
+    if (settings.ai_training_mode === 'trained' || correctionCount >= 50) {
+      return <Badge className="bg-green-500 text-white"><CheckCircle2 className="h-3 w-3 mr-1" /> Trained</Badge>;
+    }
+    return <Badge variant="outline" className="border-amber-500 text-amber-600"><Brain className="h-3 w-3 mr-1" /> Learning ({correctionCount}/50)</Badge>;
   };
 
   if (isLoading) {
@@ -119,6 +150,75 @@ export function AIDetectionSettings() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* AI Training Mode Section */}
+        <div className="space-y-3 p-4 rounded-lg border bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <GraduationCap className="h-5 w-5 text-purple-600" />
+              <Label className="text-base font-semibold">AI Grading Training</Label>
+            </div>
+            {getTrainingStatusBadge()}
+          </div>
+          
+          <p className="text-sm text-muted-foreground">
+            Train the AI to grade in your style. When you correct AI grades, the system learns your preferences.
+          </p>
+
+          <Select
+            value={settings.ai_training_mode}
+            onValueChange={(value: 'off' | 'learning' | 'trained') => 
+              setSettings(prev => ({ ...prev, ai_training_mode: value }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="off">
+                <div className="flex flex-col items-start">
+                  <span className="font-medium">Off</span>
+                  <span className="text-xs text-muted-foreground">Use standard grading only</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="learning">
+                <div className="flex flex-col items-start">
+                  <span className="font-medium flex items-center gap-1">
+                    <Brain className="h-3 w-3" /> Learning Mode
+                  </span>
+                  <span className="text-xs text-muted-foreground">AI learns from your corrections</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="trained">
+                <div className="flex flex-col items-start">
+                  <span className="font-medium flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" /> Trained Mode
+                  </span>
+                  <span className="text-xs text-muted-foreground">AI applies your grading style</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          {settings.ai_training_mode !== 'off' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Training Progress</span>
+                <span className="font-medium">{correctionCount} corrections</span>
+              </div>
+              <Progress value={getTrainingProgress()} className="h-2" />
+              <p className="text-xs text-muted-foreground">
+                {correctionCount < 10 
+                  ? "Start correcting AI grades to train the system on your preferences."
+                  : correctionCount < 30 
+                  ? "Good progress! Keep correcting grades to improve accuracy."
+                  : correctionCount < 50 
+                  ? "Almost there! A few more corrections will optimize the AI."
+                  : "Fully trained! The AI now grades in your style."}
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* AI Feedback Verbosity */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">

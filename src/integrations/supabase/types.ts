@@ -567,6 +567,79 @@ export type Database = {
           },
         ]
       }
+      grading_corrections: {
+        Row: {
+          ai_grade: number
+          ai_justification: string | null
+          ai_regents_score: number | null
+          attempt_id: string | null
+          corrected_grade: number
+          corrected_regents_score: number | null
+          correction_reason: string | null
+          created_at: string
+          grading_focus: string[] | null
+          id: string
+          strictness_indicator: string | null
+          student_id: string | null
+          teacher_id: string
+          topic_name: string
+        }
+        Insert: {
+          ai_grade: number
+          ai_justification?: string | null
+          ai_regents_score?: number | null
+          attempt_id?: string | null
+          corrected_grade: number
+          corrected_regents_score?: number | null
+          correction_reason?: string | null
+          created_at?: string
+          grading_focus?: string[] | null
+          id?: string
+          strictness_indicator?: string | null
+          student_id?: string | null
+          teacher_id: string
+          topic_name: string
+        }
+        Update: {
+          ai_grade?: number
+          ai_justification?: string | null
+          ai_regents_score?: number | null
+          attempt_id?: string | null
+          corrected_grade?: number
+          corrected_regents_score?: number | null
+          correction_reason?: string | null
+          created_at?: string
+          grading_focus?: string[] | null
+          id?: string
+          strictness_indicator?: string | null
+          student_id?: string | null
+          teacher_id?: string
+          topic_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grading_corrections_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grading_corrections_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grading_corrections_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interpretation_verifications: {
         Row: {
           attempt_id: string | null
@@ -1171,6 +1244,7 @@ export type Database = {
           ai_detection_threshold: number | null
           ai_feedback_verbosity: string | null
           ai_hourly_limit: number | null
+          ai_training_mode: string | null
           analysis_provider: string | null
           auto_handwriting_grouping_enabled: boolean | null
           auto_push_enabled: boolean | null
@@ -1206,6 +1280,7 @@ export type Database = {
           ai_detection_threshold?: number | null
           ai_feedback_verbosity?: string | null
           ai_hourly_limit?: number | null
+          ai_training_mode?: string | null
           analysis_provider?: string | null
           auto_handwriting_grouping_enabled?: boolean | null
           auto_push_enabled?: boolean | null
@@ -1241,6 +1316,7 @@ export type Database = {
           ai_detection_threshold?: number | null
           ai_feedback_verbosity?: string | null
           ai_hourly_limit?: number | null
+          ai_training_mode?: string | null
           analysis_provider?: string | null
           auto_handwriting_grouping_enabled?: boolean | null
           auto_push_enabled?: boolean | null

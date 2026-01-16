@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit2, RefreshCw, CheckCircle } from 'lucide-react';
+import { Edit2, RefreshCw, CheckCircle, Brain } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useGradingCorrections } from '@/hooks/useGradingCorrections';
+import { toast } from 'sonner';
 
 interface ReassessmentCriteria {
   id: string;
@@ -68,6 +70,10 @@ interface GradeOverrideDialogProps {
   currentJustification?: string;
   onOverride: (grade: number, justification: string) => void;
   disabled?: boolean;
+  studentId?: string;
+  attemptId?: string;
+  topicName?: string;
+  regentsScore?: number;
 }
 
 export function GradeOverrideDialog({
@@ -75,12 +81,18 @@ export function GradeOverrideDialog({
   currentJustification,
   onOverride,
   disabled = false,
+  studentId,
+  attemptId,
+  topicName = 'General',
+  regentsScore,
 }: GradeOverrideDialogProps) {
   const [open, setOpen] = useState(false);
   const [grade, setGrade] = useState(currentGrade);
   const [justification, setJustification] = useState(currentJustification || '');
   const [selectedCriteria, setSelectedCriteria] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>('quick');
+  const [isSaving, setIsSaving] = useState(false);
+  const { saveCorrection } = useGradingCorrections();
 
   const handleCriteriaToggle = (criteriaId: string) => {
     setSelectedCriteria(prev => {
@@ -110,11 +122,45 @@ export function GradeOverrideDialog({
     });
   };
 
-  const handleSubmit = () => {
-    if (justification.trim()) {
-      onOverride(grade, justification.trim());
-      setOpen(false);
+  const handleSubmit = async () => {
+    if (!justification.trim()) return;
+    
+    setIsSaving(true);
+    
+    // Map selected criteria to grading focus
+    const gradingFocus = selectedCriteria.map(id => {
+      switch (id) {
+        case 'showed_work': return 'work_shown';
+        case 'partial_understanding': return 'partial_credit';
+        case 'computational_error': return 'methodology';
+        case 'effort_evident': return 'effort';
+        default: return id;
+      }
+    });
+    
+    // Save the correction for AI training
+    const result = await saveCorrection({
+      studentId,
+      attemptId,
+      topicName,
+      aiGrade: Math.round(currentGrade),
+      aiRegentsScore: regentsScore,
+      aiJustification: currentJustification,
+      correctedGrade: Math.round(grade),
+      correctionReason: justification.trim(),
+      gradingFocus: gradingFocus.length > 0 ? gradingFocus : undefined,
+    });
+
+    if (result.success) {
+      toast.success('Grade updated & AI training saved', {
+        description: 'The AI will learn from this correction.',
+        icon: <Brain className="h-4 w-4" />,
+      });
     }
+    
+    onOverride(grade, justification.trim());
+    setIsSaving(false);
+    setOpen(false);
   };
 
   const handleReset = () => {
@@ -258,15 +304,21 @@ export function GradeOverrideDialog({
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={handleReset}>
+          <Button variant="outline" onClick={handleReset} disabled={isSaving}>
             Reset
           </Button>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={!justification.trim()}>
-            <CheckCircle className="h-4 w-4 mr-1" />
-            Save Override
+          <Button onClick={handleSubmit} disabled={!justification.trim() || isSaving}>
+            {isSaving ? (
+              <>Saving...</>
+            ) : (
+              <>
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Save Override
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
