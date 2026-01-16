@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Bot, ShieldAlert, Loader2, Save, Mail } from 'lucide-react';
+import { Bot, ShieldAlert, Loader2, Save, Mail, MessageSquare } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
@@ -16,6 +17,7 @@ interface AIDetectionSettingsData {
   parent_ai_notifications: boolean;
   level_drop_notifications: boolean;
   level_a_notifications: boolean;
+  ai_feedback_verbosity: 'concise' | 'detailed';
 }
 
 export function AIDetectionSettings() {
@@ -29,6 +31,7 @@ export function AIDetectionSettings() {
     parent_ai_notifications: true,
     level_drop_notifications: true,
     level_a_notifications: true,
+    ai_feedback_verbosity: 'concise',
   });
 
   useEffect(() => {
@@ -41,7 +44,7 @@ export function AIDetectionSettings() {
     try {
       const { data, error } = await supabase
         .from('settings')
-        .select('ai_detection_enabled, ai_detection_threshold, ai_auto_reject_enabled, parent_ai_notifications, level_drop_notifications, level_a_notifications')
+        .select('ai_detection_enabled, ai_detection_threshold, ai_auto_reject_enabled, parent_ai_notifications, level_drop_notifications, level_a_notifications, ai_feedback_verbosity')
         .eq('teacher_id', user!.id)
         .maybeSingle();
 
@@ -55,6 +58,7 @@ export function AIDetectionSettings() {
           parent_ai_notifications: data.parent_ai_notifications ?? true,
           level_drop_notifications: data.level_drop_notifications ?? true,
           level_a_notifications: data.level_a_notifications ?? true,
+          ai_feedback_verbosity: (data.ai_feedback_verbosity as 'concise' | 'detailed') ?? 'concise',
         });
       }
     } catch (error) {
@@ -79,6 +83,7 @@ export function AIDetectionSettings() {
           parent_ai_notifications: settings.parent_ai_notifications,
           level_drop_notifications: settings.level_drop_notifications,
           level_a_notifications: settings.level_a_notifications,
+          ai_feedback_verbosity: settings.ai_feedback_verbosity,
         }, { onConflict: 'teacher_id' });
 
       if (error) throw error;
@@ -114,6 +119,41 @@ export function AIDetectionSettings() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* AI Feedback Verbosity */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-primary" />
+            <Label>AI Grading Feedback Style</Label>
+          </div>
+          <Select
+            value={settings.ai_feedback_verbosity}
+            onValueChange={(value: 'concise' | 'detailed') => 
+              setSettings(prev => ({ ...prev, ai_feedback_verbosity: value }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="concise">
+                <div className="flex flex-col items-start">
+                  <span className="font-medium">Concise</span>
+                  <span className="text-xs text-muted-foreground">Brief feedback, under 75 words</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="detailed">
+                <div className="flex flex-col items-start">
+                  <span className="font-medium">Detailed</span>
+                  <span className="text-xs text-muted-foreground">Extended explanations with full context</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Controls how verbose AI grading justifications and feedback are
+          </p>
+        </div>
+
         {/* AI Detection Toggle */}
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
