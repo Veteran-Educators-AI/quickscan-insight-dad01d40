@@ -32,6 +32,7 @@ import { ManualScoringForm } from '@/components/scan/ManualScoringForm';
 import { MultiStudentScanner } from '@/components/scan/MultiStudentScanner';
 import { ScannerImportMode } from '@/components/scan/ScannerImportMode';
 import { GradingModeSelector, GradingMode } from '@/components/scan/GradingModeSelector';
+import { BatchGradingModeSelector, BatchGradingMode } from '@/components/scan/BatchGradingModeSelector';
 import { GradingComparisonView } from '@/components/scan/GradingComparisonView';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
@@ -66,6 +67,8 @@ export default function Scan() {
   const [selectedAnalysisResult, setSelectedAnalysisResult] = useState<'ai' | 'teacher-guided' | null>(null);
   const [batchSaving, setBatchSaving] = useState(false);
   const [batchSavedStudents, setBatchSavedStudents] = useState<Set<string>>(new Set());
+  const [showBatchGradingModeSelector, setShowBatchGradingModeSelector] = useState(false);
+  const [batchAnswerGuideImage, setBatchAnswerGuideImage] = useState<string | null>(null);
   
   const solutionInputRef = useRef<HTMLInputElement>(null);
 
@@ -542,20 +545,37 @@ export default function Scan() {
     }
   };
 
-  const startBatchAnalysis = async () => {
+  const openBatchGradingModeSelector = () => {
     if (batch.items.length === 0) {
       toast.error('Add images to the batch first');
       return;
     }
+    setShowBatchGradingModeSelector(true);
+  };
 
+  const handleBatchGradingModeSelect = async (mode: BatchGradingMode, answerGuideImage?: string) => {
+    setShowBatchGradingModeSelector(false);
+    
     // Check if all items have students assigned
     const unassigned = batch.items.filter(item => !item.studentId);
     if (unassigned.length > 0 && selectedClassId) {
       toast.warning(`${unassigned.length} paper(s) don't have students assigned`);
     }
 
-    toast.info(`Starting batch analysis of ${batch.items.length} papers...`);
-    await batch.startBatchAnalysis(mockRubricSteps);
+    if (mode === 'manual') {
+      // Mark all items as needing manual scoring
+      toast.info('Manual scoring mode selected. Grade each paper individually after reviewing.');
+      return;
+    }
+
+    if (mode === 'teacher-guided' && answerGuideImage) {
+      setBatchAnswerGuideImage(answerGuideImage);
+      toast.info(`Starting teacher-guided analysis of ${batch.items.length} papers...`);
+      await batch.startTeacherGuidedBatchAnalysis(answerGuideImage, mockRubricSteps);
+    } else {
+      toast.info(`Starting AI analysis of ${batch.items.length} papers...`);
+      await batch.startBatchAnalysis(mockRubricSteps);
+    }
     
     const summary = batch.generateSummary();
     setShowBatchReport(true);
@@ -563,6 +583,10 @@ export default function Scan() {
     toast.success('Batch analysis complete!', {
       description: `Average score: ${summary.averageScore}%`,
     });
+  };
+
+  const startBatchAnalysis = async () => {
+    openBatchGradingModeSelector();
   };
 
   const exportPDF = () => {
@@ -2176,6 +2200,18 @@ export default function Scan() {
           }
         }}
       />
+
+      {/* Batch Grading Mode Selector Dialog */}
+      <Dialog open={showBatchGradingModeSelector} onOpenChange={setShowBatchGradingModeSelector}>
+        <DialogContent className="max-w-md">
+          <BatchGradingModeSelector
+            itemCount={batch.items.length}
+            onSelectMode={handleBatchGradingModeSelect}
+            onCancel={() => setShowBatchGradingModeSelector(false)}
+            isProcessing={batch.isProcessing}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

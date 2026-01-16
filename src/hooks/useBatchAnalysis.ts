@@ -112,8 +112,9 @@ interface UseBatchAnalysisReturn {
   detectMultiPageByHandwriting: () => Promise<{ groupsCreated: number; pagesLinked: number }>;
   linkContinuation: (continuationId: string, primaryId: string) => void;
   unlinkContinuation: (continuationId: string) => void;
-  startBatchAnalysis: (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<void>;
+  startBatchAnalysis: (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string, answerGuideImage?: string) => Promise<void>;
   startConfidenceAnalysis: (analysisCount: 2 | 3, rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<void>;
+  startTeacherGuidedBatchAnalysis: (answerGuideImage: string, rubricSteps?: RubricStep[]) => Promise<void>;
   overrideGrade: (itemId: string, newGrade: number, justification: string) => void;
   selectRunAsGrade: (itemId: string, runIndex: number) => void;
   isProcessing: boolean;
@@ -1063,6 +1064,100 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     }));
   }, []);
 
+  // Teacher-guided batch analysis - analyzes all items with a common answer guide
+  const startTeacherGuidedBatchAnalysis = useCallback(async (
+    answerGuideImage: string,
+    rubricSteps?: RubricStep[]
+  ) => {
+    if (items.length === 0 || isProcessing) return;
+
+    setIsProcessing(true);
+    setSummary(null);
+
+    const currentItems = [...items];
+
+    for (let i = 0; i < currentItems.length; i++) {
+      const item = currentItems[i];
+      
+      // Skip continuation pages - they'll be analyzed with their primary paper
+      if (item.pageType === 'continuation' && item.continuationOf) {
+        setItems(prev => prev.map((it, idx) => 
+          idx === i ? { ...it, status: 'completed' } : it
+        ));
+        continue;
+      }
+
+      setCurrentIndex(i);
+      
+      // Mark current item as analyzing
+      setItems(prev => prev.map((it, idx) => 
+        idx === i ? { ...it, status: 'analyzing' } : it
+      ));
+
+      // Mark any continuation pages as analyzing too
+      if (item.continuationPages && item.continuationPages.length > 0) {
+        setItems(prev => prev.map(it => 
+          item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing' } : it
+        ));
+      }
+
+      try {
+        // Get all continuation page images
+        const additionalImages: string[] = [];
+        if (item.continuationPages && item.continuationPages.length > 0) {
+          for (const contId of item.continuationPages) {
+            const contItem = currentItems.find(it => it.id === contId);
+            if (contItem) {
+              additionalImages.push(contItem.imageDataUrl);
+            }
+          }
+        }
+
+        const { data, error } = await supabase.functions.invoke('analyze-student-work', {
+          body: {
+            imageBase64: item.imageDataUrl,
+            additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
+            answerGuideBase64: answerGuideImage,
+            rubricSteps,
+            studentName: item.studentName,
+            teacherId: user?.id,
+            assessmentMode: 'teacher-guided',
+          },
+        });
+
+        if (error) {
+          const errorMsg = handleApiError(error, 'Analysis');
+          throw new Error(errorMsg);
+        }
+        if (data?.error) {
+          const errorMsg = handleApiError({ message: data.error }, 'Analysis');
+          throw new Error(errorMsg);
+        }
+        if (!data?.success || !data?.analysis) throw new Error('Invalid response');
+
+        const curvedAnalysis = applyGradeCurve(data.analysis);
+
+        setItems(prev => prev.map((it, idx) => 
+          idx === i ? { ...it, status: 'completed', result: curvedAnalysis, rawAnalysis: data.rawAnalysis } : it
+        ));
+
+        // Update continuation pages with the same result
+        if (item.continuationPages && item.continuationPages.length > 0) {
+          setItems(prev => prev.map(it => 
+            item.continuationPages!.includes(it.id) ? { ...it, status: 'completed', result: curvedAnalysis } : it
+          ));
+        }
+      } catch (err) {
+        setItems(prev => prev.map((it, idx) => 
+          idx === i ? { ...it, status: 'failed', error: err instanceof Error ? err.message : 'Analysis failed' } : it
+        ));
+      }
+    }
+
+    setCurrentIndex(-1);
+    setIsProcessing(false);
+  }, [items, isProcessing, user?.id]);
+
   const generateSummary = useCallback((): BatchSummary => {
     // Only count primary pages (not continuations) to avoid double-counting
     const completedItems = items.filter(item => 
@@ -1163,6 +1258,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     unlinkContinuation,
     startBatchAnalysis,
     startConfidenceAnalysis,
+    startTeacherGuidedBatchAnalysis,
     overrideGrade,
     selectRunAsGrade,
     isProcessing,
