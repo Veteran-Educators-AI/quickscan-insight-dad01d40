@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { NYS_SUBJECTS, searchTopics, type JMAPTopic, type TopicCategory } from '@/data/nysTopics';
 import { WorksheetBuilder, type WorksheetQuestion } from '@/components/questions/WorksheetBuilder';
 import { DifferentiatedWorksheetGenerator } from '@/components/questions/DifferentiatedWorksheetGenerator';
+import { AdaptiveWorksheetGenerator } from '@/components/questions/AdaptiveWorksheetGenerator';
 import { LessonPlanGenerator } from '@/components/questions/LessonPlanGenerator';
 import { LessonPlanLibrary } from '@/components/questions/LessonPlanLibrary';
 import { LessonTopicSelector, type PresentationTheme } from '@/components/questions/LessonTopicSelector';
@@ -35,6 +36,7 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
   const [showTopicSelector, setShowTopicSelector] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<PresentationTheme | null>(null);
   const [showMasteryChallenge, setShowMasteryChallenge] = useState(false);
+  const [showAdaptiveGenerator, setShowAdaptiveGenerator] = useState(false);
 
   // Get selected topics as array for passing to generator
   const getSelectedTopicsArray = () => {
@@ -439,6 +441,13 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                 )}
               </Button>
               <Button 
+                onClick={() => setShowAdaptiveGenerator(true)}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                <Brain className="h-4 w-4 mr-2" />
+                Adaptive Worksheets
+              </Button>
+              <Button 
                 onClick={() => setShowMasteryChallenge(true)}
                 variant="outline"
                 className="border-amber-300 text-amber-700 hover:bg-amber-50"
@@ -728,6 +737,12 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
       <MasteryChallengeGenerator
         open={showMasteryChallenge}
         onOpenChange={setShowMasteryChallenge}
+      />
+
+      {/* Adaptive Worksheet Generator Modal */}
+      <AdaptiveWorksheetGenerator
+        open={showAdaptiveGenerator}
+        onOpenChange={setShowAdaptiveGenerator}
       />
     </AppLayout>
   );
