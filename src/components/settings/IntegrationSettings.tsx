@@ -74,7 +74,9 @@ export function IntegrationSettings() {
   // --- Webhook Configuration ---
   // The external webhook URL (e.g., Zapier or n8n webhook endpoint)
   // Format: "https://hooks.zapier.com/hooks/catch/..." or similar
-  const [webhookUrl, setWebhookUrl] = useState("");
+  // Default to Nyclogic Sentry webhook
+  const NYCLOGIC_SENTRY_WEBHOOK = "https://tscxbmozbvmbmbslccpu.supabase.co/functions/v1/webhook-receive";
+  const [webhookUrl, setWebhookUrl] = useState(NYCLOGIC_SENTRY_WEBHOOK);
   // Master toggle for webhook integration - when false, no data is sent
   const [webhookEnabled, setWebhookEnabled] = useState(false);
 
@@ -141,7 +143,8 @@ export function IntegrationSettings() {
 
       // If we found settings, update our state with the saved values
       if (data) {
-        setWebhookUrl(data.integration_webhook_url || "");
+        // Use saved webhook URL or default to Nyclogic Sentry
+        setWebhookUrl(data.integration_webhook_url || NYCLOGIC_SENTRY_WEBHOOK);
         setWebhookEnabled(data.integration_webhook_enabled || false);
         setSisterAppSyncEnabled(data.sister_app_sync_enabled || false);
         // Use saved multipliers or fall back to defaults (0.5 for XP, 0.25 for coins)
@@ -440,7 +443,7 @@ export function IntegrationSettings() {
         {/* Explains how to get a webhook URL from Zapier or n8n */}
         <Alert>
           <AlertDescription>
-            <strong>Setup:</strong> Create a Zap in Zapier or workflow in n8n with a "Webhooks by Zapier" or "Webhook" trigger, then paste the webhook URL below.
+            <strong>Nyclogic Sentry:</strong> The webhook is pre-configured to send data to Nyclogic Sentry for real-time monitoring and alerts.
           </AlertDescription>
         </Alert>
 
@@ -448,9 +451,9 @@ export function IntegrationSettings() {
         {/* Master switch for the webhook integration */}
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <Label htmlFor="webhook-enabled">Enable Integration</Label>
+            <Label htmlFor="webhook-enabled">Enable Nyclogic Sentry Integration</Label>
             <p className="text-sm text-muted-foreground">
-              Push data automatically when student work is analyzed
+              Push data automatically to Nyclogic Sentry when student work is analyzed
             </p>
           </div>
           <Switch
@@ -464,15 +467,26 @@ export function IntegrationSettings() {
         {/* Text field for entering the Zapier/n8n webhook URL */}
         <div className="space-y-2">
           <Label htmlFor="webhook-url">Webhook URL</Label>
-          <Input
-            id="webhook-url"
-            type="url"
-            placeholder="https://hooks.zapier.com/hooks/catch/..."
-            value={webhookUrl}
-            onChange={(e) => setWebhookUrl(e.target.value)}
-          />
+          <div className="flex gap-2">
+            <Input
+              id="webhook-url"
+              type="url"
+              placeholder="https://hooks.zapier.com/hooks/catch/..."
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              className="flex-1"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setWebhookUrl(NYCLOGIC_SENTRY_WEBHOOK)}
+              title="Reset to Nyclogic Sentry"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
           <p className="text-xs text-muted-foreground">
-            Your Zapier or n8n webhook URL
+            Default: Nyclogic Sentry webhook. You can also use a custom Zapier or n8n URL.
           </p>
         </div>
 
