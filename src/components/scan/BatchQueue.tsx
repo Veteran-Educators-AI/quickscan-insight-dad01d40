@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical } from 'lucide-react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +31,7 @@ import { BatchItem } from '@/hooks/useBatchAnalysis';
 import { HandwritingComparisonDialog } from './HandwritingComparisonDialog';
 import { MultiAnalysisBreakdownDialog } from './MultiAnalysisBreakdownDialog';
 import { ManualLinkDialog } from './ManualLinkDialog';
+import { BatchImageZoomDialog } from './BatchImageZoomDialog';
 import {
   DndContext,
   closestCenter,
@@ -185,6 +186,7 @@ export function BatchQueue({
   const [overrideJustification, setOverrideJustification] = useState('');
   const [breakdownDialogItem, setBreakdownDialogItem] = useState<BatchItem | null>(null);
   const [manualLinkItem, setManualLinkItem] = useState<BatchItem | null>(null);
+  const [zoomPreviewIndex, setZoomPreviewIndex] = useState<number | null>(null);
 
   // Get primary pages (not continuations)
   const primaryPages = items.filter(i => i.pageType !== 'continuation');
@@ -397,17 +399,36 @@ export function BatchQueue({
                   {index + 1}
                 </div>
 
-                {/* Thumbnail */}
-                <div className="relative h-12 w-12 rounded-md overflow-hidden bg-muted shrink-0">
-                  <img 
-                    src={item.imageDataUrl} 
-                    alt={`Paper ${index + 1}`}
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-                    {getStatusIcon(item.status)}
-                  </div>
-                </div>
+                {/* Thumbnail - Clickable for zoom */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="relative h-12 w-12 rounded-md overflow-hidden bg-muted shrink-0 group cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setZoomPreviewIndex(index);
+                        }}
+                      >
+                        <img 
+                          src={item.imageDataUrl} 
+                          alt={`Paper ${index + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/60 group-hover:bg-background/40 transition-colors">
+                          {getStatusIcon(item.status)}
+                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center bg-primary/0 group-hover:bg-primary/20 transition-colors">
+                          <ZoomIn className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p className="text-xs">Click to zoom & match paper</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
                 {/* Student Selector with auto-assign indicator */}
                 <div className="flex-1 min-w-0">
@@ -816,7 +837,6 @@ export function BatchQueue({
     />
 
     {/* Manual Link Dialog */}
-    {/* Manual Link Dialog */}
     <ManualLinkDialog
       open={!!manualLinkItem}
       onOpenChange={(open) => !open && setManualLinkItem(null)}
@@ -827,6 +847,25 @@ export function BatchQueue({
         setManualLinkItem(null);
       }}
     />
+
+    {/* Zoom Preview Dialog */}
+    {zoomPreviewIndex !== null && items[zoomPreviewIndex] && (
+      <BatchImageZoomDialog
+        open={zoomPreviewIndex !== null}
+        onOpenChange={(open) => !open && setZoomPreviewIndex(null)}
+        imageUrl={items[zoomPreviewIndex].imageDataUrl}
+        studentName={items[zoomPreviewIndex].studentName || 'Unassigned'}
+        paperIndex={zoomPreviewIndex}
+        totalPapers={items.length}
+        onNavigate={(direction) => {
+          if (direction === 'prev' && zoomPreviewIndex > 0) {
+            setZoomPreviewIndex(zoomPreviewIndex - 1);
+          } else if (direction === 'next' && zoomPreviewIndex < items.length - 1) {
+            setZoomPreviewIndex(zoomPreviewIndex + 1);
+          }
+        }}
+      />
+    )}
     </>
   );
 }
