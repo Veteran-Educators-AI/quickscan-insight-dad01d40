@@ -131,27 +131,101 @@ const identifyMisconceptionCategory = (text: string): { category: string; title:
   return { category: 'Other Errors', title: 'Mathematical error' };
 };
 
-// Get remedies for category
-const getRemediesForCategory = (category: string): string[] => {
+// Get remedies for category with topic context
+const getRemediesForCategory = (category: string, topics: string[] = []): string[] => {
+  const topicContext = topics.length > 0 ? topics[0].replace(/\*\*/g, '').trim() : category;
+  
   const remedies: Record<string, string[]> = {
-    'Sign Errors': ['Number line practice with signed operations', 'Color-coded positive/negative exercises', 'Real-world temperature/elevation problems'],
-    'Order of Operations': ['PEMDAS step-by-step practice', 'Expression evaluation with grouping symbols', 'Error analysis exercises'],
-    'Fraction Operations': ['Visual fraction models', 'Fraction bar manipulatives', 'Cross-multiplication practice'],
-    'Decimal Operations': ['Place value charts', 'Money-based decimal problems', 'Grid models for decimals'],
-    'Algebraic Expressions': ['Variable substitution drills', 'Like terms sorting activities', 'Expression building exercises'],
-    'Equation Solving': ['Balance method visualization', 'Inverse operation practice', 'Equation verification checks'],
-    'Graphing': ['Coordinate plotting practice', 'Slope calculation from points', 'Interactive graphing tools'],
-    'Exponents': ['Exponent rules flashcards', 'Pattern recognition with powers', 'Scientific notation practice'],
-    'Measurement': ['Formula reference sheets', 'Unit analysis practice', 'Real-world measurement applications'],
-    'Geometry Concepts': ['Geometric constructions', 'Angle relationship practice', 'Visual proofs'],
-    'Ratios & Proportions': ['Proportion tables', 'Cross-multiplication practice', 'Real-world ratio problems'],
-    'Calculation Error': ['Timed basic facts practice', 'Mental math strategies', 'Error checking techniques'],
-    'Formula Application': ['Formula derivation activities', 'When-to-use decision trees', 'Formula matching exercises'],
-    'Unit Conversion': ['Conversion factor practice', 'Dimensional analysis', 'Unit relationship charts'],
-    'Incomplete Work': ['Structured solution templates', 'Justification sentence starters', 'Work verification checklists'],
-    'Problem Setup': ['Problem translation exercises', 'Key word identification', 'Diagram drawing practice'],
-    'Conceptual Understanding': ['Concept mapping', 'Explain-to-a-friend activities', 'Multiple representation tasks'],
-    'Other Errors': ['Targeted practice problems', 'One-on-one review', 'Error analysis journals'],
+    'Sign Errors': [
+      `Targeted practice problems on signed number operations within ${topicContext}`,
+      'Number line visualization exercises with positive/negative values',
+      'Real-world context problems (temperature, elevation, debt/credit)',
+    ],
+    'Order of Operations': [
+      `Targeted practice problems on PEMDAS application in ${topicContext}`,
+      'Step-by-step expression evaluation with grouping symbols',
+      'Error analysis: find and fix order-of-operations mistakes',
+    ],
+    'Fraction Operations': [
+      `Targeted practice problems on fraction computation in ${topicContext}`,
+      'Visual fraction model exercises with area/bar models',
+      'Common denominator and reciprocal operation drills',
+    ],
+    'Decimal Operations': [
+      `Targeted practice problems on decimal place value in ${topicContext}`,
+      'Money-based computation problems',
+      'Decimal-fraction conversion exercises',
+    ],
+    'Algebraic Expressions': [
+      `Targeted practice problems on expression manipulation in ${topicContext}`,
+      'Like terms identification and combining drills',
+      'Variable substitution and evaluation exercises',
+    ],
+    'Equation Solving': [
+      `Targeted practice problems on solving equations in ${topicContext}`,
+      'Balance method step-by-step walkthroughs',
+      'Solution verification and checking exercises',
+    ],
+    'Graphing': [
+      `Targeted practice problems on graphing and coordinates in ${topicContext}`,
+      'Slope calculation from multiple representations',
+      'Point plotting and line interpretation exercises',
+    ],
+    'Exponents': [
+      `Targeted practice problems on exponent rules in ${topicContext}`,
+      'Pattern recognition with powers and bases',
+      'Exponent law application drills',
+    ],
+    'Measurement': [
+      `Targeted practice problems on measurement formulas in ${topicContext}`,
+      'Formula selection decision exercises',
+      'Real-world measurement applications with units',
+    ],
+    'Geometry Concepts': [
+      `Targeted practice problems on geometric relationships in ${topicContext}`,
+      'Angle relationship identification exercises',
+      'Property application and proof practice',
+    ],
+    'Ratios & Proportions': [
+      `Targeted practice problems on ratios and proportions in ${topicContext}`,
+      'Cross-multiplication and proportion setup drills',
+      'Real-world rate and ratio applications',
+    ],
+    'Calculation Error': [
+      `Targeted practice problems on arithmetic accuracy in ${topicContext}`,
+      'Mental math strategy development',
+      'Self-checking and estimation techniques',
+    ],
+    'Formula Application': [
+      `Targeted practice problems on formula usage in ${topicContext}`,
+      'When-to-use formula decision trees',
+      'Formula derivation and understanding exercises',
+    ],
+    'Unit Conversion': [
+      `Targeted practice problems on unit conversion in ${topicContext}`,
+      'Dimensional analysis step-by-step practice',
+      'Unit relationship mapping exercises',
+    ],
+    'Incomplete Work': [
+      `Targeted practice problems requiring full justification in ${topicContext}`,
+      'Structured solution template exercises',
+      'Work verification checklist practice',
+    ],
+    'Problem Setup': [
+      `Targeted practice problems on problem translation in ${topicContext}`,
+      'Key information identification exercises',
+      'Diagram and model creation practice',
+    ],
+    'Conceptual Understanding': [
+      `Targeted practice problems on concept application in ${topicContext}`,
+      'Explain-your-reasoning exercises',
+      'Multiple representation tasks',
+    ],
+    'Other Errors': [
+      `Targeted practice problems on ${topicContext}`,
+      'One-on-one review and error analysis',
+      'Focused skill-building exercises',
+    ],
   };
   
   return remedies[category] || remedies['Other Errors'];
@@ -441,14 +515,14 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
           ? 'medium'
           : 'low';
       
-      grouped.push({
+    grouped.push({
         category,
         title: instances[0].title,
         severity,
         studentCount: uniqueStudents.size,
         instances,
         commonTopics: uniqueTopics.slice(0, 3),
-        suggestedRemedies: getRemediesForCategory(category),
+        suggestedRemedies: getRemediesForCategory(category, uniqueTopics),
       });
     });
     
@@ -644,20 +718,26 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
                         </div>
                       </CollapsibleTrigger>
                       
-                      <CollapsibleContent>
+                        <CollapsibleContent>
                         <div className="px-3 pb-3 space-y-3 border-t bg-muted/20">
-                          {/* Suggested Remediation - Compact */}
+                          {/* Suggested Remediation - Clear bounded section */}
                           <div className="pt-3">
-                            <div className="flex items-center gap-1.5 text-xs font-medium text-green-700 dark:text-green-400 mb-1.5">
-                              <Lightbulb className="h-3.5 w-3.5" />
-                              Suggested Remediation Strategies
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {group.suggestedRemedies.map((remedy, idx) => (
-                                <Badge key={idx} variant="outline" className="text-xs font-normal bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300">
-                                  • {remedy}
-                                </Badge>
-                              ))}
+                            <div className="rounded-lg border border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/30 p-3">
+                              <div className="flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400 mb-2">
+                                <Lightbulb className="h-4 w-4" />
+                                Recommended Remediation Strategies
+                              </div>
+                              <ul className="space-y-1.5 ml-1">
+                                {group.suggestedRemedies.map((remedy, idx) => (
+                                  <li key={idx} className="text-sm text-green-800 dark:text-green-300 flex items-start gap-2">
+                                    <span className="text-green-600 dark:text-green-500 mt-0.5">•</span>
+                                    <span>{remedy}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                              <p className="text-xs text-green-600 dark:text-green-500 mt-2 italic border-t border-green-200 dark:border-green-800 pt-2">
+                                These practice sets will be suggested to push to the Scholar App for student completion.
+                              </p>
                             </div>
                           </div>
                           
@@ -707,19 +787,19 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
                                   </span>
                                 </div>
                                 
-                                {/* Error Analysis - Two Distinct Sections */}
+                                {/* Error Analysis - Two Distinct Sections with full text display */}
                                 <div className="space-y-2">
                                   {/* What Went Wrong - Red Section */}
-                                  <div className="rounded border border-destructive/30 bg-destructive/5 p-2">
-                                    <div className="flex items-start gap-1.5">
-                                      <AlertCircle className="h-3.5 w-3.5 text-destructive mt-0.5 shrink-0" />
-                                      <div className="space-y-1 flex-1 min-w-0">
-                                        <p className="text-xs font-medium text-destructive">Error Identified</p>
-                                        <p className="text-xs text-destructive/90 leading-relaxed">
+                                  <div className="rounded-md border-2 border-destructive/40 bg-destructive/5 p-3">
+                                    <div className="flex items-start gap-2">
+                                      <X className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                                      <div className="space-y-1.5 flex-1">
+                                        <p className="text-xs font-semibold text-destructive">What the Student Did Wrong</p>
+                                        <p className="text-sm text-destructive/90 leading-relaxed break-words whitespace-normal">
                                           {instance.specificError}
                                         </p>
                                         {instance.whyItMatters && (
-                                          <p className="text-xs text-destructive/70 italic">
+                                          <p className="text-xs text-destructive/70 italic mt-1 border-t border-destructive/20 pt-1">
                                             Impact: {instance.whyItMatters}
                                           </p>
                                         )}
@@ -728,12 +808,12 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
                                   </div>
                                   
                                   {/* Corrective Action - Green Section */}
-                                  <div className="rounded border border-green-500/30 bg-green-50 dark:bg-green-950/20 p-2">
-                                    <div className="flex items-start gap-1.5">
-                                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mt-0.5 shrink-0" />
-                                      <div className="space-y-1 flex-1 min-w-0">
-                                        <p className="text-xs font-medium text-green-700 dark:text-green-400">Correct Approach</p>
-                                        <p className="text-xs text-green-700/90 dark:text-green-300/90 leading-relaxed">
+                                  <div className="rounded-md border-2 border-green-500/40 bg-green-50 dark:bg-green-950/30 p-3">
+                                    <div className="flex items-start gap-2">
+                                      <Target className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                                      <div className="space-y-1.5 flex-1">
+                                        <p className="text-xs font-semibold text-green-700 dark:text-green-400">What Was Expected</p>
+                                        <p className="text-sm text-green-700/90 dark:text-green-300/90 leading-relaxed break-words whitespace-normal">
                                           {instance.expectedAction}
                                         </p>
                                       </div>
