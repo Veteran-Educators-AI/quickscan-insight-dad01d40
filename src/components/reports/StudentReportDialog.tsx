@@ -1176,36 +1176,34 @@ export function StudentReportDialog({
                   ) : gradeHistory?.length ? (
                     gradeHistory.map(entry => (
                       <Card key={entry.id} className="overflow-hidden">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <p className="font-semibold text-lg">{entry.topic_name}</p>
-                                {entry.nys_standard && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {entry.nys_standard}
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {format(new Date(entry.created_at), 'MMMM d, yyyy h:mm a')}
-                              </p>
+                        <CardContent className="p-5">
+                          {/* Header Row - Topic and Date */}
+                          <div className="mb-4 pb-3 border-b">
+                            <h4 className="font-semibold text-lg leading-tight">{entry.topic_name}</h4>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {format(new Date(entry.created_at), 'MMMM d, yyyy h:mm a')}
+                            </p>
+                          </div>
+
+                          {/* Scores Row - Clear separation */}
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="p-3 bg-muted/30 rounded-lg">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Grade</p>
+                              <span className={cn('text-3xl font-bold', getGradeColor(entry.grade))}>
+                                {entry.grade}%
+                              </span>
+                              {entry.raw_score_earned !== null && entry.raw_score_possible !== null && (
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {entry.raw_score_earned}/{entry.raw_score_possible} pts
+                                </p>
+                              )}
                             </div>
-                            <div className="flex items-center gap-3">
-                              <div className="text-right">
-                                <span className={cn('text-2xl font-bold', getGradeColor(entry.grade))}>
-                                  {entry.grade}%
-                                </span>
-                                {entry.raw_score_earned !== null && entry.raw_score_possible !== null && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {entry.raw_score_earned}/{entry.raw_score_possible} pts
-                                  </p>
-                                )}
-                              </div>
-                              {entry.regents_score !== null && (
+                            <div className="p-3 bg-muted/30 rounded-lg">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Regents Score</p>
+                              {entry.regents_score !== null ? (
                                 <Badge
                                   className={cn(
-                                    'text-white text-lg px-3 py-1',
+                                    'text-white text-xl px-3 py-1',
                                     entry.regents_score >= 5 && 'bg-green-500',
                                     entry.regents_score >= 3 && entry.regents_score < 5 && 'bg-yellow-500',
                                     entry.regents_score < 3 && 'bg-red-500'
@@ -1213,35 +1211,41 @@ export function StudentReportDialog({
                                 >
                                   {entry.regents_score}/6
                                 </Badge>
+                              ) : (
+                                <span className="text-sm text-muted-foreground italic">Not scored</span>
                               )}
                             </div>
                           </div>
+
+                          {/* NYS Standard - Full width */}
+                          <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+                            <p className="text-xs font-medium text-purple-600 dark:text-purple-400 mb-1">NYS Standard</p>
+                            <p className="text-sm">
+                              {entry.nys_standard || 'Standard not specified'}
+                            </p>
+                          </div>
                           
-                          {/* Grade Justification */}
-                          {entry.grade_justification && (
-                            <div className="mt-3 p-3 bg-muted/50 rounded-lg">
-                              <div className="flex items-center gap-2 text-sm font-medium mb-1">
-                                <FileText className="h-4 w-4 text-primary" />
-                                Grade Justification
-                              </div>
-                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                {entry.grade_justification}
-                              </p>
+                          {/* Grade Justification - Full width */}
+                          <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+                            <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                              <FileText className="h-4 w-4 text-primary" />
+                              Grade Justification
                             </div>
-                          )}
+                            <p className="text-sm leading-relaxed">
+                              {entry.grade_justification || 'No justification provided'}
+                            </p>
+                          </div>
                           
-                          {/* Regents Justification */}
-                          {entry.regents_justification && (
-                            <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                              <div className="flex items-center gap-2 text-sm font-medium mb-1 text-blue-700 dark:text-blue-300">
-                                <Award className="h-4 w-4" />
-                                Regents Scoring Rationale
-                              </div>
-                              <p className="text-sm text-blue-600 dark:text-blue-400 whitespace-pre-wrap">
-                                {entry.regents_justification}
-                              </p>
+                          {/* Regents Justification - Full width */}
+                          <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                            <div className="flex items-center gap-2 text-sm font-medium mb-2 text-blue-700 dark:text-blue-300">
+                              <Award className="h-4 w-4" />
+                              Regents Scoring Rationale
                             </div>
-                          )}
+                            <p className="text-sm text-blue-600 dark:text-blue-400 leading-relaxed">
+                              {entry.regents_justification || 'No rationale provided'}
+                            </p>
+                          </div>
                         </CardContent>
                       </Card>
                     ))
