@@ -13,6 +13,8 @@ import {
   ChevronUp,
   Check,
   GraduationCap,
+  Layers,
+  Shuffle,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -56,6 +58,7 @@ interface GeneratedQuestion {
 }
 
 type ChallengeType = 'deeper' | 'application' | 'next-topic';
+type SelectionMode = 'single' | 'multi';
 
 const CHALLENGE_TYPES = {
   deeper: {
@@ -89,13 +92,15 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
   const { toast } = useToast();
   
   const [step, setStep] = useState<'topic' | 'students' | 'configure' | 'preview'>('topic');
-  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('single');
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<MasteryStudent[]>([]);
   const [challengeType, setChallengeType] = useState<ChallengeType>('deeper');
   const [questionCount, setQuestionCount] = useState('5');
   const [includeHints, setIncludeHints] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestion[]>([]);
+  const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
 
   // Fetch students with Level A on any topic (high achievers)
   const { data: masteryStudents, isLoading } = useQuery({
@@ -195,24 +200,113 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
     return grouped;
   }, [masteryStudents]);
 
+  // Group topics by subject area (extract subject from topic name pattern)
+  const topicsBySubject = useMemo(() => {
+    const topics = Object.keys(studentsByTopic);
+    const grouped: Record<string, string[]> = {};
+    
+    topics.forEach(topic => {
+      // Try to extract subject area from topic name
+      // Common patterns: "Algebra - Linear Equations", "Geometry: Triangles", "Number Sense", etc.
+      let subject = 'General Mathematics';
+      
+      if (topic.includes(' - ')) {
+        subject = topic.split(' - ')[0].trim();
+      } else if (topic.includes(': ')) {
+        subject = topic.split(': ')[0].trim();
+      } else if (topic.toLowerCase().includes('algebra')) {
+        subject = 'Algebra';
+      } else if (topic.toLowerCase().includes('geometry')) {
+        subject = 'Geometry';
+      } else if (topic.toLowerCase().includes('number')) {
+        subject = 'Number Sense';
+      } else if (topic.toLowerCase().includes('ratio') || topic.toLowerCase().includes('proportion')) {
+        subject = 'Ratios & Proportions';
+      } else if (topic.toLowerCase().includes('statistics') || topic.toLowerCase().includes('probability')) {
+        subject = 'Statistics & Probability';
+      } else if (topic.toLowerCase().includes('function')) {
+        subject = 'Functions';
+      }
+      
+      if (!grouped[subject]) {
+        grouped[subject] = [];
+      }
+      grouped[subject].push(topic);
+    });
+    
+    return grouped;
+  }, [studentsByTopic]);
+
+  // Single topic selection
   const handleSelectTopic = (topic: string) => {
-    setSelectedTopic(topic);
-    // Auto-select all students in this topic
-    const topicStudents = studentsByTopic[topic] || [];
-    setSelectedStudents(topicStudents.map(s => ({ ...s, selected: true })));
+    if (selectionMode === 'single') {
+      setSelectedTopics([topic]);
+      // Auto-select all students in this topic
+      const topicStudents = studentsByTopic[topic] || [];
+      setSelectedStudents(topicStudents.map(s => ({ ...s, selected: true })));
+      setStep('students');
+    }
+  };
+
+  // Multi-topic toggle
+  const toggleTopicSelection = (topic: string) => {
+    setSelectedTopics(prev => {
+      if (prev.includes(topic)) {
+        return prev.filter(t => t !== topic);
+      }
+      return [...prev, topic];
+    });
+  };
+
+  // Select all topics in a subject area
+  const handleSelectAllSubjectTopics = (subject: string) => {
+    const subjectTopics = topicsBySubject[subject] || [];
+    // Get all students from all topics in this subject
+    const allStudents: MasteryStudent[] = [];
+    subjectTopics.forEach(topic => {
+      const topicStudents = studentsByTopic[topic] || [];
+      topicStudents.forEach(s => {
+        if (!allStudents.some(existing => existing.id === s.id && existing.topicName === s.topicName)) {
+          allStudents.push({ ...s, selected: true });
+        }
+      });
+    });
+    
+    setSelectedTopics(subjectTopics);
+    setSelectedStudents(allStudents);
     setStep('students');
   };
 
-  const toggleStudent = (studentId: string) => {
-    if (!selectedTopic) return;
+  // Proceed with multi-topic selection
+  const handleProceedWithMultiTopics = () => {
+    if (selectedTopics.length === 0) return;
     
+    // Get all students from selected topics
+    const allStudents: MasteryStudent[] = [];
+    selectedTopics.forEach(topic => {
+      const topicStudents = studentsByTopic[topic] || [];
+      topicStudents.forEach(s => {
+        if (!allStudents.some(existing => existing.id === s.id && existing.topicName === s.topicName)) {
+          allStudents.push({ ...s, selected: true });
+        }
+      });
+    });
+    
+    setSelectedStudents(allStudents);
+    setStep('students');
+  };
+
+  const toggleStudent = (studentId: string, topicName?: string) => {
     setSelectedStudents(prev => {
-      const exists = prev.find(s => s.id === studentId);
+      const exists = prev.find(s => s.id === studentId && (!topicName || s.topicName === topicName));
       if (exists) {
-        return prev.filter(s => s.id !== studentId);
+        return prev.filter(s => !(s.id === studentId && (!topicName || s.topicName === topicName)));
       }
       
-      const student = masteryStudents?.find(s => s.id === studentId && s.topicName === selectedTopic);
+      // Find the student in masteryStudents
+      const student = masteryStudents?.find(s => 
+        s.id === studentId && (!topicName || s.topicName === topicName)
+      );
       if (student) {
         return [...prev, { ...student, selected: true }];
       }
@@ -221,18 +315,38 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
   };
 
   const toggleAllStudents = () => {
-    if (!selectedTopic) return;
+    // Get all students from selected topics
+    const allStudents: MasteryStudent[] = [];
+    selectedTopics.forEach(topic => {
+      const topicStudents = studentsByTopic[topic] || [];
+      topicStudents.forEach(s => {
+        if (!allStudents.some(existing => existing.id === s.id && existing.topicName === s.topicName)) {
+          allStudents.push(s);
+        }
+      });
+    });
     
-    const topicStudents = studentsByTopic[selectedTopic] || [];
-    const allSelected = topicStudents.every(s => 
-      selectedStudents.some(sel => sel.id === s.id)
+    const allSelected = allStudents.every(s => 
+      selectedStudents.some(sel => sel.id === s.id && sel.topicName === s.topicName)
     );
 
     if (allSelected) {
       setSelectedStudents([]);
     } else {
-      setSelectedStudents(topicStudents.map(s => ({ ...s, selected: true })));
+      setSelectedStudents(allStudents.map(s => ({ ...s, selected: true })));
     }
+  };
+
+  const toggleSubjectExpanded = (subject: string) => {
+    setExpandedSubjects(prev => {
+      const next = new Set(prev);
+      if (next.has(subject)) {
+        next.delete(subject);
+      } else {
+        next.add(subject);
+      }
+      return next;
+    });
   };
 
   const handleGenerate = async () => {
@@ -302,14 +416,30 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
 
   const handleClose = () => {
     setStep('topic');
-    setSelectedTopic(null);
+    setSelectionMode('single');
+    setSelectedTopics([]);
     setSelectedStudents([]);
     setGeneratedQuestions([]);
+    setExpandedSubjects(new Set());
     onOpenChange(false);
   };
 
-  const studentsForSelectedTopic = selectedTopic ? (studentsByTopic[selectedTopic] || []) : [];
+  // Get students for selected topics
+  const studentsForSelectedTopics = useMemo(() => {
+    const allStudents: MasteryStudent[] = [];
+    selectedTopics.forEach(topic => {
+      const topicStudents = studentsByTopic[topic] || [];
+      topicStudents.forEach(s => {
+        if (!allStudents.some(existing => existing.id === s.id && existing.topicName === s.topicName)) {
+          allStudents.push(s);
+        }
+      });
+    });
+    return allStudents;
+  }, [selectedTopics, studentsByTopic]);
+
   const topics = Object.keys(studentsByTopic);
+  const subjects = Object.keys(topicsBySubject);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -344,43 +474,151 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
                 </Card>
               ) : (
                 <div className="space-y-4">
+                  {/* Mode Toggle */}
+                  <div className="flex gap-2 mb-4">
+                    <Button
+                      variant={selectionMode === 'single' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setSelectionMode('single');
+                        setSelectedTopics([]);
+                      }}
+                    >
+                      Single Topic
+                    </Button>
+                    <Button
+                      variant={selectionMode === 'multi' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setSelectionMode('multi');
+                        setSelectedTopics([]);
+                      }}
+                      className="gap-1"
+                    >
+                      <Layers className="h-4 w-4" />
+                      Multi-Topic
+                    </Button>
+                  </div>
+
                   <div className="mb-4">
-                    <h3 className="font-medium text-base mb-1">Step 1: Select a Topic</h3>
+                    <h3 className="font-medium text-base mb-1">
+                      Step 1: {selectionMode === 'single' ? 'Select a Topic' : 'Select Multiple Topics'}
+                    </h3>
                     <p className="text-sm text-muted-foreground">
-                      Choose a topic where students have demonstrated mastery. All students who achieved Level A or 95%+ will be shown.
+                      {selectionMode === 'single' 
+                        ? 'Choose a topic where students have demonstrated mastery.'
+                        : 'Select multiple topics or use "Mix All" to combine all subtopics in a subject area.'}
                     </p>
                   </div>
 
-                  <div className="grid gap-3">
-                    {topics.map((topic) => {
-                      const studentCount = studentsByTopic[topic]?.length || 0;
+                  {/* Topics grouped by subject */}
+                  <div className="space-y-3">
+                    {subjects.map((subject) => {
+                      const subjectTopics = topicsBySubject[subject] || [];
+                      const isExpanded = expandedSubjects.has(subject);
+                      const totalStudents = subjectTopics.reduce((sum, t) => sum + (studentsByTopic[t]?.length || 0), 0);
+                      const selectedInSubject = subjectTopics.filter(t => selectedTopics.includes(t)).length;
+                      
                       return (
-                        <Card 
-                          key={topic}
-                          className="cursor-pointer hover:border-amber-500 transition-colors"
-                          onClick={() => handleSelectTopic(topic)}
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                                  <BookOpen className="h-5 w-5 text-amber-600" />
+                        <Card key={subject} className="overflow-hidden">
+                          <Collapsible open={isExpanded} onOpenChange={() => toggleSubjectExpanded(subject)}>
+                            <CollapsibleTrigger className="w-full">
+                              <CardHeader className="py-3 px-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    {isExpanded ? (
+                                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                    <div className="text-left">
+                                      <CardTitle className="text-sm font-semibold">{subject}</CardTitle>
+                                      <CardDescription className="text-xs">
+                                        {subjectTopics.length} topic{subjectTopics.length !== 1 ? 's' : ''} • {totalStudents} student{totalStudents !== 1 ? 's' : ''}
+                                      </CardDescription>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {selectionMode === 'multi' && selectedInSubject > 0 && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        {selectedInSubject} selected
+                                      </Badge>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="gap-1 text-xs"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSelectAllSubjectTopics(subject);
+                                      }}
+                                    >
+                                      <Shuffle className="h-3 w-3" />
+                                      Mix All
+                                    </Button>
+                                  </div>
                                 </div>
-                                <div>
-                                  <h4 className="font-medium">{topic}</h4>
-                                  <p className="text-sm text-muted-foreground">
-                                    {studentCount} student{studentCount !== 1 ? 's' : ''} at mastery level
-                                  </p>
+                              </CardHeader>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <CardContent className="pt-0 pb-3 px-4">
+                                <div className="grid gap-2">
+                                  {subjectTopics.map((topic) => {
+                                    const studentCount = studentsByTopic[topic]?.length || 0;
+                                    const isSelected = selectedTopics.includes(topic);
+                                    
+                                    return (
+                                      <div
+                                        key={topic}
+                                        className={cn(
+                                          'flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors',
+                                          isSelected 
+                                            ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700'
+                                            : 'hover:bg-muted/50 border border-transparent'
+                                        )}
+                                        onClick={() => {
+                                          if (selectionMode === 'single') {
+                                            handleSelectTopic(topic);
+                                          } else {
+                                            toggleTopicSelection(topic);
+                                          }
+                                        }}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          {selectionMode === 'multi' && (
+                                            <Checkbox
+                                              checked={isSelected}
+                                              onCheckedChange={() => toggleTopicSelection(topic)}
+                                            />
+                                          )}
+                                          <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                                            <BookOpen className="h-4 w-4 text-amber-600" />
+                                          </div>
+                                          <div>
+                                            <h4 className="font-medium text-sm">{topic}</h4>
+                                            <p className="text-xs text-muted-foreground">
+                                              {studentCount} student{studentCount !== 1 ? 's' : ''} at mastery
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <Badge className={cn('text-xs', LEVEL_COLORS['A'])}>
+                                            Level A
+                                          </Badge>
+                                          {selectionMode === 'single' && (
+                                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                                          )}
+                                          {isSelected && selectionMode === 'multi' && (
+                                            <Check className="h-4 w-4 text-amber-600" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Badge className={cn('text-xs', LEVEL_COLORS['A'])}>
-                                  Level A
-                                </Badge>
-                                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                            </div>
-                          </CardContent>
+                              </CardContent>
+                            </CollapsibleContent>
+                          </Collapsible>
                         </Card>
                       );
                     })}
@@ -391,23 +629,34 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
 
             <DialogFooter>
               <Button variant="outline" onClick={handleClose}>Cancel</Button>
+              {selectionMode === 'multi' && selectedTopics.length > 0 && (
+                <Button 
+                  onClick={handleProceedWithMultiTopics}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Continue ({selectedTopics.length} topics)
+                </Button>
+              )}
             </DialogFooter>
           </>
         )}
 
-        {/* Step 2: Select Students from Topic */}
-        {step === 'students' && selectedTopic && (
+        {/* Step 2: Select Students from Topic(s) */}
+        {step === 'students' && selectedTopics.length > 0 && (
           <>
             <ScrollArea className="flex-1 pr-4">
               <div className="space-y-4">
                 <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge className="bg-amber-500">{selectedTopic}</Badge>
-                    <Badge variant="outline">{studentsForSelectedTopic.length} students</Badge>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    {selectedTopics.map(topic => (
+                      <Badge key={topic} className="bg-amber-500">{topic}</Badge>
+                    ))}
+                    <Badge variant="outline">{studentsForSelectedTopics.length} students total</Badge>
                   </div>
                   <h3 className="font-medium text-base mb-1">Step 2: Select Students</h3>
                   <p className="text-sm text-muted-foreground">
-                    All students who mastered this topic are pre-selected. Uncheck any you want to exclude.
+                    All students who mastered the selected topic(s) are pre-selected. Uncheck any you want to exclude.
                   </p>
                 </div>
 
@@ -416,52 +665,106 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <Checkbox
-                          checked={selectedStudents.length === studentsForSelectedTopic.length}
+                          checked={selectedStudents.length === studentsForSelectedTopics.length}
                           onCheckedChange={toggleAllStudents}
                         />
-                        <span className="font-medium">Select All ({studentsForSelectedTopic.length})</span>
+                        <span className="font-medium">Select All ({studentsForSelectedTopics.length})</span>
                       </div>
                       <Badge variant="secondary">
                         {selectedStudents.length} selected
                       </Badge>
                     </div>
                     
-                    <div className="grid gap-2">
-                      {studentsForSelectedTopic.map(student => {
-                        const isSelected = selectedStudents.some(s => s.id === student.id);
-                        
-                        return (
-                          <div
-                            key={student.id}
-                            className={cn(
-                              'flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors',
-                              isSelected 
-                                ? 'bg-white dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700'
-                                : 'bg-muted/30 hover:bg-muted/50'
-                            )}
-                            onClick={() => toggleStudent(student.id)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Checkbox
-                                checked={isSelected}
-                                onCheckedChange={() => toggleStudent(student.id)}
-                              />
-                              <div>
-                                <p className="font-medium">
-                                  {student.firstName} {student.lastName}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {student.latestGrade !== null ? `Score: ${student.latestGrade}%` : 'Level A achieved'}
-                                </p>
+                    {/* Group students by topic for multi-topic mode */}
+                    {selectedTopics.length > 1 ? (
+                      <div className="space-y-4">
+                        {selectedTopics.map(topic => {
+                          const topicStudents = studentsByTopic[topic] || [];
+                          if (topicStudents.length === 0) return null;
+                          
+                          return (
+                            <div key={topic}>
+                              <p className="text-xs font-medium text-muted-foreground mb-2">{topic}</p>
+                              <div className="grid gap-2">
+                                {topicStudents.map(student => {
+                                  const isSelected = selectedStudents.some(
+                                    s => s.id === student.id && s.topicName === student.topicName
+                                  );
+                                  
+                                  return (
+                                    <div
+                                      key={`${student.id}-${student.topicName}`}
+                                      className={cn(
+                                        'flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors',
+                                        isSelected 
+                                          ? 'bg-white dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700'
+                                          : 'bg-muted/30 hover:bg-muted/50'
+                                      )}
+                                      onClick={() => toggleStudent(student.id, student.topicName)}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <Checkbox
+                                          checked={isSelected}
+                                          onCheckedChange={() => toggleStudent(student.id, student.topicName)}
+                                        />
+                                        <div>
+                                          <p className="font-medium">
+                                            {student.firstName} {student.lastName}
+                                          </p>
+                                          <p className="text-sm text-muted-foreground">
+                                            {student.latestGrade !== null ? `Score: ${student.latestGrade}%` : 'Level A achieved'}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      {isSelected && (
+                                        <Check className="h-5 w-5 text-amber-600" />
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
-                            {isSelected && (
-                              <Check className="h-5 w-5 text-amber-600" />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="grid gap-2">
+                        {studentsForSelectedTopics.map(student => {
+                          const isSelected = selectedStudents.some(s => s.id === student.id);
+                          
+                          return (
+                            <div
+                              key={student.id}
+                              className={cn(
+                                'flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors',
+                                isSelected 
+                                  ? 'bg-white dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700'
+                                  : 'bg-muted/30 hover:bg-muted/50'
+                              )}
+                              onClick={() => toggleStudent(student.id)}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => toggleStudent(student.id)}
+                                />
+                                <div>
+                                  <p className="font-medium">
+                                    {student.firstName} {student.lastName}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {student.latestGrade !== null ? `Score: ${student.latestGrade}%` : 'Level A achieved'}
+                                  </p>
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <Check className="h-5 w-5 text-amber-600" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -470,7 +773,7 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
             <DialogFooter>
               <Button variant="outline" onClick={() => {
                 setStep('topic');
-                setSelectedTopic(null);
+                setSelectedTopics([]);
                 setSelectedStudents([]);
               }}>
                 Back
@@ -499,11 +802,11 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
                       <span className="font-medium">Challenge for {selectedStudents.length} student(s)</span>
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {selectedTopic && (
-                        <Badge variant="outline" className="text-xs">
-                          {selectedTopic}
+                      {selectedTopics.map(topic => (
+                        <Badge key={topic} variant="outline" className="text-xs">
+                          {topic}
                         </Badge>
-                      )}
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
@@ -633,7 +936,7 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
                   <div className="flex items-center justify-between">
                     <div>
                       <h1 className="text-xl font-bold">Mastery Challenge</h1>
-                      <p className="text-sm text-gray-600">{selectedTopic || 'Mathematics'}</p>
+                      <p className="text-sm text-gray-600">{selectedTopics.join(', ')}</p>
                     </div>
                     <Badge className={cn('text-sm', LEVEL_COLORS['A'])}>
                       Level A - Advanced
@@ -687,7 +990,7 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
 
                 {/* Footer */}
                 <div className="mt-6 pt-4 border-t text-center text-xs text-gray-500">
-                  Mastery Challenge • {selectedTopic || 'Mathematics'}
+                  Mastery Challenge • {selectedTopics[0] || 'Mathematics'}{selectedTopics.length > 1 ? ` (+${selectedTopics.length - 1} more)` : ''}
                 </div>
               </div>
             </ScrollArea>
