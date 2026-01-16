@@ -386,10 +386,10 @@ When scoring, apply both this custom rubric AND align to NYS Regents standards.
     const standardContext = standardCode ? `
 SPECIFIC STANDARD BEING ASSESSED: ${standardCode}${topicName ? ` - ${topicName}` : ''}
 
-Evaluate the student's work specifically against this NYS standard. Consider:
-- Does the student demonstrate understanding of ${topicName || 'the standard'}?
-- Are the mathematical procedures aligned with what's expected for this standard?
-- What specific skills from this standard are demonstrated or missing?
+Evaluate the student's work against this standard. When reporting the NYS Standard in your analysis:
+- Use CONCISE format: "[CODE] - [Brief 5-10 word synopsis]"
+- Example: "6.G.A.1 - Finding area of composite shapes"
+- Do NOT include full standard text, long explanations, or curriculum descriptions
 ` : '';
     
     let systemPrompt: string;
@@ -524,8 +524,9 @@ STEP 3 - FLAG FOR TEACHER VERIFICATION:
 Provide your analysis in the following structure:
 - OCR Text: (extracted content - include interpretations marked as "[INTERPRETATION - VERIFY: probable reading is X]")
 - Interpretations Made: (LIST any interpretations that need teacher verification)
-- Problem Identified: (what problem the student is solving)
-- NYS Standard: (the most relevant NYS standard code and name, e.g., "A.REI.B.4 - Solving Quadratic Equations")${isAIMode ? '\n- Correct Solution: (your step-by-step solution to the problem)' : ''}
+- Problem Identified: (what problem the student is solving - BRIEF description only, under 20 words)
+- NYS Standard: (CONCISE format ONLY: "[CODE] - [Brief 5-10 word description]". Example: "6.G.A.1 - Finding area of composite shapes". Do NOT include full standard text or long explanations.)` + (isAIMode ? `
+- Correct Solution: (your step-by-step solution to the problem)` : '') + `
 - Concepts Demonstrated: (LIST each concept with citation from their work)
 - Coherent Work Shown: (YES or NO - does the student show logical thinking/work, even if simple?)
 - Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND)
@@ -533,7 +534,11 @@ Provide your analysis in the following structure:
 - Regents Score: (0, 1, 2, 3, or 4 - remember: ANY understanding = Score 1 minimum)
 - Regents Score Justification: (why this score - cite evidence)
 - Rubric Scores: (if teacher rubric provided, score each criterion)
-- Misconceptions: (SPECIFIC errors with EVIDENCE - format each as: "ERROR: [what student did wrong - cite exact quote]. EXPECTED: [correct approach]. IMPACT: [why this caused point loss]")
+- Misconceptions: (DETAILED FORMAT FOR EACH ERROR - use EXACT quotes from student work:
+    "ERROR: Student wrote '[exact quote from their work]' when solving [specific step].
+     EXPECTED: [What the correct step should be with correct values].
+     IMPACT: [Specific consequence - e.g., 'This gave final answer of X instead of Y']"
+    Be SPECIFIC with direct quotes. Do not use vague descriptions.)
 - Needs Teacher Review: (list items flagged for verification)
 - Total Score: (points earned / total possible from teacher rubric)
 - Standards Met: (YES or NO - does work show ANY understanding of the standards?)
@@ -543,8 +548,8 @@ Provide your analysis in the following structure:
     • 70-79 = Partial understanding, some concepts grasped
     • 65-69 = Basic/limited understanding shown (DEFAULT if ANY work with understanding)
     • 55 = ONLY if completely blank or NO understanding whatsoever)
-- Grade Justification: (CRITICAL: Be SPECIFIC and DISTINCT. Include: 1) WHAT the student did wrong with exact citation, 2) WHY this is incorrect with mathematical reasoning, 3) WHAT the correct approach should be. Never repeat the same information in both "what went wrong" and "what was expected".)
-- Feedback: (constructive suggestions for the student)`;
+- Grade Justification: (CONCISE - under 75 words. Format: "DEDUCTIONS: [specific errors]. STRENGTHS: [what was correct]. RESULT: [final reasoning]")
+- Feedback: (constructive suggestions - under 40 words)`;
 
     // Build messages for Lovable AI
     // If additionalImages provided, include all pages as a multi-page paper
