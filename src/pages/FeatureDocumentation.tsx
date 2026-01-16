@@ -201,7 +201,7 @@ export default function FeatureDocumentation() {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 15;
+      const margin = 20;
       const contentWidth = pageWidth - margin * 2;
       let yPosition = margin;
 
@@ -215,62 +215,136 @@ export default function FeatureDocumentation() {
         return false;
       };
 
-      // Title
-      pdf.setFontSize(24);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('NYCLogic AI - Feature Documentation', pageWidth / 2, yPosition, { align: 'center' });
-      yPosition += 12;
+      // Draw header background
+      pdf.setFillColor(30, 64, 175);
+      pdf.rect(0, 0, pageWidth, 45, 'F');
 
-      pdf.setFontSize(12);
+      // Title
+      pdf.setFontSize(28);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(255, 255, 255);
+      pdf.text('NYCLogic AI', pageWidth / 2, 22, { align: 'center' });
+      
+      pdf.setFontSize(14);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth / 2, yPosition, { align: 'center' });
+      pdf.text('Feature Documentation & Workflow Guide', pageWidth / 2, 32, { align: 'center' });
+      
+      pdf.setFontSize(10);
+      pdf.text(`Generated: ${new Date().toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })}`, pageWidth / 2, 40, { align: 'center' });
+      
+      yPosition = 55;
+      pdf.setTextColor(0, 0, 0);
+
+      // Table of Contents
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Table of Contents', margin, yPosition);
+      yPosition += 10;
+
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'normal');
+      featureModules.forEach((module, index) => {
+        pdf.text(`${index + 1}. ${module.title}`, margin + 5, yPosition);
+        yPosition += 7;
+      });
+      
+      yPosition += 5;
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition);
       yPosition += 15;
 
       // Feature Modules
-      for (const module of featureModules) {
-        checkPageBreak(30);
+      for (let i = 0; i < featureModules.length; i++) {
+        const module = featureModules[i];
+        checkPageBreak(50);
         
-        // Module title
+        // Module header with background
+        pdf.setFillColor(241, 245, 249);
+        pdf.roundedRect(margin, yPosition - 5, contentWidth, 12, 2, 2, 'F');
+        
         pdf.setFontSize(14);
         pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(0, 100, 150);
-        pdf.text(module.title, margin, yPosition);
-        yPosition += 8;
+        pdf.setTextColor(30, 64, 175);
+        pdf.text(`${i + 1}. ${module.title}`, margin + 5, yPosition + 3);
+        yPosition += 15;
 
         // Module features
-        pdf.setFontSize(10);
+        pdf.setFontSize(11);
         pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(0, 0, 0);
+        pdf.setTextColor(50, 50, 50);
 
         for (const feature of module.features) {
-          checkPageBreak(6);
-          const lines = pdf.splitTextToSize(`• ${feature}`, contentWidth - 5);
-          pdf.text(lines, margin + 5, yPosition);
-          yPosition += lines.length * 5;
+          checkPageBreak(10);
+          const lines = pdf.splitTextToSize(`• ${feature}`, contentWidth - 15);
+          pdf.text(lines, margin + 10, yPosition);
+          yPosition += lines.length * 6 + 2;
         }
 
-        yPosition += 8;
+        yPosition += 12;
       }
 
-      // Add flowchart page
+      // Flowchart Section - New Page
       pdf.addPage();
-      yPosition = margin;
-
-      pdf.setFontSize(18);
+      
+      // Flowchart header
+      pdf.setFillColor(30, 64, 175);
+      pdf.rect(0, 0, pageWidth, 35, 'F');
+      
+      pdf.setFontSize(22);
       pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(0, 100, 150);
-      pdf.text('Application Flow Charts', pageWidth / 2, yPosition, { align: 'center' });
-      yPosition += 15;
-
-      pdf.setFontSize(9);
-      pdf.setFont('courier', 'normal');
+      pdf.setTextColor(255, 255, 255);
+      pdf.text('Application Workflow Diagrams', pageWidth / 2, 22, { align: 'center' });
+      
+      yPosition = 45;
       pdf.setTextColor(0, 0, 0);
 
-      const flowLines = flowchartText.trim().split('\n');
-      for (const line of flowLines) {
-        checkPageBreak(5);
-        pdf.text(line, margin, yPosition);
-        yPosition += 4.5;
+      const flowSections = flowchartText.trim().split('\n\n');
+      
+      for (const section of flowSections) {
+        const lines = section.split('\n');
+        if (lines.length === 0) continue;
+        
+        checkPageBreak(lines.length * 6 + 20);
+        
+        // Section title (first line without tree characters)
+        const titleLine = lines[0];
+        pdf.setFillColor(241, 245, 249);
+        pdf.roundedRect(margin, yPosition - 4, contentWidth, 10, 2, 2, 'F');
+        
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(30, 64, 175);
+        pdf.text(titleLine, margin + 5, yPosition + 2);
+        yPosition += 14;
+        
+        // Flow lines
+        pdf.setFontSize(10);
+        pdf.setFont('courier', 'normal');
+        pdf.setTextColor(60, 60, 60);
+        
+        for (let i = 1; i < lines.length; i++) {
+          checkPageBreak(7);
+          pdf.text(lines[i], margin + 8, yPosition);
+          yPosition += 5.5;
+        }
+        
+        yPosition += 10;
+      }
+
+      // Footer on last page
+      const totalPages = pdf.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(150, 150, 150);
+        pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        pdf.text('NYCLogic AI - QuickScan Insight', margin, pageHeight - 10);
       }
 
       // Save the PDF
