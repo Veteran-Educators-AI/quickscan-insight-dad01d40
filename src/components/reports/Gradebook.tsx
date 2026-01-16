@@ -39,6 +39,30 @@ import { useAuth } from '@/lib/auth';
 import { useStudentNames } from '@/lib/StudentNameContext';
 import { toast } from 'sonner';
 import nycologicLogo from '@/assets/nycologic-logo.png';
+import { GEOMETRY_TOPICS, ALGEBRA1_TOPICS, ALGEBRA2_TOPICS } from '@/data/nysTopics';
+
+// Build a lookup map of all known topics from NYS standards
+const buildTopicLookup = () => {
+  const lookup: { standard: string; name: string; keywords: string[] }[] = [];
+  
+  const allTopicCategories = [...GEOMETRY_TOPICS, ...ALGEBRA1_TOPICS, ...ALGEBRA2_TOPICS];
+  
+  for (const category of allTopicCategories) {
+    for (const topic of category.topics) {
+      // Create keywords from the topic name for matching
+      const keywords = topic.name.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      lookup.push({
+        standard: topic.standard,
+        name: topic.name,
+        keywords
+      });
+    }
+  }
+  
+  return lookup;
+};
+
+const TOPIC_LOOKUP = buildTopicLookup();
 
 // Helper function to extract clean standard code from verbose text
 const extractStandardCode = (text: string | null): string | null => {
@@ -46,63 +70,84 @@ const extractStandardCode = (text: string | null): string | null => {
   
   // Match patterns like G.GMD.B.4, A.REI.B.3, F.IF.C.7, 7.G.B.6, CCSS.MATH.CONTENT.7.G.B.6
   const patterns = [
-    /\b([A-Z])\.(CO|SRT|GPE|GMD|MG|C|SSE|APR|REI|CED|IF|BF|LE|TF|CN|RN|ID|IC|CP|MD)\.[A-Z]?\.\d+\b/gi,
-    /\b([A-Z])-([A-Z]{2,3})\.[A-Z]\.\d+\b/gi,
-    /\b\d\.[A-Z]{1,3}\.[A-Z]\.\d+\b/gi,
+    /\b[A-Z]\.[A-Z]{1,3}\.[A-Z]\.\d+\b/g,
+    /\b[A-Z]-[A-Z]{2,3}\.[A-Z]\.\d+\b/g,
+    /\b\d\.[A-Z]{1,3}\.[A-Z]\.\d+\b/g,
     /\bCCSS\.MATH\.CONTENT\.\d\.[A-Z]+\.[A-Z]\.\d+\b/gi,
   ];
   
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match) {
-      return match[0].replace('CCSS.MATH.CONTENT.', '');
+      return match[0].replace('CCSS.MATH.CONTENT.', '').toUpperCase();
     }
   }
   
   // If text is already short and looks like a standard, return it
   if (text.length <= 15 && /^[A-Z0-9.-]+$/i.test(text.trim())) {
-    return text.trim();
+    return text.trim().toUpperCase();
   }
   
   return null;
 };
 
-// Helper function to extract clean topic name
-const extractTopicName = (text: string): string => {
+// Helper function to extract clean topic name by matching against known standards
+const extractTopicName = (text: string, standardText?: string | null): string => {
   if (!text) return 'Unknown Topic';
   
-  // If it's a short, clean topic name, return as-is
-  if (text.length <= 50 && !text.includes('**') && !text.includes('the student')) {
+  const lowerText = text.toLowerCase();
+  
+  // First, try to find a standard code and match it to a known topic
+  const standardCode = extractStandardCode(standardText || text);
+  if (standardCode) {
+    const matchedTopic = TOPIC_LOOKUP.find(t => t.standard === standardCode);
+    if (matchedTopic) {
+      return matchedTopic.name;
+    }
+  }
+  
+  // Try to match keywords from the text against known topics
+  let bestMatch: { name: string; score: number } | null = null;
+  
+  for (const topic of TOPIC_LOOKUP) {
+    let score = 0;
+    for (const keyword of topic.keywords) {
+      if (lowerText.includes(keyword)) {
+        score += keyword.length; // Longer keyword matches are worth more
+      }
+    }
+    // Also check if the topic name appears in the text
+    if (lowerText.includes(topic.name.toLowerCase())) {
+      score += 100; // Strong boost for exact topic name match
+    }
+    
+    if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+      bestMatch = { name: topic.name, score };
+    }
+  }
+  
+  if (bestMatch && bestMatch.score >= 5) {
+    return bestMatch.name;
+  }
+  
+  // If it's a short, clean topic name already, return as-is
+  if (text.length <= 40 && !text.includes('**') && !lowerText.includes('the student') && !lowerText.includes('based on')) {
     return text;
   }
   
   // Try to extract topic from markdown-style bold text like **Topic Name**
-  const boldMatch = text.match(/\*\*([^*]+)\*\*/);
+  const boldMatch = text.match(/\*\*([^*]{3,40})\*\*/);
   if (boldMatch) {
     const extracted = boldMatch[1].trim();
-    // If extracted text looks like a topic (not a standard code)
-    if (extracted.length > 3 && !/^[A-Z]\.[A-Z]+\.[A-Z]\.\d+$/.test(extracted)) {
-      return extracted.length > 50 ? extracted.substring(0, 47) + '...' : extracted;
+    // If extracted text looks like a topic (not a standard code or sentence)
+    if (!/^[A-Z]\.[A-Z]+\.[A-Z]\.\d+$/.test(extracted) && !extracted.includes(' is ') && !extracted.includes(' the ')) {
+      return extracted;
     }
   }
   
-  // Try to find common topic indicators
-  const topicIndicators = [
-    /topic:\s*([^,.\n]+)/i,
-    /about\s+([^,.\n]+)/i,
-    /concept:\s*([^,.\n]+)/i,
-  ];
-  
-  for (const pattern of topicIndicators) {
-    const match = text.match(pattern);
-    if (match) {
-      const extracted = match[1].trim();
-      return extracted.length > 50 ? extracted.substring(0, 47) + '...' : extracted;
-    }
-  }
-  
-  // Fallback: return first 50 chars
-  const cleaned = text.replace(/\*\*/g, '').trim();
+  // Fallback: return a truncated version
+  const cleaned = text.replace(/\*\*/g, '').replace(/^(The student|Based on|This).{0,20}/i, '').trim();
+  return cleaned.length > 35 ? cleaned.substring(0, 32) + '...' : cleaned || 'Topic';
   return cleaned.length > 50 ? cleaned.substring(0, 47) + '...' : cleaned;
 };
 const COLUMN_INFO = {
@@ -780,12 +825,15 @@ export function Gradebook({ classId }: GradebookProps) {
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="block truncate cursor-help">
-                                  {extractTopicName(grade.topic_name)}
+                                <span className="block truncate cursor-help font-medium">
+                                  {extractTopicName(grade.topic_name, grade.nys_standard)}
                                 </span>
                               </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-[300px]">
-                                <p className="text-xs">{grade.topic_name}</p>
+                              <TooltipContent side="top" className="max-w-[350px]">
+                                <p className="text-xs font-medium mb-1">{extractTopicName(grade.topic_name, grade.nys_standard)}</p>
+                                {grade.topic_name !== extractTopicName(grade.topic_name, grade.nys_standard) && (
+                                  <p className="text-xs text-muted-foreground">{grade.topic_name}</p>
+                                )}
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
