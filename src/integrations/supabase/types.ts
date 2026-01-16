@@ -1169,6 +1169,7 @@ export type Database = {
           ai_daily_limit: number | null
           ai_detection_enabled: boolean | null
           ai_detection_threshold: number | null
+          ai_feedback_verbosity: string | null
           ai_hourly_limit: number | null
           analysis_provider: string | null
           auto_handwriting_grouping_enabled: boolean | null
@@ -1203,6 +1204,7 @@ export type Database = {
           ai_daily_limit?: number | null
           ai_detection_enabled?: boolean | null
           ai_detection_threshold?: number | null
+          ai_feedback_verbosity?: string | null
           ai_hourly_limit?: number | null
           analysis_provider?: string | null
           auto_handwriting_grouping_enabled?: boolean | null
@@ -1237,6 +1239,7 @@ export type Database = {
           ai_daily_limit?: number | null
           ai_detection_enabled?: boolean | null
           ai_detection_threshold?: number | null
+          ai_feedback_verbosity?: string | null
           ai_hourly_limit?: number | null
           analysis_provider?: string | null
           auto_handwriting_grouping_enabled?: boolean | null

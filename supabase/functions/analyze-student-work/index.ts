@@ -233,6 +233,32 @@ serve(async (req) => {
     console.log('Assessment mode:', assessmentMode || 'teacher');
     console.log('Rubric steps provided:', rubricSteps?.length || 0);
 
+    // Fetch teacher settings early (for verbosity and grade floor)
+    let feedbackVerbosity = 'concise';
+    let gradeFloor = customGradeFloor || 55;
+    let gradeFloorWithEffort = customGradeFloorWithEffort || 65;
+    
+    if (effectiveTeacherId && supabase) {
+      try {
+        const { data: settingsData } = await supabase
+          .from('settings')
+          .select('grade_floor, grade_floor_with_effort, ai_feedback_verbosity')
+          .eq('teacher_id', effectiveTeacherId)
+          .maybeSingle();
+        
+        if (settingsData) {
+          if (!customGradeFloor) {
+            gradeFloor = settingsData.grade_floor ?? 55;
+            gradeFloorWithEffort = settingsData.grade_floor_with_effort ?? 65;
+          }
+          feedbackVerbosity = settingsData.ai_feedback_verbosity ?? 'concise';
+        }
+      } catch (settingsError) {
+        console.error('Error fetching teacher settings:', settingsError);
+      }
+    }
+    console.log('Feedback verbosity:', feedbackVerbosity);
+
     // Fetch past verification decisions to improve AI grading accuracy
     let verificationContext = '';
     if (supabase && effectiveTeacherId) {
@@ -548,8 +574,11 @@ Provide your analysis in the following structure:
     • 70-79 = Partial understanding, some concepts grasped
     • 65-69 = Basic/limited understanding shown (DEFAULT if ANY work with understanding)
     • 55 = ONLY if completely blank or NO understanding whatsoever)
+` + (feedbackVerbosity === 'detailed' ? `
+- Grade Justification: (DETAILED - 150-200 words. Include: 1) Complete breakdown of each error with exact citations from student work, 2) Explanation of WHY each error is mathematically incorrect, 3) What the correct approach should have been step-by-step, 4) How each error affected the final grade. Be thorough and educational.)
+- Feedback: (DETAILED - 100-150 words. Provide comprehensive suggestions for improvement including: specific practice topics, common pitfalls to avoid, study strategies, and encouragement. Be constructive and educational.)` : `
 - Grade Justification: (CONCISE - under 75 words. Format: "DEDUCTIONS: [specific errors]. STRENGTHS: [what was correct]. RESULT: [final reasoning]")
-- Feedback: (constructive suggestions - under 40 words)`;
+- Feedback: (constructive suggestions - under 40 words)`) + `\``;
 
     // Build messages for Lovable AI
     // If additionalImages provided, include all pages as a multi-page paper
@@ -588,26 +617,7 @@ Provide your analysis in the following structure:
 
     console.log('Analysis complete');
 
-    // Get teacher's grade floor settings if available
-    let gradeFloor = customGradeFloor || 55;
-    let gradeFloorWithEffort = customGradeFloorWithEffort || 65;
-    
-    if (effectiveTeacherId && supabase && !customGradeFloor) {
-      try {
-        const { data: settingsData } = await supabase
-          .from('settings')
-          .select('grade_floor, grade_floor_with_effort')
-          .eq('teacher_id', effectiveTeacherId)
-          .maybeSingle();
-        
-        if (settingsData) {
-          gradeFloor = settingsData.grade_floor ?? 55;
-          gradeFloorWithEffort = settingsData.grade_floor_with_effort ?? 65;
-        }
-      } catch (settingsError) {
-        console.error('Error fetching grade floor settings:', settingsError);
-      }
-    }
+    // Settings were already fetched earlier in the function
 
     // Parse the structured response with grade floor settings
     const result = parseAnalysisResult(analysisText, rubricSteps, gradeFloor, gradeFloorWithEffort);
