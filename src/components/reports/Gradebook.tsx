@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { 
   BookOpen, 
@@ -252,13 +253,43 @@ type SortDirection = 'asc' | 'desc';
 export function Gradebook({ classId }: GradebookProps) {
   const { user } = useAuth();
   const { getDisplayName } = useStudentNames();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [topicFilter, setTopicFilter] = useState<string>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Initialize filters from URL params
+  const initialTopic = searchParams.get('topic') || 'all';
+  const initialSearch = searchParams.get('search') || '';
+  
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [topicFilter, setTopicFilter] = useState<string>(initialTopic);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [isExpanded, setIsExpanded] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isSyncingToScholar, setIsSyncingToScholar] = useState(false);
+  
+  // Scroll to gradebook and expand when URL params change
+  useEffect(() => {
+    const topic = searchParams.get('topic');
+    const search = searchParams.get('search');
+    
+    if (topic || search) {
+      setIsExpanded(true);
+      if (topic && topic !== 'all') {
+        setTopicFilter(topic);
+      }
+      if (search) {
+        setSearchTerm(search);
+      }
+      
+      // Scroll to gradebook
+      setTimeout(() => {
+        const gradebook = document.getElementById('gradebook-section');
+        if (gradebook) {
+          gradebook.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, [searchParams]);
   
   // Edit state
   const [editingEntry, setEditingEntry] = useState<GradeEntry | null>(null);
@@ -383,9 +414,18 @@ export function Gradebook({ classId }: GradebookProps) {
       });
     }
 
-    // Topic filter
+    // Topic filter - match exact topic_name or if the topic filter text is contained in topic_name
     if (topicFilter !== 'all') {
-      filtered = filtered.filter(g => g.topic_name === topicFilter);
+      const filterLower = topicFilter.toLowerCase();
+      filtered = filtered.filter(g => {
+        const topicLower = g.topic_name.toLowerCase();
+        const standardLower = (g.nys_standard || '').toLowerCase();
+        return (
+          g.topic_name === topicFilter ||
+          topicLower.includes(filterLower) ||
+          standardLower.includes(filterLower)
+        );
+      });
     }
 
     // Sort
@@ -575,7 +615,7 @@ export function Gradebook({ classId }: GradebookProps) {
 
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-      <Card>
+      <Card id="gradebook-section">
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
             <div className="flex items-center justify-between">

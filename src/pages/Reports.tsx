@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart3, Users, BookOpen, Share2, Loader2, Copy, Check } from 'lucide-react';
+import { BarChart3, Users, BookOpen, Share2, Loader2, Check, FileText } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -20,7 +20,9 @@ import { RegentsScoreReport } from '@/components/reports/RegentsScoreReport';
 import { Gradebook } from '@/components/reports/Gradebook';
 import { ScholarSyncDashboard } from '@/components/reports/ScholarSyncDashboard';
 import { ClassMisconceptionSummary } from '@/components/reports/ClassMisconceptionSummary';
+import { StandardsByClass } from '@/components/reports/StandardsByClass';
 import { useMasteryData } from '@/hooks/useMasteryData';
+import { useGradeHistoryStats } from '@/hooks/useGradeHistoryStats';
 import { toast } from 'sonner';
 
 export default function Reports() {
@@ -97,12 +99,19 @@ export default function Reports() {
     classId: selectedClassId === 'all' ? undefined : selectedClassId,
   });
 
-  // Calculate summary stats
-  const totalStudents = students.length;
-  const studentsWithData = students.filter(s => s.overallMastery > 0).length;
-  const classAverage = studentsWithData > 0
-    ? Math.round(students.reduce((sum, s) => sum + s.overallMastery, 0) / studentsWithData)
-    : 0;
+  // Get stats from grade_history (actual analyzed work)
+  const { 
+    totalStudents: gradeStudents, 
+    classAverage: gradeAverage, 
+    topicsTracked,
+    totalEntries,
+    isLoading: statsLoading 
+  } = useGradeHistoryStats(selectedClassId === 'all' ? undefined : selectedClassId);
+
+  // Use grade_history stats as primary, fallback to mastery data
+  const displayStudents = gradeStudents || students.length;
+  const displayAverage = gradeAverage || 0;
+  const displayTopics = topicsTracked || topics.length;
 
   return (
     <AppLayout>
@@ -145,9 +154,10 @@ export default function Reports() {
           </div>
         </div>
 
-        {isLoading ? (
+        {isLoading || statsLoading ? (
           <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
+              <Skeleton className="h-24" />
               <Skeleton className="h-24" />
               <Skeleton className="h-24" />
               <Skeleton className="h-24" />
@@ -160,7 +170,7 @@ export default function Reports() {
               <p className="text-destructive">Error loading data: {error.message}</p>
             </CardContent>
           </Card>
-        ) : students.length === 0 ? (
+        ) : students.length === 0 && totalEntries === 0 ? (
           <Card className="text-center py-12">
             <CardContent>
               <BarChart3 className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
@@ -173,7 +183,7 @@ export default function Reports() {
         ) : (
           <>
             {/* Summary Stats */}
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-4">
@@ -181,8 +191,8 @@ export default function Reports() {
                       <Users className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{totalStudents}</p>
-                      <p className="text-sm text-muted-foreground">Total Students</p>
+                      <p className="text-2xl font-bold">{displayStudents}</p>
+                      <p className="text-sm text-muted-foreground">Students with Data</p>
                     </div>
                   </div>
                 </CardContent>
@@ -195,7 +205,7 @@ export default function Reports() {
                       <BarChart3 className="h-6 w-6 text-emerald-500" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{classAverage}%</p>
+                      <p className="text-2xl font-bold">{displayAverage}%</p>
                       <p className="text-sm text-muted-foreground">Class Average</p>
                     </div>
                   </div>
@@ -209,13 +219,30 @@ export default function Reports() {
                       <BookOpen className="h-6 w-6 text-blue-500" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{topics.length}</p>
+                      <p className="text-2xl font-bold">{displayTopics}</p>
                       <p className="text-sm text-muted-foreground">Topics Tracked</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-lg bg-purple-500/10">
+                      <FileText className="h-6 w-6 text-purple-500" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{totalEntries}</p>
+                      <p className="text-sm text-muted-foreground">Work Analyzed</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
+
+            {/* Standards by Class - Clickable to view all work */}
+            <StandardsByClass classId={selectedClassId === 'all' ? undefined : selectedClassId} />
 
             {/* Strengths and Weaknesses */}
             <TopicStrengthsChart data={students} topics={topics} />
