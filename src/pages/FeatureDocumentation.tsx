@@ -2,65 +2,84 @@ import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Loader2, FileText } from 'lucide-react';
+import { 
+  BarChart3, 
+  BookOpen, 
+  Camera, 
+  Download, 
+  FileText, 
+  GraduationCap, 
+  Layers, 
+  Lightbulb, 
+  Loader2, 
+  Lock, 
+  Settings, 
+  Users 
+} from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { toast } from 'sonner';
 
 const featureModules = [
   {
-    title: '🔐 Authentication',
+    title: 'Authentication',
+    icon: Lock,
     features: [
-      'Login Page → Teacher or Student Dashboard',
+      'Login Page -> Teacher or Student Dashboard',
       'MFA Challenge for secure access',
       'Password Reset flow',
       'Role-based access (Teacher/Student/Admin)',
     ],
   },
   {
-    title: '📚 Class Management',
+    title: 'Class Management',
+    icon: Users,
     features: [
-      'Create Class → Set Name/Period/Year → Generate Join Code',
-      'Manage Roster via CSV Upload, Image OCR, or Manual Entry',
-      'Edit Class settings and student information',
+      'Create Class -> Set Name/Period/Year -> Generate Join Code',
+      'Manage roster via CSV upload, image OCR, or manual entry',
+      'Edit class settings and student information',
       'Student join via class codes',
     ],
   },
   {
-    title: '📝 Worksheet & Question Builder',
+    title: 'Worksheet & Question Builder',
+    icon: BookOpen,
     features: [
       'Browse NYS Standards by subject (Geometry, Algebra, etc.)',
-      'Select Topics → Build Worksheet or Diagnostic',
-      'Differentiated Generator creates Levels A-F assessments',
-      'Mastery Challenge mode for advanced students',
+      'Select topics -> Build worksheet or diagnostic',
+      'Differentiated generator creates Levels A-F assessments',
+      'Mastery challenge mode for advanced students',
       'Print worksheets with embedded QR codes for tracking',
     ],
   },
   {
-    title: '📖 Lesson Planning',
+    title: 'Lesson Planning',
+    icon: Lightbulb,
     features: [
-      'Select Topic → Choose Presentation Theme',
+      'Select topic -> Choose presentation theme',
       'AI generates slide content automatically',
       'Edit and customize slides with clipart',
       'Export to PowerPoint (PPTX) format',
-      'Save to Lesson Library for reuse',
+      'Save to lesson library for reuse',
     ],
   },
   {
-    title: '📸 Scan & Grade',
+    title: 'Scan & Grade',
+    icon: Camera,
     features: [
       'Upload images or use camera (Single/Batch mode)',
-      'Student Identification: QR Code, AI Name Match, or Manual',
-      'Grading Modes:',
-      '  • AI Only: Full automated analysis',
-      '  • Teacher-Guided: Upload answer key for comparison',
-      '  • Manual: Score rubric criteria manually',
-      '  • Comparison: Side-by-side AI vs Teacher view',
+      'Student identification: QR code, AI name match, or manual',
+      'Grading modes:',
+      'AI Only: Full automated analysis',
+      'Teacher-Guided: Upload answer key for comparison',
+      'Manual: Score rubric criteria manually',
+      'Comparison: Side-by-side AI vs teacher view',
       'View rubric scores, misconceptions, and remediation suggestions',
       'Save results to gradebook',
     ],
   },
   {
-    title: '📋 Batch Processing',
+    title: 'Batch Processing',
+    icon: Layers,
     features: [
       'Add multiple images at once',
       'Auto-identify students via QR or handwriting',
@@ -72,19 +91,21 @@ const featureModules = [
     ],
   },
   {
-    title: '📊 Reports & Analytics',
+    title: 'Reports & Analytics',
+    icon: BarChart3,
     features: [
       'Gradebook: View/edit all saved grades',
-      'Mastery Heatmap: Topic performance visualization',
-      'Grade History Chart: Trend analysis over time',
-      'Differentiation Groups: Skill-based student grouping',
-      'Class Misconceptions: Common errors summary',
-      'Regents Score Report: Projected exam scores',
-      'Student Progress Tracker: Individual performance',
+      'Mastery heatmap: Topic performance visualization',
+      'Grade history chart: Trend analysis over time',
+      'Differentiation groups: Skill-based student grouping',
+      'Class misconceptions: Common errors summary',
+      'Regents score report: Projected exam scores',
+      'Student progress tracker: Individual performance',
     ],
   },
   {
-    title: '🎓 Student Portal',
+    title: 'Student Portal',
+    icon: GraduationCap,
     features: [
       'Join class with code',
       'View personal dashboard',
@@ -93,103 +114,104 @@ const featureModules = [
     ],
   },
   {
-    title: '🔗 Integrations & Settings',
+    title: 'Integrations & Settings',
+    icon: Settings,
     features: [
-      'Webhook Push: Real-time alerts to external systems',
-      'Scholar Sync: Push grades to sister app for rewards',
-      'Google Drive Sync: Auto-import scanned images',
-      'Grade Floor Settings: NYS 55% standard support',
-      'AI Detection: Handwriting similarity analysis',
-      'Auto-Push Alerts: Parent notifications for low scores',
+      'Webhook push: Real-time alerts to external systems',
+      'Scholar sync: Push grades to sister app for rewards',
+      'Google Drive sync: Auto-import scanned images',
+      'Grade floor settings: NYS 55% standard support',
+      'AI detection: Handwriting similarity analysis',
+      'Auto-push alerts: Parent notifications for low scores',
     ],
   },
 ];
 
 const flowchartText = `
 AUTHENTICATION FLOW
-├── Login Page
-│   ├── Teacher → Teacher Dashboard
-│   └── Student → Student Dashboard
-├── MFA Challenge → Dashboard
-└── Password Reset → Login
+- Login Page
+  - Teacher -> Teacher Dashboard
+  - Student -> Student Dashboard
+- MFA Challenge -> Dashboard
+- Password Reset -> Login
 
 CLASS MANAGEMENT FLOW
-├── Create Class
-│   ├── Set Name/Period/Year
-│   └── Generate Join Code
-└── Manage Roster
-    ├── CSV Upload
-    ├── Roster Image OCR
-    └── Manual Entry
+- Create Class
+  - Set Name/Period/Year
+  - Generate Join Code
+- Manage Roster
+  - CSV Upload
+  - Roster Image OCR
+  - Manual Entry
 
 WORKSHEET BUILDER FLOW
-├── Browse NYS Standards
-├── Select Topics
-└── Choose Mode
-    ├── Worksheet → Add Questions → Print with QR
-    ├── Diagnostic → Generate Levels A-F → Print
-    └── Mastery Challenge
+- Browse NYS Standards
+- Select Topics
+- Choose Mode
+  - Worksheet -> Add Questions -> Print with QR
+  - Diagnostic -> Generate Levels A-F -> Print
+  - Mastery Challenge
 
 LESSON PLANNING FLOW
-├── Select Topic
-├── Choose Theme
-├── AI Generate Slides
-├── Edit/Customize
-└── Export to PPTX
+- Select Topic
+- Choose Theme
+- AI Generate Slides
+- Edit/Customize
+- Export to PPTX
 
 SCAN & GRADE FLOW
-├── Upload/Camera
-├── Scan Mode
-│   ├── Single Paper
-│   ├── Batch (Multi-Paper)
-│   ├── Saved (Pending)
-│   └── Continuous QR Scanner
-├── Identification
-│   ├── QR Code → Auto-Link
-│   ├── Handwriting → AI Match
-│   └── Manual → Select from Roster
-├── Grading Mode
-│   ├── AI Only → Full Analysis
-│   ├── Teacher-Guided → Upload Answer Key
-│   ├── Manual → Scoring Form
-│   └── Comparison → Side-by-Side
-└── Results
-    ├── Rubric Scores
-    ├── Misconceptions
-    ├── Remediation
-    └── Save to Gradebook
+- Upload/Camera
+- Scan Mode
+  - Single Paper
+  - Batch (Multi-Paper)
+  - Saved (Pending)
+  - Continuous QR Scanner
+- Identification
+  - QR Code -> Auto-Link
+  - Handwriting -> AI Match
+  - Manual -> Select from Roster
+- Grading Mode
+  - AI Only -> Full Analysis
+  - Teacher-Guided -> Upload Answer Key
+  - Manual -> Scoring Form
+  - Comparison -> Side-by-Side
+- Results
+  - Rubric Scores
+  - Misconceptions
+  - Remediation
+  - Save to Gradebook
 
 BATCH PROCESSING FLOW
-├── Add Multiple Images
-├── Auto-Identify Students
-├── Link Front/Back Pages
-├── Process Queue
-├── Batch Report
-└── Save All / Export PDFs
+- Add Multiple Images
+- Auto-Identify Students
+- Link Front/Back Pages
+- Process Queue
+- Batch Report
+- Save All / Export PDFs
 
 REPORTS FLOW
-├── Gradebook → Filter → View/Edit
-├── Mastery Heatmap → Topic Grid
-├── Grade History → Trend Analysis
-├── Differentiation → Skill Groups
-├── Misconceptions → Error Summary
-├── Regents Report → Projected Scores
-└── Student Progress → Individual Tracking
+- Gradebook -> Filter -> View/Edit
+- Mastery Heatmap -> Topic Grid
+- Grade History -> Trend Analysis
+- Differentiation -> Skill Groups
+- Misconceptions -> Error Summary
+- Regents Report -> Projected Scores
+- Student Progress -> Individual Tracking
 
 STUDENT PORTAL FLOW
-├── Join with Code
-├── View Dashboard
-├── See Grades
-├── View Feedback
-└── Track Progress
+- Join with Code
+- View Dashboard
+- See Grades
+- View Feedback
+- Track Progress
 
 INTEGRATIONS
-├── Webhook Push → Real-time Alerts
-├── Scholar Sync → Sister App
-├── Google Drive → Auto-Import
-├── Grade Floor → NYS 55%
-├── AI Detection → Handwriting Analysis
-└── Auto-Push → Parent Notifications
+- Webhook Push -> Real-time Alerts
+- Scholar Sync -> Sister App
+- Google Drive -> Auto-Import
+- Grade Floor -> NYS 55%
+- AI Detection -> Handwriting Analysis
+- Auto-Push -> Parent Notifications
 `;
 
 export default function FeatureDocumentation() {
@@ -280,7 +302,7 @@ export default function FeatureDocumentation() {
 
         for (const feature of module.features) {
           checkPageBreak(10);
-          const lines = pdf.splitTextToSize(`• ${feature}`, contentWidth - 15);
+          const lines = pdf.splitTextToSize(`- ${feature}`, contentWidth - 15);
           pdf.text(lines, margin + 10, yPosition);
           yPosition += lines.length * 6 + 2;
         }
@@ -377,23 +399,29 @@ export default function FeatureDocumentation() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {featureModules.map((module, index) => (
-            <Card key={index}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">{module.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  {module.features.map((feature, fIndex) => (
-                    <li key={fIndex} className="flex items-start gap-2">
-                      <FileText className="h-3 w-3 mt-1 shrink-0 text-primary" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ))}
+          {featureModules.map((module, index) => {
+            const ModuleIcon = module.icon;
+            return (
+              <Card key={index}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <ModuleIcon className="h-4 w-4 text-primary" />
+                    {module.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-1 text-sm text-muted-foreground">
+                    {module.features.map((feature, fIndex) => (
+                      <li key={fIndex} className="flex items-start gap-2">
+                        <FileText className="h-3 w-3 mt-1 shrink-0 text-primary" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
     </AppLayout>
