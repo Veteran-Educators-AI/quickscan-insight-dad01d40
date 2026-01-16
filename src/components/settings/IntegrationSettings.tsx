@@ -77,6 +77,8 @@ export function IntegrationSettings() {
   // Default to Nyclogic Sentry webhook
   const NYCLOGIC_SENTRY_WEBHOOK = "https://tscxbmozbvmbmbslccpu.supabase.co/functions/v1/webhook-receive";
   const [webhookUrl, setWebhookUrl] = useState(NYCLOGIC_SENTRY_WEBHOOK);
+  // API key for authenticating with Nyclogic Sentry
+  const [webhookApiKey, setWebhookApiKey] = useState("");
   // Master toggle for webhook integration - when false, no data is sent
   const [webhookEnabled, setWebhookEnabled] = useState(false);
 
@@ -132,7 +134,7 @@ export function IntegrationSettings() {
       // Query the settings table for this teacher's integration settings
       const { data, error } = await supabase
         .from('settings')
-        .select('integration_webhook_url, integration_webhook_enabled, sister_app_sync_enabled, sister_app_xp_multiplier, sister_app_coin_multiplier')
+        .select('integration_webhook_url, integration_webhook_enabled, integration_webhook_api_key, sister_app_sync_enabled, sister_app_xp_multiplier, sister_app_coin_multiplier')
         .eq('teacher_id', user!.id)
         .single();
 
@@ -145,6 +147,7 @@ export function IntegrationSettings() {
       if (data) {
         // Use saved webhook URL or default to Nyclogic Sentry
         setWebhookUrl(data.integration_webhook_url || NYCLOGIC_SENTRY_WEBHOOK);
+        setWebhookApiKey(data.integration_webhook_api_key || "");
         setWebhookEnabled(data.integration_webhook_enabled || false);
         setSisterAppSyncEnabled(data.sister_app_sync_enabled || false);
         // Use saved multipliers or fall back to defaults (0.5 for XP, 0.25 for coins)
@@ -180,6 +183,7 @@ export function IntegrationSettings() {
           teacher_id: user.id,
           // Webhook settings
           integration_webhook_url: webhookUrl,
+          integration_webhook_api_key: webhookApiKey,
           integration_webhook_enabled: webhookEnabled,
           // Sister app sync settings
           sister_app_sync_enabled: sisterAppSyncEnabled,
@@ -236,7 +240,7 @@ export function IntegrationSettings() {
     try {
       // Use edge function to test the connection and get a real response
       const response = await supabase.functions.invoke('test-sentry-connection', {
-        body: { webhookUrl },
+        body: { webhookUrl, apiKey: webhookApiKey },
       });
 
       if (response.error) {
@@ -466,6 +470,22 @@ export function IntegrationSettings() {
           </div>
           <p className="text-xs text-muted-foreground">
             Default: Nyclogic Sentry webhook. You can also use a custom Zapier or n8n URL.
+          </p>
+        </div>
+
+        {/* --- Sentry API Key Input --- */}
+        {/* API key for authenticating with Nyclogic Sentry */}
+        <div className="space-y-2">
+          <Label htmlFor="webhook-api-key">Sentry API Key</Label>
+          <Input
+            id="webhook-api-key"
+            type="password"
+            placeholder="Enter your Nyclogic Sentry API key"
+            value={webhookApiKey}
+            onChange={(e) => setWebhookApiKey(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Required for Nyclogic Sentry. Get your API key from Sentry Settings → API Keys.
           </p>
         </div>
 

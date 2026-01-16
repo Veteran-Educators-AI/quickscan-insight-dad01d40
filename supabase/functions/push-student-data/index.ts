@@ -84,7 +84,7 @@ serve(async (req) => {
     // Get teacher's webhook settings
     const { data: settings, error: settingsError } = await supabase
       .from('settings')
-      .select('integration_webhook_url, integration_webhook_enabled')
+      .select('integration_webhook_url, integration_webhook_enabled, integration_webhook_api_key')
       .eq('teacher_id', teacherId)
       .single();
 
@@ -130,12 +130,18 @@ serve(async (req) => {
     console.log('Sending to webhook:', settings.integration_webhook_url);
     console.log('Alert flags:', webhookPayload.alerts);
 
+    // Build headers with optional API key
+    const webhookHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (settings.integration_webhook_api_key) {
+      webhookHeaders['x-api-key'] = settings.integration_webhook_api_key;
+    }
+
     // Send to webhook (Sentry/Zapier/n8n)
     const webhookResponse = await fetch(settings.integration_webhook_url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: webhookHeaders,
       body: JSON.stringify(webhookPayload),
     });
 

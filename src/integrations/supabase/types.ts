@@ -1183,6 +1183,7 @@ export type Database = {
           grade_floor_with_effort: number | null
           grading_scale: Json | null
           id: string
+          integration_webhook_api_key: string | null
           integration_webhook_enabled: boolean | null
           integration_webhook_url: string | null
           level_a_notifications: boolean | null
@@ -1216,6 +1217,7 @@ export type Database = {
           grade_floor_with_effort?: number | null
           grading_scale?: Json | null
           id?: string
+          integration_webhook_api_key?: string | null
           integration_webhook_enabled?: boolean | null
           integration_webhook_url?: string | null
           level_a_notifications?: boolean | null
@@ -1249,6 +1251,7 @@ export type Database = {
           grade_floor_with_effort?: number | null
           grading_scale?: Json | null
           id?: string
+          integration_webhook_api_key?: string | null
           integration_webhook_enabled?: boolean | null
           integration_webhook_url?: string | null
           level_a_notifications?: boolean | null
