@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -248,6 +248,49 @@ export default function PresentationView() {
     setEditingField(null);
   };
 
+  const deleteSlide = (slideIndex: number) => {
+    if (!presentation || presentation.slides.length <= 1) {
+      toast.error('Cannot delete the only slide');
+      return;
+    }
+    
+    const updatedSlides = presentation.slides.filter((_, i) => i !== slideIndex);
+    const updatedPresentation = { ...presentation, slides: updatedSlides };
+    setPresentation(updatedPresentation);
+    sessionStorage.setItem('nycologic_presentation', JSON.stringify(updatedPresentation));
+    
+    // Adjust current slide if needed
+    if (currentSlide >= updatedSlides.length) {
+      setCurrentSlide(updatedSlides.length - 1);
+    } else if (currentSlide > slideIndex) {
+      setCurrentSlide(currentSlide - 1);
+    }
+    
+    toast.success('Slide deleted');
+  };
+
+  const moveSlide = (fromIndex: number, direction: 'up' | 'down') => {
+    if (!presentation) return;
+    
+    const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1;
+    if (toIndex < 0 || toIndex >= presentation.slides.length) return;
+    
+    const updatedSlides = [...presentation.slides];
+    const [movedSlide] = updatedSlides.splice(fromIndex, 1);
+    updatedSlides.splice(toIndex, 0, movedSlide);
+    
+    const updatedPresentation = { ...presentation, slides: updatedSlides };
+    setPresentation(updatedPresentation);
+    sessionStorage.setItem('nycologic_presentation', JSON.stringify(updatedPresentation));
+    
+    // Keep focus on the moved slide
+    if (currentSlide === fromIndex) {
+      setCurrentSlide(toIndex);
+    } else if (currentSlide === toIndex) {
+      setCurrentSlide(fromIndex);
+    }
+  };
+
   const toggleEditMode = () => {
     if (isEditing) {
       toast.success('Changes saved!');
@@ -410,72 +453,121 @@ export default function PresentationView() {
             
             <div className="overflow-y-auto h-[calc(100vh-60px)] p-3 space-y-3">
               {presentation.slides.map((s, idx) => (
-                <motion.button
-                  key={s.id}
-                  onClick={() => {
-                    goToSlide(idx);
-                    setShowSidebar(false);
-                  }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={cn(
-                    "w-full rounded-lg overflow-hidden transition-all duration-200 text-left",
-                    "border-2",
-                    idx === currentSlide
-                      ? `${colors.accent.replace('text-', 'border-')} ring-2 ${colors.accent.replace('text-', 'ring-').replace('-400', '-400/30')}`
-                      : "border-white/10 hover:border-white/30"
-                  )}
-                >
-                  {/* Thumbnail preview */}
-                  <div 
-                    className={cn(
-                      "aspect-video w-full p-3 flex items-center justify-center",
-                      `bg-gradient-to-br ${colors.bg}`
-                    )}
-                    style={{
-                      background: colors.glow ? `linear-gradient(135deg, ${colors.glow.replace('0.15', '0.3')}, transparent)` : undefined,
+                <div key={s.id} className="group relative">
+                  <motion.button
+                    onClick={() => {
+                      goToSlide(idx);
+                      if (!isEditing) setShowSidebar(false);
                     }}
-                  >
-                    {slideImages[idx] ? (
-                      <img 
-                        src={slideImages[idx]} 
-                        alt={s.title}
-                        className="h-full w-full object-contain rounded"
-                      />
-                    ) : s.icon && slideIcons[s.icon] ? (
-                      <div className={cn("h-8 w-8", colors.accent)}>
-                        {(() => {
-                          const Icon = slideIcons[s.icon!];
-                          return <Icon className="h-full w-full" />;
-                        })()}
-                      </div>
-                    ) : (
-                      <span className={cn("text-2xl font-bold", colors.accent)}>
-                        {idx + 1}
-                      </span>
+                    whileHover={{ scale: isEditing ? 1 : 1.02 }}
+                    whileTap={{ scale: isEditing ? 1 : 0.98 }}
+                    className={cn(
+                      "w-full rounded-lg overflow-hidden transition-all duration-200 text-left",
+                      "border-2",
+                      idx === currentSlide
+                        ? `${colors.accent.replace('text-', 'border-')} ring-2 ${colors.accent.replace('text-', 'ring-').replace('-400', '-400/30')}`
+                        : "border-white/10 hover:border-white/30"
                     )}
-                  </div>
-                  
-                  {/* Slide info */}
-                  <div className="p-2.5 bg-white/5">
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "flex-shrink-0 w-5 h-5 rounded text-xs font-bold flex items-center justify-center",
-                        idx === currentSlide
-                          ? `${colors.accent.replace('text-', 'bg-')} text-black`
-                          : "bg-white/20 text-white/70"
-                      )}>
-                        {idx + 1}
-                      </span>
-                      <p className="text-white text-xs font-medium truncate flex-1">
-                        {s.title}
+                  >
+                    {/* Thumbnail preview */}
+                    <div 
+                      className={cn(
+                        "aspect-video w-full p-3 flex items-center justify-center relative",
+                        `bg-gradient-to-br ${colors.bg}`
+                      )}
+                      style={{
+                        background: colors.glow ? `linear-gradient(135deg, ${colors.glow.replace('0.15', '0.3')}, transparent)` : undefined,
+                      }}
+                    >
+                      {slideImages[idx] ? (
+                        <img 
+                          src={slideImages[idx]} 
+                          alt={s.title}
+                          className="h-full w-full object-contain rounded"
+                        />
+                      ) : s.icon && slideIcons[s.icon] ? (
+                        <div className={cn("h-8 w-8", colors.accent)}>
+                          {(() => {
+                            const Icon = slideIcons[s.icon!];
+                            return <Icon className="h-full w-full" />;
+                          })()}
+                        </div>
+                      ) : (
+                        <span className={cn("text-2xl font-bold", colors.accent)}>
+                          {idx + 1}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Slide info */}
+                    <div className="p-2.5 bg-white/5">
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "flex-shrink-0 w-5 h-5 rounded text-xs font-bold flex items-center justify-center",
+                          idx === currentSlide
+                            ? `${colors.accent.replace('text-', 'bg-')} text-black`
+                            : "bg-white/20 text-white/70"
+                        )}>
+                          {idx + 1}
+                        </span>
+                        <p className="text-white text-xs font-medium truncate flex-1">
+                          {s.title}
+                        </p>
+                      </div>
+                      <p className="text-white/40 text-[10px] uppercase tracking-wide mt-1 ml-7">
+                        {s.type}
                       </p>
                     </div>
-                    <p className="text-white/40 text-[10px] uppercase tracking-wide mt-1 ml-7">
-                      {s.type}
-                    </p>
-                  </div>
-                </motion.button>
+                  </motion.button>
+                  
+                  {/* Edit mode controls */}
+                  {isEditing && (
+                    <div className="absolute top-1 right-1 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveSlide(idx, 'up');
+                        }}
+                        disabled={idx === 0}
+                        className={cn(
+                          "h-6 w-6 rounded flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all",
+                          idx === 0 ? "opacity-30 cursor-not-allowed" : "hover:bg-white/20 text-white/80 hover:text-white"
+                        )}
+                        title="Move up"
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveSlide(idx, 'down');
+                        }}
+                        disabled={idx === presentation.slides.length - 1}
+                        className={cn(
+                          "h-6 w-6 rounded flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all",
+                          idx === presentation.slides.length - 1 ? "opacity-30 cursor-not-allowed" : "hover:bg-white/20 text-white/80 hover:text-white"
+                        )}
+                        title="Move down"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSlide(idx);
+                        }}
+                        disabled={presentation.slides.length <= 1}
+                        className={cn(
+                          "h-6 w-6 rounded flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all",
+                          presentation.slides.length <= 1 ? "opacity-30 cursor-not-allowed" : "hover:bg-red-500/40 text-red-400 hover:text-red-300"
+                        )}
+                        title="Delete slide"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </motion.aside>
