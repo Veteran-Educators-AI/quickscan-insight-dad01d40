@@ -36,6 +36,7 @@ import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { useGoogleDrive } from "@/hooks/useGoogleDrive";
+import { useGoogleClassroom } from "@/hooks/useGoogleClassroom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { GoogleDriveAutoSyncConfig } from "@/components/scan/GoogleDriveAutoSyncConfig";
 import { AutoPushSettings } from "./AutoPushSettings";
@@ -109,6 +110,11 @@ export function IntegrationSettings() {
   const [showDisconnectDriveDialog, setShowDisconnectDriveDialog] = useState(false);
   const [isDisconnectingDrive, setIsDisconnectingDrive] = useState(false);
 
+  // --- Google Classroom Configuration ---
+  const { hasClassroomAccess } = useGoogleClassroom();
+  const [classroomConnected, setClassroomConnected] = useState(false);
+  const [classroomChecked, setClassroomChecked] = useState(false);
+
   // ============================================================================
   // LOAD SETTINGS ON COMPONENT MOUNT
   // ============================================================================
@@ -118,8 +124,13 @@ export function IntegrationSettings() {
       loadSettings();
       // Check Google Drive connection status
       checkDriveConnection().then(() => setDriveChecked(true));
+      // Check Google Classroom connection status
+      hasClassroomAccess().then((connected) => {
+        setClassroomConnected(connected);
+        setClassroomChecked(true);
+      });
     }
-  }, [user, checkDriveConnection]);
+  }, [user, checkDriveConnection, hasClassroomAccess]);
 
   // ============================================================================
   // LOAD SETTINGS FROM DATABASE
@@ -716,44 +727,75 @@ export function IntegrationSettings() {
           {/* --- Section Header --- */}
           <div className="flex items-center gap-2">
             <Cloud className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">Google Drive Integration</h3>
+            <h3 className="text-lg font-semibold">Google Integration</h3>
           </div>
           <p className="text-sm text-muted-foreground">
-            Import scanned documents directly from Google Drive and set up auto-sync to automatically detect new files.
+            Import scanned documents from Google Drive and student work from Google Classroom.
           </p>
 
-          {/* --- Connection Status --- */}
-          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className={`h-10 w-10 rounded-full flex items-center justify-center ${driveConnected ? 'bg-green-100 dark:bg-green-900/30' : 'bg-muted'}`}>
-                <Cloud className={`h-5 w-5 ${driveConnected ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} />
-              </div>
-              <div>
-                <div className="font-medium text-sm">Google Drive</div>
-                <div className="text-xs text-muted-foreground">
-                  {!driveChecked ? 'Checking connection...' : driveConnected ? 'Connected via Google OAuth' : 'Not connected'}
+          {/* --- Connection Status Cards --- */}
+          <div className="grid gap-3">
+            {/* Google Drive Status */}
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${driveConnected ? 'bg-green-100 dark:bg-green-900/30' : 'bg-muted'}`}>
+                  <Cloud className={`h-5 w-5 ${driveConnected ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} />
+                </div>
+                <div>
+                  <div className="font-medium text-sm">Google Drive</div>
+                  <div className="text-xs text-muted-foreground">
+                    {!driveChecked ? 'Checking connection...' : driveConnected ? 'File import & auto-sync enabled' : 'Not connected'}
+                  </div>
                 </div>
               </div>
-            </div>
-            {driveChecked && (
-              <div className="flex items-center gap-2">
-                {driveConnected && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => setShowDisconnectDriveDialog(true)}
-                  >
-                    <Unplug className="h-4 w-4 mr-1" />
-                    Disconnect
-                  </Button>
-                )}
+              {driveChecked && (
                 <Badge variant={driveConnected ? 'default' : 'secondary'} className={driveConnected ? 'bg-green-600' : ''}>
                   {driveConnected ? 'Connected' : 'Not Connected'}
                 </Badge>
+              )}
+            </div>
+
+            {/* Google Classroom Status */}
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${classroomConnected ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-muted'}`}>
+                  <svg 
+                    className={`h-5 w-5 ${classroomConnected ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`}
+                    viewBox="0 0 24 24" 
+                    fill="currentColor"
+                  >
+                    <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"/>
+                  </svg>
+                </div>
+                <div>
+                  <div className="font-medium text-sm">Google Classroom</div>
+                  <div className="text-xs text-muted-foreground">
+                    {!classroomChecked ? 'Checking connection...' : classroomConnected ? 'Import submissions & push grades enabled' : 'Not connected'}
+                  </div>
+                </div>
               </div>
-            )}
+              {classroomChecked && (
+                <Badge variant={classroomConnected ? 'default' : 'secondary'} className={classroomConnected ? 'bg-blue-600' : ''}>
+                  {classroomConnected ? 'Connected' : 'Not Connected'}
+                </Badge>
+              )}
+            </div>
           </div>
+
+          {/* Disconnect Button (shown when either is connected) */}
+          {driveChecked && driveConnected && (
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => setShowDisconnectDriveDialog(true)}
+              >
+                <Unplug className="h-4 w-4 mr-1" />
+                Disconnect Google Account
+              </Button>
+            </div>
+          )}
 
           {/* --- Connect Google Drive Button --- */}
           {driveChecked && !driveConnected && (
