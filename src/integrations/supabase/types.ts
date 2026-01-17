@@ -892,6 +892,7 @@ export type Database = {
           title: string
           topic: string
           updated_at: string
+          visual_theme: Json | null
         }
         Insert: {
           created_at?: string
@@ -903,6 +904,7 @@ export type Database = {
           title: string
           topic: string
           updated_at?: string
+          visual_theme?: Json | null
         }
         Update: {
           created_at?: string
@@ -914,6 +916,7 @@ export type Database = {
           title?: string
           topic?: string
           updated_at?: string
+          visual_theme?: Json | null
         }
         Relationships: []
       }

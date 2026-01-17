@@ -31,12 +31,21 @@ interface PresentationSlide {
   content: string[];
 }
 
+interface VisualTheme {
+  id: string;
+  name: string;
+  gradient: string;
+  accent: string;
+  pattern: string;
+}
+
 interface SavedPresentation {
   id: string;
   title: string;
   subtitle: string | null;
   topic: string;
   slides: PresentationSlide[];
+  visual_theme: VisualTheme | null;
   is_favorite: boolean;
   created_at: string;
   updated_at: string;
@@ -74,6 +83,7 @@ export default function PresentationLibrary() {
       const parsed = (data || []).map(p => ({
         ...p,
         slides: (Array.isArray(p.slides) ? p.slides : []) as unknown as PresentationSlide[],
+        visual_theme: (p.visual_theme as unknown) as VisualTheme | null,
       }));
       
       setPresentations(parsed);
@@ -130,6 +140,7 @@ export default function PresentationLibrary() {
       subtitle: presentation.subtitle || '',
       topic: presentation.topic,
       slides: presentation.slides,
+      visualTheme: presentation.visual_theme,
       createdAt: new Date(presentation.created_at),
     };
     
