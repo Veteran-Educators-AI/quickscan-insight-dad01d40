@@ -27,6 +27,7 @@ import {
   PHYSICS_TOPICS,
   GOVERNMENT_TOPICS,
   ECONOMICS_TOPICS,
+  FINANCIAL_MATH_TOPICS,
   TopicCategory,
   JMAPTopic
 } from '@/data/nysTopics';
@@ -60,6 +61,7 @@ const CONTENT_AREAS = [
   { id: 'geometry', name: 'Geometry', icon: '📏', topics: GEOMETRY_TOPICS },
   { id: 'algebra2', name: 'Algebra 2', icon: '📊', topics: ALGEBRA2_TOPICS },
   { id: 'precalculus', name: 'Pre-Calculus', icon: '📈', topics: PRECALCULUS_TOPICS },
+  { id: 'financialmath', name: 'Financial Math', icon: '💵', topics: FINANCIAL_MATH_TOPICS },
   { id: 'english', name: 'English', icon: '📚', topics: ENGLISH_TOPICS },
   { id: 'history', name: 'History', icon: '🏛️', topics: HISTORY_TOPICS },
   { id: 'government', name: 'Government', icon: '⚖️', topics: GOVERNMENT_TOPICS },
