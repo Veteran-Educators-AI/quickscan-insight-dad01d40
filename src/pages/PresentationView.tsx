@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown, Cloud, CloudOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/auth';
 import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 
 interface PresentationSlide {
@@ -67,6 +68,7 @@ const defaultColors = { bg: 'from-[#0a1628] via-[#0f1f3a] to-[#0a1628]', accent:
 
 export default function PresentationView() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [presentation, setPresentation] = useState<NycologicPresentation | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,6 +80,10 @@ export default function PresentationView() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedToCloud, setSavedToCloud] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load presentation from sessionStorage
   useEffect(() => {
@@ -293,10 +299,112 @@ export default function PresentationView() {
 
   const toggleEditMode = () => {
     if (isEditing) {
-      toast.success('Changes saved!');
+      toast.success('Changes saved locally!');
     }
     setIsEditing(!isEditing);
     setEditingField(null);
+  };
+
+  // Auto-save to database when presentation changes (debounced)
+  useEffect(() => {
+    if (!presentation || !user || !savedToCloud) return;
+    
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const { error } = await supabase
+          .from('nycologic_presentations')
+          .update({
+            slides: presentation.slides as any,
+            title: presentation.title,
+            subtitle: presentation.subtitle || '',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', presentation.id)
+          .eq('teacher_id', user.id);
+        
+        if (error) throw error;
+        setLastSavedAt(new Date());
+      } catch (error) {
+        console.error('Auto-save failed:', error);
+      }
+    }, 2000);
+    
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [presentation, user, savedToCloud]);
+
+  // Save presentation to user's account
+  const saveToAccount = async () => {
+    if (!presentation || !user) {
+      toast.error('Please log in to save presentations');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Check if this presentation is already saved
+      const { data: existing } = await supabase
+        .from('nycologic_presentations')
+        .select('id')
+        .eq('teacher_id', user.id)
+        .eq('title', presentation.title)
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing
+        const { error } = await supabase
+          .from('nycologic_presentations')
+          .update({
+            slides: presentation.slides as any,
+            subtitle: presentation.subtitle || '',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id);
+        
+        if (error) throw error;
+        
+        // Update local presentation with the database ID
+        setPresentation({ ...presentation, id: existing.id });
+        sessionStorage.setItem('nycologic_presentation', JSON.stringify({ ...presentation, id: existing.id }));
+      } else {
+        // Insert new
+        const { data, error } = await supabase
+          .from('nycologic_presentations')
+          .insert([{
+            teacher_id: user.id,
+            title: presentation.title,
+            subtitle: presentation.subtitle || '',
+            topic: presentation.topic,
+            slides: presentation.slides as any,
+          }])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        
+        // Update local presentation with the new database ID
+        if (data) {
+          setPresentation({ ...presentation, id: data.id });
+          sessionStorage.setItem('nycologic_presentation', JSON.stringify({ ...presentation, id: data.id }));
+        }
+      }
+
+      setSavedToCloud(true);
+      setLastSavedAt(new Date());
+      toast.success('Presentation saved to your account!');
+    } catch (error) {
+      console.error('Error saving presentation:', error);
+      toast.error('Failed to save presentation');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (isLoading || !presentation || !slide) {
@@ -371,6 +479,31 @@ export default function PresentationView() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Save to Cloud Button */}
+          <Button
+            variant="ghost"
+            onClick={saveToAccount}
+            disabled={isSaving}
+            className={cn(
+              "h-10 px-4 rounded-full transition-all gap-2",
+              savedToCloud 
+                ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" 
+                : "text-white/60 hover:text-white hover:bg-white/10"
+            )}
+            title={savedToCloud ? `Auto-saving • Last saved ${lastSavedAt?.toLocaleTimeString() || 'now'}` : "Save to your account"}
+          >
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : savedToCloud ? (
+              <Cloud className="h-4 w-4" />
+            ) : (
+              <CloudOff className="h-4 w-4" />
+            )}
+            <span className="hidden md:inline text-sm">
+              {isSaving ? 'Saving...' : savedToCloud ? 'Saved' : 'Save'}
+            </span>
+          </Button>
+          
           {/* Edit Mode Toggle */}
           <Button
             variant="ghost"
@@ -787,13 +920,13 @@ export default function PresentationView() {
                   )}
                 </div>
 
-                {/* Options */}
+                {/* Touch-friendly Options - Big and Interactive */}
                 {slide.question?.options && (
                   <motion.div 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.4 }}
-                    className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto"
+                    className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto px-4"
                   >
                     {slide.question.options.map((option, idx) => {
                       const letters = ['A', 'B', 'C', 'D'];
@@ -805,45 +938,81 @@ export default function PresentationView() {
                         <motion.button
                           key={idx}
                           onClick={() => handleOptionSelect(idx)}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                          whileHover={{ scale: 1.03, y: -4 }}
+                          whileTap={{ scale: 0.97 }}
                           className={cn(
-                            "relative p-5 lg:p-6 rounded-xl text-left transition-all duration-300",
-                            "border-2 backdrop-blur-sm",
+                            "relative flex items-center gap-6 p-8 lg:p-10 rounded-2xl text-left transition-all duration-300",
+                            "border-3 backdrop-blur-sm shadow-xl touch-manipulation",
+                            "min-h-[100px] lg:min-h-[120px]",
                             isCorrect 
-                              ? "border-emerald-400 bg-emerald-500/20" 
+                              ? "border-emerald-400 bg-emerald-500/30 shadow-emerald-500/20" 
                               : isWrong
-                                ? "border-red-400 bg-red-500/20"
+                                ? "border-red-400 bg-red-500/30 shadow-red-500/20"
                                 : isSelected
-                                  ? "border-white/40 bg-white/10"
-                                  : "border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10"
+                                  ? "border-white/50 bg-white/15 shadow-white/10"
+                                  : "border-white/20 bg-white/5 hover:border-white/40 hover:bg-white/10 hover:shadow-2xl active:bg-white/15"
                           )}
+                          style={{ 
+                            borderWidth: '3px',
+                            WebkitTapHighlightColor: 'transparent'
+                          }}
                         >
+                          {/* Large Letter Circle */}
                           <span className={cn(
-                            "inline-flex items-center justify-center w-8 h-8 rounded-full font-bold mr-4",
-                            isCorrect ? "bg-emerald-400 text-white" :
-                            isWrong ? "bg-red-400 text-white" :
-                            isSelected ? "bg-white/20 text-white" :
-                            "bg-white/10 text-white/60"
+                            "flex-shrink-0 inline-flex items-center justify-center w-14 h-14 lg:w-16 lg:h-16 rounded-full font-bold text-2xl lg:text-3xl transition-all",
+                            isCorrect ? "bg-emerald-400 text-white scale-110" :
+                            isWrong ? "bg-red-400 text-white scale-110" :
+                            isSelected ? "bg-white/30 text-white scale-105" :
+                            "bg-white/10 text-white/70"
                           )}>
                             {letters[idx]}
                           </span>
-                          <span className="text-white text-lg lg:text-xl">{option}</span>
+                          
+                          {/* Option Text */}
+                          <span className="text-white text-xl lg:text-2xl font-medium leading-tight flex-1">
+                            {option}
+                          </span>
+
+                          {/* Selection indicator */}
+                          {isCorrect && (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="absolute top-4 right-4 w-8 h-8 bg-emerald-400 rounded-full flex items-center justify-center"
+                            >
+                              <Check className="h-5 w-5 text-white" />
+                            </motion.div>
+                          )}
+                          {isWrong && (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="absolute top-4 right-4 w-8 h-8 bg-red-400 rounded-full flex items-center justify-center"
+                            >
+                              <X className="h-5 w-5 text-white" />
+                            </motion.div>
+                          )}
                         </motion.button>
                       );
                     })}
                   </motion.div>
                 )}
 
-                {/* Answer reveal */}
+                {/* Answer reveal - Larger and more prominent */}
                 {showAnswer && slide.question?.explanation && (
                   <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="max-w-3xl mx-auto p-6 lg:p-8 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-400/30"
+                    initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                    className="max-w-4xl mx-auto p-8 lg:p-10 rounded-3xl bg-gradient-to-br from-emerald-500/25 to-emerald-600/15 border-2 border-emerald-400/40 shadow-2xl shadow-emerald-500/10"
                   >
-                    <h4 className="text-emerald-400 font-bold text-lg mb-3">Explanation</h4>
-                    <p className="text-white/80 text-lg">{slide.question.explanation}</p>
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-12 h-12 rounded-full bg-emerald-400/20 flex items-center justify-center">
+                        <Check className="h-6 w-6 text-emerald-400" />
+                      </div>
+                      <h4 className="text-emerald-400 font-bold text-xl lg:text-2xl">Correct Answer: {slide.question.answer}</h4>
+                    </div>
+                    <p className="text-white/90 text-lg lg:text-xl leading-relaxed">{slide.question.explanation}</p>
                   </motion.div>
                 )}
               </div>
