@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw, FileText } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw, FileText, Brain } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,6 +20,7 @@ import { ScanQuestionSelector } from '@/components/scan/ScanQuestionSelector';
 import { SaveForLaterTab } from '@/components/scan/SaveForLaterTab';
 import { SyncStatusIndicator } from '@/components/scan/SyncStatusIndicator';
 import { AILearningProgress } from '@/components/scan/AILearningProgress';
+import { AITrainingWizard } from '@/components/scan/AITrainingWizard';
 import { TeacherAnswerKeyDialog } from '@/components/scan/TeacherAnswerKeyDialog';
 import { useAnalyzeStudentWork } from '@/hooks/useAnalyzeStudentWork';
 import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
@@ -157,6 +158,9 @@ export default function Scan() {
   // Teacher answer key dialog
   const [showAnswerKeyDialog, setShowAnswerKeyDialog] = useState(false);
   const [answerKeyClassName, setAnswerKeyClassName] = useState<string | undefined>(undefined);
+  
+  // AI Training wizard
+  const [showAITrainingWizard, setShowAITrainingWizard] = useState(false);
 
   // Mock rubric steps
   const mockRubricSteps = [
@@ -861,8 +865,17 @@ export default function Scan() {
           {/* AI Learning Progress Indicator */}
           <AILearningProgress compact />
 
-          {/* Teacher Answer Key Button */}
-          <div className="flex justify-end">
+          {/* Train AI and Answer Key Buttons */}
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAITrainingWizard(true)}
+              className="gap-2"
+            >
+              <Brain className="h-4 w-4" />
+              Train AI
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -2219,6 +2232,15 @@ export default function Scan() {
         open={showAnswerKeyDialog}
         onOpenChange={setShowAnswerKeyDialog}
         classId={singleScanClassId || selectedClassId || undefined}
+      />
+
+      {/* AI Training Wizard */}
+      <AITrainingWizard
+        open={showAITrainingWizard}
+        onOpenChange={setShowAITrainingWizard}
+        onTrainingComplete={() => {
+          toast.success('AI training complete! The AI is now calibrated to your grading style.');
+        }}
       />
     </>
   );
