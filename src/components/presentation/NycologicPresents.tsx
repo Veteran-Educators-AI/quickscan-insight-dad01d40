@@ -126,11 +126,21 @@ export function NycologicPresents({
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (editingField) return;
+      // Don't intercept keyboard events when user is typing in an input/textarea
+      const activeElement = document.activeElement;
+      const isTyping = activeElement instanceof HTMLInputElement || 
+                       activeElement instanceof HTMLTextAreaElement ||
+                       activeElement?.getAttribute('contenteditable') === 'true';
+      
+      if (editingField || isTyping) return;
       
       switch (e.key) {
         case 'ArrowRight':
+          e.preventDefault();
+          nextSlide();
+          break;
         case ' ':
+          // Only use spacebar for navigation if not in any text input context
           e.preventDefault();
           nextSlide();
           break;
