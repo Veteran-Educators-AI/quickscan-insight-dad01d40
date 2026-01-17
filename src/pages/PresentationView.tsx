@@ -94,10 +94,13 @@ export default function PresentationView() {
   const [initialPinchDistance, setInitialPinchDistance] = useState<number | null>(null);
   const slideContainerRef = useRef<HTMLDivElement>(null);
   
-  // Image drag/resize states
+  // Image drag/resize/rotate states
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const [isResizingImage, setIsResizingImage] = useState(false);
+  const [isRotatingImage, setIsRotatingImage] = useState(false);
   const [imageResizeCorner, setImageResizeCorner] = useState<string | null>(null);
+  const [rotationStartAngle, setRotationStartAngle] = useState(0);
+  const [rotationStartValue, setRotationStartValue] = useState(0);
   const imageContainerRef = useRef<HTMLDivElement>(null);
 
   // Load presentation from sessionStorage
@@ -364,6 +367,68 @@ export default function PresentationView() {
     }
     setIsResizingImage(false);
     setImageResizeCorner(null);
+  };
+
+  // Image rotation handlers
+  const handleRotationStart = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isEditing || !slide?.customImage || !slideContainerRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = slideContainerRef.current.getBoundingClientRect();
+    const centerX = rect.left + (rect.width * slide.customImage.position.x / 100);
+    const centerY = rect.top + (rect.height * slide.customImage.position.y / 100);
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
+    const angle = Math.atan2(clientY - centerY, clientX - centerX) * (180 / Math.PI);
+    
+    setIsRotatingImage(true);
+    setRotationStartAngle(angle);
+    setRotationStartValue(slide.customImage.rotation);
+  };
+
+  const handleRotation = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isRotatingImage || !isEditing || !presentation || !slide?.customImage || !slideContainerRef.current) return;
+    
+    const rect = slideContainerRef.current.getBoundingClientRect();
+    const centerX = rect.left + (rect.width * slide.customImage.position.x / 100);
+    const centerY = rect.top + (rect.height * slide.customImage.position.y / 100);
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
+    const currentAngle = Math.atan2(clientY - centerY, clientX - centerX) * (180 / Math.PI);
+    const angleDelta = currentAngle - rotationStartAngle;
+    let newRotation = rotationStartValue + angleDelta;
+    
+    // Normalize to -180 to 180
+    while (newRotation > 180) newRotation -= 360;
+    while (newRotation < -180) newRotation += 360;
+    
+    // Snap to cardinal angles
+    const snapAngles = [0, 90, -90, 180, -180];
+    for (const snap of snapAngles) {
+      if (Math.abs(newRotation - snap) < 5) {
+        newRotation = snap === -180 ? 180 : snap;
+        break;
+      }
+    }
+    
+    const updatedSlides = [...presentation.slides];
+    updatedSlides[currentSlide] = {
+      ...updatedSlides[currentSlide],
+      customImage: { ...slide.customImage, rotation: Math.round(newRotation) }
+    };
+    setPresentation({ ...presentation, slides: updatedSlides });
+  };
+
+  const handleRotationEnd = () => {
+    if (isRotatingImage && presentation) {
+      sessionStorage.setItem('nycologic_presentation', JSON.stringify(presentation));
+    }
+    setIsRotatingImage(false);
   };
 
   // Update slide content
@@ -950,23 +1015,28 @@ export default function PresentationView() {
           handleTouchMove(e);
           if (isDraggingImage) handleImageDrag(e);
           if (isResizingImage) handleResize(e);
+          if (isRotatingImage) handleRotation(e);
         }}
         onTouchEnd={(e) => {
           handleTouchEnd(e);
           handleImageDragEnd();
           handleResizeEnd();
+          handleRotationEnd();
         }}
         onMouseMove={(e) => {
           if (isDraggingImage) handleImageDrag(e);
           if (isResizingImage) handleResize(e);
+          if (isRotatingImage) handleRotation(e);
         }}
         onMouseUp={() => {
           handleImageDragEnd();
           handleResizeEnd();
+          handleRotationEnd();
         }}
         onMouseLeave={() => {
           handleImageDragEnd();
           handleResizeEnd();
+          handleRotationEnd();
         }}
       >
         <AnimatePresence mode="wait">
@@ -1011,7 +1081,8 @@ export default function PresentationView() {
                     }}
                     className={cn(
                       isEditing ? "cursor-move" : "pointer-events-none",
-                      isDraggingImage && "ring-4 ring-primary/50"
+                      isDraggingImage && "ring-4 ring-primary/50",
+                      isRotatingImage && "ring-4 ring-amber-400/50"
                     )}
                     onMouseDown={isEditing ? handleImageDragStart : undefined}
                     onTouchStart={isEditing ? handleImageDragStart : undefined}
@@ -1027,7 +1098,7 @@ export default function PresentationView() {
                     {/* Resize handles (edit mode only) */}
                     {isEditing && (
                       <>
-                        {/* Corner handles */}
+                        {/* Corner resize handles */}
                         <div
                           onMouseDown={handleResizeStart('top-left')}
                           onTouchStart={handleResizeStart('top-left')}
@@ -1049,9 +1120,41 @@ export default function PresentationView() {
                           className="absolute -bottom-2 -right-2 w-5 h-5 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg"
                         />
                         
+                        {/* Rotation handle - positioned above the image */}
+                        <div className="absolute left-1/2 -translate-x-1/2 -top-12 flex flex-col items-center">
+                          {/* Rotation line */}
+                          <div className="w-0.5 h-6 bg-amber-400/60" />
+                          {/* Rotation handle */}
+                          <div
+                            onMouseDown={handleRotationStart}
+                            onTouchStart={handleRotationStart}
+                            className={cn(
+                              "w-7 h-7 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg transition-all hover:scale-110",
+                              isRotatingImage ? "bg-amber-500 scale-125" : "bg-amber-400"
+                            )}
+                            title="Drag to rotate"
+                          >
+                            <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path d="M21 12a9 9 0 11-6.219-8.56" />
+                              <path d="M21 3v5h-5" />
+                            </svg>
+                          </div>
+                        </div>
+                        
+                        {/* Rotation angle display */}
+                        {isRotatingImage && (
+                          <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-sm font-bold px-3 py-1 rounded-full shadow-lg">
+                            {slide.customImage?.rotation}°
+                          </div>
+                        )}
+                        
                         {/* Edge label */}
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 text-white/90 text-xs px-2 py-1 rounded whitespace-nowrap">
-                          Drag to move • Corners to resize
+                        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-black/80 text-white/90 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-2">
+                          <span>Drag to move</span>
+                          <span className="text-white/40">•</span>
+                          <span className="text-primary">Corners to resize</span>
+                          <span className="text-white/40">•</span>
+                          <span className="text-amber-400">Top handle to rotate</span>
                         </div>
                       </>
                     )}
