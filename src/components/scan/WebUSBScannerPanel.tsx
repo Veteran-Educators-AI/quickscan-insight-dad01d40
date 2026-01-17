@@ -22,10 +22,16 @@ import {
   Download,
   Monitor,
   HelpCircle,
-  ChevronDown
+  ChevronDown,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  AlertTriangle
 } from 'lucide-react';
 import { useWebUSBScanner } from '@/hooks/useWebUSBScanner';
 import { cn } from '@/lib/utils';
+import { useEffect } from 'react';
+
 interface WebUSBScannerPanelProps {
   onImagesScanned?: (images: string[]) => void;
   className?: string;
@@ -36,8 +42,10 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
     isSupported,
     isConnecting,
     isScanning,
+    isCheckingCompatibility,
     connectedDevice,
     capabilities,
+    compatibility,
     scanSettings,
     scannedImages,
     error,
@@ -47,9 +55,17 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
     cancelScan,
     updateSettings,
     clearImages,
+    checkCompatibility,
   } = useWebUSBScanner();
 
   const [showSettings, setShowSettings] = useState(false);
+
+  // Run compatibility check when device connects
+  useEffect(() => {
+    if (connectedDevice?.isConnected && !compatibility) {
+      checkCompatibility();
+    }
+  }, [connectedDevice, compatibility, checkCompatibility]);
 
   const handleScan = async () => {
     const images = await startScan();
@@ -219,6 +235,80 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
                 </Button>
               </div>
             </div>
+
+            {/* Compatibility Check Results */}
+            {(isCheckingCompatibility || compatibility) && (
+              <div className={cn(
+                "p-3 rounded-lg border",
+                compatibility?.isCompatible 
+                  ? "bg-green-500/10 border-green-500/30" 
+                  : compatibility?.warnings?.length 
+                    ? "bg-yellow-500/10 border-yellow-500/30"
+                    : "bg-muted"
+              )}>
+                <div className="flex items-start gap-3">
+                  {isCheckingCompatibility ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      <div>
+                        <p className="font-medium text-sm">Checking scanner compatibility...</p>
+                        <p className="text-xs text-muted-foreground">Analyzing device features</p>
+                      </div>
+                    </>
+                  ) : compatibility?.isCompatible ? (
+                    <>
+                      <ShieldCheck className="h-5 w-5 text-green-600" />
+                      <div className="flex-1">
+                        <p className="font-medium text-sm text-green-700 dark:text-green-400">
+                          Scanner Compatible
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {compatibility.details}
+                        </p>
+                        {compatibility.warnings.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {compatibility.warnings.map((warning, i) => (
+                              <p key={i} className="text-xs text-yellow-600 flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" /> {warning}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldAlert className="h-5 w-5 text-yellow-600" />
+                      <div className="flex-1">
+                        <p className="font-medium text-sm text-yellow-700 dark:text-yellow-400">
+                          Limited Compatibility
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {compatibility?.details}
+                        </p>
+                        {compatibility?.warnings && compatibility.warnings.length > 0 && (
+                          <ul className="mt-2 space-y-1">
+                            {compatibility.warnings.map((warning, i) => (
+                              <li key={i} className="text-xs text-yellow-600 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3 flex-shrink-0" /> {warning}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-2"
+                          onClick={checkCompatibility}
+                        >
+                          <RefreshCw className="h-3 w-3 mr-1" /> Recheck
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Scan Settings */}
             {showSettings && capabilities && (

@@ -132,12 +132,26 @@ export interface ScanSettings {
   useFeeder: boolean;
 }
 
+export interface CompatibilityCheck {
+  isCompatible: boolean;
+  hasImageClass: boolean;
+  hasBulkEndpoints: boolean;
+  hasInputEndpoint: boolean;
+  hasOutputEndpoint: boolean;
+  interfaceCount: number;
+  endpointCount: number;
+  warnings: string[];
+  details: string;
+}
+
 interface UseWebUSBScannerReturn {
   isSupported: boolean;
   isConnecting: boolean;
   isScanning: boolean;
+  isCheckingCompatibility: boolean;
   connectedDevice: WebUSBScannerDevice | null;
   capabilities: ScannerCapabilities | null;
+  compatibility: CompatibilityCheck | null;
   scanSettings: ScanSettings;
   scannedImages: string[];
   error: string | null;
@@ -147,6 +161,7 @@ interface UseWebUSBScannerReturn {
   cancelScan: () => void;
   updateSettings: (settings: Partial<ScanSettings>) => void;
   clearImages: () => void;
+  checkCompatibility: () => Promise<CompatibilityCheck | null>;
 }
 
 // Common scanner vendor IDs
@@ -187,8 +202,10 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
   const [isSupported] = useState(() => 'usb' in navigator);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [isCheckingCompatibility, setIsCheckingCompatibility] = useState(false);
   const [connectedDevice, setConnectedDevice] = useState<WebUSBScannerDevice | null>(null);
   const [capabilities, setCapabilities] = useState<ScannerCapabilities | null>(null);
+  const [compatibility, setCompatibility] = useState<CompatibilityCheck | null>(null);
   const [scanSettings, setScanSettings] = useState<ScanSettings>(DEFAULT_SETTINGS);
   const [scannedImages, setScannedImages] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -483,12 +500,129 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
     setScannedImages([]);
   }, [scannedImages]);
 
+  // Comprehensive compatibility check
+  const checkCompatibility = useCallback(async (): Promise<CompatibilityCheck | null> => {
+    if (!deviceRef.current) {
+      return null;
+    }
+
+    setIsCheckingCompatibility(true);
+    
+    try {
+      const device = deviceRef.current;
+      const warnings: string[] = [];
+      
+      let hasImageClass = false;
+      let hasBulkEndpoints = false;
+      let hasInputEndpoint = false;
+      let hasOutputEndpoint = false;
+      let interfaceCount = 0;
+      let endpointCount = 0;
+
+      // Check device class
+      if (device.deviceClass === 0x10) {
+        hasImageClass = true;
+      }
+
+      // Analyze configuration and interfaces
+      if (device.configuration) {
+        interfaceCount = device.configuration.interfaces.length;
+        
+        for (const iface of device.configuration.interfaces) {
+          for (const alt of iface.alternates) {
+            // Check for Image class in interface
+            if (alt.interfaceClass === 0x10 || alt.interfaceClass === 0x06) {
+              hasImageClass = true;
+            }
+            
+            endpointCount += alt.endpoints.length;
+            
+            for (const endpoint of alt.endpoints) {
+              if (endpoint.type === 'bulk') {
+                hasBulkEndpoints = true;
+                if (endpoint.direction === 'in') {
+                  hasInputEndpoint = true;
+                } else if (endpoint.direction === 'out') {
+                  hasOutputEndpoint = true;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Generate warnings
+      if (!hasImageClass) {
+        warnings.push('Scanner may not support USB Image Class protocol');
+      }
+      if (!hasBulkEndpoints) {
+        warnings.push('No bulk data transfer endpoints detected');
+      }
+      if (!hasInputEndpoint) {
+        warnings.push('No data input endpoint found - cannot receive scanned images');
+      }
+      if (!hasOutputEndpoint) {
+        warnings.push('No command output endpoint found - may not be able to control scanner');
+      }
+      if (interfaceCount === 0) {
+        warnings.push('No USB interfaces detected on device');
+      }
+
+      // Build details string
+      const details = [
+        `Device: ${device.productName || 'Unknown'}`,
+        `Vendor: ${device.manufacturerName || device.vendorId.toString(16).toUpperCase()}`,
+        `Interfaces: ${interfaceCount}`,
+        `Endpoints: ${endpointCount}`,
+        `Image Class: ${hasImageClass ? 'Yes' : 'No'}`,
+        `Bulk Transfer: ${hasBulkEndpoints ? 'Available' : 'Not Available'}`,
+      ].join(' | ');
+
+      const isCompatible = hasImageClass && hasInputEndpoint;
+
+      const result: CompatibilityCheck = {
+        isCompatible,
+        hasImageClass,
+        hasBulkEndpoints,
+        hasInputEndpoint,
+        hasOutputEndpoint,
+        interfaceCount,
+        endpointCount,
+        warnings,
+        details,
+      };
+
+      setCompatibility(result);
+      
+      if (!isCompatible) {
+        toast.warning('Scanner may have limited compatibility', {
+          description: 'Some features may not work. Consider using file import.',
+        });
+      } else if (warnings.length > 0) {
+        toast.info('Scanner connected with warnings', {
+          description: warnings[0],
+        });
+      } else {
+        toast.success('Scanner fully compatible!');
+      }
+
+      return result;
+    } catch (err) {
+      console.error('Compatibility check error:', err);
+      return null;
+    } finally {
+      setIsCheckingCompatibility(false);
+    }
+  }, []);
+
   return {
     isSupported,
     isConnecting,
     isScanning,
+    isCheckingCompatibility,
     connectedDevice,
     capabilities,
+    compatibility,
     scanSettings,
     scannedImages,
     error,
@@ -498,5 +632,6 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
     cancelScan,
     updateSettings,
     clearImages,
+    checkCompatibility,
   };
 }
