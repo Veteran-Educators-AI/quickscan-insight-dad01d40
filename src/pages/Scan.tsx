@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw, FileText, Brain } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw, FileText, Brain, BookOpen } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -37,6 +37,7 @@ import { ScannerImportMode } from '@/components/scan/ScannerImportMode';
 import { GradingModeSelector, GradingMode } from '@/components/scan/GradingModeSelector';
 import { BatchGradingModeSelector, BatchGradingMode } from '@/components/scan/BatchGradingModeSelector';
 import { GradingComparisonView } from '@/components/scan/GradingComparisonView';
+import { GoogleClassroomImport, type ImportedSubmission } from '@/components/scan/GoogleClassroomImport';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
@@ -161,6 +162,9 @@ export default function Scan() {
   
   // AI Training wizard
   const [showAITrainingWizard, setShowAITrainingWizard] = useState(false);
+  
+  // Google Classroom import
+  const [showGoogleClassroomImport, setShowGoogleClassroomImport] = useState(false);
 
   // Mock rubric steps
   const mockRubricSteps = [
@@ -865,8 +869,17 @@ export default function Scan() {
           {/* AI Learning Progress Indicator */}
           <AILearningProgress compact />
 
-          {/* Train AI and Answer Key Buttons */}
-          <div className="flex justify-end gap-2">
+          {/* Train AI, Answer Key, and Import Buttons */}
+          <div className="flex justify-end gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowGoogleClassroomImport(true)}
+              className="gap-2"
+            >
+              <BookOpen className="h-4 w-4" />
+              Import from Classroom
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -2240,6 +2253,30 @@ export default function Scan() {
         onOpenChange={setShowAITrainingWizard}
         onTrainingComplete={() => {
           toast.success('AI training complete! The AI is now calibrated to your grading style.');
+        }}
+      />
+
+      {/* Google Classroom Import */}
+      <GoogleClassroomImport
+        open={showGoogleClassroomImport}
+        onOpenChange={setShowGoogleClassroomImport}
+        onImportComplete={(submissions) => {
+          // Add imported submissions to batch queue
+          setScanMode('batch');
+          submissions.forEach(sub => {
+            if (sub.attachments.length > 0) {
+              // For each attachment, show info in toast
+              sub.attachments.forEach(att => {
+                toast.info(`${sub.studentName}: ${att.title}`, {
+                  description: 'Open the link to download and add to batch',
+                  action: {
+                    label: 'Open',
+                    onClick: () => window.open(att.url, '_blank'),
+                  },
+                });
+              });
+            }
+          });
         }}
       />
     </>
