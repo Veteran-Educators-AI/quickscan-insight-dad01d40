@@ -21,6 +21,7 @@ import { Gradebook } from '@/components/reports/Gradebook';
 import { ScholarSyncDashboard } from '@/components/reports/ScholarSyncDashboard';
 import { ClassMisconceptionSummary } from '@/components/reports/ClassMisconceptionSummary';
 import { StandardsByClass } from '@/components/reports/StandardsByClass';
+import { AILearningHistory } from '@/components/reports/AILearningHistory';
 import { useMasteryData } from '@/hooks/useMasteryData';
 import { useGradeHistoryStats } from '@/hooks/useGradeHistoryStats';
 import { toast } from 'sonner';
@@ -260,6 +261,9 @@ export default function Reports() {
 
             {/* Diagnostic Dashboard */}
             <DiagnosticDashboard classId={selectedClassId === 'all' ? undefined : selectedClassId} />
+
+            {/* AI Learning History */}
+            <AILearningHistory />
 
             {/* Class Misconception Summary */}
             <ClassMisconceptionSummary classId={selectedClassId === 'all' ? undefined : selectedClassId} />
