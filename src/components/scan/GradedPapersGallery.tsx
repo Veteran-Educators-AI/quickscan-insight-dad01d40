@@ -35,6 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { BatchItem, AnalysisResult } from '@/hooks/useBatchAnalysis';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 import { useMultipleGradeTrends, TrendDirection } from '@/hooks/useGradeTrend';
+import { MisconceptionComparison } from './MisconceptionComparison';
 
 // Extended result type that may include additional fields
 interface ExtendedAnalysisResult extends AnalysisResult {
@@ -461,24 +462,9 @@ export function GradedPapersGallery({
                     </Card>
                   )}
 
-                  {/* Misconceptions */}
+                  {/* Misconceptions - Side-by-side comparison */}
                   {selectedItem.result.misconceptions.length > 0 && (
-                    <Card className="border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/20">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                          <span className="font-medium">Misconceptions</span>
-                        </div>
-                        <ul className="space-y-1">
-                          {selectedItem.result.misconceptions.map((m, i) => (
-                            <li key={i} className="text-sm flex items-start gap-2">
-                              <span className="text-yellow-600">•</span>
-                              {m}
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
+                    <MisconceptionComparison misconceptions={selectedItem.result.misconceptions} />
                   )}
 
                   {/* Feedback */}
