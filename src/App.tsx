@@ -35,6 +35,7 @@ import StudentLogin from "./pages/StudentLogin";
 import StudentJoinClass from "./pages/StudentJoinClass";
 import StudentDashboard from "./pages/StudentDashboard";
 import PresentationView from "./pages/PresentationView";
+import PresentationLibrary from "./pages/PresentationLibrary";
 
 const queryClient = new QueryClient();
 
@@ -116,8 +117,9 @@ function AppRoutes() {
       <Route path="/student/login" element={<StudentLogin />} />
       <Route path="/student/join" element={<StudentJoinClass />} />
       <Route path="/student/dashboard" element={<StudentDashboard />} />
-      {/* Presentation route */}
+      {/* Presentation routes */}
       <Route path="/presentation" element={<PresentationView />} />
+      <Route path="/presentation/library" element={<ProtectedRoute><PresentationLibrary /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

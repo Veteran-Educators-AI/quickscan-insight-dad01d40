@@ -1,21 +1,24 @@
 import { useState, useRef } from 'react';
-import { Bot, User, FileImage, Upload, ArrowRight, CheckCircle, Loader2, X, BookOpen, Scale } from 'lucide-react';
+import { Bot, User, FileImage, Upload, ArrowRight, CheckCircle, Loader2, X, BookOpen, Scale, Brain, GraduationCap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 
 export type GradingMode = 'ai' | 'teacher-guided' | 'teacher-manual';
+export type TeacherLearningMode = 'adaptive' | 'strict';
 
 interface GradingModeSelectorProps {
   studentImage: string;
   isAnalyzing: boolean;
   onSelectAI: () => void;
-  onSelectTeacherGuided: (answerGuideImage: string) => void;
+  onSelectTeacherGuided: (answerGuideImage: string, learningMode?: TeacherLearningMode) => void;
   onSelectTeacherManual: () => void;
-  onRunBothAnalyses?: (answerGuideImage: string) => void;
+  onRunBothAnalyses?: (answerGuideImage: string, learningMode?: TeacherLearningMode) => void;
   onCancel: () => void;
 }
 
@@ -30,6 +33,7 @@ export function GradingModeSelector({
 }: GradingModeSelectorProps) {
   const [selectedMode, setSelectedMode] = useState<GradingMode | 'compare' | null>(null);
   const [answerGuideImage, setAnswerGuideImage] = useState<string | null>(null);
+  const [teacherLearningMode, setTeacherLearningMode] = useState<TeacherLearningMode>('adaptive');
   const answerGuideInputRef = useRef<HTMLInputElement>(null);
 
   const handleAnswerGuideUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,9 +62,9 @@ export function GradingModeSelector({
     if (selectedMode === 'ai') {
       onSelectAI();
     } else if (selectedMode === 'teacher-guided' && answerGuideImage) {
-      onSelectTeacherGuided(answerGuideImage);
+      onSelectTeacherGuided(answerGuideImage, teacherLearningMode);
     } else if (selectedMode === 'compare' && answerGuideImage && onRunBothAnalyses) {
-      onRunBothAnalyses(answerGuideImage);
+      onRunBothAnalyses(answerGuideImage, teacherLearningMode);
     } else if (selectedMode === 'teacher-manual') {
       onSelectTeacherManual();
     }
@@ -266,47 +270,85 @@ export function GradingModeSelector({
 
   function renderAnswerGuideUpload() {
     return (
-      <div className="pt-2 border-t">
-        <p className="text-sm font-medium mb-2">Upload Your Answer Guide</p>
-        <input 
-          type="file" 
-          accept="image/*"
-          ref={answerGuideInputRef}
-          onChange={handleAnswerGuideUpload}
-          className="hidden"
-        />
-        
-        {answerGuideImage ? (
-          <div className="space-y-2">
-            <div className="relative">
-              <img 
-                src={answerGuideImage} 
-                alt="Answer guide" 
-                className="w-full max-h-32 object-contain rounded-md border"
-              />
-              <Button
-                variant="destructive"
-                size="icon"
-                className="absolute top-2 right-2 h-6 w-6"
-                onClick={() => setAnswerGuideImage(null)}
-              >
-                <X className="h-3 w-3" />
-              </Button>
+      <div className="space-y-4 pt-2 border-t">
+        <div>
+          <p className="text-sm font-medium mb-2">Upload Your Answer Guide</p>
+          <input 
+            type="file" 
+            accept="image/*"
+            ref={answerGuideInputRef}
+            onChange={handleAnswerGuideUpload}
+            className="hidden"
+          />
+          
+          {answerGuideImage ? (
+            <div className="space-y-2">
+              <div className="relative">
+                <img 
+                  src={answerGuideImage} 
+                  alt="Answer guide" 
+                  className="w-full max-h-32 object-contain rounded-md border"
+                />
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-2 right-2 h-6 w-6"
+                  onClick={() => setAnswerGuideImage(null)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-green-600">
+                <CheckCircle className="h-4 w-4" />
+                Answer guide ready
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-sm text-green-600">
-              <CheckCircle className="h-4 w-4" />
-              Answer guide ready
-            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => answerGuideInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4" />
+              Upload Answer Key / Rubric Image
+            </Button>
+          )}
+        </div>
+
+        {answerGuideImage && (
+          <div className="space-y-3 pt-2 border-t">
+            <p className="text-sm font-medium">Learning Mode</p>
+            <RadioGroup 
+              value={teacherLearningMode} 
+              onValueChange={(v) => setTeacherLearningMode(v as TeacherLearningMode)}
+              className="space-y-2"
+            >
+              <div className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+                <RadioGroupItem value="adaptive" id="adaptive" className="mt-0.5" />
+                <div className="flex-1">
+                  <Label htmlFor="adaptive" className="flex items-center gap-2 cursor-pointer font-medium">
+                    <Brain className="h-4 w-4 text-primary" />
+                    Adaptive Learning
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    AI learns from your grading patterns over time and adapts to match your teaching style and preferences.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+                <RadioGroupItem value="strict" id="strict" className="mt-0.5" />
+                <div className="flex-1">
+                  <Label htmlFor="strict" className="flex items-center gap-2 cursor-pointer font-medium">
+                    <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                    Strict Teacher Response
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    AI grades exactly based on your answer guide without adapting. Best for standardized assessments.
+                  </p>
+                </div>
+              </div>
+            </RadioGroup>
           </div>
-        ) : (
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            onClick={() => answerGuideInputRef.current?.click()}
-          >
-            <Upload className="h-4 w-4" />
-            Upload Answer Key / Rubric Image
-          </Button>
         )}
       </div>
     );
