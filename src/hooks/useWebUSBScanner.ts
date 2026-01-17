@@ -307,18 +307,20 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
     } catch (err: any) {
       console.error('Error connecting to scanner:', err);
       
-      if (err.name === 'NotFoundError') {
-        // User cancelled the dialog or no device was selected - not an error to display
+      // Only show errors for genuine problems, not user cancellations
+      if (err.name === 'NotFoundError' || err.name === 'AbortError') {
+        // User cancelled the dialog or no device was selected - not an error
         setError(null);
       } else if (err.name === 'SecurityError') {
         setError('Permission denied. Please allow access to the scanner.');
-      } else if (err.name === 'NetworkError' && deviceRef.current) {
-        // Only show "in use" error if we actually had a device reference
-        setError('Scanner is in use by another application. Please close other scanning software.');
       } else if (err.message?.includes('Unable to claim interface')) {
-        setError('Scanner is busy or in use by another application.');
+        // Only show if it's a genuine claim error (not just no device selected)
+        setError('Scanner interface is busy. Try unplugging and reconnecting the scanner.');
+      } else if (err.name === 'NetworkError') {
+        // Network errors during USB are typically transient - don't show
+        setError(null);
       } else {
-        // Don't show generic errors for connection cancellation
+        // Don't show generic errors for connection issues
         setError(null);
       }
       
