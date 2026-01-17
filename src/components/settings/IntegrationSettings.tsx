@@ -760,19 +760,27 @@ export function IntegrationSettings() {
             <div className="space-y-4">
               <Alert>
                 <AlertDescription>
-                  <strong>Note:</strong> Google Drive integration requires re-signing in with your Google account to grant Drive access permissions. You'll be redirected back to this page after authorization.
+                  <strong>Note:</strong> This integration requires re-signing in with your Google account to grant Drive and Classroom access permissions. You'll be redirected back to this page after authorization.
                 </AlertDescription>
               </Alert>
               <Button
                 onClick={async () => {
                   try {
-                    // Use signInWithOAuth to re-authenticate with Google including Drive scopes
-                    // This will redirect the user to Google's OAuth flow
+                    // Google API scopes for Drive and Classroom access
+                    const scopes = [
+                      'https://www.googleapis.com/auth/drive.readonly',
+                      'https://www.googleapis.com/auth/classroom.courses.readonly',
+                      'https://www.googleapis.com/auth/classroom.rosters.readonly',
+                      'https://www.googleapis.com/auth/classroom.coursework.students',
+                      'https://www.googleapis.com/auth/classroom.student-submissions.students.readonly',
+                    ].join(' ');
+
+                    // Use signInWithOAuth to re-authenticate with Google including Drive and Classroom scopes
                     const { error } = await supabase.auth.signInWithOAuth({
                       provider: 'google',
                       options: {
                         redirectTo: window.location.origin + '/settings',
-                        scopes: 'https://www.googleapis.com/auth/drive.readonly',
+                        scopes,
                         queryParams: {
                           access_type: 'offline',
                           prompt: 'consent',
@@ -783,10 +791,10 @@ export function IntegrationSettings() {
                       throw error;
                     }
                   } catch (error: any) {
-                    console.error('Google Drive connection error:', error);
+                    console.error('Google connection error:', error);
                     toast({
                       title: "Connection failed",
-                      description: error.message || "Failed to connect Google Drive. Please try again.",
+                      description: error.message || "Failed to connect Google services. Please try again.",
                       variant: "destructive",
                     });
                   }
@@ -794,7 +802,7 @@ export function IntegrationSettings() {
                 className="w-full"
               >
                 <Cloud className="h-4 w-4 mr-2" />
-                Connect Google Drive
+                Connect Google Drive & Classroom
               </Button>
             </div>
           )}
