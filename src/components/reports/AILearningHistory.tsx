@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { 
@@ -12,10 +12,12 @@ import {
   CheckCircle,
   XCircle,
   Edit3,
-  Filter,
   Calendar,
   BarChart3,
-  Sparkles
+  Sparkles,
+  Download,
+  Upload,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,8 +26,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { toast } from 'sonner';
 
 interface GradingCorrection {
   id: string;
@@ -63,11 +67,22 @@ interface PatternAnalysis {
   styleEvolution: { date: string; style: string }[];
 }
 
+interface ExportData {
+  version: string;
+  exportedAt: string;
+  gradingCorrections: Omit<GradingCorrection, 'id'>[];
+  interpretationVerifications: Omit<InterpretationVerification, 'id'>[];
+  nameCorrections: Omit<NameCorrection, 'id'>[];
+}
+
 export function AILearningHistory() {
   const { user } = useAuth();
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [filterType, setFilterType] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<string>('all');
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch grading corrections
   const { data: gradingCorrections = [], isLoading: loadingGrading } = useQuery({
@@ -199,6 +214,115 @@ export function AILearningHistory() {
     return { topicPatterns, timePatterns, styleEvolution };
   })();
 
+  // Export AI learning data
+  const handleExport = async () => {
+    if (!user) return;
+    setIsExporting(true);
+    
+    try {
+      // Fetch all data without time range filter for export
+      const [gradingRes, interpRes, nameRes] = await Promise.all([
+        supabase
+          .from('grading_corrections')
+          .select('topic_name, ai_grade, corrected_grade, ai_justification, correction_reason, strictness_indicator, grading_focus, created_at')
+          .eq('teacher_id', user.id),
+        supabase
+          .from('interpretation_verifications')
+          .select('original_text, interpretation, decision, correct_interpretation, context, created_at')
+          .eq('teacher_id', user.id),
+        supabase
+          .from('name_corrections')
+          .select('handwritten_name, normalized_name, times_used, created_at')
+          .eq('teacher_id', user.id),
+      ]);
+
+      const exportData: ExportData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        gradingCorrections: gradingRes.data || [],
+        interpretationVerifications: interpRes.data || [],
+        nameCorrections: nameRes.data || [],
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ai-learning-data-${format(new Date(), 'yyyy-MM-dd')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success('AI learning data exported successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export learning data');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Import AI learning data
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      const data: ExportData = JSON.parse(text);
+
+      if (!data.version || !data.gradingCorrections) {
+        throw new Error('Invalid file format');
+      }
+
+      let importedCount = 0;
+
+      // Import grading corrections
+      if (data.gradingCorrections.length > 0) {
+        const { error } = await supabase
+          .from('grading_corrections')
+          .insert(
+            data.gradingCorrections.map(c => ({
+              ...c,
+              teacher_id: user.id,
+            }))
+          );
+        if (!error) importedCount += data.gradingCorrections.length;
+      }
+
+      // Import interpretation verifications
+      if (data.interpretationVerifications.length > 0) {
+        const { error } = await supabase
+          .from('interpretation_verifications')
+          .insert(
+            data.interpretationVerifications.map(v => ({
+              ...v,
+              teacher_id: user.id,
+            }))
+          );
+        if (!error) importedCount += data.interpretationVerifications.length;
+      }
+
+      // Note: Name corrections require class_id and correct_student_id, so we skip those
+      // as they are context-specific
+
+      toast.success(`Imported ${importedCount} learning records!`);
+      
+      // Refresh queries
+      window.location.reload();
+    } catch (error) {
+      console.error('Import error:', error);
+      toast.error('Failed to import learning data. Please check the file format.');
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const toggleExpanded = (id: string) => {
     const newExpanded = new Set(expandedItems);
     if (newExpanded.has(id)) {
@@ -269,7 +393,7 @@ export function AILearningHistory() {
               Detailed view of all corrections and how they influence AI grading patterns
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Select value={timeRange} onValueChange={setTimeRange}>
               <SelectTrigger className="w-[140px]">
                 <Calendar className="h-4 w-4 mr-2" />
@@ -281,6 +405,40 @@ export function AILearningHistory() {
                 <SelectItem value="month">Past Month</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* Hidden file input for import */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleImport}
+              className="hidden"
+            />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={isExporting || isImporting}>
+                  {isExporting || isImporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Transfer
+                    </>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExport} disabled={totalCorrections === 0}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Learning Data
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import Learning Data
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </CardHeader>
