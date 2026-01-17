@@ -87,6 +87,18 @@ export default function PresentationView() {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showImageGenerator, setShowImageGenerator] = useState(false);
+  
+  // Touch gesture states
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [initialPinchDistance, setInitialPinchDistance] = useState<number | null>(null);
+  const slideContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Image drag/resize states
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
+  const [isResizingImage, setIsResizingImage] = useState(false);
+  const [imageResizeCorner, setImageResizeCorner] = useState<string | null>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
 
   // Load presentation from sessionStorage
   useEffect(() => {
@@ -207,6 +219,151 @@ export default function PresentationView() {
   const handleOptionSelect = (index: number) => {
     setSelectedOption(index);
     setTimeout(() => setShowAnswer(true), 500);
+  };
+
+  // Touch gesture handlers for swipe navigation
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    } else if (e.touches.length === 2) {
+      // Pinch-to-zoom start
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      setInitialPinchDistance(dist);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && initialPinchDistance) {
+      // Pinch-to-zoom
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const scale = dist / initialPinchDistance;
+      setZoomLevel(Math.max(0.5, Math.min(3, scale)));
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStart && e.changedTouches.length === 1) {
+      const deltaX = e.changedTouches[0].clientX - touchStart.x;
+      const deltaY = e.changedTouches[0].clientY - touchStart.y;
+      const minSwipeDistance = 50;
+      
+      // Only trigger swipe if horizontal movement is greater than vertical
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
+        if (deltaX > 0) {
+          prevSlide();
+        } else {
+          nextSlide();
+        }
+      }
+    }
+    setTouchStart(null);
+    setInitialPinchDistance(null);
+  };
+
+  // Reset zoom on slide change
+  useEffect(() => {
+    setZoomLevel(1);
+  }, [currentSlide]);
+
+  // Image drag handlers for edit mode
+  const handleImageDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isEditing || !slide?.customImage) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingImage(true);
+  };
+
+  const handleImageDrag = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDraggingImage || !isEditing || !presentation || !slideContainerRef.current) return;
+    
+    const rect = slideContainerRef.current.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    const y = ((clientY - rect.top) / rect.height) * 100;
+    
+    const updatedSlides = [...presentation.slides];
+    if (updatedSlides[currentSlide].customImage) {
+      updatedSlides[currentSlide] = {
+        ...updatedSlides[currentSlide],
+        customImage: {
+          ...updatedSlides[currentSlide].customImage!,
+          position: { x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) }
+        }
+      };
+      const updatedPresentation = { ...presentation, slides: updatedSlides };
+      setPresentation(updatedPresentation);
+    }
+  };
+
+  const handleImageDragEnd = () => {
+    if (isDraggingImage && presentation) {
+      sessionStorage.setItem('nycologic_presentation', JSON.stringify(presentation));
+    }
+    setIsDraggingImage(false);
+  };
+
+  // Image resize handlers
+  const handleResizeStart = (corner: string) => (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isEditing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizingImage(true);
+    setImageResizeCorner(corner);
+  };
+
+  const handleResize = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isResizingImage || !isEditing || !presentation || !slide?.customImage) return;
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
+    const rect = slideContainerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const currentImage = slide.customImage;
+    let newWidth = currentImage.size.width;
+    let newHeight = currentImage.size.height;
+    
+    // Calculate new dimensions based on mouse position
+    const deltaScale = 2; // Sensitivity
+    if (imageResizeCorner?.includes('right')) {
+      newWidth = Math.max(100, Math.min(800, clientX - rect.left - (rect.width * currentImage.position.x / 100) + currentImage.size.width / 2));
+    }
+    if (imageResizeCorner?.includes('bottom')) {
+      newHeight = Math.max(80, Math.min(600, clientY - rect.top - (rect.height * currentImage.position.y / 100) + currentImage.size.height / 2));
+    }
+    if (imageResizeCorner?.includes('left')) {
+      newWidth = Math.max(100, Math.min(800, (rect.width * currentImage.position.x / 100) - clientX + rect.left + currentImage.size.width / 2));
+    }
+    if (imageResizeCorner?.includes('top')) {
+      newHeight = Math.max(80, Math.min(600, (rect.height * currentImage.position.y / 100) - clientY + rect.top + currentImage.size.height / 2));
+    }
+    
+    const updatedSlides = [...presentation.slides];
+    updatedSlides[currentSlide] = {
+      ...updatedSlides[currentSlide],
+      customImage: {
+        ...currentImage,
+        size: { width: newWidth, height: newHeight }
+      }
+    };
+    setPresentation({ ...presentation, slides: updatedSlides });
+  };
+
+  const handleResizeEnd = () => {
+    if (isResizingImage && presentation) {
+      sessionStorage.setItem('nycologic_presentation', JSON.stringify(presentation));
+    }
+    setIsResizingImage(false);
+    setImageResizeCorner(null);
   };
 
   // Update slide content
@@ -784,23 +941,63 @@ export default function PresentationView() {
         <ChevronRight className="h-6 w-6 lg:h-8 lg:w-8" />
       </button>
 
-      {/* Main content area */}
-      <main className="min-h-screen flex items-center justify-center px-20 lg:px-40 py-24 lg:py-32">
+      {/* Main content area with touch gestures */}
+      <main 
+        ref={slideContainerRef}
+        className="min-h-screen flex items-center justify-center px-20 lg:px-40 py-24 lg:py-32 touch-pan-y"
+        onTouchStart={handleTouchStart}
+        onTouchMove={(e) => {
+          handleTouchMove(e);
+          if (isDraggingImage) handleImageDrag(e);
+          if (isResizingImage) handleResize(e);
+        }}
+        onTouchEnd={(e) => {
+          handleTouchEnd(e);
+          handleImageDragEnd();
+          handleResizeEnd();
+        }}
+        onMouseMove={(e) => {
+          if (isDraggingImage) handleImageDrag(e);
+          if (isResizingImage) handleResize(e);
+        }}
+        onMouseUp={() => {
+          handleImageDragEnd();
+          handleResizeEnd();
+        }}
+        onMouseLeave={() => {
+          handleImageDragEnd();
+          handleResizeEnd();
+        }}
+      >
         <AnimatePresence mode="wait">
           <motion.div
             key={currentSlide}
             initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+            animate={{ opacity: 1, scale: zoomLevel }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-            className="w-full max-w-6xl mx-auto"
+            className="w-full max-w-6xl mx-auto origin-center"
           >
+            {/* Zoom indicator */}
+            {zoomLevel !== 1 && (
+              <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-black/70 backdrop-blur-sm px-4 py-2 rounded-full">
+                <span className="text-white/80 text-sm font-medium">{Math.round(zoomLevel * 100)}%</span>
+                <button 
+                  onClick={() => setZoomLevel(1)} 
+                  className="ml-2 text-white/60 hover:text-white text-xs underline"
+                >
+                  Reset
+                </button>
+              </div>
+            )}
+            
             {/* Slide content based on type */}
             {slide.type === 'title' ? (
               <div className="text-center space-y-8 relative">
-                {/* Custom Generated Image (positioned by user) */}
+                {/* Custom Generated Image (interactive in edit mode) */}
                 {slide.customImage?.url && (
                   <motion.div
+                    ref={imageContainerRef}
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     style={{
@@ -812,14 +1009,52 @@ export default function PresentationView() {
                       height: `${slide.customImage.size.height}px`,
                       zIndex: 10,
                     }}
-                    className="pointer-events-none"
+                    className={cn(
+                      isEditing ? "cursor-move" : "pointer-events-none",
+                      isDraggingImage && "ring-4 ring-primary/50"
+                    )}
+                    onMouseDown={isEditing ? handleImageDragStart : undefined}
+                    onTouchStart={isEditing ? handleImageDragStart : undefined}
                   >
                     <img 
                       src={slide.customImage.url} 
                       alt="Slide image"
-                      className="w-full h-full object-contain rounded-2xl shadow-2xl"
+                      className="w-full h-full object-contain rounded-2xl shadow-2xl pointer-events-none select-none"
                       style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.5))' }}
+                      draggable={false}
                     />
+                    
+                    {/* Resize handles (edit mode only) */}
+                    {isEditing && (
+                      <>
+                        {/* Corner handles */}
+                        <div
+                          onMouseDown={handleResizeStart('top-left')}
+                          onTouchStart={handleResizeStart('top-left')}
+                          className="absolute -top-2 -left-2 w-5 h-5 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg"
+                        />
+                        <div
+                          onMouseDown={handleResizeStart('top-right')}
+                          onTouchStart={handleResizeStart('top-right')}
+                          className="absolute -top-2 -right-2 w-5 h-5 bg-primary rounded-full cursor-nesw-resize hover:scale-125 transition-transform shadow-lg"
+                        />
+                        <div
+                          onMouseDown={handleResizeStart('bottom-left')}
+                          onTouchStart={handleResizeStart('bottom-left')}
+                          className="absolute -bottom-2 -left-2 w-5 h-5 bg-primary rounded-full cursor-nesw-resize hover:scale-125 transition-transform shadow-lg"
+                        />
+                        <div
+                          onMouseDown={handleResizeStart('bottom-right')}
+                          onTouchStart={handleResizeStart('bottom-right')}
+                          className="absolute -bottom-2 -right-2 w-5 h-5 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg"
+                        />
+                        
+                        {/* Edge label */}
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 text-white/90 text-xs px-2 py-1 rounded whitespace-nowrap">
+                          Drag to move • Corners to resize
+                        </div>
+                      </>
+                    )}
                   </motion.div>
                 )}
                 
