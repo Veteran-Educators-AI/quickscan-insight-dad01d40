@@ -622,28 +622,31 @@ Provide your analysis in the following structure:
 - Regents Score: (0, 1, 2, 3, or 4 - remember: ANY understanding = Score 1 minimum)
 - Regents Score Justification: (why this score - cite evidence)
 - Rubric Scores: (if teacher rubric provided, score each criterion with points)
-- Misconceptions: (CRITICAL - Write COMPLETE, COHERENT SENTENCES for each error. Format:
-    "ERROR_LOCATION: [top/middle/bottom]-[left/center/right] of page | The student incorrectly wrote '[EXACT QUOTE from their work - copy their actual words/numbers]' when attempting [specific step]. The correct approach would be [expected solution with actual values]. This error resulted in [specific impact on the final answer]."
+- Misconceptions: (CRITICAL - ONLY list ERRORS. Do NOT include strengths or what the student did correctly here.
     
-    REQUIREMENTS:
-    1. START each misconception with "ERROR_LOCATION: [position]" where position describes where on the page the error appears
-       - Use format: "[vertical]-[horizontal]" like "top-left", "middle-center", "bottom-right"
-       - This helps teachers quickly locate the error on the student's paper
-    2. ALWAYS quote EXACTLY what the student wrote - never abbreviate or summarize
-    3. Start the explanation with a complete subject ("The student...", "In step 3, the student...")
-    4. Explain WHY this is wrong mathematically
-    5. NEVER use incomplete sentences or fragments like "S and errors" - always write full sentences
-    6. If multiple errors, write a separate complete entry for each error with its own ERROR_LOCATION
+    FORMAT - Start with the ERROR first, then explain:
+    "ERROR_LOCATION: [top/middle/bottom]-[left/center/right] | [WHAT WENT WRONG]: The student wrote '[EXACT QUOTE]' which is incorrect. [WHY IT'S WRONG]: The correct approach is [expected]. [IMPACT]: This caused [consequence]."
     
-    EXAMPLES OF CORRECT FORMAT:
-    ✓ "ERROR_LOCATION: top-right | The student wrote 'A = πr' instead of 'A = πr²' when calculating the area of the semicircle, omitting the exponent on the radius. This caused the area to be calculated as 15.7 instead of 78.5."
-    ✓ "ERROR_LOCATION: middle-center | The student incorrectly added the fractions by writing '1/2 + 1/3 = 2/5', failing to find a common denominator. The correct answer should be 5/6."
-    ✓ "ERROR_LOCATION: bottom-left | The student wrote 'x = 5' as the final answer, but forgot to substitute back to find y. The complete solution requires both x = 5 and y = 3."
+    CRITICAL RULES:
+    1. ERRORS ONLY - Never mention strengths, correct work, or what student did right in this section
+    2. ERROR FIRST - Always state the error/mistake at the beginning of each entry
+    3. START with "ERROR_LOCATION: [position]" format: "top-left", "middle-center", "bottom-right"
+    4. QUOTE EXACTLY what the student wrote - copy their actual words/numbers
+    5. EXPLAIN why this is mathematically wrong
+    6. STATE the impact on the final answer
+    7. Write COMPLETE sentences - no fragments
+    8. Separate entry for each distinct error
     
-    EXAMPLES OF WRONG FORMAT (DO NOT DO THIS):
-    ✗ "S and errors in algebraic manipulation" - INCOMPLETE, no location, no quote, no context
-    ✗ "Wrong formula used" - TOO VAGUE, no specifics
-    ✗ "The student made mistakes" - NO SPECIFIC QUOTE or explanation, no location)
+    CORRECT EXAMPLES:
+    ✓ "ERROR_LOCATION: top-right | The student incorrectly wrote 'A = πr' instead of 'A = πr²', omitting the exponent. The area formula requires squaring the radius. This caused the area to be 15.7 instead of 78.5."
+    ✓ "ERROR_LOCATION: middle-center | The student made an addition error: '1/2 + 1/3 = 2/5'. When adding fractions, a common denominator is required. The correct sum is 5/6."
+    ✓ "ERROR_LOCATION: bottom-left | The student stopped at 'x = 5' without finding y. The solution is incomplete - both variables must be solved. The full answer is x = 5, y = 3."
+    
+    WRONG EXAMPLES (NEVER DO THIS):
+    ✗ "Strengths include calculating areas correctly. The error was..." - NO STRENGTHS ALLOWED
+    ✗ "The student did many things right but..." - START WITH ERROR, NOT PRAISE
+    ✗ "S and errors in algebraic manipulation" - INCOMPLETE FRAGMENT
+    ✗ "Wrong formula used" - TOO VAGUE, needs specifics)
 - Needs Teacher Review: (list items flagged for verification)
 - Total Score: (IMPORTANT: This is points from teacher rubric criteria ONLY. If no teacher rubric was provided, use the Regents score converted: Score 4=4/4, Score 3=3/4, Score 2=2/4, Score 1=1/4, Score 0=0/4. Format: earned/possible)
 - Standards Met: (YES or NO - does work show ANY understanding of the standards?)
