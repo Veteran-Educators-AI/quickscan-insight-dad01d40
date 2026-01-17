@@ -44,6 +44,13 @@ export interface ImportedSubmission {
   }>;
   state: string;
   assignedGrade?: number;
+  // Classroom context for grade pushing
+  classroomContext?: {
+    courseId: string;
+    courseWorkId: string;
+    submissionId: string;
+    maxPoints: number;
+  };
 }
 
 type ImportStep = 'courses' | 'coursework' | 'submissions' | 'importing' | 'complete';
@@ -215,6 +222,12 @@ export function GoogleClassroomImport({ open, onOpenChange, onImportComplete }: 
         attachments,
         state: sub.state,
         assignedGrade: sub.assignedGrade,
+        classroomContext: {
+          courseId: selectedCourse!.id,
+          courseWorkId: selectedCourseWork!.id,
+          submissionId: sub.id,
+          maxPoints: selectedCourseWork?.maxPoints || 100,
+        },
       });
 
       setImportProgress(Math.round(((i + 1) / selectedSubs.length) * 100));
