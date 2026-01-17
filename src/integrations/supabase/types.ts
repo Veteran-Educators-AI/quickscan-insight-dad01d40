@@ -199,6 +199,64 @@ export type Database = {
           },
         ]
       }
+      assignment_attendance: {
+        Row: {
+          assignment_name: string
+          class_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          status: string
+          student_id: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_name: string
+          class_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status: string
+          student_id: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_name?: string
+          class_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          student_id?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_attendance_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_attendance_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_attendance_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attempt_images: {
         Row: {
           attempt_id: string

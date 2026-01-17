@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartContainer, ChartTooltip } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell, PieChart, Pie, Legend } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, User, BookOpen, Target, Award, Info, ChevronDown, ChevronRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, User, BookOpen, Target, Award, Info, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { format } from 'date-fns';
@@ -81,17 +81,48 @@ function getSubjectArea(standard: string): string {
   return 'OTHER';
 }
 
-// Clean up standard code for display
+// Clean up standard code for display - extract just the code portion
 function cleanStandardCode(standard: string): string {
   if (!standard) return 'N/A';
   
   // Remove verbose CCSS prefixes
   let cleaned = standard.replace(/CCSS\.MATH\.CONTENT\./gi, '');
   
-  // Clean up trailing asterisks or special chars
-  cleaned = cleaned.replace(/[\*#]+$/, '').trim();
+  // Remove any descriptive text after the code (text that starts with " -" or contains explanations)
+  cleaned = cleaned.replace(/\s*[-–—]\s*[A-Za-z].*$/g, '');
+  
+  // Remove parenthetical notes
+  cleaned = cleaned.replace(/\s*\([^)]*\)\s*/g, '');
+  
+  // Clean up trailing asterisks, special chars, or periods
+  cleaned = cleaned.replace(/[\*#\.]+$/, '').trim();
+  
+  // If it still looks like a mix of code and description, extract just the code part
+  // Standard codes typically follow patterns like: G.GMD.B.4, 7.G.B.6, A-SSE.A.1, etc.
+  const codeMatch = cleaned.match(/^[\d\.]*[A-Z][-\.]?[A-Z]*\.?[A-Z]?\.?\d*\.?[a-z]?/i);
+  if (codeMatch && codeMatch[0].length >= 3) {
+    cleaned = codeMatch[0].replace(/\.$/, '');
+  }
   
   return cleaned || standard;
+}
+
+// Generate a link to learn more about a standard
+function getStandardLink(standard: string): string {
+  const cleaned = cleanStandardCode(standard).toUpperCase();
+  
+  // JMAP link for NY Regents standards
+  if (cleaned.match(/^[AG]-/) || cleaned.match(/^\d+\.[A-Z]/)) {
+    return `https://www.jmap.org/JMAP/StandardSearch.htm`;
+  }
+  
+  // Common Core State Standards link
+  if (cleaned.match(/^[GNFSA]-/) || cleaned.startsWith('CCSS')) {
+    return `https://www.corestandards.org/Math/`;
+  }
+  
+  // Default to EngageNY
+  return `https://www.engageny.org/search?search_api_views_fulltext=${encodeURIComponent(cleaned)}`;
 }
 
 export function RegentsScoreReport({ classId }: RegentsScoreReportProps) {
@@ -756,23 +787,20 @@ function StandardsPerformanceSection({ standards }: StandardsPerformanceSectionP
                       {areaStandards.map((std, idx) => (
                         <TableRow key={`${std.standard}-${idx}`} className="hover:bg-muted/30">
                           <TableCell>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Badge 
-                                    variant="outline" 
-                                    className="font-mono text-xs cursor-help bg-background"
-                                  >
-                                    {std.cleanCode}
-                                  </Badge>
-                                </TooltipTrigger>
-                                {std.cleanCode !== std.standard && (
-                                  <TooltipContent>
-                                    <p className="text-xs max-w-xs">{std.standard}</p>
-                                  </TooltipContent>
-                                )}
-                              </Tooltip>
-                            </TooltipProvider>
+                            <a 
+                              href={getStandardLink(std.standard)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 group"
+                            >
+                              <Badge 
+                                variant="outline" 
+                                className="font-mono text-xs bg-background hover:bg-primary/10 hover:border-primary transition-colors cursor-pointer"
+                              >
+                                {std.cleanCode}
+                              </Badge>
+                              <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </a>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-3">
