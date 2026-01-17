@@ -228,6 +228,62 @@ export function useGoogleClassroom() {
     }
   };
 
+  const addSubmissionComment = async (
+    courseId: string,
+    courseWorkId: string,
+    submissionId: string,
+    comment: string
+  ): Promise<boolean> => {
+    try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) return false;
+
+      const response = await fetch(
+        `https://classroom.googleapis.com/v1/courses/${courseId}/courseWork/${courseWorkId}/studentSubmissions/${submissionId}:modifyAttachments`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            addAttachments: [{
+              link: {
+                url: `data:text/plain,${encodeURIComponent(comment)}`,
+                title: 'Teacher Feedback',
+              }
+            }]
+          }),
+        }
+      );
+
+      // If modifyAttachments doesn't work, we'll use a different approach
+      if (!response.ok) {
+        // Try adding as a private comment instead
+        const commentResponse = await fetch(
+          `https://classroom.googleapis.com/v1/courses/${courseId}/courseWork/${courseWorkId}/studentSubmissions/${submissionId}:addPrivateComment`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text: comment,
+            }),
+          }
+        );
+
+        return commentResponse.ok;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      return false;
+    }
+  };
+
   const updateSubmissionGrade = async (
     courseId: string,
     courseWorkId: string,
@@ -323,11 +379,24 @@ export function useGoogleClassroom() {
     courseWorkId: string,
     submissionId: string,
     grade: number,
-    autoReturn: boolean = false
+    autoReturn: boolean = false,
+    feedbackComment?: string
   ): Promise<boolean> => {
     // Update the grade
     const gradeUpdated = await updateSubmissionGrade(courseId, courseWorkId, submissionId, grade);
     if (!gradeUpdated) return false;
+
+    // Add feedback comment if provided
+    if (feedbackComment && feedbackComment.trim()) {
+      const commentAdded = await addSubmissionComment(courseId, courseWorkId, submissionId, feedbackComment);
+      if (!commentAdded) {
+        toast({
+          title: "Grade saved, comment failed",
+          description: "The grade was saved but we couldn't add the feedback comment",
+          variant: "default",
+        });
+      }
+    }
 
     // Optionally return the submission to the student
     if (autoReturn) {
@@ -353,6 +422,7 @@ export function useGoogleClassroom() {
     fetchSubmissions,
     hasClassroomAccess,
     updateSubmissionGrade,
+    addSubmissionComment,
     returnSubmission,
     pushGradeToClassroom,
   };
