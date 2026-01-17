@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw, FileText } from 'lucide-react';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,6 +19,8 @@ import { ScanClassStudentPicker, useStudentName } from '@/components/scan/ScanCl
 import { ScanQuestionSelector } from '@/components/scan/ScanQuestionSelector';
 import { SaveForLaterTab } from '@/components/scan/SaveForLaterTab';
 import { SyncStatusIndicator } from '@/components/scan/SyncStatusIndicator';
+import { AILearningProgress } from '@/components/scan/AILearningProgress';
+import { TeacherAnswerKeyDialog } from '@/components/scan/TeacherAnswerKeyDialog';
 import { useAnalyzeStudentWork } from '@/hooks/useAnalyzeStudentWork';
 import { useBatchAnalysis } from '@/hooks/useBatchAnalysis';
 import { usePendingScans } from '@/hooks/usePendingScans';
@@ -151,6 +153,10 @@ export default function Scan() {
     misconceptions: string[];
     feedback: string;
   } | null>(null);
+
+  // Teacher answer key dialog
+  const [showAnswerKeyDialog, setShowAnswerKeyDialog] = useState(false);
+  const [answerKeyClassName, setAnswerKeyClassName] = useState<string | undefined>(undefined);
 
   // Mock rubric steps
   const mockRubricSteps = [
@@ -850,6 +856,24 @@ export default function Scan() {
           <div className="text-center">
             <h1 className="font-display text-2xl font-bold">Scan Student Work</h1>
             <p className="text-muted-foreground">Capture or upload photos of student responses</p>
+          </div>
+
+          {/* AI Learning Progress Indicator */}
+          <AILearningProgress compact />
+
+          {/* Teacher Answer Key Button */}
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowAnswerKeyDialog(true);
+              }}
+              className="gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              Create Answer Key
+            </Button>
           </div>
 
           {/* Mode Toggle */}
@@ -2227,6 +2251,13 @@ export default function Scan() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Teacher Answer Key Dialog */}
+      <TeacherAnswerKeyDialog
+        open={showAnswerKeyDialog}
+        onOpenChange={setShowAnswerKeyDialog}
+        classId={singleScanClassId || selectedClassId || undefined}
+      />
     </>
   );
 }
