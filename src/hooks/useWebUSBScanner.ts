@@ -268,9 +268,21 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
     setIsConnecting(true);
     setError(null);
 
+    // Connection timeout - 15 seconds total for device selection + connection
+    const CONNECTION_TIMEOUT = 15000;
+    let timeoutId: NodeJS.Timeout | null = null;
+    let connectionAborted = false;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        connectionAborted = true;
+        reject(new Error('CONNECTION_TIMEOUT'));
+      }, CONNECTION_TIMEOUT);
+    });
+
     try {
       // Request a USB device with scanner-like characteristics
-      const device = await navigator.usb.requestDevice({
+      const device = await navigator.usb!.requestDevice({
         filters: [
           // Known scanner vendors
           ...KNOWN_SCANNER_VENDORS.map(vendorId => ({ vendorId })),
@@ -279,24 +291,48 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
         ],
       });
 
+      if (timeoutId) clearTimeout(timeoutId);
+      
       if (!device) {
         throw new Error('No device selected');
       }
 
-      console.log('Selected device:', device.productName, device.vendorId, device.productId);
-
-      // Open the device
-      await device.open();
-      
-      // Select configuration if not already selected
-      if (device.configuration === null && device.configurations.length > 0) {
-        await device.selectConfiguration(device.configurations[0].configurationValue);
+      if (connectionAborted) {
+        throw new Error('CONNECTION_TIMEOUT');
       }
 
-      // Claim the first interface
+      console.log('Selected device:', device.productName, device.vendorId, device.productId);
+
+      // Open the device with timeout
+      const OPEN_TIMEOUT = 8000;
+      const openWithTimeout = Promise.race([
+        device.open(),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('OPEN_TIMEOUT')), OPEN_TIMEOUT)
+        )
+      ]);
+      
+      await openWithTimeout;
+      
+      // Select configuration if not already selected (with timeout)
+      if (device.configuration === null && device.configurations.length > 0) {
+        await Promise.race([
+          device.selectConfiguration(device.configurations[0].configurationValue),
+          new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('CONFIG_TIMEOUT')), 5000)
+          )
+        ]);
+      }
+
+      // Claim the first interface (with timeout)
       if (device.configuration && device.configuration.interfaces.length > 0) {
         const interfaceNumber = device.configuration.interfaces[0].interfaceNumber;
-        await device.claimInterface(interfaceNumber);
+        await Promise.race([
+          device.claimInterface(interfaceNumber),
+          new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('CLAIM_TIMEOUT')), 5000)
+          )
+        ]);
       }
 
       deviceRef.current = device;
@@ -322,27 +358,37 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
       return true;
 
     } catch (err: any) {
+      if (timeoutId) clearTimeout(timeoutId);
       console.error('Error connecting to scanner:', err);
       
-      // Only show errors for genuine problems, not user cancellations
-      if (err.name === 'NotFoundError' || err.name === 'AbortError') {
+      // Handle timeout errors specifically
+      if (err.message === 'CONNECTION_TIMEOUT' || err.message === 'OPEN_TIMEOUT') {
+        setError('Connection timed out. The scanner may be busy or unresponsive. Try power cycling it.');
+        toast.error('Scanner connection timed out', {
+          description: 'Try unplugging and reconnecting the scanner.'
+        });
+      } else if (err.message === 'CONFIG_TIMEOUT' || err.message === 'CLAIM_TIMEOUT') {
+        setError('Failed to configure scanner. It may be in use by another application.');
+        toast.error('Scanner configuration failed', {
+          description: 'Close any other scanning software and try again.'
+        });
+      } else if (err.name === 'NotFoundError' || err.name === 'AbortError') {
         // User cancelled the dialog or no device was selected - not an error
         setError(null);
       } else if (err.name === 'SecurityError') {
         setError('Permission denied. Please allow access to the scanner.');
       } else if (err.message?.includes('Unable to claim interface')) {
-        // Only show if it's a genuine claim error (not just no device selected)
         setError('Scanner interface is busy. Try unplugging and reconnecting the scanner.');
       } else if (err.name === 'NetworkError') {
-        // Network errors during USB are typically transient - don't show
-        setError(null);
+        setError('Connection lost. Check USB cable and try again.');
       } else {
-        // Don't show generic errors for connection issues
-        setError(null);
+        // Generic fallback with actionable message
+        setError('Could not connect to scanner. Please check the connection and try again.');
       }
       
       return false;
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       setIsConnecting(false);
     }
   }, [isSupported]);
