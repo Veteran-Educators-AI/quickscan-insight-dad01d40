@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 import { usePushStudentData } from './usePushStudentData';
 import { usePushToSisterApp } from './usePushToSisterApp';
+import { usePerformanceDropAlert } from './usePerformanceDropAlert';
 import type { SyncStatus } from '@/components/scan/SyncStatusIndicator';
 
 interface RubricScore {
@@ -73,6 +74,7 @@ export function useSaveAnalysisResults() {
   const { user } = useAuth();
   const { pushData } = usePushStudentData();
   const { pushToSisterApp } = usePushToSisterApp();
+  const { checkAndSendAlert: checkPerformanceDrop, getPreviousGrade } = usePerformanceDropAlert();
   const [isSaving, setIsSaving] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     sisterAppSync: 'idle',
@@ -259,6 +261,48 @@ export function useSaveAnalysisResults() {
             // Don't throw - misconceptions are secondary
           } else {
             console.log(`Saved ${misconceptionRecords.length} misconceptions for student`);
+          }
+        }
+
+        // Check for performance drop and send alert if significant
+        if (params.topicName && params.studentName) {
+          const previousGrade = await getPreviousGrade(params.studentId, params.topicName);
+          if (previousGrade !== null && previousGrade > finalGrade) {
+            // Get student's parent email for potential parent notification
+            const { data: studentData } = await supabase
+              .from('students')
+              .select('parent_email')
+              .eq('id', params.studentId)
+              .single();
+
+            // Get weak topics for remediation suggestions
+            const { data: weakTopicsData } = await supabase
+              .from('grade_history')
+              .select('topic_name, grade')
+              .eq('student_id', params.studentId)
+              .lt('grade', 70)
+              .order('created_at', { ascending: false })
+              .limit(5);
+
+            const weakTopics = weakTopicsData?.map(t => t.topic_name) || [];
+
+            // Send performance drop alert (runs in background)
+            checkPerformanceDrop({
+              studentId: params.studentId,
+              studentName: params.studentName,
+              previousGrade,
+              currentGrade: finalGrade,
+              topicName: params.topicName,
+              nysStandard: params.result.nysStandard,
+              parentEmail: studentData?.parent_email || undefined,
+              weakTopics,
+            }).then(result => {
+              if (result.sent) {
+                console.log('Performance drop alert sent:', result.reason);
+              }
+            }).catch(err => {
+              console.error('Performance drop alert error:', err);
+            });
           }
         }
 

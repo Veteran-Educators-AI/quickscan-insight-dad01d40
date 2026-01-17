@@ -9,8 +9,14 @@ interface StudentOnlyQRCodeProps {
  * Generates a QR code encoding only the student ID for automatic student identification.
  * This is different from StudentQRCode which encodes both student and question IDs.
  * Format: JSON object with studentId and version for future compatibility
+ * 
+ * IMPORTANT: QR codes are optimized for scanning with:
+ * - High error correction (H = 30% recovery)
+ * - Sufficient quiet zone margin
+ * - Minimum size of 72px for reliable scanning
+ * - High contrast black on white
  */
-export function StudentOnlyQRCode({ studentId, size = 48 }: StudentOnlyQRCodeProps) {
+export function StudentOnlyQRCode({ studentId, size = 72 }: StudentOnlyQRCodeProps) {
   const qrData = JSON.stringify({
     v: 2, // version 2 for student-only codes
     type: 'student',
@@ -18,12 +24,24 @@ export function StudentOnlyQRCode({ studentId, size = 48 }: StudentOnlyQRCodePro
   });
 
   return (
-    <QRCodeSVG
-      value={qrData}
-      size={size}
-      level="M"
-      includeMargin={false}
-    />
+    <div 
+      style={{ 
+        padding: '4px', 
+        backgroundColor: '#ffffff', 
+        border: '2px solid #000000',
+        borderRadius: '4px',
+        display: 'inline-block',
+      }}
+    >
+      <QRCodeSVG
+        value={qrData}
+        size={size}
+        level="H" // High error correction - 30% recovery
+        includeMargin={true}
+        bgColor="#ffffff"
+        fgColor="#000000"
+      />
+    </div>
   );
 }
 

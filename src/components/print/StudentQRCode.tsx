@@ -11,8 +11,13 @@ interface StudentQRCodeProps {
  * Generates a QR code encoding student and question IDs for automatic detection
  * Format: JSON object with studentId, questionId, and version for future compatibility
  * When includeUrl is true, generates a direct URL to the student results page
+ * 
+ * IMPORTANT: QR codes are optimized for scanning with:
+ * - High error correction (H = 30% recovery)
+ * - Sufficient quiet zone margin
+ * - Minimum size of 80px for reliable scanning
  */
-export function StudentQRCode({ studentId, questionId, size = 64, includeUrl = false }: StudentQRCodeProps) {
+export function StudentQRCode({ studentId, questionId, size = 80, includeUrl = false }: StudentQRCodeProps) {
   // Generate either a URL (for student-facing) or JSON data (for teacher scanning)
   const qrData = includeUrl 
     ? `${window.location.origin}/results/${studentId}/${questionId}`
@@ -23,12 +28,24 @@ export function StudentQRCode({ studentId, questionId, size = 64, includeUrl = f
       });
 
   return (
-    <QRCodeSVG
-      value={qrData}
-      size={size}
-      level="M"
-      includeMargin={false}
-    />
+    <div 
+      style={{ 
+        padding: '4px', 
+        backgroundColor: '#ffffff', 
+        border: '2px solid #000000',
+        borderRadius: '4px',
+        display: 'inline-block',
+      }}
+    >
+      <QRCodeSVG
+        value={qrData}
+        size={size}
+        level="H" // High error correction - 30% recovery
+        includeMargin={true}
+        bgColor="#ffffff"
+        fgColor="#000000"
+      />
+    </div>
   );
 }
 
