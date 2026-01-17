@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/accordion';
 import { AIWorkDetector } from './AIWorkDetector';
 import { GradeOverrideDialog } from './GradeOverrideDialog';
+import { MisconceptionComparison } from './MisconceptionComparison';
 import { RemediationActions } from './RemediationActions';
 import { RecommendedNextSteps } from './RecommendedNextSteps';
 import { TeacherVerificationPanel } from './TeacherVerificationPanel';
@@ -321,26 +322,9 @@ export function AnalysisResults({
         </Card>
       )}
 
-      {/* Misconceptions */}
+      {/* Misconceptions - Side-by-side comparison view */}
       {result.misconceptions.length > 0 && (
-        <Card className="border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-600" />
-              Identified Misconceptions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {result.misconceptions.map((misconception, i) => (
-                <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="text-yellow-600">•</span>
-                  {misconception}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <MisconceptionComparison misconceptions={result.misconceptions} />
       )}
 
       {/* Remediation Actions - Generate practice questions based on misconceptions */}
