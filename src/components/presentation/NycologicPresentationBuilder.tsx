@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,7 @@ import { Loader2, Sparkles, Play, Save, Plus, Trash2, Check } from 'lucide-react
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
-import { NycologicPresents, NycologicPresentation, PresentationSlide, VisualTheme } from './NycologicPresents';
+import { NycologicPresentation, PresentationSlide, VisualTheme } from './NycologicPresents';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,9 +29,9 @@ interface NycologicPresentationBuilderProps {
 export function NycologicPresentationBuilder({ open, onOpenChange, topic }: NycologicPresentationBuilderProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isGenerating, setIsGenerating] = useState(false);
   const [presentation, setPresentation] = useState<NycologicPresentation | null>(null);
-  const [showPresentation, setShowPresentation] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Form state
@@ -198,29 +199,18 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
     }
   };
 
-  const handlePresentationSave = (updatedPresentation: NycologicPresentation) => {
-    setPresentation(updatedPresentation);
-    toast({
-      title: 'Changes saved',
-      description: 'Your edits have been applied to the presentation.',
-    });
+  const launchPresentation = () => {
+    if (presentation) {
+      // Store presentation in sessionStorage and navigate to full-page view
+      sessionStorage.setItem('nycologic_presentation', JSON.stringify(presentation));
+      onOpenChange(false);
+      navigate('/presentation');
+    }
   };
 
   return (
-    <>
-      {/* Presentation viewer - renders above everything when active */}
-      {showPresentation && presentation && (
-        <NycologicPresents
-          presentation={presentation}
-          onClose={() => setShowPresentation(false)}
-          onMinimize={() => setShowPresentation(false)}
-          onSave={handlePresentationSave}
-          isEditable={true}
-        />
-      )}
-
-      <Dialog open={open && !showPresentation} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col z-50">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col z-50">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <img src={nyclogicLogo} alt="NYClogic" className="h-6 w-6" />
@@ -439,7 +429,7 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
                       )}
                       Save
                     </Button>
-                    <Button onClick={() => setShowPresentation(true)}>
+                    <Button onClick={launchPresentation}>
                       <Play className="h-4 w-4 mr-2" />
                       Present
                     </Button>
@@ -452,7 +442,7 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
                     <Card 
                       key={slide.id} 
                       className="cursor-pointer hover:ring-2 ring-primary transition-all overflow-hidden"
-                      onClick={() => setShowPresentation(true)}
+                      onClick={launchPresentation}
                     >
                       <div className="aspect-video bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 flex flex-col items-center justify-center text-center">
                         <Badge variant="outline" className="text-white/50 border-white/20 text-[10px] mb-2">
@@ -501,6 +491,5 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
         )}
       </DialogContent>
     </Dialog>
-    </>
   );
 }

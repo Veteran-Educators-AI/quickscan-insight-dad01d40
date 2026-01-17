@@ -34,6 +34,7 @@ import NotFound from "./pages/NotFound";
 import StudentLogin from "./pages/StudentLogin";
 import StudentJoinClass from "./pages/StudentJoinClass";
 import StudentDashboard from "./pages/StudentDashboard";
+import PresentationView from "./pages/PresentationView";
 
 const queryClient = new QueryClient();
 
@@ -115,6 +116,8 @@ function AppRoutes() {
       <Route path="/student/login" element={<StudentLogin />} />
       <Route path="/student/join" element={<StudentJoinClass />} />
       <Route path="/student/dashboard" element={<StudentDashboard />} />
+      {/* Presentation route */}
+      <Route path="/presentation" element={<PresentationView />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
