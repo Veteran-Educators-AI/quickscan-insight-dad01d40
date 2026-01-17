@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2, Save, CheckCircle, BookOpen, Link, Unlink, FileStack } from 'lucide-react';
+import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2, Save, CheckCircle, BookOpen, Link, Unlink, FileStack, Upload } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { StudentComparisonView } from './StudentComparisonView';
 import { GradedPapersGallery } from './GradedPapersGallery';
 import { DifferentiationGroupView } from './DifferentiationGroupView';
 import { MissingSubmissionsAlert } from './MissingSubmissionsAlert';
+import { PushToClassroomDialog } from './PushToClassroomDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,6 +31,13 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
+interface ClassroomContext {
+  courseId: string;
+  courseWorkId: string;
+  submissionId: string;
+  maxPoints: number;
+}
+
 interface BatchReportProps {
   items: BatchItem[];
   summary: BatchSummary;
@@ -39,19 +47,23 @@ interface BatchReportProps {
   onUpdateNotes?: (itemId: string, notes: string) => void;
   onSaveComplete?: () => void;
   onUnlinkContinuation?: (continuationId: string) => void;
+  classroomContextMap?: Record<string, ClassroomContext>; // studentId -> classroom context
+  assignmentTitle?: string;
 }
 
-export function BatchReport({ items, summary, classId, questionId, onExport, onUpdateNotes, onSaveComplete, onUnlinkContinuation }: BatchReportProps) {
+export function BatchReport({ items, summary, classId, questionId, onExport, onUpdateNotes, onSaveComplete, onUnlinkContinuation, classroomContextMap, assignmentTitle }: BatchReportProps) {
   const { user } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState<BatchItem | null>(null);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
   const [showComparison, setShowComparison] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
+  const [showClassroomPush, setShowClassroomPush] = useState(false);
   const [isPushingAll, setIsPushingAll] = useState(false);
   const [isPushingBasicSkills, setIsPushingBasicSkills] = useState(false);
   const [isSavingAll, setIsSavingAll] = useState(false);
   const [savedStudents, setSavedStudents] = useState<Set<string>>(new Set());
   const [pushedStudents, setPushedStudents] = useState<Set<string>>(new Set());
+  const [classroomPushed, setClassroomPushed] = useState<Set<string>>(new Set());
   const [basicSkillsPushed, setBasicSkillsPushed] = useState<Set<string>>(new Set());
   const { pushToSisterApp } = usePushToSisterApp();
   const completedItems = items.filter(item => item.status === 'completed' && item.result);
@@ -474,6 +486,18 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
             </Button>
           )}
           
+          {/* Push to Google Classroom */}
+          {classroomContextMap && Object.keys(classroomContextMap).length > 0 && (
+            <Button 
+              onClick={() => setShowClassroomPush(true)} 
+              variant="outline"
+              className="border-green-300 hover:bg-green-50 dark:hover:bg-green-950/20"
+            >
+              <Upload className="h-4 w-4 mr-2 text-green-600" />
+              Push to Classroom
+            </Button>
+          )}
+          
           <Button onClick={() => setShowGallery(true)} variant="outline">
             <LayoutGrid className="h-4 w-4 mr-2" />
             View All Papers
@@ -827,6 +851,44 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
           onOpenChange={setShowComparison}
           students={comparisonStudents}
           initialStudentIds={Array.from(selectedForCompare) as [string, string]}
+        />
+      )}
+
+      {/* Push to Google Classroom Dialog */}
+      {classroomContextMap && (
+        <PushToClassroomDialog
+          open={showClassroomPush}
+          onOpenChange={setShowClassroomPush}
+          assignmentTitle={assignmentTitle}
+          gradesToSync={completedItems
+            .filter(item => item.studentId && classroomContextMap[item.studentId] && !classroomPushed.has(item.studentId!))
+            .map(item => {
+              const context = classroomContextMap[item.studentId!];
+              const effectiveGrade = getEffectiveGrade(item.result);
+              const maxPoints = context.maxPoints || 100;
+              const scaledGrade = Math.round((effectiveGrade / 100) * maxPoints);
+              
+              return {
+                studentName: item.studentName || 'Unknown',
+                studentEmail: undefined,
+                courseId: context.courseId,
+                courseWorkId: context.courseWorkId,
+                submissionId: context.submissionId,
+                grade: scaledGrade,
+                maxPoints,
+                percentage: effectiveGrade,
+              };
+            })}
+          onSyncComplete={(successCount) => {
+            if (successCount > 0) {
+              // Mark synced students
+              completedItems.forEach(item => {
+                if (item.studentId && classroomContextMap[item.studentId]) {
+                  setClassroomPushed(prev => new Set([...prev, item.studentId!]));
+                }
+              });
+            }
+          }}
         />
       )}
     </div>

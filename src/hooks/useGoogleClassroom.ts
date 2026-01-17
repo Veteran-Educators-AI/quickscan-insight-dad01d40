@@ -228,6 +228,122 @@ export function useGoogleClassroom() {
     }
   };
 
+  const updateSubmissionGrade = async (
+    courseId: string,
+    courseWorkId: string,
+    submissionId: string,
+    grade: number,
+    draftGrade?: number
+  ): Promise<boolean> => {
+    try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        toast({
+          title: "Not connected",
+          description: "Please sign in with Google Classroom access",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      // First, patch the grade
+      const updateMask = draftGrade !== undefined 
+        ? 'assignedGrade,draftGrade' 
+        : 'assignedGrade';
+      
+      const body: { assignedGrade: number; draftGrade?: number } = { assignedGrade: grade };
+      if (draftGrade !== undefined) {
+        body.draftGrade = draftGrade;
+      }
+
+      const response = await fetch(
+        `https://classroom.googleapis.com/v1/courses/${courseId}/courseWork/${courseWorkId}/studentSubmissions/${submissionId}?updateMask=${updateMask}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'Failed to update grade');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error updating grade:', error);
+      toast({
+        title: "Failed to update grade",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const returnSubmission = async (
+    courseId: string,
+    courseWorkId: string,
+    submissionId: string
+  ): Promise<boolean> => {
+    try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) return false;
+
+      const response = await fetch(
+        `https://classroom.googleapis.com/v1/courses/${courseId}/courseWork/${courseWorkId}/studentSubmissions/${submissionId}:return`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'Failed to return submission');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error returning submission:', error);
+      return false;
+    }
+  };
+
+  const pushGradeToClassroom = async (
+    courseId: string,
+    courseWorkId: string,
+    submissionId: string,
+    grade: number,
+    autoReturn: boolean = false
+  ): Promise<boolean> => {
+    // Update the grade
+    const gradeUpdated = await updateSubmissionGrade(courseId, courseWorkId, submissionId, grade);
+    if (!gradeUpdated) return false;
+
+    // Optionally return the submission to the student
+    if (autoReturn) {
+      const returned = await returnSubmission(courseId, courseWorkId, submissionId);
+      if (!returned) {
+        toast({
+          title: "Grade saved, but not returned",
+          description: "The grade was saved but we couldn't return it to the student",
+          variant: "default",
+        });
+      }
+    }
+
+    return true;
+  };
+
   return {
     loading,
     courses,
@@ -236,5 +352,8 @@ export function useGoogleClassroom() {
     fetchCourseWork,
     fetchSubmissions,
     hasClassroomAccess,
+    updateSubmissionGrade,
+    returnSubmission,
+    pushGradeToClassroom,
   };
 }
