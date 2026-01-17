@@ -10,6 +10,14 @@ import { useToast } from '@/hooks/use-toast';
 import { exportToPDF, exportToPPTX } from '@/lib/presentationExport';
 import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 
+export interface SlideImage {
+  url: string;
+  prompt: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  rotation: number;
+}
+
 export interface PresentationSlide {
   id: string;
   type: 'title' | 'content' | 'question' | 'reveal' | 'summary' | 'interactive';
@@ -24,6 +32,7 @@ export interface PresentationSlide {
     explanation?: string;
   };
   icon?: 'lightbulb' | 'book' | 'question' | 'award' | 'sparkles';
+  image?: SlideImage;
 }
 
 export interface VisualTheme {

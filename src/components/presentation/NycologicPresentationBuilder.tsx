@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Sparkles, Play, Save, Plus, Trash2, Check, GripVertical } from 'lucide-react';
+import { Loader2, Sparkles, Play, Save, Plus, Trash2, Check, GripVertical, Image, Wand2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
+import { SlideImageGenerator, GeneratedImageData } from './SlideImageGenerator';
 import {
   DndContext,
   closestCenter,
@@ -47,11 +48,15 @@ interface NycologicPresentationBuilderProps {
 function SortableSlideCard({ 
   slide, 
   index, 
-  onLaunch 
+  onLaunch,
+  onGenerateImage,
+  hasImage,
 }: { 
   slide: PresentationSlide; 
   index: number; 
   onLaunch: () => void;
+  onGenerateImage: () => void;
+  hasImage: boolean;
 }) {
   const {
     attributes,
@@ -86,13 +91,41 @@ function SortableSlideCard({
         <GripVertical className="h-4 w-4 text-white" />
       </div>
       
-      <div className="aspect-video bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 flex flex-col items-center justify-center text-center">
-        <Badge variant="outline" className="text-white/50 border-white/20 text-[10px] mb-2">
+      {/* Image generation button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onGenerateImage();
+        }}
+        className="absolute top-2 left-2 z-10 p-1.5 rounded bg-primary/80 hover:bg-primary opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-lg"
+        title="Generate image for this slide"
+      >
+        {hasImage ? (
+          <Image className="h-4 w-4 text-primary-foreground" />
+        ) : (
+          <Wand2 className="h-4 w-4 text-primary-foreground" />
+        )}
+      </button>
+      
+      <div className="aspect-video bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 flex flex-col items-center justify-center text-center relative">
+        {/* Show image thumbnail if exists */}
+        {slide.image?.url && (
+          <div className="absolute inset-0 opacity-30">
+            <img src={slide.image.url} alt="" className="w-full h-full object-cover" />
+          </div>
+        )}
+        <Badge variant="outline" className="text-white/50 border-white/20 text-[10px] mb-2 relative z-10">
           {slide.type}
         </Badge>
-        <p className="text-white text-sm font-medium line-clamp-2">
+        <p className="text-white text-sm font-medium line-clamp-2 relative z-10">
           {slide.title.replace(/\*\*/g, '')}
         </p>
+        {slide.image?.url && (
+          <Badge className="absolute bottom-2 right-2 text-[8px] bg-primary/80">
+            <Image className="h-2.5 w-2.5 mr-0.5" />
+            Image
+          </Badge>
+        )}
       </div>
       <CardContent className="p-2">
         <p className="text-xs text-muted-foreground text-center">
@@ -110,6 +143,7 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
   const [isGenerating, setIsGenerating] = useState(false);
   const [presentation, setPresentation] = useState<NycologicPresentation | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [imageGenSlideIndex, setImageGenSlideIndex] = useState<number | null>(null);
 
   // Form state
   const [title, setTitle] = useState(topic?.topicName || '');
@@ -120,6 +154,30 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
   const [questionCount, setQuestionCount] = useState('3');
   const [style, setStyle] = useState<'engaging' | 'formal' | 'story'>('engaging');
   const [visualTheme, setVisualTheme] = useState<string>('neon-city');
+
+  // Handle image generated for a slide
+  const handleSlideImageGenerated = useCallback((imageData: GeneratedImageData) => {
+    if (imageGenSlideIndex === null || !presentation) return;
+    
+    const updatedSlides = [...presentation.slides];
+    updatedSlides[imageGenSlideIndex] = {
+      ...updatedSlides[imageGenSlideIndex],
+      image: imageData.url ? {
+        url: imageData.url,
+        prompt: imageData.prompt,
+        position: imageData.position,
+        size: imageData.size,
+        rotation: imageData.rotation,
+      } : undefined,
+    };
+    
+    setPresentation({ ...presentation, slides: updatedSlides });
+    setImageGenSlideIndex(null);
+    toast({
+      title: imageData.url ? 'Image added to slide' : 'Image removed',
+      description: imageData.url ? 'The generated image has been applied.' : 'The slide image has been removed.',
+    });
+  }, [imageGenSlideIndex, presentation, toast]);
 
   // DnD sensors
   const sensors = useSensors(
@@ -568,11 +626,31 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
                             slide={slide}
                             index={index}
                             onLaunch={launchPresentation}
+                            onGenerateImage={() => setImageGenSlideIndex(index)}
+                            hasImage={!!slide.image?.url}
                           />
                         ))}
                       </div>
                     </SortableContext>
                   </DndContext>
+
+                  {/* Slide Image Generator Dialog */}
+                  {imageGenSlideIndex !== null && presentation.slides[imageGenSlideIndex] && (
+                    <SlideImageGenerator
+                      open={imageGenSlideIndex !== null}
+                      onOpenChange={(open) => !open && setImageGenSlideIndex(null)}
+                      onImageGenerated={handleSlideImageGenerated}
+                      currentImage={presentation.slides[imageGenSlideIndex].image ? {
+                        url: presentation.slides[imageGenSlideIndex].image!.url,
+                        prompt: presentation.slides[imageGenSlideIndex].image!.prompt,
+                        position: presentation.slides[imageGenSlideIndex].image!.position,
+                        size: presentation.slides[imageGenSlideIndex].image!.size,
+                        rotation: presentation.slides[imageGenSlideIndex].image!.rotation,
+                      } : null}
+                      slideTitle={presentation.slides[imageGenSlideIndex].title}
+                      topic={presentation.topic}
+                    />
+                  )}
                 </div>
               </div>
             )}
