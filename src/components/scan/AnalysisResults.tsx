@@ -17,6 +17,7 @@ import { MisconceptionComparison } from './MisconceptionComparison';
 import { RemediationActions } from './RemediationActions';
 import { RecommendedNextSteps } from './RecommendedNextSteps';
 import { TeacherVerificationPanel } from './TeacherVerificationPanel';
+import { TrainingConfidenceIndicator } from './TrainingConfidenceIndicator';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 
 interface RubricScore {
@@ -159,6 +160,9 @@ export function AnalysisResults({
 
   return (
     <div className="space-y-4">
+      {/* Training Confidence Indicator - Compact version at top */}
+      <TrainingConfidenceIndicator compact className="mb-2" />
+
       {/* Prominent Score Display */}
       <Card className={`${isOverridden ? 'border-primary' : 'border-2'}`}>
         <CardContent className="p-6">
