@@ -621,14 +621,27 @@ Provide your analysis in the following structure:
 - Is Correct: (YES or NO - is the final answer mathematically correct?)
 - Regents Score: (0, 1, 2, 3, or 4 - remember: ANY understanding = Score 1 minimum)
 - Regents Score Justification: (why this score - cite evidence)
-- Rubric Scores: (if teacher rubric provided, score each criterion)
-- Misconceptions: (DETAILED FORMAT FOR EACH ERROR - use EXACT quotes from student work:
-    "ERROR: Student wrote '[exact quote from their work]' when solving [specific step].
-     EXPECTED: [What the correct step should be with correct values].
-     IMPACT: [Specific consequence - e.g., 'This gave final answer of X instead of Y']"
-    Be SPECIFIC with direct quotes. Do not use vague descriptions.)
+- Rubric Scores: (if teacher rubric provided, score each criterion with points)
+- Misconceptions: (CRITICAL - Write COMPLETE, COHERENT SENTENCES for each error. Format:
+    "The student incorrectly wrote '[EXACT QUOTE from their work - copy their actual words/numbers]' when attempting [specific step]. The correct approach would be [expected solution with actual values]. This error resulted in [specific impact on the final answer]."
+    
+    REQUIREMENTS:
+    1. ALWAYS quote EXACTLY what the student wrote - never abbreviate or summarize
+    2. Start each misconception with a complete subject ("The student...", "In step 3, the student...")
+    3. Explain WHY this is wrong mathematically
+    4. NEVER use incomplete sentences or fragments like "S and errors" - always write full sentences
+    5. If multiple errors, write a separate complete sentence for each error
+    
+    EXAMPLES OF CORRECT FORMAT:
+    ✓ "The student wrote 'A = πr' instead of 'A = πr²' when calculating the area of the semicircle, omitting the exponent on the radius. This caused the area to be calculated as 15.7 instead of 78.5."
+    ✓ "The student incorrectly added the fractions by writing '1/2 + 1/3 = 2/5', failing to find a common denominator. The correct answer should be 5/6."
+    
+    EXAMPLES OF WRONG FORMAT (DO NOT DO THIS):
+    ✗ "S and errors in algebraic manipulation" - INCOMPLETE, no quote, no context
+    ✗ "Wrong formula used" - TOO VAGUE, no specifics
+    ✗ "The student made mistakes" - NO SPECIFIC QUOTE or explanation)
 - Needs Teacher Review: (list items flagged for verification)
-- Total Score: (points earned / total possible from teacher rubric)
+- Total Score: (IMPORTANT: This is points from teacher rubric criteria ONLY. If no teacher rubric was provided, use the Regents score converted: Score 4=4/4, Score 3=3/4, Score 2=2/4, Score 1=1/4, Score 0=0/4. Format: earned/possible)
 - Standards Met: (YES or NO - does work show ANY understanding of the standards?)
 - Grade: (55-100 scale based on concepts understood:
     • 90-100 = Full mastery of all concepts
@@ -1328,13 +1341,25 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   const regentsJustificationMatch = text.match(/Regents Score Justification[:\s]*([^]*?)(?=Rubric Scores|Misconceptions|$)/i);
   if (regentsJustificationMatch) result.regentsScoreJustification = regentsJustificationMatch[1].trim();
 
-  const misconceptionsMatch = text.match(/Misconceptions[:\s]*([^]*?)(?=Total Score|Standards Met|Feedback|$)/i);
+  const misconceptionsMatch = text.match(/Misconceptions[:\s]*([^]*?)(?=Total Score|Needs Teacher|Standards Met|Feedback|$)/i);
   if (misconceptionsMatch) {
     const misconceptionsText = misconceptionsMatch[1].trim();
+    // Split on newlines but preserve complete sentences
+    // Filter out incomplete fragments (less than 20 chars or missing subject)
     result.misconceptions = misconceptionsText
-      .split(/[-•\n]/)
-      .map(m => m.trim())
-      .filter(m => m.length > 0 && !m.match(/^(none|n\/a)$/i));
+      .split(/\n/)
+      .map(m => m.replace(/^[-•*]\s*/, '').trim())
+      .filter(m => {
+        // Filter criteria for valid misconceptions:
+        // 1. Must be at least 20 characters (complete sentence)
+        // 2. Must not be just "none" or "n/a"
+        // 3. Should start with a proper subject (The, In, Student, When, etc.) or contain key explanation words
+        const isLongEnough = m.length >= 20;
+        const isNotNone = !m.match(/^(none|n\/a|no misconceptions?|no errors?)$/i);
+        const hasProperStructure = /^(The|In|Student|When|During|For|On|At|While|After|Before|Here|This|Their|A |An )/i.test(m) ||
+                                   m.includes('wrote') || m.includes('student') || m.includes('incorrect');
+        return isLongEnough && isNotNone && hasProperStructure;
+      });
   }
 
   const scoreMatch = text.match(/Total Score[:\s]*(\d+(?:\.\d+)?)\s*[\/\\]\s*(\d+)/i);
@@ -1344,6 +1369,15 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     result.totalScore.percentage = result.totalScore.possible > 0 
       ? Math.round((result.totalScore.earned / result.totalScore.possible) * 100) 
       : 0;
+  }
+  
+  // FALLBACK: If no valid totalScore parsed but we have a Regents score, convert it
+  // This ensures we always have meaningful score data aligned with Regents rubric
+  if (result.totalScore.possible === 0 && result.regentsScore >= 0) {
+    // Use 4-point Regents scale when no teacher rubric is provided
+    result.totalScore.earned = result.regentsScore;
+    result.totalScore.possible = 4;
+    result.totalScore.percentage = Math.round((result.regentsScore / 4) * 100);
   }
 
   // Parse grade justification EARLY so it's available for mastery detection
