@@ -58,17 +58,26 @@ export function ScanClassStudentPicker({
   useEffect(() => {
     async function fetchClasses() {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('classes')
-        .select('id, name, students(id)')
-        .order('name');
+      try {
+        const { data, error } = await supabase
+          .from('classes')
+          .select('id, name, students(id)')
+          .order('name');
 
-      if (!error && data) {
-        setClasses(data.map(c => ({
-          id: c.id,
-          name: c.name,
-          studentCount: c.students?.length || 0,
-        })));
+        if (error) {
+          console.error('Error fetching classes:', error);
+        }
+        
+        if (data) {
+          console.log('Fetched classes:', data.length, data.map(c => c.name));
+          setClasses(data.map(c => ({
+            id: c.id,
+            name: c.name,
+            studentCount: c.students?.length || 0,
+          })));
+        }
+      } catch (e) {
+        console.error('Exception fetching classes:', e);
       }
       setLoading(false);
     }

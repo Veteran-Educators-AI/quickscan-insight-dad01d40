@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 
 interface PresentationSlide {
@@ -73,6 +76,8 @@ export default function PresentationView() {
   const [slideImages, setSlideImages] = useState<Record<number, string>>({});
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingField, setEditingField] = useState<string | null>(null);
 
   // Load presentation from sessionStorage
   useEffect(() => {
@@ -167,6 +172,12 @@ export default function PresentationView() {
         case 'T':
           setShowSidebar(prev => !prev);
           break;
+        case 'e':
+        case 'E':
+          if (!editingField) {
+            toggleEditMode();
+          }
+          break;
       }
     };
 
@@ -187,6 +198,47 @@ export default function PresentationView() {
   const handleOptionSelect = (index: number) => {
     setSelectedOption(index);
     setTimeout(() => setShowAnswer(true), 500);
+  };
+
+  // Update slide content
+  const updateSlide = (field: string, value: string | string[]) => {
+    if (!presentation) return;
+    const updatedSlides = [...presentation.slides];
+    const currentSlideData = updatedSlides[currentSlide];
+    
+    if (field === 'content') {
+      updatedSlides[currentSlide] = { ...currentSlideData, content: value as string[] };
+    } else if (field === 'title') {
+      updatedSlides[currentSlide] = { ...currentSlideData, title: value as string };
+    } else if (field === 'subtitle') {
+      updatedSlides[currentSlide] = { ...currentSlideData, subtitle: value as string };
+    } else if (field.startsWith('question.')) {
+      const questionField = field.split('.')[1];
+      updatedSlides[currentSlide] = { 
+        ...currentSlideData, 
+        question: { ...currentSlideData.question!, [questionField]: value }
+      };
+    }
+    
+    const updatedPresentation = { ...presentation, slides: updatedSlides };
+    setPresentation(updatedPresentation);
+    // Update sessionStorage so changes persist
+    sessionStorage.setItem('nycologic_presentation', JSON.stringify(updatedPresentation));
+  };
+
+  const updateContentItem = (index: number, value: string) => {
+    if (!slide) return;
+    const newContent = [...slide.content];
+    newContent[index] = value;
+    updateSlide('content', newContent);
+  };
+
+  const toggleEditMode = () => {
+    if (isEditing) {
+      toast.success('Changes saved!');
+    }
+    setIsEditing(!isEditing);
+    setEditingField(null);
   };
 
   if (isLoading || !presentation || !slide) {
@@ -261,6 +313,21 @@ export default function PresentationView() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Edit Mode Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleEditMode}
+            className={cn(
+              "h-10 w-10 rounded-full transition-all",
+              isEditing 
+                ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" 
+                : "text-white/60 hover:text-white hover:bg-white/10"
+            )}
+            title={isEditing ? "Save changes (E)" : "Edit slides (E)"}
+          >
+            {isEditing ? <Check className="h-5 w-5" /> : <Pencil className="h-5 w-5" />}
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -475,29 +542,76 @@ export default function PresentationView() {
                   transition={{ delay: 0.3 }}
                   className="text-4xl md:text-6xl lg:text-7xl font-bold text-white leading-tight"
                 >
-                  {slide.title}
+                  {isEditing && editingField === 'title' ? (
+                    <Textarea
+                      value={slide.title}
+                      onChange={(e) => updateSlide('title', e.target.value)}
+                      onBlur={() => setEditingField(null)}
+                      autoFocus
+                      className="bg-white/10 border-white/20 text-white text-center text-4xl md:text-5xl font-bold resize-none min-h-[80px]"
+                    />
+                  ) : (
+                    <span 
+                      onClick={() => isEditing && setEditingField('title')}
+                      className={cn(isEditing && 'cursor-text hover:bg-white/5 px-4 py-2 rounded-lg transition-colors')}
+                    >
+                      {slide.title}
+                    </span>
+                  )}
                 </motion.h1>
 
-                {slide.subtitle && (
+                {(slide.subtitle || isEditing) && (
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.5 }}
                     className={cn("text-xl lg:text-2xl font-medium tracking-wide", colors.accent)}
                   >
-                    {slide.subtitle}
+                    {isEditing && editingField === 'subtitle' ? (
+                      <Input
+                        value={slide.subtitle || ''}
+                        onChange={(e) => updateSlide('subtitle', e.target.value)}
+                        onBlur={() => setEditingField(null)}
+                        autoFocus
+                        placeholder="Add subtitle..."
+                        className="bg-white/10 border-white/20 text-center max-w-md mx-auto"
+                      />
+                    ) : (
+                      <span 
+                        onClick={() => isEditing && setEditingField('subtitle')}
+                        className={cn(isEditing && 'cursor-text hover:bg-white/5 px-4 py-2 rounded-lg transition-colors')}
+                      >
+                        {slide.subtitle || (isEditing ? 'Click to add subtitle' : '')}
+                      </span>
+                    )}
                   </motion.p>
                 )}
 
-                {slide.content.length > 0 && (
-                  <motion.p
+                {(slide.content.length > 0 || isEditing) && (
+                  <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.6 }}
                     className="text-white/60 text-lg lg:text-xl max-w-3xl mx-auto"
                   >
-                    {slide.content[0]}
-                  </motion.p>
+                    {isEditing && editingField === 'content-0' ? (
+                      <Textarea
+                        value={slide.content[0] || ''}
+                        onChange={(e) => updateContentItem(0, e.target.value)}
+                        onBlur={() => setEditingField(null)}
+                        autoFocus
+                        placeholder="Add content..."
+                        className="bg-white/10 border-white/20 text-white/80 text-center resize-none min-h-[60px]"
+                      />
+                    ) : (
+                      <span 
+                        onClick={() => isEditing && setEditingField('content-0')}
+                        className={cn(isEditing && 'cursor-text hover:bg-white/5 px-4 py-2 rounded-lg transition-colors block')}
+                      >
+                        {slide.content[0] || (isEditing ? 'Click to add content' : '')}
+                      </span>
+                    )}
+                  </motion.div>
                 )}
               </div>
             ) : slide.type === 'question' ? (
@@ -518,7 +632,22 @@ export default function PresentationView() {
                     animate={{ opacity: 1, y: 0 }}
                     className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4"
                   >
-                    {slide.title}
+                    {isEditing && editingField === 'question-title' ? (
+                      <Input
+                        value={slide.title}
+                        onChange={(e) => updateSlide('title', e.target.value)}
+                        onBlur={() => setEditingField(null)}
+                        autoFocus
+                        className="bg-white/10 border-white/20 text-white text-center text-2xl font-bold"
+                      />
+                    ) : (
+                      <span 
+                        onClick={() => isEditing && setEditingField('question-title')}
+                        className={cn(isEditing && 'cursor-text hover:bg-white/5 px-4 py-2 rounded-lg transition-colors')}
+                      >
+                        {slide.title}
+                      </span>
+                    )}
                   </motion.h2>
 
                   {slide.question && (
@@ -528,9 +657,25 @@ export default function PresentationView() {
                       transition={{ delay: 0.2 }}
                       className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 lg:p-8 border border-white/10 mt-8"
                     >
-                      <p className="text-xl lg:text-2xl text-white/90">
-                        {slide.question.prompt}
-                      </p>
+                      {isEditing && editingField === 'question-prompt' ? (
+                        <Textarea
+                          value={slide.question.prompt}
+                          onChange={(e) => updateSlide('question.prompt', e.target.value)}
+                          onBlur={() => setEditingField(null)}
+                          autoFocus
+                          className="bg-white/10 border-white/20 text-white/90 text-xl resize-none min-h-[80px]"
+                        />
+                      ) : (
+                        <p 
+                          onClick={() => isEditing && setEditingField('question-prompt')}
+                          className={cn(
+                            "text-xl lg:text-2xl text-white/90",
+                            isEditing && 'cursor-text hover:bg-white/5 px-2 py-1 rounded transition-colors'
+                          )}
+                        >
+                          {slide.question.prompt}
+                        </p>
+                      )}
                     </motion.div>
                   )}
                 </div>
@@ -625,13 +770,29 @@ export default function PresentationView() {
 
                 {/* Content side */}
                 <div className="flex-1 space-y-6 text-center lg:text-left">
-                  {slide.subtitle && (
+                  {(slide.subtitle || isEditing) && (
                     <motion.p
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       className={cn("text-sm font-bold tracking-[0.25em] uppercase", colors.accent)}
                     >
-                      {slide.subtitle}
+                      {isEditing && editingField === 'content-subtitle' ? (
+                        <Input
+                          value={slide.subtitle || ''}
+                          onChange={(e) => updateSlide('subtitle', e.target.value)}
+                          onBlur={() => setEditingField(null)}
+                          autoFocus
+                          placeholder="Add subtitle..."
+                          className="bg-white/10 border-white/20 text-sm uppercase"
+                        />
+                      ) : (
+                        <span 
+                          onClick={() => isEditing && setEditingField('content-subtitle')}
+                          className={cn(isEditing && 'cursor-text hover:bg-white/5 px-2 py-1 rounded transition-colors')}
+                        >
+                          {slide.subtitle || (isEditing ? 'Click to add subtitle' : '')}
+                        </span>
+                      )}
                     </motion.p>
                   )}
 
@@ -641,7 +802,22 @@ export default function PresentationView() {
                     transition={{ delay: 0.1 }}
                     className="text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight"
                   >
-                    {slide.title}
+                    {isEditing && editingField === 'content-title' ? (
+                      <Textarea
+                        value={slide.title}
+                        onChange={(e) => updateSlide('title', e.target.value)}
+                        onBlur={() => setEditingField(null)}
+                        autoFocus
+                        className="bg-white/10 border-white/20 text-white text-2xl font-bold resize-none min-h-[60px]"
+                      />
+                    ) : (
+                      <span 
+                        onClick={() => isEditing && setEditingField('content-title')}
+                        className={cn(isEditing && 'cursor-text hover:bg-white/5 px-2 py-1 rounded transition-colors')}
+                      >
+                        {slide.title}
+                      </span>
+                    )}
                   </motion.h2>
 
                   <motion.div
@@ -659,7 +835,25 @@ export default function PresentationView() {
                         className="flex items-start gap-4"
                       >
                         <span className={cn("w-2 h-2 rounded-full mt-3 flex-shrink-0", colors.accent.replace('text-', 'bg-'))} />
-                        <p className="text-white/80 text-lg lg:text-xl leading-relaxed">{item}</p>
+                        {isEditing && editingField === `content-item-${idx}` ? (
+                          <Textarea
+                            value={item}
+                            onChange={(e) => updateContentItem(idx, e.target.value)}
+                            onBlur={() => setEditingField(null)}
+                            autoFocus
+                            className="bg-white/10 border-white/20 text-white/80 text-lg resize-none flex-1 min-h-[40px]"
+                          />
+                        ) : (
+                          <p 
+                            onClick={() => isEditing && setEditingField(`content-item-${idx}`)}
+                            className={cn(
+                              "text-white/80 text-lg lg:text-xl leading-relaxed flex-1",
+                              isEditing && 'cursor-text hover:bg-white/5 px-2 py-1 rounded transition-colors'
+                            )}
+                          >
+                            {item}
+                          </p>
+                        )}
                       </motion.div>
                     ))}
                   </motion.div>
