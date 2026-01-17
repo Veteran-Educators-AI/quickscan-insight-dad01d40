@@ -6,12 +6,15 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartContainer, ChartTooltip } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell, PieChart, Pie, Legend } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, User, BookOpen, Target, Award } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, User, BookOpen, Target, Award, Info, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useStudentNames } from '@/lib/StudentNameContext';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface RegentsScoreReportProps {
   classId?: string;
@@ -40,6 +43,56 @@ const REGENTS_SCORE_LABELS: Record<number, string> = {
   1: 'Limited Understanding',
   0: 'No Understanding',
 };
+
+// Subject area mapping for NYS standards
+const SUBJECT_AREAS: Record<string, { name: string; description: string; color: string }> = {
+  'G': { name: 'Geometry', description: 'Shapes, proofs, transformations, and spatial reasoning', color: 'bg-blue-500' },
+  'A': { name: 'Algebra', description: 'Equations, expressions, functions, and relationships', color: 'bg-purple-500' },
+  'N': { name: 'Number & Quantity', description: 'Number systems, operations, and quantitative reasoning', color: 'bg-green-500' },
+  'F': { name: 'Functions', description: 'Function notation, graphs, and transformations', color: 'bg-teal-500' },
+  'S': { name: 'Statistics & Probability', description: 'Data analysis, probability, and statistical inference', color: 'bg-orange-500' },
+  'NGPF': { name: 'Financial Literacy', description: 'Personal finance, credit, budgeting, and money management', color: 'bg-amber-500' },
+  'FIN': { name: 'Financial Literacy', description: 'Personal finance, credit, budgeting, and money management', color: 'bg-amber-500' },
+  'MP': { name: 'Mathematical Practices', description: 'Problem-solving, reasoning, and modeling skills', color: 'bg-indigo-500' },
+  'CCSS': { name: 'Common Core', description: 'Common Core State Standards for Mathematics', color: 'bg-rose-500' },
+  'OTHER': { name: 'Other Standards', description: 'Additional standards and assessments', color: 'bg-gray-500' },
+};
+
+// Extract subject area from standard code
+function getSubjectArea(standard: string): string {
+  if (!standard) return 'OTHER';
+  const upper = standard.toUpperCase();
+  
+  if (upper.startsWith('NGPF') || upper.includes('FINANCE') || upper.includes('CREDIT')) return 'NGPF';
+  if (upper.startsWith('CCSS')) return 'CCSS';
+  if (upper.startsWith('G-') || upper.startsWith('G.')) return 'G';
+  if (upper.startsWith('A-') || upper.startsWith('A.')) return 'A';
+  if (upper.startsWith('N-') || upper.startsWith('N.')) return 'N';
+  if (upper.startsWith('F-') || upper.startsWith('F.') || upper.startsWith('F-')) return 'F';
+  if (upper.startsWith('S-') || upper.startsWith('S.') || upper.match(/^\d+\.SP/)) return 'S';
+  if (upper.startsWith('MP')) return 'MP';
+  if (upper.match(/^\d+\.[A-Z]/)) {
+    // Grade-level standards like 7.G.B.6, 8.G.B.7
+    if (upper.includes('.G.')) return 'G';
+    if (upper.includes('.RP.') || upper.includes('.EE.') || upper.includes('.NS.')) return 'N';
+    if (upper.includes('.SP.')) return 'S';
+  }
+  
+  return 'OTHER';
+}
+
+// Clean up standard code for display
+function cleanStandardCode(standard: string): string {
+  if (!standard) return 'N/A';
+  
+  // Remove verbose CCSS prefixes
+  let cleaned = standard.replace(/CCSS\.MATH\.CONTENT\./gi, '');
+  
+  // Clean up trailing asterisks or special chars
+  cleaned = cleaned.replace(/[\*#]+$/, '').trim();
+  
+  return cleaned || standard;
+}
 
 export function RegentsScoreReport({ classId }: RegentsScoreReportProps) {
   const { user } = useAuth();
@@ -531,39 +584,257 @@ export function RegentsScoreReport({ classId }: RegentsScoreReportProps) {
         </Card>
       )}
 
-      {/* Performance by Standard */}
+      {/* Performance by Standard - Organized by Subject Area */}
       {processedData.standardPerformance.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Performance by NYS Standard</CardTitle>
-            <CardDescription>Average Regents score for each standard</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {processedData.standardPerformance.map((std) => (
-                <div key={std.standard} className="flex items-center gap-4">
-                  <Badge variant="outline" className="min-w-24 justify-center bg-purple-50 dark:bg-purple-900/20 border-purple-300">
-                    {std.standard}
-                  </Badge>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className={cn("h-4 rounded-full transition-all",
-                          std.avgScore >= 3 ? 'bg-green-500' :
-                          std.avgScore >= 2 ? 'bg-yellow-500' : 'bg-orange-500'
-                        )}
-                        style={{ width: `${(std.avgScore / 4) * 100}%` }}
-                      />
-                      <span className="text-sm font-medium">{std.avgScore.toFixed(1)}</span>
-                    </div>
-                  </div>
-                  <span className="text-sm text-muted-foreground">{std.count} assessments</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <StandardsPerformanceSection standards={processedData.standardPerformance} />
       )}
     </div>
+  );
+}
+
+// Separate component for the organized standards display
+interface StandardsPerformanceSectionProps {
+  standards: Array<{ standard: string; avgScore: number; count: number }>;
+}
+
+function StandardsPerformanceSection({ standards }: StandardsPerformanceSectionProps) {
+  const [expandedAreas, setExpandedAreas] = useState<Record<string, boolean>>({});
+
+  // Group standards by subject area
+  const groupedStandards = useMemo(() => {
+    const groups: Record<string, Array<{ standard: string; cleanCode: string; avgScore: number; count: number }>> = {};
+    
+    standards.forEach(std => {
+      const area = getSubjectArea(std.standard);
+      if (!groups[area]) {
+        groups[area] = [];
+      }
+      groups[area].push({
+        ...std,
+        cleanCode: cleanStandardCode(std.standard),
+      });
+    });
+    
+    // Sort each group by score (highest first)
+    Object.values(groups).forEach(group => {
+      group.sort((a, b) => b.avgScore - a.avgScore);
+    });
+    
+    return groups;
+  }, [standards]);
+
+  // Sort subject areas by average score
+  const sortedAreas = useMemo(() => {
+    return Object.entries(groupedStandards)
+      .map(([area, stds]) => ({
+        area,
+        standards: stds,
+        avgScore: stds.reduce((sum, s) => sum + s.avgScore, 0) / stds.length,
+        totalAssessments: stds.reduce((sum, s) => sum + s.count, 0),
+      }))
+      .sort((a, b) => b.totalAssessments - a.totalAssessments);
+  }, [groupedStandards]);
+
+  const toggleArea = (area: string) => {
+    setExpandedAreas(prev => ({ ...prev, [area]: !prev[area] }));
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 3.5) return 'text-green-600 dark:text-green-400';
+    if (score >= 3) return 'text-emerald-600 dark:text-emerald-400';
+    if (score >= 2) return 'text-yellow-600 dark:text-yellow-400';
+    if (score >= 1) return 'text-orange-600 dark:text-orange-400';
+    return 'text-red-600 dark:text-red-400';
+  };
+
+  const getScoreBg = (score: number) => {
+    if (score >= 3) return 'bg-green-500';
+    if (score >= 2) return 'bg-yellow-500';
+    if (score >= 1) return 'bg-orange-500';
+    return 'bg-red-500';
+  };
+
+  const getScoreLabel = (score: number) => {
+    if (score >= 3.5) return 'Excellent';
+    if (score >= 3) return 'Proficient';
+    if (score >= 2) return 'Developing';
+    if (score >= 1) return 'Beginning';
+    return 'Needs Support';
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Performance by NYS Standard
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Standards organized by subject area with Regents score breakdown
+            </CardDescription>
+          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button className="p-1.5 rounded-full hover:bg-muted transition-colors">
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-xs">
+                <div className="space-y-2 text-sm">
+                  <p className="font-semibold">Understanding This Report</p>
+                  <div className="space-y-1">
+                    <p><strong>Standard Code:</strong> The NYS learning standard identifier (e.g., G.GMD.B.4)</p>
+                    <p><strong>Avg Score:</strong> Average Regents rubric score (0-4 scale)</p>
+                    <p><strong>Assessments:</strong> Number of student work samples analyzed for this standard</p>
+                  </div>
+                  <div className="pt-2 border-t space-y-1">
+                    <p className="font-medium">Score Meanings:</p>
+                    <p>4 = Thorough understanding</p>
+                    <p>3 = Adequate understanding</p>
+                    <p>2 = Partial understanding</p>
+                    <p>1 = Limited understanding</p>
+                    <p>0 = No understanding</p>
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {sortedAreas.map(({ area, standards: areaStandards, avgScore, totalAssessments }) => {
+          const subjectInfo = SUBJECT_AREAS[area] || SUBJECT_AREAS['OTHER'];
+          const isExpanded = expandedAreas[area] ?? true; // Default expanded
+          
+          return (
+            <Collapsible key={area} open={isExpanded} onOpenChange={() => toggleArea(area)}>
+              <div className="border rounded-lg overflow-hidden">
+                {/* Subject Area Header */}
+                <CollapsibleTrigger asChild>
+                  <button className="w-full flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={cn("w-3 h-8 rounded-full", subjectInfo.color)} />
+                      <div className="text-left">
+                        <h3 className="font-semibold text-base">{subjectInfo.name}</h3>
+                        <p className="text-xs text-muted-foreground">{subjectInfo.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className={cn("text-lg font-bold", getScoreColor(avgScore))}>
+                          {avgScore.toFixed(1)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">avg score</div>
+                      </div>
+                      <Badge variant="secondary" className="font-normal">
+                        {areaStandards.length} standards · {totalAssessments} assessments
+                      </Badge>
+                      {isExpanded ? (
+                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                  </button>
+                </CollapsibleTrigger>
+                
+                {/* Standards Table */}
+                <CollapsibleContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/20">
+                        <TableHead className="w-[140px]">Standard</TableHead>
+                        <TableHead>Score</TableHead>
+                        <TableHead className="w-[120px] text-right">Assessments</TableHead>
+                        <TableHead className="w-[100px] text-right">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {areaStandards.map((std, idx) => (
+                        <TableRow key={`${std.standard}-${idx}`} className="hover:bg-muted/30">
+                          <TableCell>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge 
+                                    variant="outline" 
+                                    className="font-mono text-xs cursor-help bg-background"
+                                  >
+                                    {std.cleanCode}
+                                  </Badge>
+                                </TooltipTrigger>
+                                {std.cleanCode !== std.standard && (
+                                  <TooltipContent>
+                                    <p className="text-xs max-w-xs">{std.standard}</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="w-24 h-2.5 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className={cn("h-full rounded-full transition-all", getScoreBg(std.avgScore))}
+                                  style={{ width: `${(std.avgScore / 4) * 100}%` }}
+                                />
+                              </div>
+                              <span className={cn("font-semibold text-sm min-w-[2rem]", getScoreColor(std.avgScore))}>
+                                {std.avgScore.toFixed(1)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="text-sm text-muted-foreground">
+                              {std.count} {std.count === 1 ? 'sample' : 'samples'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge 
+                              variant={std.avgScore >= 3 ? 'default' : std.avgScore >= 2 ? 'secondary' : 'destructive'}
+                              className={cn(
+                                "text-xs",
+                                std.avgScore >= 3 && "bg-green-500 hover:bg-green-600",
+                                std.avgScore >= 2 && std.avgScore < 3 && "bg-yellow-500 hover:bg-yellow-600 text-black",
+                              )}
+                            >
+                              {getScoreLabel(std.avgScore)}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          );
+        })}
+        
+        {/* Legend */}
+        <div className="mt-6 p-4 bg-muted/30 rounded-lg">
+          <p className="text-sm font-medium mb-3">Score Legend</p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {[
+              { score: 4, label: 'Thorough', color: 'bg-green-500' },
+              { score: 3, label: 'Adequate', color: 'bg-emerald-500' },
+              { score: 2, label: 'Partial', color: 'bg-yellow-500' },
+              { score: 1, label: 'Limited', color: 'bg-orange-500' },
+              { score: 0, label: 'None', color: 'bg-red-500' },
+            ].map(item => (
+              <div key={item.score} className="flex items-center gap-2">
+                <div className={cn("w-4 h-4 rounded", item.color)} />
+                <span className="text-xs text-muted-foreground">
+                  <strong>{item.score}</strong> - {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
