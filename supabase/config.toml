@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.receive-sister-app-data]
 verify_jwt = false
+
+[functions.send-performance-drop-alert]
+verify_jwt = false
