@@ -170,19 +170,19 @@ Requirements:
 - Single object, centered composition
 - Professional and friendly style`;
 
-      const imageUrl = await generateImageWithNanoBanana(clipartPrompt);
+      let imageUrl = await generateImageWithNanoBanana(clipartPrompt);
       
-      if (imageUrl) {
-        return new Response(
-          JSON.stringify({ imageUrl }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      } else {
-        return new Response(
-          JSON.stringify({ error: 'Failed to generate clipart' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      // If Nano Banana fails, try SVG fallback
+      if (!imageUrl) {
+        console.log('Nano Banana failed, trying SVG fallback...');
+        imageUrl = await generateSVGWithAI(body.prompt);
       }
+      
+      // Return imageUrl (null is acceptable - frontend should handle gracefully)
+      return new Response(
+        JSON.stringify({ imageUrl: imageUrl || null, fallback: !imageUrl }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Existing batch question image generation
