@@ -22,6 +22,7 @@ import { ScholarSyncDashboard } from '@/components/reports/ScholarSyncDashboard'
 import { ClassMisconceptionSummary } from '@/components/reports/ClassMisconceptionSummary';
 import { StandardsByClass } from '@/components/reports/StandardsByClass';
 import { AILearningHistory } from '@/components/reports/AILearningHistory';
+import { AttendancePatternsReport } from '@/components/reports/AttendancePatternsReport';
 import { useMasteryData } from '@/hooks/useMasteryData';
 import { useGradeHistoryStats } from '@/hooks/useGradeHistoryStats';
 import { toast } from 'sonner';
@@ -273,6 +274,9 @@ export default function Reports() {
 
             {/* Student Progress Tracker */}
             <StudentProgressTracker classId={selectedClassId === 'all' ? undefined : selectedClassId} />
+
+            {/* Attendance Patterns */}
+            <AttendancePatternsReport classId={selectedClassId === 'all' ? undefined : selectedClassId} />
 
             {/* Regents Score Report */}
             <RegentsScoreReport classId={selectedClassId === 'all' ? undefined : selectedClassId} />
