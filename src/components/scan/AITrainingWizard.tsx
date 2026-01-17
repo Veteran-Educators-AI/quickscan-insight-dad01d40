@@ -22,6 +22,11 @@ import {
   ENGLISH_TOPICS,
   HISTORY_TOPICS,
   BIOLOGY_TOPICS,
+  EARTH_SCIENCE_TOPICS,
+  CHEMISTRY_TOPICS,
+  PHYSICS_TOPICS,
+  GOVERNMENT_TOPICS,
+  ECONOMICS_TOPICS,
   TopicCategory,
   JMAPTopic
 } from '@/data/nysTopics';
@@ -56,7 +61,13 @@ const CONTENT_AREAS = [
   { id: 'algebra2', name: 'Algebra 2', icon: '📊', topics: ALGEBRA2_TOPICS },
   { id: 'precalculus', name: 'Pre-Calculus', icon: '📈', topics: PRECALCULUS_TOPICS },
   { id: 'english', name: 'English', icon: '📚', topics: ENGLISH_TOPICS },
+  { id: 'history', name: 'History', icon: '🏛️', topics: HISTORY_TOPICS },
+  { id: 'government', name: 'Government', icon: '⚖️', topics: GOVERNMENT_TOPICS },
+  { id: 'economics', name: 'Economics', icon: '💰', topics: ECONOMICS_TOPICS },
   { id: 'biology', name: 'Biology', icon: '🧬', topics: BIOLOGY_TOPICS },
+  { id: 'earthscience', name: 'Earth Science', icon: '🌍', topics: EARTH_SCIENCE_TOPICS },
+  { id: 'chemistry', name: 'Chemistry', icon: '⚗️', topics: CHEMISTRY_TOPICS },
+  { id: 'physics', name: 'Physics', icon: '⚛️', topics: PHYSICS_TOPICS },
 ];
 
 const DIFFICULTY_LEVELS = ['easy', 'medium', 'hard', 'challenging'];
