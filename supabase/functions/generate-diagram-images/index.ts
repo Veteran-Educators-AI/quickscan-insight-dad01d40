@@ -158,11 +158,22 @@ serve(async (req) => {
   try {
     const body = await req.json();
     
-    // Support single clipart generation
-    if (body.prompt && body.style === 'clipart') {
-      console.log('Generating single clipart image...');
+    // Support presentation-style image generation
+    if (body.prompt && (body.style === 'clipart' || body.style === 'presentation')) {
+      console.log(`Generating ${body.style} image...`);
       
-      const clipartPrompt = `Create a simple, clean clipart-style icon. ${body.prompt}. 
+      const isPresentation = body.style === 'presentation';
+      
+      const clipartPrompt = isPresentation 
+        ? `Create a stunning, professional illustration for an educational presentation. ${body.prompt}. 
+Requirements:
+- Modern, vibrant, and visually striking
+- Suitable for classroom presentations with dark backgrounds
+- Professional and educational style
+- Bold colors and clean composition
+- High quality, detailed illustration
+- No text or labels in the image`
+        : `Create a simple, clean clipart-style icon. ${body.prompt}. 
 Requirements:
 - Simple flat vector-style illustration
 - Clean lines, minimal detail
@@ -172,8 +183,8 @@ Requirements:
 
       let imageUrl = await generateImageWithNanoBanana(clipartPrompt);
       
-      // If Nano Banana fails, try SVG fallback
-      if (!imageUrl) {
+      // If Nano Banana fails, try SVG fallback (only for clipart style)
+      if (!imageUrl && !isPresentation) {
         console.log('Nano Banana failed, trying SVG fallback...');
         imageUrl = await generateSVGWithAI(body.prompt);
       }

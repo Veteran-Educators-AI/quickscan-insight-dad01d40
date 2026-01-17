@@ -111,8 +111,7 @@ export default function PresentationView() {
         const data = JSON.parse(stored);
         setPresentation(data);
         setIsLoading(false);
-        // Generate images for slides
-        generateSlideImages(data);
+        // No auto-generated images - let presenters add images on the fly using the image generator
       } catch (e) {
         console.error('Failed to parse presentation:', e);
         navigate('/dashboard');
@@ -122,35 +121,8 @@ export default function PresentationView() {
     }
   }, [navigate]);
 
-  // Generate AI images for each slide topic
-  const generateSlideImages = async (pres: NycologicPresentation) => {
-    setIsGeneratingImages(true);
-    const images: Record<number, string> = {};
-
-    for (let i = 0; i < pres.slides.length; i++) {
-      const slide = pres.slides[i];
-      // Generate image based on slide title/content
-      const prompt = `Create a professional, elegant illustration for an educational presentation slide about "${slide.title}". Topic: ${pres.topic}. Style: modern, minimalist, professional, suitable for classroom. Dark theme with subtle glow effects. No text in image.`;
-      
-      try {
-        const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
-          body: {
-            prompt,
-            style: 'clipart',
-          },
-        });
-
-        if (!error && data?.imageUrl) {
-          images[i] = data.imageUrl;
-          setSlideImages(prev => ({ ...prev, [i]: data.imageUrl }));
-        }
-      } catch (e) {
-        console.error(`Failed to generate image for slide ${i}:`, e);
-      }
-    }
-
-    setIsGeneratingImages(false);
-  };
+  // Presenters can generate images on-the-fly using the image generator dialog
+  // No automatic image generation - slides are content-focused by default
 
   const slide = presentation?.slides[currentSlide];
   const totalSlides = presentation?.slides.length || 0;
@@ -274,16 +246,16 @@ export default function PresentationView() {
     setZoomLevel(1);
   }, [currentSlide]);
 
-  // Image drag handlers for edit mode
+  // Image drag handlers - always enabled when image exists
   const handleImageDragStart = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isEditing || !slide?.customImage) return;
+    if (!slide?.customImage) return;
     e.preventDefault();
     e.stopPropagation();
     setIsDraggingImage(true);
   };
 
   const handleImageDrag = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDraggingImage || !isEditing || !presentation || !slideContainerRef.current) return;
+    if (!isDraggingImage || !presentation || !slideContainerRef.current) return;
     
     const rect = slideContainerRef.current.getBoundingClientRect();
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -313,9 +285,9 @@ export default function PresentationView() {
     setIsDraggingImage(false);
   };
 
-  // Image resize handlers
+  // Image resize handlers - always enabled when image exists
   const handleResizeStart = (corner: string) => (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isEditing) return;
+    if (!slide?.customImage) return;
     e.preventDefault();
     e.stopPropagation();
     setIsResizingImage(true);
@@ -323,7 +295,7 @@ export default function PresentationView() {
   };
 
   const handleResize = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isResizingImage || !isEditing || !presentation || !slide?.customImage) return;
+    if (!isResizingImage || !presentation || !slide?.customImage) return;
     
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
@@ -369,9 +341,9 @@ export default function PresentationView() {
     setImageResizeCorner(null);
   };
 
-  // Image rotation handlers
+  // Image rotation handlers - always enabled when image exists
   const handleRotationStart = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isEditing || !slide?.customImage || !slideContainerRef.current) return;
+    if (!slide?.customImage || !slideContainerRef.current) return;
     e.preventDefault();
     e.stopPropagation();
     
@@ -390,7 +362,7 @@ export default function PresentationView() {
   };
 
   const handleRotation = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isRotatingImage || !isEditing || !presentation || !slide?.customImage || !slideContainerRef.current) return;
+    if (!isRotatingImage || !presentation || !slide?.customImage || !slideContainerRef.current) return;
     
     const rect = slideContainerRef.current.getBoundingClientRect();
     const centerX = rect.left + (rect.width * slide.customImage.position.x / 100);
@@ -732,18 +704,23 @@ export default function PresentationView() {
             <span className="hidden md:inline text-sm">Library</span>
           </Button>
           
-          {/* Generate Image Button (Edit mode only) */}
-          {isEditing && (
-            <Button
-              variant="ghost"
-              onClick={() => setShowImageGenerator(true)}
-              className="h-10 px-4 rounded-full text-white/60 hover:text-white hover:bg-white/10 gap-2"
-              title="Generate image for this slide"
-            >
-              <ImagePlus className="h-4 w-4" />
-              <span className="hidden md:inline text-sm">Add Image</span>
-            </Button>
-          )}
+          {/* Generate Image Button - Always visible for on-the-fly image creation */}
+          <Button
+            variant="ghost"
+            onClick={() => setShowImageGenerator(true)}
+            className={cn(
+              "h-10 px-4 rounded-full gap-2 transition-all",
+              slide?.customImage?.url 
+                ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" 
+                : "text-white/60 hover:text-white hover:bg-white/10"
+            )}
+            title="Generate image for this slide using AI"
+          >
+            <ImagePlus className="h-4 w-4" />
+            <span className="hidden md:inline text-sm">
+              {slide?.customImage?.url ? 'Edit Image' : 'Add Image'}
+            </span>
+          </Button>
           
           {/* Save to Cloud Button */}
           <Button
@@ -1064,7 +1041,7 @@ export default function PresentationView() {
             {/* Slide content based on type */}
             {slide.type === 'title' ? (
               <div className="text-center space-y-8 relative">
-                {/* Custom Generated Image (interactive in edit mode) */}
+                {/* Custom Generated Image - always interactive for on-the-fly adjustments */}
                 {slide.customImage?.url && (
                   <motion.div
                     ref={imageContainerRef}
@@ -1080,12 +1057,12 @@ export default function PresentationView() {
                       zIndex: 10,
                     }}
                     className={cn(
-                      isEditing ? "cursor-move" : "pointer-events-none",
+                      "cursor-move group",
                       isDraggingImage && "ring-4 ring-primary/50",
                       isRotatingImage && "ring-4 ring-amber-400/50"
                     )}
-                    onMouseDown={isEditing ? handleImageDragStart : undefined}
-                    onTouchStart={isEditing ? handleImageDragStart : undefined}
+                    onMouseDown={handleImageDragStart}
+                    onTouchStart={handleImageDragStart}
                   >
                     <img 
                       src={slide.customImage.url} 
@@ -1095,93 +1072,92 @@ export default function PresentationView() {
                       draggable={false}
                     />
                     
-                    {/* Resize handles (edit mode only) */}
-                    {isEditing && (
-                      <>
-                        {/* Corner resize handles */}
+                    {/* Image controls - always visible on hover or when manipulating */}
+                    <div className={cn(
+                      "transition-opacity",
+                      (isDraggingImage || isResizingImage || isRotatingImage) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    )}>
+                      {/* Corner resize handles */}
+                      <div
+                        onMouseDown={handleResizeStart('top-left')}
+                        onTouchStart={handleResizeStart('top-left')}
+                        className="absolute -top-2 -left-2 w-5 h-5 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg"
+                      />
+                      <div
+                        onMouseDown={handleResizeStart('top-right')}
+                        onTouchStart={handleResizeStart('top-right')}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-primary rounded-full cursor-nesw-resize hover:scale-125 transition-transform shadow-lg"
+                      />
+                      <div
+                        onMouseDown={handleResizeStart('bottom-left')}
+                        onTouchStart={handleResizeStart('bottom-left')}
+                        className="absolute -bottom-2 -left-2 w-5 h-5 bg-primary rounded-full cursor-nesw-resize hover:scale-125 transition-transform shadow-lg"
+                      />
+                      <div
+                        onMouseDown={handleResizeStart('bottom-right')}
+                        onTouchStart={handleResizeStart('bottom-right')}
+                        className="absolute -bottom-2 -right-2 w-5 h-5 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg"
+                      />
+                      
+                      {/* Rotation handle - positioned above the image */}
+                      <div className="absolute left-1/2 -translate-x-1/2 -top-12 flex flex-col items-center">
+                        {/* Rotation line */}
+                        <div className="w-0.5 h-6 bg-amber-400/60" />
+                        {/* Rotation handle */}
                         <div
-                          onMouseDown={handleResizeStart('top-left')}
-                          onTouchStart={handleResizeStart('top-left')}
-                          className="absolute -top-2 -left-2 w-5 h-5 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg"
-                        />
-                        <div
-                          onMouseDown={handleResizeStart('top-right')}
-                          onTouchStart={handleResizeStart('top-right')}
-                          className="absolute -top-2 -right-2 w-5 h-5 bg-primary rounded-full cursor-nesw-resize hover:scale-125 transition-transform shadow-lg"
-                        />
-                        <div
-                          onMouseDown={handleResizeStart('bottom-left')}
-                          onTouchStart={handleResizeStart('bottom-left')}
-                          className="absolute -bottom-2 -left-2 w-5 h-5 bg-primary rounded-full cursor-nesw-resize hover:scale-125 transition-transform shadow-lg"
-                        />
-                        <div
-                          onMouseDown={handleResizeStart('bottom-right')}
-                          onTouchStart={handleResizeStart('bottom-right')}
-                          className="absolute -bottom-2 -right-2 w-5 h-5 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg"
-                        />
-                        
-                        {/* Rotation handle - positioned above the image */}
-                        <div className="absolute left-1/2 -translate-x-1/2 -top-12 flex flex-col items-center">
-                          {/* Rotation line */}
-                          <div className="w-0.5 h-6 bg-amber-400/60" />
-                          {/* Rotation handle */}
-                          <div
-                            onMouseDown={handleRotationStart}
-                            onTouchStart={handleRotationStart}
-                            className={cn(
-                              "w-7 h-7 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg transition-all hover:scale-110",
-                              isRotatingImage ? "bg-amber-500 scale-125" : "bg-amber-400"
-                            )}
-                            title="Drag to rotate"
-                          >
-                            <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <path d="M21 12a9 9 0 11-6.219-8.56" />
-                              <path d="M21 3v5h-5" />
-                            </svg>
-                          </div>
+                          onMouseDown={handleRotationStart}
+                          onTouchStart={handleRotationStart}
+                          className={cn(
+                            "w-7 h-7 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg transition-all hover:scale-110",
+                            isRotatingImage ? "bg-amber-500 scale-125" : "bg-amber-400"
+                          )}
+                          title="Drag to rotate"
+                        >
+                          <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M21 12a9 9 0 11-6.219-8.56" />
+                            <path d="M21 3v5h-5" />
+                          </svg>
                         </div>
-                        
-                        {/* Rotation angle display */}
-                        {isRotatingImage && (
-                          <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-sm font-bold px-3 py-1 rounded-full shadow-lg">
-                            {slide.customImage?.rotation}°
-                          </div>
-                        )}
-                        
-                        {/* Edge label */}
-                        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-black/80 text-white/90 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-2">
-                          <span>Drag to move</span>
-                          <span className="text-white/40">•</span>
-                          <span className="text-primary">Corners to resize</span>
-                          <span className="text-white/40">•</span>
-                          <span className="text-amber-400">Top handle to rotate</span>
+                      </div>
+                      
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleImageGenerated({
+                            url: '',
+                            prompt: '',
+                            position: { x: 50, y: 50 },
+                            size: { width: 400, height: 300 },
+                            rotation: 0,
+                          });
+                        }}
+                        className="absolute -top-2 right-8 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center cursor-pointer hover:scale-125 hover:bg-red-600 transition-all shadow-lg"
+                        title="Remove image"
+                      >
+                        <X className="w-3.5 h-3.5 text-white" />
+                      </button>
+                      
+                      {/* Rotation angle display */}
+                      {isRotatingImage && (
+                        <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-sm font-bold px-3 py-1 rounded-full shadow-lg">
+                          {slide.customImage?.rotation}°
                         </div>
-                      </>
-                    )}
+                      )}
+                      
+                      {/* Edge label */}
+                      <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-black/80 text-white/90 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-2">
+                        <span>Drag to move</span>
+                        <span className="text-white/40">•</span>
+                        <span className="text-primary">Corners to resize</span>
+                        <span className="text-white/40">•</span>
+                        <span className="text-amber-400">Top to rotate</span>
+                      </div>
+                    </div>
                   </motion.div>
                 )}
                 
-                {/* AI Auto-generated image (only show if no custom image) */}
-                {!slide.customImage?.url && slideImages[currentSlide] && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="mx-auto mb-8"
-                  >
-                    <img 
-                      src={slideImages[currentSlide]} 
-                      alt={slide.title}
-                      className="h-40 lg:h-56 mx-auto object-contain rounded-2xl shadow-2xl"
-                      style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.5))' }}
-                    />
-                  </motion.div>
-                )}
-                {isGeneratingImages && !slideImages[currentSlide] && !slide.customImage?.url && (
-                  <div className="h-40 lg:h-56 flex items-center justify-center">
-                    <Loader2 className={cn("h-8 w-8 animate-spin", colors.accent)} />
-                  </div>
-                )}
+                {/* Slides are content-focused - images are added on-the-fly by presenter */}
 
                 <motion.h1
                   initial={{ opacity: 0, y: 30 }}
@@ -1425,31 +1401,124 @@ export default function PresentationView() {
               </div>
             ) : (
               // Content/Summary/Other slides
-              <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
-                {/* Image side */}
-                <motion.div
-                  initial={{ opacity: 0, x: -40 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="flex-shrink-0"
-                >
-                  {slideImages[currentSlide] ? (
+              <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 relative">
+                {/* Custom Generated Image - interactive for on-the-fly adjustments */}
+                {slide.customImage?.url && (
+                  <motion.div
+                    ref={imageContainerRef}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    style={{
+                      position: 'absolute',
+                      left: `${slide.customImage.position.x}%`,
+                      top: `${slide.customImage.position.y}%`,
+                      transform: `translate(-50%, -50%) rotate(${slide.customImage.rotation}deg)`,
+                      width: `${slide.customImage.size.width}px`,
+                      height: `${slide.customImage.size.height}px`,
+                      zIndex: 10,
+                    }}
+                    className={cn(
+                      "cursor-move group",
+                      isDraggingImage && "ring-4 ring-primary/50",
+                      isRotatingImage && "ring-4 ring-amber-400/50"
+                    )}
+                    onMouseDown={handleImageDragStart}
+                    onTouchStart={handleImageDragStart}
+                  >
                     <img 
-                      src={slideImages[currentSlide]} 
-                      alt={slide.title}
-                      className="w-48 h-48 lg:w-72 lg:h-72 object-contain rounded-2xl"
-                      style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.4))' }}
+                      src={slide.customImage.url} 
+                      alt="Slide image"
+                      className="w-full h-full object-contain rounded-2xl shadow-2xl pointer-events-none select-none"
+                      style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.5))' }}
+                      draggable={false}
                     />
-                  ) : isGeneratingImages ? (
-                    <div className="w-48 h-48 lg:w-72 lg:h-72 flex items-center justify-center bg-white/5 rounded-2xl">
-                      <Loader2 className={cn("h-10 w-10 animate-spin", colors.accent)} />
+                    
+                    {/* Image controls - visible on hover */}
+                    <div className={cn(
+                      "transition-opacity",
+                      (isDraggingImage || isResizingImage || isRotatingImage) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    )}>
+                      {/* Corner resize handles */}
+                      <div
+                        onMouseDown={handleResizeStart('top-left')}
+                        onTouchStart={handleResizeStart('top-left')}
+                        className="absolute -top-2 -left-2 w-5 h-5 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg"
+                      />
+                      <div
+                        onMouseDown={handleResizeStart('top-right')}
+                        onTouchStart={handleResizeStart('top-right')}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-primary rounded-full cursor-nesw-resize hover:scale-125 transition-transform shadow-lg"
+                      />
+                      <div
+                        onMouseDown={handleResizeStart('bottom-left')}
+                        onTouchStart={handleResizeStart('bottom-left')}
+                        className="absolute -bottom-2 -left-2 w-5 h-5 bg-primary rounded-full cursor-nesw-resize hover:scale-125 transition-transform shadow-lg"
+                      />
+                      <div
+                        onMouseDown={handleResizeStart('bottom-right')}
+                        onTouchStart={handleResizeStart('bottom-right')}
+                        className="absolute -bottom-2 -right-2 w-5 h-5 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg"
+                      />
+                      
+                      {/* Rotation handle */}
+                      <div className="absolute left-1/2 -translate-x-1/2 -top-12 flex flex-col items-center">
+                        <div className="w-0.5 h-6 bg-amber-400/60" />
+                        <div
+                          onMouseDown={handleRotationStart}
+                          onTouchStart={handleRotationStart}
+                          className={cn(
+                            "w-7 h-7 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg transition-all hover:scale-110",
+                            isRotatingImage ? "bg-amber-500 scale-125" : "bg-amber-400"
+                          )}
+                          title="Drag to rotate"
+                        >
+                          <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M21 12a9 9 0 11-6.219-8.56" />
+                            <path d="M21 3v5h-5" />
+                          </svg>
+                        </div>
+                      </div>
+                      
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleImageGenerated({
+                            url: '',
+                            prompt: '',
+                            position: { x: 50, y: 50 },
+                            size: { width: 400, height: 300 },
+                            rotation: 0,
+                          });
+                        }}
+                        className="absolute -top-2 right-8 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center cursor-pointer hover:scale-125 hover:bg-red-600 transition-all shadow-lg"
+                        title="Remove image"
+                      >
+                        <X className="w-3.5 h-3.5 text-white" />
+                      </button>
+                      
+                      {isRotatingImage && (
+                        <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-sm font-bold px-3 py-1 rounded-full shadow-lg">
+                          {slide.customImage?.rotation}°
+                        </div>
+                      )}
                     </div>
-                  ) : IconComponent ? (
+                  </motion.div>
+                )}
+
+                {/* Icon placeholder when no image */}
+                {!slide.customImage?.url && IconComponent && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -40 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="flex-shrink-0"
+                  >
                     <div className="w-48 h-48 lg:w-72 lg:h-72 flex items-center justify-center bg-white/5 rounded-2xl">
                       <IconComponent className={cn("h-24 w-24", colors.accent)} />
                     </div>
-                  ) : null}
-                </motion.div>
+                  </motion.div>
+                )}
 
                 {/* Content side */}
                 <div className="flex-1 space-y-6 text-center lg:text-left">
