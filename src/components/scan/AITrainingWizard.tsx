@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Brain, BookOpen, GraduationCap, CheckCircle, ArrowRight, ArrowLeft, Sparkles, Target, FileText, Loader2, AlertCircle, Trophy } from 'lucide-react';
+import { Brain, BookOpen, GraduationCap, CheckCircle, ArrowRight, ArrowLeft, Sparkles, Target, FileText, Loader2, AlertCircle, Trophy, Download } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { 
@@ -312,6 +313,138 @@ export function AITrainingWizard({ open, onOpenChange, onTrainingComplete }: AIT
   const trainingProgress = Math.min(100, ((existingTrainingSamples + teacherAnswers.length) / MIN_TRAINING_SAMPLES) * 100);
   const isFullyTrained = existingTrainingSamples >= MIN_TRAINING_SAMPLES;
 
+  const downloadQuestionsToPDF = () => {
+    if (trainingQuestions.length === 0) {
+      toast.error('No questions to download');
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'letter'
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const marginLeft = 25.4; // 1 inch margin
+    const marginRight = 25.4;
+    const marginTop = 25.4;
+    const marginBottom = 25.4;
+    const contentWidth = pageWidth - marginLeft - marginRight;
+    let yPosition = marginTop;
+
+    const contentArea = CONTENT_AREAS.find(c => c.id === selectedContentArea);
+    const contentAreaName = contentArea?.name || 'Training';
+
+    // Title
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('AI Training Questions', marginLeft, yPosition);
+    yPosition += 8;
+
+    // Subtitle
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Content Area: ${contentAreaName}`, marginLeft, yPosition);
+    yPosition += 5;
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, marginLeft, yPosition);
+    yPosition += 5;
+    doc.text(`Total Questions: ${trainingQuestions.length}`, marginLeft, yPosition);
+    yPosition += 10;
+
+    // Separator line
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(marginLeft, yPosition, pageWidth - marginRight, yPosition);
+    yPosition += 10;
+
+    // Questions
+    trainingQuestions.forEach((question, index) => {
+      // Check if we need a new page
+      if (yPosition > pageHeight - marginBottom - 60) {
+        doc.addPage();
+        yPosition = marginTop;
+      }
+
+      // Question number and topic
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Question ${index + 1}`, marginLeft, yPosition);
+      yPosition += 5;
+
+      // Topic and standard
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Topic: ${question.topic}`, marginLeft, yPosition);
+      yPosition += 4;
+      doc.text(`Standard: ${question.standard} | Difficulty: ${question.difficulty}`, marginLeft, yPosition);
+      yPosition += 6;
+
+      // Question text
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      const questionLines = doc.splitTextToSize(question.question, contentWidth);
+      questionLines.forEach((line: string) => {
+        if (yPosition > pageHeight - marginBottom - 20) {
+          doc.addPage();
+          yPosition = marginTop;
+        }
+        doc.text(line, marginLeft, yPosition);
+        yPosition += 5;
+      });
+
+      // Answer space
+      yPosition += 5;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(100, 100, 100);
+      doc.text('Your Answer:', marginLeft, yPosition);
+      yPosition += 4;
+
+      // Draw answer box
+      const boxHeight = 35;
+      if (yPosition + boxHeight > pageHeight - marginBottom) {
+        doc.addPage();
+        yPosition = marginTop;
+      }
+      doc.setDrawColor(180, 180, 180);
+      doc.setLineWidth(0.3);
+      doc.rect(marginLeft, yPosition, contentWidth, boxHeight);
+      
+      // Add lined paper effect inside box
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.1);
+      for (let lineY = yPosition + 7; lineY < yPosition + boxHeight - 2; lineY += 7) {
+        doc.line(marginLeft + 2, lineY, marginLeft + contentWidth - 2, lineY);
+      }
+
+      yPosition += boxHeight + 10;
+
+      // Separator between questions
+      if (index < trainingQuestions.length - 1) {
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.3);
+        doc.line(marginLeft, yPosition - 5, marginLeft + contentWidth / 3, yPosition - 5);
+      }
+    });
+
+    // Footer on last page
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(150, 150, 150);
+    doc.text(
+      'Generated by Scan Genius - AI Training Worksheet',
+      pageWidth / 2,
+      pageHeight - 15,
+      { align: 'center' }
+    );
+
+    doc.save(`AI-Training-Questions-${contentAreaName.replace(/\s+/g, '-')}.pdf`);
+    toast.success('Training questions downloaded as PDF');
+  };
+
   const renderStep = () => {
     switch (step) {
       case 'intro':
@@ -538,6 +671,15 @@ export function AITrainingWizard({ open, onOpenChange, onTrainingComplete }: AIT
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={downloadQuestionsToPDF}
+                  className="gap-1"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  PDF
+                </Button>
                 <Badge variant="outline">{currentQuestion?.difficulty}</Badge>
                 <Badge variant="secondary">{currentQuestion?.standard}</Badge>
               </div>
