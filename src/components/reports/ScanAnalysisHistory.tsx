@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StudentWorkDetailDialog } from '@/components/scan/StudentWorkDetailDialog';
 import { GradeRecalculationDialog } from './GradeRecalculationDialog';
+import { MissingSubmissionsAlert } from '@/components/scan/MissingSubmissionsAlert';
 import { FileImage, User, Calendar, ChevronRight, Eye, Calculator } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -171,8 +172,27 @@ export function ScanAnalysisHistory({ classId }: ScanAnalysisHistoryProps) {
     );
   }
 
+  // Get unique analyzed student IDs and names for roster comparison
+  const analyzedStudentIds = useMemo(() => {
+    return [...new Set(attempts?.map(a => a.student.id) || [])];
+  }, [attempts]);
+
+  const analyzedStudentNames = useMemo(() => {
+    return [...new Set(attempts?.map(a => `${a.student.first_name} ${a.student.last_name}`) || [])];
+  }, [attempts]);
+
   return (
     <>
+      {/* Missing Submissions Alert */}
+      {classId && attempts && attempts.length > 0 && (
+        <MissingSubmissionsAlert
+          classId={classId}
+          analyzedStudentIds={analyzedStudentIds}
+          analyzedStudentNames={analyzedStudentNames}
+          assignmentName="recent scans"
+        />
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">

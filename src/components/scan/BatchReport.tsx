@@ -9,6 +9,7 @@ import { StudentWorkDetailDialog } from './StudentWorkDetailDialog';
 import { StudentComparisonView } from './StudentComparisonView';
 import { GradedPapersGallery } from './GradedPapersGallery';
 import { DifferentiationGroupView } from './DifferentiationGroupView';
+import { MissingSubmissionsAlert } from './MissingSubmissionsAlert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { supabase } from '@/integrations/supabase/client';
@@ -554,6 +555,16 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
           </CardContent>
         </Card>
       </div>
+
+      {/* Missing Submissions Alert - Roster Comparison */}
+      {classId && (
+        <MissingSubmissionsAlert
+          classId={classId}
+          analyzedStudentIds={completedItems.map(item => item.studentId).filter(Boolean) as string[]}
+          analyzedStudentNames={completedItems.map(item => item.studentName).filter(Boolean) as string[]}
+          assignmentName={completedItems[0]?.result?.problemIdentified || 'this assignment'}
+        />
+      )}
 
       {/* Score Distribution */}
       <Card>
