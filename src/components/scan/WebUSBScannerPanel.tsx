@@ -43,12 +43,14 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
     isConnecting,
     isScanning,
     isCheckingCompatibility,
+    isAutoReconnecting,
     connectedDevice,
     capabilities,
     compatibility,
     scanSettings,
     scannedImages,
     error,
+    pairedDevices,
     requestDevice,
     disconnect,
     startScan,
@@ -56,6 +58,7 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
     updateSettings,
     clearImages,
     checkCompatibility,
+    reconnectToDevice,
   } = useWebUSBScanner();
 
   const [showSettings, setShowSettings] = useState(false);
@@ -149,6 +152,16 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
 
         {!connectedDevice ? (
           <div className="flex flex-col items-center justify-center py-6 gap-4">
+            {/* Auto-reconnecting indicator */}
+            {isAutoReconnecting && (
+              <Alert className="mb-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertDescription className="ml-2">
+                  Auto-reconnecting to previously paired scanner...
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="p-4 rounded-full bg-muted">
               <Usb className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -158,8 +171,44 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
                 <br />
                 <span className="text-xs">Works best with scanners that support USB Image Class</span>
               </p>
+
+              {/* Previously paired devices */}
+              {pairedDevices.length > 0 && !isAutoReconnecting && (
+                <div className="mb-4 p-3 rounded-lg bg-muted/50 border">
+                  <p className="text-xs font-medium mb-2 flex items-center justify-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 text-green-500" />
+                    Previously Paired Scanners
+                  </p>
+                  <div className="space-y-2">
+                    {pairedDevices.map((device, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded bg-background">
+                        <span className="text-xs truncate">
+                          {device.productName || `Scanner ${device.vendorId.toString(16).toUpperCase()}`}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => reconnectToDevice(device)}
+                          disabled={isConnecting}
+                          className="text-xs h-7"
+                        >
+                          {isConnecting ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <>
+                              <RefreshCw className="h-3 w-3 mr-1" />
+                              Reconnect
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col gap-2 items-center">
-                <Button onClick={requestDevice} disabled={isConnecting}>
+                <Button onClick={requestDevice} disabled={isConnecting || isAutoReconnecting}>
                   {isConnecting ? (
                     <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
                   ) : (
