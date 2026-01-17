@@ -2,7 +2,10 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Image, Wand2, Loader2, X, Move, ZoomIn, ZoomOut, 
-  RotateCcw, Check, Trash2, GripVertical, Maximize2, Minimize2
+  RotateCcw, Check, Trash2, GripVertical, Maximize2, Minimize2,
+  LayoutGrid, PieChart, BarChart3, GitBranch, Layers, Target,
+  Lightbulb, Workflow, Users, BookOpen, Beaker, Globe, Calculator,
+  Atom, Brain, Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,9 +13,43 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+
+// Template categories and items
+const imageTemplates = {
+  diagrams: [
+    { id: 'flowchart', label: 'Flowchart', icon: Workflow, prompt: 'A clear flowchart diagram with connected boxes and arrows, showing a process flow. Clean lines, professional look, minimal colors.' },
+    { id: 'venn', label: 'Venn Diagram', icon: Layers, prompt: 'A Venn diagram with 2-3 overlapping circles, showing relationships between concepts. Soft pastel colors, clear labels areas.' },
+    { id: 'cycle', label: 'Cycle Diagram', icon: RotateCcw, prompt: 'A circular cycle diagram with 4-5 stages connected by curved arrows. Colorful, engaging, easy to follow.' },
+    { id: 'hierarchy', label: 'Hierarchy Tree', icon: GitBranch, prompt: 'A hierarchical tree diagram showing parent-child relationships. Clean organizational structure, professional colors.' },
+    { id: 'timeline', label: 'Timeline', icon: Clock, prompt: 'A horizontal timeline with key milestones and dates. Modern design, clear markers, professional styling.' },
+    { id: 'mindmap', label: 'Mind Map', icon: Brain, prompt: 'A colorful mind map with a central topic and branching subtopics. Organic, creative layout, engaging colors.' },
+  ],
+  charts: [
+    { id: 'bar', label: 'Bar Chart', icon: BarChart3, prompt: 'A clean bar chart with 5-6 bars showing comparison data. Professional colors, clear labels, modern design.' },
+    { id: 'pie', label: 'Pie Chart', icon: PieChart, prompt: 'A pie chart with 4-5 colorful segments showing proportions. Clear percentage labels, professional look.' },
+    { id: 'line', label: 'Line Graph', icon: LayoutGrid, prompt: 'A line graph showing trends over time with 2-3 lines. Grid background, clear axis labels, modern styling.' },
+    { id: 'comparison', label: 'Comparison', icon: Layers, prompt: 'A side-by-side comparison infographic showing two options with pros and cons. Clean, balanced layout.' },
+  ],
+  concepts: [
+    { id: 'lightbulb', label: 'Idea/Innovation', icon: Lightbulb, prompt: 'A glowing lightbulb representing ideas and innovation. Creative, inspiring, bright colors with sparkles.' },
+    { id: 'target', label: 'Goals/Target', icon: Target, prompt: 'A target with an arrow hitting the bullseye, representing goals and achievement. Dynamic, motivating design.' },
+    { id: 'teamwork', label: 'Teamwork', icon: Users, prompt: 'Diverse people working together as a team. Collaborative, inclusive, positive atmosphere.' },
+    { id: 'growth', label: 'Growth', icon: BarChart3, prompt: 'A plant or arrow growing upward representing growth and progress. Green tones, optimistic, dynamic.' },
+    { id: 'success', label: 'Success', icon: Check, prompt: 'A person reaching the top of a mountain or podium celebrating success. Inspirational, triumphant mood.' },
+  ],
+  subjects: [
+    { id: 'science', label: 'Science', icon: Beaker, prompt: 'Scientific laboratory equipment like beakers, test tubes, and molecules. Clean, educational, colorful.' },
+    { id: 'math', label: 'Mathematics', icon: Calculator, prompt: 'Mathematical symbols, equations, geometric shapes, and numbers. Educational, clean, organized layout.' },
+    { id: 'geography', label: 'Geography', icon: Globe, prompt: 'A globe or world map with geographic features highlighted. Educational, colorful continents, clean design.' },
+    { id: 'literature', label: 'Literature', icon: BookOpen, prompt: 'Open books with pages flying, quill pen, literary symbols. Warm, classic, inviting atmosphere.' },
+    { id: 'physics', label: 'Physics', icon: Atom, prompt: 'Atoms, planetary orbits, physics equations, and energy symbols. Scientific, modern, dynamic design.' },
+  ],
+};
 
 interface SlideImageGeneratorProps {
   open: boolean;
@@ -243,8 +280,60 @@ export function SlideImageGenerator({
         </DialogHeader>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left: Prompt and Generation */}
+          {/* Left: Prompt, Templates, and Generation */}
           <div className="space-y-6">
+            {/* Template Gallery */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <LayoutGrid className="h-4 w-4" />
+                Quick Templates
+              </Label>
+              <Tabs defaultValue="diagrams" className="w-full">
+                <TabsList className="w-full grid grid-cols-4 h-auto">
+                  <TabsTrigger value="diagrams" className="text-xs py-1.5">Diagrams</TabsTrigger>
+                  <TabsTrigger value="charts" className="text-xs py-1.5">Charts</TabsTrigger>
+                  <TabsTrigger value="concepts" className="text-xs py-1.5">Concepts</TabsTrigger>
+                  <TabsTrigger value="subjects" className="text-xs py-1.5">Subjects</TabsTrigger>
+                </TabsList>
+                {Object.entries(imageTemplates).map(([category, templates]) => (
+                  <TabsContent key={category} value={category} className="mt-3">
+                    <ScrollArea className="h-[140px]">
+                      <div className="grid grid-cols-3 gap-2 pr-4">
+                        {templates.map((template) => {
+                          const IconComponent = template.icon;
+                          return (
+                            <Button
+                              key={template.id}
+                              variant="outline"
+                              size="sm"
+                              className={cn(
+                                "h-auto py-2 px-2 flex flex-col items-center gap-1 text-xs",
+                                "hover:bg-primary/10 hover:border-primary transition-colors"
+                              )}
+                              onClick={() => {
+                                const contextualPrompt = `${template.prompt} Related to: ${topic} - ${slideTitle}.`;
+                                setPrompt(contextualPrompt);
+                                toast.success(`Template "${template.label}" applied!`);
+                              }}
+                              disabled={isGenerating}
+                            >
+                              <IconComponent className="h-5 w-5 text-primary" />
+                              <span className="text-[10px] leading-tight text-center">
+                                {template.label}
+                              </span>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                  </TabsContent>
+                ))}
+              </Tabs>
+              <p className="text-xs text-muted-foreground">
+                Click a template to use it as your prompt, then generate or customize further.
+              </p>
+            </div>
+
             <div className="space-y-3">
               <Label className="text-base font-semibold">Describe Your Image</Label>
               <Textarea
@@ -257,13 +346,13 @@ export function SlideImageGenerator({
                 placeholder="Describe the image you want to generate in detail...
 
 Example: A colorful diagram showing the water cycle with clouds, rain, rivers, and the ocean. Arrows showing evaporation and condensation. Bright, engaging colors suitable for students."
-                className="min-h-[180px] text-base leading-relaxed resize-none"
+                className="min-h-[120px] text-base leading-relaxed resize-none"
                 autoComplete="off"
                 autoCorrect="off"
                 spellCheck="true"
               />
               <p className="text-sm text-muted-foreground">
-                💡 Tip: Be specific about style, colors, objects, and composition. The AI creates educational illustrations.
+                💡 Tip: Use a template above or write your own custom prompt.
               </p>
             </div>
 
