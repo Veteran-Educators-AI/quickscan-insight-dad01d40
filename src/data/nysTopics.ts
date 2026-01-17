@@ -540,6 +540,90 @@ export const BIOLOGY_TOPICS: TopicCategory[] = [
   },
 ];
 
+export const EARTH_SCIENCE_TOPICS: TopicCategory[] = [
+  {
+    category: 'EARTH IN SPACE',
+    topics: [
+      { name: 'Solar System', standard: 'NYS.ES.1.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Earth-Moon System', standard: 'NYS.ES.1.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Seasons and Tilt', standard: 'NYS.ES.1.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Phases of the Moon', standard: 'NYS.ES.1.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Eclipses', standard: 'NYS.ES.1.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Stars and Galaxies', standard: 'NYS.ES.1.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'MINERALS AND ROCKS',
+    topics: [
+      { name: 'Mineral Identification', standard: 'NYS.ES.2.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Rock Cycle', standard: 'NYS.ES.2.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Igneous Rocks', standard: 'NYS.ES.2.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Sedimentary Rocks', standard: 'NYS.ES.2.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Metamorphic Rocks', standard: 'NYS.ES.2.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'PLATE TECTONICS',
+    topics: [
+      { name: 'Continental Drift', standard: 'NYS.ES.3.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Plate Boundaries', standard: 'NYS.ES.3.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Earthquakes', standard: 'NYS.ES.3.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Volcanoes', standard: 'NYS.ES.3.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Mountain Building', standard: 'NYS.ES.3.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'WEATHERING AND EROSION',
+    topics: [
+      { name: 'Weathering Types', standard: 'NYS.ES.4.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Erosion and Deposition', standard: 'NYS.ES.4.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Soil Formation', standard: 'NYS.ES.4.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Glaciers', standard: 'NYS.ES.4.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Mass Movement', standard: 'NYS.ES.4.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'ATMOSPHERE AND WEATHER',
+    topics: [
+      { name: 'Atmospheric Layers', standard: 'NYS.ES.5.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Weather Variables', standard: 'NYS.ES.5.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Air Masses and Fronts', standard: 'NYS.ES.5.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Storms and Severe Weather', standard: 'NYS.ES.5.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Weather Maps', standard: 'NYS.ES.5.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Climate Zones', standard: 'NYS.ES.5.6', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'WATER CYCLE AND OCEANS',
+    topics: [
+      { name: 'Water Cycle', standard: 'NYS.ES.6.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Groundwater', standard: 'NYS.ES.6.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Ocean Currents', standard: 'NYS.ES.6.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Tides', standard: 'NYS.ES.6.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Ocean Floor Features', standard: 'NYS.ES.6.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'EARTH HISTORY',
+    topics: [
+      { name: 'Geologic Time Scale', standard: 'NYS.ES.7.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Fossils and Index Fossils', standard: 'NYS.ES.7.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Relative Dating', standard: 'NYS.ES.7.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Absolute Dating', standard: 'NYS.ES.7.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Mass Extinctions', standard: 'NYS.ES.7.5', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+  {
+    category: 'EARTH REFERENCE TABLES',
+    topics: [
+      { name: 'Reading Topographic Maps', standard: 'NYS.ES.8.1', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Using the ESRT', standard: 'NYS.ES.8.2', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Latitude and Longitude', standard: 'NYS.ES.8.3', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+      { name: 'Coordinate Systems', standard: 'NYS.ES.8.4', url: 'https://www.nysed.gov/curriculum-instruction/science-learning-standards' },
+    ],
+  },
+];
+
 export const CHEMISTRY_TOPICS: TopicCategory[] = [
   {
     category: 'MATTER AND ENERGY',
