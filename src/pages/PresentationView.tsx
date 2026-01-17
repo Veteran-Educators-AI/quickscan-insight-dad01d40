@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -231,6 +231,21 @@ export default function PresentationView() {
     const newContent = [...slide.content];
     newContent[index] = value;
     updateSlide('content', newContent);
+  };
+
+  const addContentItem = () => {
+    if (!slide) return;
+    const newContent = [...slide.content, 'New bullet point'];
+    updateSlide('content', newContent);
+    // Set focus to the new item
+    setTimeout(() => setEditingField(`content-item-${newContent.length - 1}`), 100);
+  };
+
+  const removeContentItem = (index: number) => {
+    if (!slide || slide.content.length <= 1) return;
+    const newContent = slide.content.filter((_, i) => i !== index);
+    updateSlide('content', newContent);
+    setEditingField(null);
   };
 
   const toggleEditMode = () => {
@@ -832,7 +847,7 @@ export default function PresentationView() {
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.4 + idx * 0.1 }}
-                        className="flex items-start gap-4"
+                        className="flex items-start gap-4 group"
                       >
                         <span className={cn("w-2 h-2 rounded-full mt-3 flex-shrink-0", colors.accent.replace('text-', 'bg-'))} />
                         {isEditing && editingField === `content-item-${idx}` ? (
@@ -854,8 +869,31 @@ export default function PresentationView() {
                             {item}
                           </p>
                         )}
+                        {isEditing && slide.content.length > 1 && (
+                          <button
+                            onClick={() => removeContentItem(idx)}
+                            className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity p-1"
+                            title="Remove bullet point"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </motion.div>
                     ))}
+                    {isEditing && (
+                      <motion.button
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        onClick={addContentItem}
+                        className={cn(
+                          "flex items-center gap-2 text-sm font-medium mt-4 px-4 py-2 rounded-lg border border-dashed border-white/30 hover:border-white/50 hover:bg-white/5 transition-all",
+                          colors.accent
+                        )}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add bullet point
+                      </motion.button>
+                    )}
                   </motion.div>
                 </div>
               </div>
