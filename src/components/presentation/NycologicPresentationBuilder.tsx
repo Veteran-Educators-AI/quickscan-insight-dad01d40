@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Sparkles, Play, Save, Plus, Trash2, Check } from 'lucide-react';
+import { Loader2, Sparkles, Play, Save, Plus, Trash2, Check, GripVertical } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
@@ -15,6 +15,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface NycologicPresentationBuilderProps {
   open: boolean;
@@ -24,6 +41,66 @@ interface NycologicPresentationBuilderProps {
     standard: string;
     subject?: string;
   } | null;
+}
+
+// Sortable slide card component
+function SortableSlideCard({ 
+  slide, 
+  index, 
+  onLaunch 
+}: { 
+  slide: PresentationSlide; 
+  index: number; 
+  onLaunch: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: slide.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 1,
+  };
+
+  return (
+    <Card 
+      ref={setNodeRef}
+      style={style}
+      className="cursor-pointer hover:ring-2 ring-primary transition-all overflow-hidden group relative"
+      onClick={onLaunch}
+    >
+      {/* Drag handle */}
+      <div 
+        {...attributes}
+        {...listeners}
+        className="absolute top-2 right-2 z-10 p-1 rounded bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical className="h-4 w-4 text-white" />
+      </div>
+      
+      <div className="aspect-video bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 flex flex-col items-center justify-center text-center">
+        <Badge variant="outline" className="text-white/50 border-white/20 text-[10px] mb-2">
+          {slide.type}
+        </Badge>
+        <p className="text-white text-sm font-medium line-clamp-2">
+          {slide.title.replace(/\*\*/g, '')}
+        </p>
+      </div>
+      <CardContent className="p-2">
+        <p className="text-xs text-muted-foreground text-center">
+          Slide {index + 1}
+        </p>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function NycologicPresentationBuilder({ open, onOpenChange, topic }: NycologicPresentationBuilderProps) {
@@ -43,6 +120,38 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
   const [questionCount, setQuestionCount] = useState('3');
   const [style, setStyle] = useState<'engaging' | 'formal' | 'story'>('engaging');
   const [visualTheme, setVisualTheme] = useState<string>('neon-city');
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle slide reordering
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id && presentation) {
+      const oldIndex = presentation.slides.findIndex((s) => s.id === active.id);
+      const newIndex = presentation.slides.findIndex((s) => s.id === over.id);
+
+      const newSlides = arrayMove(presentation.slides, oldIndex, newIndex);
+      setPresentation({
+        ...presentation,
+        slides: newSlides,
+      });
+      toast({
+        title: 'Slides reordered',
+        description: `Moved slide ${oldIndex + 1} to position ${newIndex + 1}`,
+      });
+    }
+  }, [presentation, toast]);
 
   // Visual theme options with colorful designs
   const visualThemes = [
@@ -437,29 +546,33 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
                   </div>
                 </div>
 
-                {/* Slide preview grid */}
-                <div className="grid grid-cols-3 gap-4">
-                  {presentation.slides.map((slide, index) => (
-                    <Card 
-                      key={slide.id} 
-                      className="cursor-pointer hover:ring-2 ring-primary transition-all overflow-hidden"
-                      onClick={launchPresentation}
+                {/* Slide preview grid - draggable */}
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <GripVertical className="h-3 w-3" />
+                    Drag slides to reorder them
+                  </p>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={presentation.slides.map(s => s.id)}
+                      strategy={rectSortingStrategy}
                     >
-                      <div className="aspect-video bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 flex flex-col items-center justify-center text-center">
-                        <Badge variant="outline" className="text-white/50 border-white/20 text-[10px] mb-2">
-                          {slide.type}
-                        </Badge>
-                        <p className="text-white text-sm font-medium line-clamp-2">
-                          {slide.title.replace(/\*\*/g, '')}
-                        </p>
+                      <div className="grid grid-cols-3 gap-4">
+                        {presentation.slides.map((slide, index) => (
+                          <SortableSlideCard
+                            key={slide.id}
+                            slide={slide}
+                            index={index}
+                            onLaunch={launchPresentation}
+                          />
+                        ))}
                       </div>
-                      <CardContent className="p-2">
-                        <p className="text-xs text-muted-foreground text-center">
-                          Slide {index + 1}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))}
+                    </SortableContext>
+                  </DndContext>
                 </div>
               </div>
             )}
