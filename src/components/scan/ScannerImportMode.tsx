@@ -3,7 +3,7 @@ import {
   Upload, Loader2, RotateCcw, RotateCw, ArrowUp, ArrowDown, 
   Trash2, Check, Layers, FileImage, Wand2, GripVertical,
   ZoomIn, ZoomOut, Eye, FolderOpen, RefreshCw, Settings2, Cloud,
-  Zap, Pause, Play
+  Zap, Pause, Play, Usb
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,12 +14,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { resizeImage, blobToBase64, applyPhotocopyFilter } from '@/lib/imageUtils';
 import { GoogleDriveImport } from './GoogleDriveImport';
 import { GoogleDriveAutoSyncConfig } from './GoogleDriveAutoSyncConfig';
 import { HotFolderAlert } from './HotFolderAlert';
+import { WebUSBScannerPanel } from './WebUSBScannerPanel';
 import { useGoogleDriveAutoSync, SyncedFile } from '@/hooks/useGoogleDriveAutoSync';
 import { playNotificationSound, isSoundEnabled } from '@/lib/notificationSound';
 
@@ -189,6 +191,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const [previewOpen, setPreviewOpen] = useState(false);
   const [driveImportOpen, setDriveImportOpen] = useState(false);
   const [autoSyncConfigOpen, setAutoSyncConfigOpen] = useState(false);
+  const [showUSBScanner, setShowUSBScanner] = useState(false);
   const [settings, setSettings] = useState({
     autoRotate: true,
     applyPhotocopyFilter: true,
@@ -579,6 +582,42 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
     }
   };
 
+  // Handle images scanned via WebUSB scanner
+  const handleUSBScannedImages = useCallback(async (imageUrls: string[]) => {
+    if (imageUrls.length === 0) return;
+    
+    setIsProcessing(true);
+    setProcessProgress(0);
+    
+    try {
+      const newPages: ScanPage[] = [];
+      
+      for (let i = 0; i < imageUrls.length; i++) {
+        const response = await fetch(imageUrls[i]);
+        const blob = await response.blob();
+        const file = new File([blob], `usb-scan-${Date.now()}-${i + 1}.png`, { type: blob.type });
+        const page = await processImage(file, i, imageUrls.length);
+        newPages.push(page);
+      }
+      
+      setPages(prev => {
+        const existingCount = prev.length;
+        return [
+          ...prev,
+          ...newPages.map((p, i) => ({ ...p, order: existingCount + i + 1 }))
+        ];
+      });
+      
+      toast.success(`Added ${newPages.length} pages from USB scanner`);
+    } catch (error) {
+      console.error('Error processing USB scanned images:', error);
+      toast.error('Error processing scanned images');
+    } finally {
+      setIsProcessing(false);
+      setProcessProgress(0);
+    }
+  }, [processImage]);
+
   const handleConfirmPages = () => {
     if (pages.length === 0) {
       toast.error('No pages to process');
@@ -685,6 +724,16 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               Import Scans
             </Button>
 
+            {/* WebUSB Scanner Button */}
+            <Button
+              variant={showUSBScanner ? "default" : "outline"}
+              onClick={() => setShowUSBScanner(!showUSBScanner)}
+              disabled={isProcessing}
+            >
+              <Usb className="h-4 w-4 mr-2" />
+              USB Scanner
+            </Button>
+
             <Button
               variant="outline"
               onClick={() => setDriveImportOpen(true)}
@@ -754,6 +803,14 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               </>
             )}
           </div>
+
+          {/* WebUSB Scanner Panel */}
+          {showUSBScanner && (
+            <WebUSBScannerPanel
+              onImagesScanned={handleUSBScannedImages}
+              className="mt-2"
+            />
+          )}
 
           {/* Auto-Sync Status */}
           {autoSyncConfig?.folderId && (
