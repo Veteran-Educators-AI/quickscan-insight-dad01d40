@@ -308,13 +308,18 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
       console.error('Error connecting to scanner:', err);
       
       if (err.name === 'NotFoundError') {
-        setError('No scanner selected. Please try again and select a scanner from the list.');
+        // User cancelled the dialog or no device was selected - not an error to display
+        setError(null);
       } else if (err.name === 'SecurityError') {
         setError('Permission denied. Please allow access to the scanner.');
-      } else if (err.name === 'NetworkError') {
+      } else if (err.name === 'NetworkError' && deviceRef.current) {
+        // Only show "in use" error if we actually had a device reference
         setError('Scanner is in use by another application. Please close other scanning software.');
+      } else if (err.message?.includes('Unable to claim interface')) {
+        setError('Scanner is busy or in use by another application.');
       } else {
-        setError(err.message || 'Failed to connect to scanner');
+        // Don't show generic errors for connection cancellation
+        setError(null);
       }
       
       return false;
