@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   Usb, 
   ScanLine, 
@@ -19,11 +20,12 @@ import {
   Trash2,
   RefreshCw,
   Download,
-  Monitor
+  Monitor,
+  HelpCircle,
+  ChevronDown
 } from 'lucide-react';
 import { useWebUSBScanner } from '@/hooks/useWebUSBScanner';
 import { cn } from '@/lib/utils';
-
 interface WebUSBScannerPanelProps {
   onImagesScanned?: (images: string[]) => void;
   className?: string;
@@ -115,12 +117,22 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="flex items-center justify-between">
+              <span>{error}</span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={requestDevice}
+                className="ml-2"
+              >
+                <RefreshCw className="h-3 w-3 mr-1" /> Retry
+              </Button>
+            </AlertDescription>
           </Alert>
         )}
 
         {!connectedDevice ? (
-          <div className="flex flex-col items-center justify-center py-8 gap-4">
+          <div className="flex flex-col items-center justify-center py-6 gap-4">
             <div className="p-4 rounded-full bg-muted">
               <Usb className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -130,13 +142,48 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
                 <br />
                 <span className="text-xs">Works best with scanners that support USB Image Class</span>
               </p>
-              <Button onClick={requestDevice} disabled={isConnecting}>
-                {isConnecting ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
-                ) : (
-                  <><Usb className="h-4 w-4 mr-2" /> Connect Scanner</>
-                )}
-              </Button>
+              <div className="flex flex-col gap-2 items-center">
+                <Button onClick={requestDevice} disabled={isConnecting}>
+                  {isConnecting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
+                  ) : (
+                    <><Usb className="h-4 w-4 mr-2" /> Connect Scanner</>
+                  )}
+                </Button>
+                
+                {/* Troubleshooting Tips */}
+                <Collapsible className="w-full max-w-md mt-4">
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">
+                      <HelpCircle className="h-3 w-3 mr-1" />
+                      Having trouble connecting?
+                      <ChevronDown className="h-3 w-3 ml-1" />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div className="p-3 rounded-lg bg-muted/50 border text-left space-y-2">
+                      <h4 className="font-medium text-sm flex items-center gap-1">
+                        <HelpCircle className="h-4 w-4" /> Troubleshooting Tips
+                      </h4>
+                      <ul className="text-xs text-muted-foreground space-y-1.5 list-disc list-inside">
+                        <li><strong>Close other apps</strong> using the scanner (scanning software, printer utilities)</li>
+                        <li><strong>Unplug and replug</strong> the USB cable, then try again</li>
+                        <li><strong>Try a different USB port</strong> - use a direct port, not a hub</li>
+                        <li><strong>Power cycle</strong> the scanner (turn off/on or unplug power)</li>
+                        <li><strong>Check cable</strong> - use the original cable if possible</li>
+                        <li><strong>Allow permission</strong> when the browser prompts for USB access</li>
+                        <li><strong>Use Chrome or Edge</strong> - other browsers don't support WebUSB</li>
+                      </ul>
+                      <div className="pt-2 border-t mt-2">
+                        <p className="text-xs text-muted-foreground">
+                          <strong>Note:</strong> Not all scanners support WebUSB. If your scanner doesn't appear, 
+                          try using the file import or camera options instead.
+                        </p>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
             </div>
           </div>
         ) : (
