@@ -9,12 +9,14 @@ import {
   ChevronRight,
   User,
   BookOpen,
+  Mail,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StudentReportDialog } from '@/components/reports/StudentReportDialog';
+import { BatchRemediationEmailDialog } from '@/components/reports/BatchRemediationEmailDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -29,6 +31,9 @@ interface StrugglingStudent {
   weakTopicCount: number;
   trend: 'improving' | 'stable' | 'declining';
   lastAssessmentDate: string | null;
+  email?: string;
+  parentEmail?: string;
+  weakTopics?: string[];
 }
 
 interface StudentsNeedingHelpWidgetProps {
@@ -63,6 +68,7 @@ function calculateTrend(scores: number[]): 'improving' | 'stable' | 'declining' 
 export function StudentsNeedingHelpWidget({ className, limit = 5 }: StudentsNeedingHelpWidgetProps) {
   const { user } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string } | null>(null);
+  const [showBatchEmailDialog, setShowBatchEmailDialog] = useState(false);
 
   const { data: strugglingStudents, isLoading } = useQuery({
     queryKey: ['struggling-students', user?.id, limit],
@@ -81,10 +87,10 @@ export function StudentsNeedingHelpWidget({ className, limit = 5 }: StudentsNeed
       const classMap = new Map(classes.map(c => [c.id, c.name]));
       const classIds = classes.map(c => c.id);
 
-      // 2. Fetch all students in these classes
+      // 2. Fetch all students in these classes with email info
       const { data: students, error: studentsError } = await supabase
         .from('students')
-        .select('id, first_name, last_name, class_id')
+        .select('id, first_name, last_name, class_id, email, parent_email')
         .in('class_id', classIds);
 
       if (studentsError) throw studentsError;
@@ -126,10 +132,12 @@ export function StudentsNeedingHelpWidget({ className, limit = 5 }: StudentsNeed
           topicScores[g.topic_name].push(score);
         });
 
-        const weakTopicCount = Object.entries(topicScores).filter(([_, topicScoreList]) => {
+        const weakTopicsEntries = Object.entries(topicScores).filter(([_, topicScoreList]) => {
           const avg = topicScoreList.reduce((a, b) => a + b, 0) / topicScoreList.length;
           return avg < 70;
-        }).length;
+        });
+        const weakTopicCount = weakTopicsEntries.length;
+        const weakTopics = weakTopicsEntries.map(([name]) => name);
 
         return {
           id: student.id,
@@ -139,10 +147,13 @@ export function StudentsNeedingHelpWidget({ className, limit = 5 }: StudentsNeed
           className: classMap.get(student.class_id) || 'Unknown Class',
           averageGrade,
           weakTopicCount,
+          weakTopics,
           trend: calculateTrend(scores),
           lastAssessmentDate: studentGrades.length > 0
             ? studentGrades[studentGrades.length - 1].created_at
             : null,
+          email: student.email || undefined,
+          parentEmail: student.parent_email || undefined,
         };
       });
 
@@ -191,11 +202,27 @@ export function StudentsNeedingHelpWidget({ className, limit = 5 }: StudentsNeed
               <CardDescription>Top {limit} struggling students across all classes</CardDescription>
             </div>
           </div>
-          <Link to="/reports">
-            <Button variant="ghost" size="sm">
-              All Reports <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            {strugglingStudents && strugglingStudents.length > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowBatchEmailDialog(true);
+                }}
+                className="gap-1"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Email All</span>
+              </Button>
+            )}
+            <Link to="/reports">
+              <Button variant="ghost" size="sm">
+                All Reports <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -279,6 +306,15 @@ export function StudentsNeedingHelpWidget({ className, limit = 5 }: StudentsNeed
           onOpenChange={(open) => !open && setSelectedStudent(null)}
           studentId={selectedStudent.id}
           studentName={selectedStudent.name}
+        />
+      )}
+
+      {/* Batch Remediation Email Dialog */}
+      {strugglingStudents && strugglingStudents.length > 0 && (
+        <BatchRemediationEmailDialog
+          open={showBatchEmailDialog}
+          onOpenChange={setShowBatchEmailDialog}
+          students={strugglingStudents}
         />
       )}
     </>
