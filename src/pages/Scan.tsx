@@ -884,17 +884,13 @@ export default function Scan() {
             setSelectedClassId(null);
             setSelectedStudentIds([]);
           }}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="single" className="gap-2">
                 <Camera className="h-4 w-4" />
                 Single
               </TabsTrigger>
-              <TabsTrigger value="batch" className="gap-2">
-                <Layers className="h-4 w-4" />
-                Batch
-              </TabsTrigger>
               <TabsTrigger value="scanner" className="gap-2">
-                <FileImage className="h-4 w-4" />
+                <Layers className="h-4 w-4" />
                 Scanner
               </TabsTrigger>
               <TabsTrigger value="saved" className="gap-2">
@@ -1749,40 +1745,9 @@ export default function Scan() {
                           </Button>
                         </div>
 
-                        {/* Multi-Student Tool */}
-                        <div className="pt-4 border-t space-y-3">
-                          <Button
-                            variant="outline"
-                            size="lg"
-                            className="w-full border-dashed border-2 hover:border-primary hover:bg-primary/5"
-                            onClick={() => setShowMultiStudentScanner(true)}
-                          >
-                            <Users className="h-5 w-5 mr-2 text-primary" />
-                            <span className="font-semibold">MSG</span>
-                            <span className="text-muted-foreground ml-2 text-sm">— Grade many students from one photo</span>
-                          </Button>
-
-                          {/* Continuous QR Scanner */}
-                          {singleScanClassId && singleScanStudents.length > 0 && (
-                            <Button
-                              variant="outline"
-                              size="lg"
-                              className="w-full border-dashed border-2 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-950/20"
-                              onClick={() => setShowContinuousQRScanner(true)}
-                            >
-                              <ScanLine className="h-5 w-5 mr-2 text-green-600" />
-                              <span className="font-semibold text-green-700 dark:text-green-400">Bulk QR Scan</span>
-                              <span className="text-muted-foreground ml-2 text-sm">— Scan through a stack of papers</span>
-                            </Button>
-                          )}
-                        </div>
-
                         <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
                           <p>💡 <strong>Tip:</strong> For best results, ensure good lighting and capture the full response</p>
                           <p>📱 QR codes on printed assessments will auto-detect student & question</p>
-                          {singleScanClassId && singleScanStudents.length > 0 && (
-                            <p>🔍 <strong>Bulk QR Scan:</strong> Point camera at QR codes to quickly identify papers</p>
-                          )}
                         </div>
                         </div>
                       </div>
@@ -1792,8 +1757,8 @@ export default function Scan() {
               )}
             </TabsContent>
 
-            {/* Batch Mode */}
-            <TabsContent value="batch" className="space-y-4 mt-4">
+            {/* Scanner Mode - Combined Batch + Scanner Import */}
+            <TabsContent value="scanner" className="space-y-4 mt-4">
               {showBatchReport && batch.summary ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -1831,6 +1796,35 @@ export default function Scan() {
                     onClassChange={setSelectedClassId}
                     onStudentsChange={setSelectedStudentIds}
                     disabled={batch.isProcessing}
+                  />
+
+                  {/* Scanner Import Panel */}
+                  <ScannerImportMode
+                    onPagesReady={async (pages) => {
+                      setScannerImportPages(pages);
+                      // Add all pages to batch for processing
+                      pages.forEach(page => {
+                        batch.addImage(page.dataUrl);
+                      });
+                      toast.success(`${pages.length} pages added for analysis`);
+                      
+                      // Auto-run handwriting grouping if enabled and more than 1 page
+                      if (qrScanSettings.autoHandwritingGroupingEnabled && pages.length >= 2) {
+                        // Wait for state update
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        toast.info('Auto-grouping multi-page papers by handwriting...', { 
+                          icon: <FileStack className="h-4 w-4" /> 
+                        });
+                        const result = await batch.detectMultiPageByHandwriting();
+                        if (result.pagesLinked > 0) {
+                          toast.success(`Auto-grouped ${result.pagesLinked} continuation pages`, {
+                            description: `${result.groupsCreated} separate student papers detected`,
+                            icon: <FileStack className="h-4 w-4" />,
+                          });
+                        }
+                      }
+                    }}
+                    onClose={() => setScanMode('single')}
                   />
 
                   {/* Add images section */}
@@ -2147,38 +2141,6 @@ export default function Scan() {
                   )}
                 </>
               )}
-            </TabsContent>
-
-            {/* Scanner Import Mode */}
-            <TabsContent value="scanner" className="space-y-4 mt-4">
-              <ScannerImportMode
-                onPagesReady={async (pages) => {
-                  setScannerImportPages(pages);
-                  // Add all pages to batch for processing
-                  pages.forEach(page => {
-                    batch.addImage(page.dataUrl);
-                  });
-                  setScanMode('batch');
-                  toast.success(`${pages.length} pages added to batch for analysis`);
-                  
-                  // Auto-run handwriting grouping if enabled and more than 1 page
-                  if (qrScanSettings.autoHandwritingGroupingEnabled && pages.length >= 2) {
-                    // Wait for state update
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    toast.info('Auto-grouping multi-page papers by handwriting...', { 
-                      icon: <FileStack className="h-4 w-4" /> 
-                    });
-                    const result = await batch.detectMultiPageByHandwriting();
-                    if (result.pagesLinked > 0) {
-                      toast.success(`Auto-grouped ${result.pagesLinked} continuation pages`, {
-                        description: `${result.groupsCreated} separate student papers detected`,
-                        icon: <FileStack className="h-4 w-4" />,
-                      });
-                    }
-                  }
-                }}
-                onClose={() => setScanMode('single')}
-              />
             </TabsContent>
 
             {/* Save for Later Mode */}
