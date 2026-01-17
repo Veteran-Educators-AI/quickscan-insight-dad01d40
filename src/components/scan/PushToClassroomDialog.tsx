@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Upload, Loader2, CheckCircle, AlertCircle, BookOpen, ArrowRight } from 'lucide-react';
+import { Upload, Loader2, CheckCircle, AlertCircle, BookOpen, ArrowRight, MessageSquare, Edit3 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { useGoogleClassroom } from '@/hooks/useGoogleClassroom';
 
@@ -22,6 +24,8 @@ interface GradeToSync {
   grade: number;
   maxPoints: number;
   percentage: number;
+  feedback?: string;
+  justification?: string;
 }
 
 interface PushToClassroomDialogProps {
@@ -44,9 +48,24 @@ export function PushToClassroomDialog({
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [autoReturn, setAutoReturn] = useState(false);
+  const [includeFeedback, setIncludeFeedback] = useState(true);
+  const [feedbackComments, setFeedbackComments] = useState<Record<string, string>>({});
   const [syncResults, setSyncResults] = useState<{ studentName: string; success: boolean; error?: string }[]>([]);
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [step, setStep] = useState<'preview' | 'syncing' | 'complete'>('preview');
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+
+  // Initialize feedback comments from grade justifications
+  useState(() => {
+    if (gradesToSync.length > 0) {
+      const initialComments: Record<string, string> = {};
+      gradesToSync.forEach((grade) => {
+        const key = `${grade.courseId}-${grade.submissionId}`;
+        initialComments[key] = grade.feedback || grade.justification || '';
+      });
+      setFeedbackComments(initialComments);
+    }
+  });
 
   // Check access when dialog opens
   useState(() => {
@@ -70,6 +89,8 @@ export function PushToClassroomDialog({
 
     for (let i = 0; i < gradesToSync.length; i++) {
       const grade = gradesToSync[i];
+      const feedbackKey = `${grade.courseId}-${grade.submissionId}`;
+      const feedback = includeFeedback ? feedbackComments[feedbackKey] : undefined;
       
       try {
         const success = await pushGradeToClassroom(
@@ -77,7 +98,8 @@ export function PushToClassroomDialog({
           grade.courseWorkId,
           grade.submissionId,
           grade.grade,
-          autoReturn
+          autoReturn,
+          feedback
         );
 
         results.push({
@@ -112,6 +134,20 @@ export function PushToClassroomDialog({
     }
 
     onSyncComplete?.(successCount, failCount);
+  };
+
+  const toggleCard = (key: string) => {
+    const newExpanded = new Set(expandedCards);
+    if (newExpanded.has(key)) {
+      newExpanded.delete(key);
+    } else {
+      newExpanded.add(key);
+    }
+    setExpandedCards(newExpanded);
+  };
+
+  const updateFeedback = (key: string, value: string) => {
+    setFeedbackComments(prev => ({ ...prev, [key]: value }));
   };
 
   const getGradeColor = (percentage: number) => {
@@ -160,51 +196,112 @@ export function PushToClassroomDialog({
               </p>
             </div>
 
-            <ScrollArea className="h-[250px] border rounded-lg p-3">
+            <ScrollArea className="h-[300px] border rounded-lg p-3">
               <div className="space-y-2">
-                {gradesToSync.map((grade, index) => (
-                  <Card key={index} className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">{grade.studentName}</p>
-                        {grade.studentEmail && (
-                          <p className="text-xs text-muted-foreground">{grade.studentEmail}</p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-bold ${getGradeColor(grade.percentage)}`}>
-                          {grade.grade}/{grade.maxPoints}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {grade.percentage.toFixed(0)}%
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
+                {gradesToSync.map((grade, index) => {
+                  const feedbackKey = `${grade.courseId}-${grade.submissionId}`;
+                  const isExpanded = expandedCards.has(feedbackKey);
+                  const currentFeedback = feedbackComments[feedbackKey] || '';
+                  
+                  return (
+                    <Collapsible key={index} open={isExpanded} onOpenChange={() => toggleCard(feedbackKey)}>
+                      <Card className="p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{grade.studentName}</p>
+                            {grade.studentEmail && (
+                              <p className="text-xs text-muted-foreground">{grade.studentEmail}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className={`font-bold ${getGradeColor(grade.percentage)}`}>
+                                {grade.grade}/{grade.maxPoints}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {grade.percentage.toFixed(0)}%
+                              </p>
+                            </div>
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <Edit3 className={`h-4 w-4 transition-colors ${currentFeedback ? 'text-primary' : 'text-muted-foreground'}`} />
+                              </Button>
+                            </CollapsibleTrigger>
+                          </div>
+                        </div>
+                        
+                        <CollapsibleContent className="mt-3 pt-3 border-t">
+                          <div className="space-y-2">
+                            <Label className="text-xs flex items-center gap-1">
+                              <MessageSquare className="h-3 w-3" />
+                              Feedback Comment
+                            </Label>
+                            <Textarea
+                              placeholder="Add personalized feedback for this student..."
+                              value={currentFeedback}
+                              onChange={(e) => updateFeedback(feedbackKey, e.target.value)}
+                              rows={3}
+                              className="text-sm resize-none"
+                            />
+                            {grade.justification && !currentFeedback && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs"
+                                onClick={() => updateFeedback(feedbackKey, grade.justification || '')}
+                              >
+                                Use AI Justification
+                              </Button>
+                            )}
+                          </div>
+                        </CollapsibleContent>
+                      </Card>
+                    </Collapsible>
+                  );
+                })}
               </div>
             </ScrollArea>
 
             <Separator />
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="auto-return">Auto-return to students</Label>
-                <p className="text-xs text-muted-foreground">
-                  Immediately return graded work to students
-                </p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="include-feedback" className="flex items-center gap-1">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    Include feedback comments
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Add written feedback as private comments
+                  </p>
+                </div>
+                <Switch
+                  id="include-feedback"
+                  checked={includeFeedback}
+                  onCheckedChange={setIncludeFeedback}
+                />
               </div>
-              <Switch
-                id="auto-return"
-                checked={autoReturn}
-                onCheckedChange={setAutoReturn}
-              />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="auto-return">Auto-return to students</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Immediately return graded work to students
+                  </p>
+                </div>
+                <Switch
+                  id="auto-return"
+                  checked={autoReturn}
+                  onCheckedChange={setAutoReturn}
+                />
+              </div>
             </div>
 
             <Alert>
               <BookOpen className="h-4 w-4" />
               <AlertDescription>
-                Grades will be synced as the assigned grade in Google Classroom. 
+                Grades will be synced as the assigned grade in Google Classroom.
+                {includeFeedback && ' Feedback will be added as private comments.'}
                 {autoReturn 
                   ? ' Students will be notified immediately.' 
                   : ' You can return them to students later from Classroom.'}
