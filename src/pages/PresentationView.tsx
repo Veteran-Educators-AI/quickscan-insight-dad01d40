@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -72,6 +72,7 @@ export default function PresentationView() {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [slideImages, setSlideImages] = useState<Record<number, string>>({});
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   // Load presentation from sessionStorage
   useEffect(() => {
@@ -161,6 +162,10 @@ export default function PresentationView() {
           break;
         case 'f':
           toggleFullscreen();
+          break;
+        case 't':
+        case 'T':
+          setShowSidebar(prev => !prev);
           break;
       }
     };
@@ -259,6 +264,20 @@ export default function PresentationView() {
           <Button
             variant="ghost"
             size="icon"
+            onClick={() => setShowSidebar(prev => !prev)}
+            className={cn(
+              "h-10 w-10 rounded-full transition-all",
+              showSidebar 
+                ? `${colors.accent} bg-white/10` 
+                : "text-white/60 hover:text-white hover:bg-white/10"
+            )}
+            title="Toggle thumbnails (T)"
+          >
+            <LayoutGrid className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => navigate(-1)}
             className="text-white/60 hover:text-white hover:bg-white/10 h-10 w-10 rounded-full"
           >
@@ -282,6 +301,104 @@ export default function PresentationView() {
           </Button>
         </div>
       </header>
+
+      {/* Slide Thumbnail Sidebar */}
+      <AnimatePresence>
+        {showSidebar && (
+          <motion.aside
+            initial={{ x: -320, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -320, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="fixed left-0 top-0 bottom-0 w-72 z-30 bg-black/80 backdrop-blur-xl border-r border-white/10"
+          >
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <h3 className={cn("font-semibold text-sm tracking-wide", colors.accent)}>
+                Slides
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSidebar(false)}
+                className="text-white/60 hover:text-white hover:bg-white/10 h-8 w-8 rounded-full"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="overflow-y-auto h-[calc(100vh-60px)] p-3 space-y-3">
+              {presentation.slides.map((s, idx) => (
+                <motion.button
+                  key={s.id}
+                  onClick={() => {
+                    goToSlide(idx);
+                    setShowSidebar(false);
+                  }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={cn(
+                    "w-full rounded-lg overflow-hidden transition-all duration-200 text-left",
+                    "border-2",
+                    idx === currentSlide
+                      ? `${colors.accent.replace('text-', 'border-')} ring-2 ${colors.accent.replace('text-', 'ring-').replace('-400', '-400/30')}`
+                      : "border-white/10 hover:border-white/30"
+                  )}
+                >
+                  {/* Thumbnail preview */}
+                  <div 
+                    className={cn(
+                      "aspect-video w-full p-3 flex items-center justify-center",
+                      `bg-gradient-to-br ${colors.bg}`
+                    )}
+                    style={{
+                      background: colors.glow ? `linear-gradient(135deg, ${colors.glow.replace('0.15', '0.3')}, transparent)` : undefined,
+                    }}
+                  >
+                    {slideImages[idx] ? (
+                      <img 
+                        src={slideImages[idx]} 
+                        alt={s.title}
+                        className="h-full w-full object-contain rounded"
+                      />
+                    ) : s.icon && slideIcons[s.icon] ? (
+                      <div className={cn("h-8 w-8", colors.accent)}>
+                        {(() => {
+                          const Icon = slideIcons[s.icon!];
+                          return <Icon className="h-full w-full" />;
+                        })()}
+                      </div>
+                    ) : (
+                      <span className={cn("text-2xl font-bold", colors.accent)}>
+                        {idx + 1}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Slide info */}
+                  <div className="p-2.5 bg-white/5">
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "flex-shrink-0 w-5 h-5 rounded text-xs font-bold flex items-center justify-center",
+                        idx === currentSlide
+                          ? `${colors.accent.replace('text-', 'bg-')} text-black`
+                          : "bg-white/20 text-white/70"
+                      )}>
+                        {idx + 1}
+                      </span>
+                      <p className="text-white text-xs font-medium truncate flex-1">
+                        {s.title}
+                      </p>
+                    </div>
+                    <p className="text-white/40 text-[10px] uppercase tracking-wide mt-1 ml-7">
+                      {s.type}
+                    </p>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
 
       {/* Navigation arrows */}
       <button
