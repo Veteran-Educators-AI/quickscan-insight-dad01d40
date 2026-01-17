@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown, Cloud, CloudOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown, Cloud, CloudOff, Library, ImagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
+import { SlideImageGenerator, GeneratedImageData } from '@/components/presentation/SlideImageGenerator';
 
 interface PresentationSlide {
   id: string;
@@ -26,6 +27,7 @@ interface PresentationSlide {
   };
   icon?: 'lightbulb' | 'book' | 'question' | 'award' | 'sparkles';
   generatedImage?: string;
+  customImage?: GeneratedImageData;
 }
 
 interface VisualTheme {
@@ -84,6 +86,7 @@ export default function PresentationView() {
   const [savedToCloud, setSavedToCloud] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showImageGenerator, setShowImageGenerator] = useState(false);
 
   // Load presentation from sessionStorage
   useEffect(() => {
@@ -305,6 +308,23 @@ export default function PresentationView() {
     setEditingField(null);
   };
 
+  // Handle custom image generation for current slide
+  const handleImageGenerated = (imageData: GeneratedImageData) => {
+    if (!presentation) return;
+    const updatedSlides = [...presentation.slides];
+    if (imageData.url) {
+      updatedSlides[currentSlide] = { ...updatedSlides[currentSlide], customImage: imageData };
+    } else {
+      // Remove image
+      const { customImage, ...rest } = updatedSlides[currentSlide];
+      updatedSlides[currentSlide] = rest;
+    }
+    const updatedPresentation = { ...presentation, slides: updatedSlides };
+    setPresentation(updatedPresentation);
+    sessionStorage.setItem('nycologic_presentation', JSON.stringify(updatedPresentation));
+    toast.success(imageData.url ? 'Image added to slide!' : 'Image removed from slide');
+  };
+
   // Auto-save to database when presentation changes (debounced)
   useEffect(() => {
     if (!presentation || !user || !savedToCloud) return;
@@ -479,6 +499,30 @@ export default function PresentationView() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Presentation Library Button */}
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/presentation/library')}
+            className="h-10 px-4 rounded-full text-white/60 hover:text-white hover:bg-white/10 gap-2"
+            title="Presentation Library"
+          >
+            <Library className="h-4 w-4" />
+            <span className="hidden md:inline text-sm">Library</span>
+          </Button>
+          
+          {/* Generate Image Button (Edit mode only) */}
+          {isEditing && (
+            <Button
+              variant="ghost"
+              onClick={() => setShowImageGenerator(true)}
+              className="h-10 px-4 rounded-full text-white/60 hover:text-white hover:bg-white/10 gap-2"
+              title="Generate image for this slide"
+            >
+              <ImagePlus className="h-4 w-4" />
+              <span className="hidden md:inline text-sm">Add Image</span>
+            </Button>
+          )}
+          
           {/* Save to Cloud Button */}
           <Button
             variant="ghost"
@@ -753,9 +797,34 @@ export default function PresentationView() {
           >
             {/* Slide content based on type */}
             {slide.type === 'title' ? (
-              <div className="text-center space-y-8">
-                {/* AI Generated image */}
-                {slideImages[currentSlide] && (
+              <div className="text-center space-y-8 relative">
+                {/* Custom Generated Image (positioned by user) */}
+                {slide.customImage?.url && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    style={{
+                      position: 'absolute',
+                      left: `${slide.customImage.position.x}%`,
+                      top: `${slide.customImage.position.y}%`,
+                      transform: `translate(-50%, -50%) rotate(${slide.customImage.rotation}deg)`,
+                      width: `${slide.customImage.size.width}px`,
+                      height: `${slide.customImage.size.height}px`,
+                      zIndex: 10,
+                    }}
+                    className="pointer-events-none"
+                  >
+                    <img 
+                      src={slide.customImage.url} 
+                      alt="Slide image"
+                      className="w-full h-full object-contain rounded-2xl shadow-2xl"
+                      style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.5))' }}
+                    />
+                  </motion.div>
+                )}
+                
+                {/* AI Auto-generated image (only show if no custom image) */}
+                {!slide.customImage?.url && slideImages[currentSlide] && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -770,7 +839,7 @@ export default function PresentationView() {
                     />
                   </motion.div>
                 )}
-                {isGeneratingImages && !slideImages[currentSlide] && (
+                {isGeneratingImages && !slideImages[currentSlide] && !slide.customImage?.url && (
                   <div className="h-40 lg:h-56 flex items-center justify-center">
                     <Loader2 className={cn("h-8 w-8 animate-spin", colors.accent)} />
                   </div>
@@ -1198,6 +1267,16 @@ export default function PresentationView() {
           {currentSlide + 1} of {totalSlides}
         </p>
       </footer>
+
+      {/* Slide Image Generator Dialog */}
+      <SlideImageGenerator
+        open={showImageGenerator}
+        onOpenChange={setShowImageGenerator}
+        onImageGenerated={handleImageGenerated}
+        currentImage={slide?.customImage || null}
+        slideTitle={slide?.title || ''}
+        topic={presentation?.topic || ''}
+      />
     </div>
   );
 }
