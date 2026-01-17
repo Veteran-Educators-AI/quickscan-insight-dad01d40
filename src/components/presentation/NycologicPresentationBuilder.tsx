@@ -179,6 +179,7 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
         subtitle: presentation.subtitle || '',
         topic: presentation.topic,
         slides: presentation.slides as any,
+        visual_theme: presentation.visualTheme as any,
       }]);
 
       if (error) throw error;
