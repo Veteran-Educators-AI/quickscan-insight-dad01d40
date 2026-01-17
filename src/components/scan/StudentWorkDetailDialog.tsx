@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,10 +21,10 @@ import {
   AlertTriangle,
   Lightbulb,
   FileText,
-  X
+  X,
+  Move
 } from 'lucide-react';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
-
 interface RubricScore {
   criterion: string;
   score: number;
@@ -66,6 +66,12 @@ export function StudentWorkDetailDialog({
   const [rotation, setRotation] = useState(0);
   const [showImageFullscreen, setShowImageFullscreen] = useState(false);
   const { gradeFloor, gradeFloorWithEffort, calculateGrade } = useGradeFloorSettings();
+  
+  // Pan state for when zoomed
+  const [isPanning, setIsPanning] = useState(false);
+  const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
+  const [startPan, setStartPan] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));
@@ -73,7 +79,59 @@ export function StudentWorkDetailDialog({
   const resetView = () => {
     setZoom(1);
     setRotation(0);
+    setPanPosition({ x: 0, y: 0 });
   };
+  
+  // Pan handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (zoom <= 1) return;
+    e.preventDefault();
+    setIsPanning(true);
+    setStartPan({ x: e.clientX - panPosition.x, y: e.clientY - panPosition.y });
+  }, [zoom, panPosition]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning || zoom <= 1) return;
+    e.preventDefault();
+    setPanPosition({
+      x: e.clientX - startPan.x,
+      y: e.clientY - startPan.y,
+    });
+  }, [isPanning, zoom, startPan]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      handleZoomIn();
+    } else {
+      handleZoomOut();
+    }
+  }, []);
+
+  // Touch handlers for mobile
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (zoom <= 1 || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    setIsPanning(true);
+    setStartPan({ x: touch.clientX - panPosition.x, y: touch.clientY - panPosition.y });
+  }, [zoom, panPosition]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isPanning || zoom <= 1 || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    setPanPosition({
+      x: touch.clientX - startPan.x,
+      y: touch.clientY - startPan.y,
+    });
+  }, [isPanning, zoom, startPan]);
+
+  const handleTouchEnd = useCallback(() => {
+    setIsPanning(false);
+  }, []);
 
   const getScoreColor = (percentage: number) => {
     if (percentage >= 80) return 'text-green-600';
@@ -151,6 +209,11 @@ export function StudentWorkDetailDialog({
                   <Button variant="outline" size="icon" onClick={handleRotate}>
                     <RotateCw className="h-4 w-4" />
                   </Button>
+                  {zoom > 1 && (
+                    <Badge variant="secondary" className="gap-1 text-xs">
+                      <Move className="h-3 w-3" /> Drag to pan
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" onClick={resetView}>
@@ -168,20 +231,38 @@ export function StudentWorkDetailDialog({
                 </div>
               </div>
 
-              {/* Zoomable Image */}
-              <div className="flex-1 overflow-auto p-4">
+              {/* Zoomable Image with Pan */}
+              <div 
+                ref={containerRef}
+                className={`flex-1 overflow-hidden p-4 ${
+                  zoom > 1 ? 'cursor-grab' : 'cursor-zoom-in'
+                } ${isPanning ? 'cursor-grabbing' : ''}`}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onWheel={handleWheel}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
                 {imageUrl ? (
-                  <div className="flex items-center justify-center min-h-full">
+                  <div 
+                    className="flex items-center justify-center min-h-full select-none"
+                    style={{
+                      transform: zoom > 1 ? `translate(${panPosition.x}px, ${panPosition.y}px)` : undefined,
+                    }}
+                  >
                     <img
                       src={imageUrl}
                       alt={`${studentName}'s work`}
-                      className="transition-transform duration-200 cursor-grab active:cursor-grabbing rounded-lg shadow-lg"
+                      className="transition-transform duration-200 rounded-lg shadow-lg pointer-events-none"
                       style={{
                         transform: `scale(${zoom}) rotate(${rotation}deg)`,
                         transformOrigin: 'center center',
                         maxWidth: zoom === 1 ? '100%' : 'none',
                       }}
-                      onClick={() => setShowImageFullscreen(true)}
+                      draggable={false}
                     />
                   </div>
                 ) : (
