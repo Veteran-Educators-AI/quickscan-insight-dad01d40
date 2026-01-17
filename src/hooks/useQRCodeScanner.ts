@@ -48,28 +48,29 @@ export function useQRCodeScanner() {
             ctx.drawImage(img, 0, 0);
             
             // Calculate region sizes based on image dimensions
-            const cornerSize = Math.max(150, Math.min(400, Math.floor(img.width / 3)));
-            const edgeWidth = Math.max(100, Math.min(300, Math.floor(img.width / 4)));
+            // QR codes are now larger (72-80px) with borders, so look for bigger regions
+            const cornerSize = Math.max(200, Math.min(500, Math.floor(img.width / 2.5)));
+            const edgeWidth = Math.max(150, Math.min(400, Math.floor(img.width / 3)));
             
             // Try scanning different regions of the image - QR codes can be anywhere
-            // Order matters: most common locations first
+            // Order matters: most common locations first (optimized for new layout)
             const regions = [
-              // Top-left corner (most common for student QR)
-              { x: 0, y: 0, w: cornerSize, h: cornerSize },
-              // Top-right corner
+              // Top-right corner (PRIMARY - new student QR location)
               { x: Math.max(0, img.width - cornerSize), y: 0, w: cornerSize, h: cornerSize },
-              // Bottom-right corner (diagnostic worksheet QR location)
+              // Top-left corner (question QRs are on left side)
+              { x: 0, y: 0, w: cornerSize, h: cornerSize },
+              // Left edge full height (for question QRs)
+              { x: 0, y: 0, w: edgeWidth, h: img.height },
+              // Top edge full width (header area)
+              { x: 0, y: 0, w: img.width, h: Math.min(300, img.height / 3) },
+              // Bottom-right corner (legacy support)
               { x: Math.max(0, img.width - cornerSize), y: Math.max(0, img.height - cornerSize), w: cornerSize, h: cornerSize },
               // Bottom-left corner
               { x: 0, y: Math.max(0, img.height - cornerSize), w: cornerSize, h: cornerSize },
-              // Top edge full width (name/header area)
-              { x: 0, y: 0, w: img.width, h: Math.min(200, img.height / 4) },
-              // Right edge (for diagnostic worksheets)
+              // Right edge full height
               { x: Math.max(0, img.width - edgeWidth), y: 0, w: edgeWidth, h: img.height },
-              // Left edge (for worksheet question QRs)
-              { x: 0, y: 0, w: edgeWidth, h: img.height },
-              // Bottom edge
-              { x: 0, y: Math.max(0, img.height - 200), w: img.width, h: Math.min(200, img.height / 4) },
+              // Upper half of image (most QRs are in top half)
+              { x: 0, y: 0, w: img.width, h: Math.floor(img.height / 2) },
               // Center region (sometimes QR is in middle)
               { x: Math.floor(img.width / 4), y: Math.floor(img.height / 4), w: Math.floor(img.width / 2), h: Math.floor(img.height / 2) },
               // Full image (fallback - scan everything)

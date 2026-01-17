@@ -70,30 +70,33 @@ export function PrintableWorksheet({
         boxSizing: 'border-box',
       }}
     >
-      {/* Header with Student QR Code */}
+      {/* Header with Student QR Code - QR in top-right corner for optimal scanning */}
       <div className="flex items-start justify-between border-b-2 border-black pb-4 mb-6">
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-          {/* Student Identification QR Code */}
-          {showQRCodes && (
-            <div style={{ flexShrink: 0, textAlign: 'center' }}>
-              <StudentOnlyQRCode studentId={student.id} size={64} />
-              <p style={{ fontSize: '0.65rem', color: '#666', marginTop: '0.25rem' }}>Student ID</p>
-            </div>
-          )}
-          <div>
-            <h1 className="text-2xl font-bold" style={{ margin: 0 }}>{assessmentName}</h1>
-            <div className="mt-2 text-lg">
-              <p style={{ margin: '0.25rem 0' }}><strong>Name:</strong> {student.first_name} {student.last_name}</p>
-              {student.student_id && (
-                <p style={{ margin: '0.25rem 0' }}><strong>Student ID:</strong> {student.student_id}</p>
-              )}
-            </div>
+        <div>
+          <h1 className="text-2xl font-bold" style={{ margin: 0 }}>{assessmentName}</h1>
+          <div className="mt-2 text-lg">
+            <p style={{ margin: '0.25rem 0' }}><strong>Name:</strong> {student.first_name} {student.last_name}</p>
+            {student.student_id && (
+              <p style={{ margin: '0.25rem 0' }}><strong>Student ID:</strong> {student.student_id}</p>
+            )}
+          </div>
+          <div className="text-sm mt-2" style={{ color: '#666' }}>
+            <p style={{ margin: 0 }}>Date: _______________  Period: ____________</p>
           </div>
         </div>
-        <div className="text-right text-sm" style={{ color: '#666' }}>
-          <p style={{ margin: 0 }}>Date: _______________</p>
-          <p style={{ margin: '0.25rem 0 0 0' }}>Period: ____________</p>
-        </div>
+        {/* Student Identification QR Code - Top Right Corner for reliable scanning */}
+        {showQRCodes && (
+          <div style={{ 
+            flexShrink: 0, 
+            textAlign: 'center',
+            marginLeft: '1rem',
+          }}>
+            <StudentOnlyQRCode studentId={student.id} size={80} />
+            <p style={{ fontSize: '0.65rem', color: '#666', marginTop: '0.25rem', fontWeight: 'bold' }}>
+              SCAN FOR ID
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Student Level Indicator */}
@@ -199,15 +202,29 @@ export function PrintableWorksheet({
             }}
           >
             <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              {/* QR Code */}
+              {/* QR Code - Left side with clear margin for scanning */}
               {showQRCodes && (
-                <div style={{ flexShrink: 0 }}>
+                <div style={{ 
+                  flexShrink: 0, 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center',
+                  marginRight: '0.5rem',
+                }}>
                   <StudentQRCode 
                     studentId={student.id} 
                     questionId={question.id} 
-                    size={56}
+                    size={72}
                   />
-                  <p style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem', textAlign: 'center' }}>Q{index + 1}</p>
+                  <p style={{ 
+                    fontSize: '0.7rem', 
+                    color: '#333', 
+                    marginTop: '0.25rem', 
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                  }}>
+                    Q{index + 1}
+                  </p>
                 </div>
               )}
 
@@ -215,7 +232,7 @@ export function PrintableWorksheet({
               <div style={{ 
                 flex: 1, 
                 minWidth: 0,
-                maxWidth: showQRCodes ? 'calc(100% - 70px)' : '100%',
+                maxWidth: showQRCodes ? 'calc(100% - 100px)' : '100%',
                 overflow: 'hidden',
                 wordWrap: 'break-word',
                 overflowWrap: 'break-word',
