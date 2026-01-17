@@ -84,12 +84,18 @@ export function TWAINBridgePanel({ onImagesScanned, className }: TWAINBridgePane
   };
 
   const downloadCompanionApp = () => {
-    // Link to companion app download (placeholder)
-    toast.info('Companion app download coming soon! For now, you can use the file import option.');
+    // Open GitHub releases page for the scanner bridge
+    window.open('https://github.com/scangenius/scanner-bridge/releases', '_blank');
+    toast.info('Download the scanner-bridge folder and run install.sh (Mac/Linux) or install.bat (Windows)');
+  };
+
+  const copyDockerCommand = () => {
+    navigator.clipboard.writeText('docker run -d --privileged -p 8765:8765 -v /dev/bus/usb:/dev/bus/usb --name scanner-bridge scangenius/scanner-bridge');
+    toast.success('Docker command copied to clipboard');
   };
 
   const copyConnectionCommand = () => {
-    navigator.clipboard.writeText('npx scangenius-bridge');
+    navigator.clipboard.writeText('cd scanner-bridge && docker-compose up -d');
     toast.success('Command copied to clipboard');
   };
 
@@ -140,21 +146,44 @@ export function TWAINBridgePanel({ onImagesScanned, className }: TWAINBridgePane
               <>
                 <Alert>
                   <Info className="h-4 w-4" />
-                  <AlertTitle>Companion App Required</AlertTitle>
+                  <AlertTitle>Scanner Bridge Setup (Docker)</AlertTitle>
                   <AlertDescription className="space-y-3 mt-2">
                     <p>
-                      To scan directly from your computer's scanner, you need to run our 
-                      lightweight companion app. It bridges your scanner to this web app.
+                      Run our Docker-based scanner bridge to connect your TWAIN/SANE scanner.
+                      Requires Docker Desktop installed on your computer.
                     </p>
+                    
+                    <div className="bg-muted p-3 rounded-md space-y-2">
+                      <p className="text-xs font-medium">Quick Start:</p>
+                      <ol className="text-xs space-y-1 list-decimal list-inside">
+                        <li>Download the scanner-bridge folder from GitHub</li>
+                        <li>Open terminal/command prompt in that folder</li>
+                        <li>Run: <code className="bg-background px-1 rounded">docker-compose up -d</code></li>
+                        <li>Click "Connect to Bridge" below</li>
+                      </ol>
+                    </div>
+                    
                     <div className="flex flex-col sm:flex-row gap-2">
                       <Button onClick={downloadCompanionApp} className="flex-1">
                         <Download className="h-4 w-4 mr-2" />
-                        Download App
+                        View on GitHub
                       </Button>
-                      <Button variant="outline" onClick={copyConnectionCommand} className="flex-1">
+                      <Button variant="outline" onClick={copyDockerCommand} className="flex-1">
                         <Copy className="h-4 w-4 mr-2" />
-                        Copy NPX Command
+                        Copy Docker Command
                       </Button>
+                    </div>
+                    
+                    <div className="text-xs text-muted-foreground pt-2 border-t">
+                      <p><strong>Alternative:</strong> Copy & run in terminal:</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <code className="flex-1 bg-background p-2 rounded text-xs overflow-x-auto">
+                          docker-compose up -d
+                        </code>
+                        <Button variant="ghost" size="sm" onClick={copyConnectionCommand}>
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   </AlertDescription>
                 </Alert>

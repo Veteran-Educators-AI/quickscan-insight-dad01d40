@@ -1,0 +1,19 @@
+{
+  "name": "scanner-bridge",
+  "version": "1.0.0",
+  "description": "TWAIN/SANE Scanner Bridge for Web Applications",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0",
+    "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "ScanGenius",
+  "license": "MIT"
+}
