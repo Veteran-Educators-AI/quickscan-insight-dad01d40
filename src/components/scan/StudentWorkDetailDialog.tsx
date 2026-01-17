@@ -25,7 +25,8 @@ import {
   Move
 } from 'lucide-react';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
-import { MisconceptionComparison } from './MisconceptionComparison';
+import { MisconceptionComparison, extractErrorRegions } from './MisconceptionComparison';
+import { ImageErrorOverlay } from './ImageErrorOverlay';
 interface RubricScore {
   criterion: string;
   score: number;
@@ -66,7 +67,11 @@ export function StudentWorkDetailDialog({
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [showImageFullscreen, setShowImageFullscreen] = useState(false);
+  const [highlightedError, setHighlightedError] = useState<number | null>(null);
   const { gradeFloor, gradeFloorWithEffort, calculateGrade } = useGradeFloorSettings();
+  
+  // Extract error regions from misconceptions for overlay
+  const errorRegions = result?.misconceptions ? extractErrorRegions(result.misconceptions) : [];
   
   // Pan state for when zoomed
   const [isPanning, setIsPanning] = useState(false);
@@ -249,22 +254,36 @@ export function StudentWorkDetailDialog({
               >
                 {imageUrl ? (
                   <div 
-                    className="flex items-center justify-center min-h-full select-none"
+                    className="flex items-center justify-center min-h-full select-none relative"
                     style={{
                       transform: zoom > 1 ? `translate(${panPosition.x}px, ${panPosition.y}px)` : undefined,
                     }}
                   >
-                    <img
-                      src={imageUrl}
-                      alt={`${studentName}'s work`}
-                      className="transition-transform duration-200 rounded-lg shadow-lg pointer-events-none"
-                      style={{
-                        transform: `scale(${zoom}) rotate(${rotation}deg)`,
-                        transformOrigin: 'center center',
-                        maxWidth: zoom === 1 ? '100%' : 'none',
-                      }}
-                      draggable={false}
-                    />
+                    {/* Image container with relative positioning for overlay */}
+                    <div className="relative inline-block">
+                      <img
+                        src={imageUrl}
+                        alt={`${studentName}'s work`}
+                        className="transition-transform duration-200 rounded-lg shadow-lg pointer-events-none"
+                        style={{
+                          transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                          transformOrigin: 'center center',
+                          maxWidth: zoom === 1 ? '100%' : 'none',
+                        }}
+                        draggable={false}
+                      />
+                      {/* Error region overlay */}
+                      {errorRegions.length > 0 && (
+                        <ImageErrorOverlay
+                          errorRegions={errorRegions}
+                          highlightedError={highlightedError}
+                          onErrorHover={setHighlightedError}
+                          onErrorClick={(id) => setHighlightedError(id === highlightedError ? null : id)}
+                          zoom={zoom}
+                          rotation={rotation}
+                        />
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -335,9 +354,14 @@ export function StudentWorkDetailDialog({
                   </Card>
                 )}
 
-                {/* Misconceptions - Side-by-side comparison */}
+                {/* Misconceptions - Side-by-side comparison with image highlighting */}
                 {result.misconceptions.length > 0 && (
-                  <MisconceptionComparison misconceptions={result.misconceptions} />
+                  <MisconceptionComparison 
+                    misconceptions={result.misconceptions}
+                    highlightedError={highlightedError}
+                    onErrorHover={setHighlightedError}
+                    onErrorClick={(id) => setHighlightedError(id === highlightedError ? null : id)}
+                  />
                 )}
 
                 {/* Feedback */}
