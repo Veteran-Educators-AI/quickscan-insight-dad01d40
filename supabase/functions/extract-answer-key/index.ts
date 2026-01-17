@@ -157,10 +157,12 @@ serve(async (req) => {
 
     const authenticatedUserId = user.id;
 
-    const { imageBase64, teacherId } = await req.json();
+    const { imageBase64, imageUrl, teacherId, mode = 'simple' } = await req.json();
     
-    if (!imageBase64) {
-      throw new Error('Image data is required');
+    // Support both base64 and URL formats
+    const imageData = imageBase64 || imageUrl;
+    if (!imageData) {
+      throw new Error('Image data is required (imageBase64 or imageUrl)');
     }
 
     // Use authenticated user ID, fall back to provided teacherId
@@ -174,7 +176,7 @@ serve(async (req) => {
 
     // Check rate limit
     if (supabase && effectiveTeacherId) {
-      const rateLimit = await checkRateLimit(supabase, teacherId);
+      const rateLimit = await checkRateLimit(supabase, effectiveTeacherId);
       if (!rateLimit.allowed) {
         return new Response(JSON.stringify({ 
           success: false, 
@@ -187,9 +189,37 @@ serve(async (req) => {
       }
     }
 
-    console.log('Extracting answer from student work image...');
+    console.log(`Extracting answer key (mode: ${mode})...`);
 
-    const prompt = `You are analyzing an image of correct student work (an answer key). Your task is to extract the complete solution and answer.
+    // Different prompts based on mode
+    let prompt: string;
+    
+    if (mode === 'worksheet') {
+      prompt = `Analyze this teacher answer key worksheet image and extract structured information.
+
+Return a JSON object with this exact structure:
+{
+  "questions": [
+    {
+      "questionNumber": 1,
+      "questionText": "The question or problem text if visible",
+      "correctAnswer": "The complete correct answer with all work shown",
+      "partialCreditGuidelines": "Guidelines for partial credit (e.g., '50% for correct setup but wrong calculation')",
+      "commonMistakes": ["mistake 1", "mistake 2", "mistake 3"],
+      "points": 4
+    }
+  ]
+}
+
+Extract ALL visible questions with:
+1. Complete correct answers with all steps
+2. Any notes about partial credit or grading
+3. Common mistakes to watch for
+4. Point values if specified
+
+If information is not visible, make reasonable inferences. Return ONLY the JSON object, no other text.`;
+    } else {
+      prompt = `You are analyzing an image of correct student work (an answer key). Your task is to extract the complete solution and answer.
 
 Extract:
 1. The final answer (numerical value, expression, or statement)
@@ -203,13 +233,54 @@ Format your response as:
 [numbered list of steps/work shown]
 
 Be precise and include all mathematical notation. If there are diagrams, describe them briefly.`;
+    }
 
-    // Clean base64 if it has data URL prefix
-    const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+    // Prepare image content - support both base64 and URL
+    let imageContent: { type: string; image_url: { url: string } };
+    if (imageUrl) {
+      imageContent = { type: 'image_url', image_url: { url: imageUrl } };
+    } else {
+      const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+      imageContent = { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${cleanBase64}` } };
+    }
 
-    const extractedText = await callLovableAI(prompt, cleanBase64, supabase, teacherId);
+    const extractedText = await callLovableAI(prompt, imageContent.image_url.url.replace(/^data:image\/[a-z]+;base64,/, ''), supabase, effectiveTeacherId);
 
     console.log('Answer extraction complete');
+
+    // Parse response based on mode
+    if (mode === 'worksheet') {
+      try {
+        // Try to extract JSON from the response
+        const jsonMatch = extractedText.match(/\{[\s\S]*"questions"[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          return new Response(JSON.stringify({
+            success: true,
+            questions: parsed.questions || [],
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+      }
+      
+      // Fallback if parsing fails
+      return new Response(JSON.stringify({
+        success: true,
+        questions: [{
+          questionNumber: 1,
+          questionText: 'Extracted from answer key',
+          correctAnswer: extractedText.substring(0, 500),
+          partialCreditGuidelines: 'Award partial credit for correct approach',
+          commonMistakes: ['Calculation errors', 'Missing units', 'Incomplete work'],
+          points: 4,
+        }],
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     return new Response(JSON.stringify({
       success: true,
