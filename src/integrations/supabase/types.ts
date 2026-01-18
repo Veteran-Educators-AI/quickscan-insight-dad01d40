@@ -439,6 +439,45 @@ export type Database = {
           },
         ]
       }
+      beta_feedback: {
+        Row: {
+          created_at: string
+          description: string
+          email: string | null
+          feedback_type: string
+          id: string
+          page_url: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          email?: string | null
+          feedback_type: string
+          id?: string
+          page_url?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          email?: string | null
+          feedback_type?: string
+          id?: string
+          page_url?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       classes: {
         Row: {
           class_period: string | null
