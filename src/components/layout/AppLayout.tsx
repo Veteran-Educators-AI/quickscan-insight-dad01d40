@@ -13,7 +13,8 @@ import {
   LogOut,
   HelpCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  FolderOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -34,6 +35,7 @@ const navItems = [
   { href: '/classes', label: 'Classes', icon: Users },
   { href: '/questions', label: 'Assessment', icon: ClipboardList },
   { href: '/scan', label: 'Scan', icon: Camera },
+  { href: '/library', label: 'Library', icon: FolderOpen },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/help', label: 'Help', icon: HelpCircle },
   { href: '/settings', label: 'Settings', icon: Settings },
