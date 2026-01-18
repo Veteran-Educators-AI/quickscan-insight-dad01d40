@@ -220,9 +220,14 @@ export default function Dashboard() {
         {/* Header */}
         <div className="animate-fade-in flex items-start justify-between">
           <div>
-            <h1 className="font-display text-3xl font-bold text-foreground">
-              Welcome back!
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="font-display text-3xl font-bold text-foreground">
+                Welcome back!
+              </h1>
+              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded border border-amber-500/30">
+                Beta
+              </span>
+            </div>
             <p className="text-muted-foreground mt-1">
               Here's an overview of your geometry assessments.
             </p>
