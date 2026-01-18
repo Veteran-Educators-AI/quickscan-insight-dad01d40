@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Sparkles, Play, Save, Plus, Trash2, Check, GripVertical, Image, Wand2 } from 'lucide-react';
+import { Loader2, Sparkles, Play, Save, Plus, Trash2, Check, GripVertical, Image, Wand2, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
@@ -211,7 +211,10 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
     }
   }, [presentation, toast]);
 
-  // Visual theme options with colorful designs
+  // Preview mode state
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Visual theme options with colorful designs - include background hex colors for preview
   const visualThemes = [
     {
       id: 'neon-city',
@@ -221,6 +224,8 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
       accent: 'bg-pink-500',
       emoji: '🌆',
       pattern: 'radial-gradient(circle at 20% 80%, rgba(168, 85, 247, 0.4) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(236, 72, 153, 0.4) 0%, transparent 50%)',
+      bgHex: 'linear-gradient(135deg, #9333ea 0%, #ec4899 50%, #f97316 100%)',
+      accentHex: '#ec4899',
     },
     {
       id: 'ocean-wave',
@@ -230,6 +235,8 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
       accent: 'bg-cyan-400',
       emoji: '🌊',
       pattern: 'radial-gradient(circle at 30% 70%, rgba(34, 211, 238, 0.4) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(59, 130, 246, 0.4) 0%, transparent 50%)',
+      bgHex: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #4f46e5 100%)',
+      accentHex: '#22d3ee',
     },
     {
       id: 'sunset-glow',
@@ -239,6 +246,8 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
       accent: 'bg-amber-400',
       emoji: '🌅',
       pattern: 'radial-gradient(circle at 50% 100%, rgba(251, 191, 36, 0.4) 0%, transparent 50%), radial-gradient(circle at 50% 0%, rgba(244, 63, 94, 0.3) 0%, transparent 50%)',
+      bgHex: 'linear-gradient(135deg, #fbbf24 0%, #f97316 50%, #f43f5e 100%)',
+      accentHex: '#fbbf24',
     },
     {
       id: 'forest-zen',
@@ -248,6 +257,8 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
       accent: 'bg-emerald-400',
       emoji: '🌿',
       pattern: 'radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.4) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(20, 184, 166, 0.4) 0%, transparent 50%)',
+      bgHex: 'linear-gradient(135deg, #10b981 0%, #14b8a6 50%, #0891b2 100%)',
+      accentHex: '#34d399',
     },
     {
       id: 'galaxy-dreams',
@@ -257,6 +268,8 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
       accent: 'bg-violet-400',
       emoji: '✨',
       pattern: 'radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.5) 0%, transparent 40%), radial-gradient(circle at 90% 90%, rgba(192, 38, 211, 0.4) 0%, transparent 40%)',
+      bgHex: 'linear-gradient(135deg, #7c3aed 0%, #9333ea 50%, #d946ef 100%)',
+      accentHex: '#a78bfa',
     },
     {
       id: 'candy-pop',
@@ -266,8 +279,13 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
       accent: 'bg-rose-300',
       emoji: '🍭',
       pattern: 'radial-gradient(circle at 25% 25%, rgba(244, 114, 182, 0.4) 0%, transparent 40%), radial-gradient(circle at 75% 75%, rgba(251, 113, 133, 0.4) 0%, transparent 40%)',
+      bgHex: 'linear-gradient(135deg, #f472b6 0%, #fb7185 50%, #f87171 100%)',
+      accentHex: '#fda4af',
     },
   ];
+
+  // Get selected theme for preview
+  const selectedThemeData = visualThemes.find(t => t.id === visualTheme);
 
   const generatePresentation = async () => {
     if (!title.trim()) {
@@ -481,10 +499,94 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
             {/* Visual Theme Selection */}
             {!presentation && (
               <div className="space-y-3">
-                <Label className="text-base font-semibold flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-400" />
-                  Choose Your Visual Theme
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-amber-400" />
+                    Choose Your Visual Theme
+                  </Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPreview(!showPreview)}
+                    className="gap-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    {showPreview ? 'Hide Preview' : 'Preview Theme'}
+                  </Button>
+                </div>
+
+                {/* Theme Preview Panel */}
+                {showPreview && selectedThemeData && (
+                  <Card className="overflow-hidden border-2 border-primary/20">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <span>{selectedThemeData.emoji}</span>
+                        Preview: {selectedThemeData.name}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                      {/* Mini slide preview */}
+                      <div 
+                        className="aspect-video rounded-lg overflow-hidden shadow-xl relative"
+                        style={{ background: selectedThemeData.bgHex }}
+                      >
+                        {/* Pattern overlay */}
+                        <div 
+                          className="absolute inset-0 opacity-60"
+                          style={{ backgroundImage: selectedThemeData.pattern }}
+                        />
+                        
+                        {/* Animated particles */}
+                        <div className="absolute inset-0 overflow-hidden">
+                          {[...Array(5)].map((_, i) => (
+                            <div
+                              key={i}
+                              className="absolute w-2 h-2 rounded-full bg-white/40 animate-pulse"
+                              style={{
+                                left: `${15 + i * 18}%`,
+                                top: `${20 + (i % 3) * 25}%`,
+                                animationDelay: `${i * 0.2}s`,
+                              }}
+                            />
+                          ))}
+                        </div>
+
+                        {/* Sample slide content */}
+                        <div className="relative z-10 h-full flex flex-col items-center justify-center p-6 text-center">
+                          <img src={nyclogicLogo} alt="NYClogic" className="h-8 w-8 mb-3 drop-shadow-lg" />
+                          <h3 className="text-white text-lg font-bold drop-shadow-lg mb-2">
+                            {title || 'Your Presentation Title'}
+                          </h3>
+                          <p className="text-white/80 text-sm drop-shadow mb-4">
+                            {subject || 'Mathematics'}
+                          </p>
+                          <div 
+                            className="px-4 py-2 rounded-full text-white text-xs font-semibold shadow-lg"
+                            style={{ backgroundColor: selectedThemeData.accentHex }}
+                          >
+                            Sample Button
+                          </div>
+                        </div>
+
+                        {/* Bottom gradient */}
+                        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/40 to-transparent" />
+                        
+                        {/* Corner decoration */}
+                        <div 
+                          className="absolute top-0 right-0 w-24 h-24 opacity-30"
+                          style={{ 
+                            background: `radial-gradient(circle at 100% 0%, ${selectedThemeData.accentHex} 0%, transparent 70%)` 
+                          }}
+                        />
+                      </div>
+
+                      <p className="text-xs text-muted-foreground text-center mt-3">
+                        This is how your slides will look with the <strong>{selectedThemeData.name}</strong> theme
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {visualThemes.map((theme) => (
                     <button
