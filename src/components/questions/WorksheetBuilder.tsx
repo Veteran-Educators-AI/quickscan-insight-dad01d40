@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,9 @@ import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler'
 import { renderMathText, sanitizeForPDF, fixEncodingCorruption } from '@/lib/mathRenderer';
 import { MathSymbolPreview } from './MathSymbolPreview';
 import { CanvasDrawingTool } from './CanvasDrawingTool';
+import { AIImageReviewDialog } from './AIImageReviewDialog';
+import { ImageLibraryPicker } from './ImageLibraryPicker';
+import { useAIImageLibrary } from '@/hooks/useAIImageLibrary';
 import jsPDF from 'jspdf';
 import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
 // Shared assignments are now saved directly to database - no need for usePushToSisterApp
@@ -182,6 +185,11 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [pushDueDate, setPushDueDate] = useState('');
   const [isPushing, setIsPushing] = useState(false);
   // Push button now uses direct database insert - no hook needed
+  
+  // AI Image Review state
+  const [showImageReviewDialog, setShowImageReviewDialog] = useState(false);
+  const [imageSelectionQuestionNumber, setImageSelectionQuestionNumber] = useState<number | null>(null);
+  const { pendingCount, saveImageForReview, approvedImages } = useAIImageLibrary();
   
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -658,13 +666,22 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       if (error) throw error;
 
       if (data.results) {
-        // Update questions with generated images
+        // Update questions with generated images and save for review
         const finalQuestions = [...updatedQuestions];
         let successCount = 0;
         
         for (const result of data.results) {
           const questionIndex = finalQuestions.findIndex(q => q.questionNumber === result.questionNumber);
           if (questionIndex !== -1 && result.imageUrl) {
+            const question = finalQuestions[questionIndex];
+            
+            // Save image to library for teacher review
+            await saveImageForReview(result.imageUrl, question.imagePrompt || '', {
+              subject: selectedQuestions[0]?.subject || 'math',
+              topic: question.topic,
+              source: 'worksheet',
+            });
+            
             finalQuestions[questionIndex] = {
               ...finalQuestions[questionIndex],
               imageUrl: result.imageUrl,
@@ -681,8 +698,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         setImagesGenerated(true);
         
         toast({
-          title: 'Diagrams generated!',
-          description: `Successfully created ${successCount} of ${editablePrompts.length} diagram images.`,
+          title: 'Diagrams generated & saved for review!',
+          description: `${successCount} images created. Review them in your Image Library before using on worksheets.`,
         });
       }
     } catch (error) {
@@ -1871,6 +1888,30 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       <span>Small</span>
                       <span>Large</span>
                     </div>
+                    
+                    {/* Image Library & Review Button */}
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowImageReviewDialog(true)}
+                        className="flex-1 text-xs"
+                      >
+                        <Library className="h-3.5 w-3.5 mr-1" />
+                        Image Library
+                        {pendingCount > 0 && (
+                          <Badge variant="destructive" className="ml-1 h-4 px-1 text-[10px]">
+                            {pendingCount}
+                          </Badge>
+                        )}
+                      </Button>
+                    </div>
+                    {pendingCount > 0 && (
+                      <p className="text-xs text-amber-600 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {pendingCount} image{pendingCount > 1 ? 's' : ''} pending review
+                      </p>
+                    )}
                   </div>
                 )}
                 
@@ -2901,6 +2942,33 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         onOpenChange={setShowDrawingTool}
         onSaveDrawing={handleSaveDrawing}
         questionNumber={drawingQuestionNumber || undefined}
+      />
+
+      {/* AI Image Review Dialog */}
+      <AIImageReviewDialog
+        open={showImageReviewDialog}
+        onOpenChange={setShowImageReviewDialog}
+        selectionMode={imageSelectionQuestionNumber !== null}
+        onSelectImage={(imageUrl, imageId) => {
+          if (imageSelectionQuestionNumber !== null) {
+            // Replace the image for the selected question with approved library image
+            const updatedQuestions = compiledQuestions.map(q =>
+              q.questionNumber === imageSelectionQuestionNumber
+                ? { ...q, imageUrl }
+                : q
+            );
+            setCompiledQuestions(updatedQuestions);
+            setImageSelectionQuestionNumber(null);
+            toast({
+              title: 'Image applied!',
+              description: `Approved image added to question ${imageSelectionQuestionNumber}.`,
+            });
+          }
+        }}
+        topicFilter={imageSelectionQuestionNumber !== null 
+          ? compiledQuestions.find(q => q.questionNumber === imageSelectionQuestionNumber)?.topic
+          : undefined
+        }
       />
     </>
   );
