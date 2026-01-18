@@ -112,6 +112,14 @@ serve(async (req) => {
     // ========================================================================
     // SEND DATA TO SISTER APP
     // ========================================================================
+    // Ensure the payload includes the type field for grade data
+    const payloadWithType = {
+      type: 'grade' as const,
+      ...requestData,
+    };
+    
+    console.log('Sending payload to sister app:', JSON.stringify(payloadWithType));
+    
     // Make POST request to the sister app's endpoint with the grade data
     const response = await fetch(sisterAppEndpoint, {
       method: 'POST',
@@ -119,7 +127,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
         'x-api-key': sisterAppApiKey,  // Authenticate with the API key
       },
-      body: JSON.stringify(requestData),
+      body: JSON.stringify(payloadWithType),
     });
 
     // Read the response

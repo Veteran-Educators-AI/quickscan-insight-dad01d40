@@ -532,18 +532,23 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
                         </div>
                       )}
 
-                      {/* Student List - Clean Column Layout */}
+                      {/* Student List - Clean Column Layout with Zebra Striping */}
                       {group.students.length > 0 ? (
-                        <div className="divide-y divide-border/50">
-                          {group.students.map((item) => {
+                        <div className="divide-y divide-border/30">
+                          {group.students.map((item, index) => {
                             const grade = getEffectiveGrade(item.result);
                             const isSelected = isStudentSelected(group.level, item.id);
+                            const isEven = index % 2 === 0;
                             return (
                               <div
                                 key={item.id}
-                                className={`flex items-center gap-3 py-2 px-1 cursor-pointer transition-colors hover:bg-background/50 ${
-                                  isSelected ? 'bg-primary/5' : ''
-                                }`}
+                                className={`flex items-center gap-3 py-2.5 px-2 cursor-pointer transition-colors ${
+                                  isSelected 
+                                    ? 'bg-primary/10' 
+                                    : isEven 
+                                      ? 'bg-background/40' 
+                                      : 'bg-muted/30'
+                                } hover:bg-accent/50`}
                                 onClick={() => toggleStudentSelection(group.level, item.id)}
                               >
                                 <Checkbox
