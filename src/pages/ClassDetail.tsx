@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil, QrCode, BookOpen, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil, QrCode, BookOpen, ExternalLink, FileText, Database } from 'lucide-react';
+import { useStudentDataCoverage } from '@/hooks/useStudentDataCoverage';
 import { StudentOnlyQRCode } from '@/components/print/StudentOnlyQRCode';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,6 +55,7 @@ export default function ClassDetail() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   
   const availablePseudonyms = getAvailablePseudonyms();
+  const { coverage, totalAssignments, totalDataPoints, isLoading: coverageLoading } = useStudentDataCoverage(id);
 
   useEffect(() => {
     if (id) fetchClassData();
@@ -482,6 +484,38 @@ export default function ClassDetail() {
           </TabsList>
 
           <TabsContent value="students">
+            {/* Data Coverage Summary */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <Card className="p-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                  <Users className="h-4 w-4" />
+                  <span>Students</span>
+                </div>
+                <p className="text-2xl font-bold">{students.length}</p>
+              </Card>
+              <Card className="p-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                  <FileText className="h-4 w-4" />
+                  <span>Total Submissions</span>
+                </div>
+                <p className="text-2xl font-bold">{coverageLoading ? '...' : totalAssignments}</p>
+              </Card>
+              <Card className="p-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                  <Database className="h-4 w-4" />
+                  <span>Data Points</span>
+                </div>
+                <p className="text-2xl font-bold">{coverageLoading ? '...' : totalDataPoints}</p>
+              </Card>
+              <Card className="p-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                  <span className="text-xs">📧</span>
+                  <span>With Email</span>
+                </div>
+                <p className="text-2xl font-bold">{students.filter(s => s.email).length}</p>
+              </Card>
+            </div>
+
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -658,6 +692,18 @@ export default function ClassDetail() {
                     </TableHead>
                     <TableHead>Student ID</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <FileText className="h-3.5 w-3.5" />
+                        <span className="text-xs">Submissions</span>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Database className="h-3.5 w-3.5" />
+                        <span className="text-xs">Data Points</span>
+                      </div>
+                    </TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -709,8 +755,30 @@ export default function ClassDetail() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>—</TableCell>
-                      <TableCell>—</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {student.student_id || '—'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {student.email || '—'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {coverageLoading ? (
+                          <span className="text-muted-foreground">...</span>
+                        ) : (
+                          <span className={`font-medium ${(coverage.get(student.id)?.assignmentsSubmitted || 0) > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
+                            {coverage.get(student.id)?.assignmentsSubmitted || 0}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {coverageLoading ? (
+                          <span className="text-muted-foreground">...</span>
+                        ) : (
+                          <span className={`font-medium ${(coverage.get(student.id)?.totalDataPoints || 0) > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
+                            {coverage.get(student.id)?.totalDataPoints || 0}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
