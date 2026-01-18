@@ -86,6 +86,8 @@ export interface BatchItem {
   continuationPages?: string[]; // IDs of pages that are continuations of this paper
   // Handwriting similarity info
   handwritingSimilarity?: HandwritingSimilarity;
+  // Flag when a continuation is converted to separate paper for individual grading
+  wasConvertedFromContinuation?: boolean;
 }
 
 export interface BatchSummary {
@@ -113,6 +115,8 @@ interface UseBatchAnalysisReturn {
   groupPagesByStudent: () => { studentsGrouped: number; pagesLinked: number };
   linkContinuation: (continuationId: string, primaryId: string) => void;
   unlinkContinuation: (continuationId: string) => void;
+  unlinkAllPages: () => void;
+  convertToSeparatePaper: (itemId: string) => void;
   startBatchAnalysis: (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string, answerGuideImage?: string, useLearnedStyle?: boolean) => Promise<void>;
   startConfidenceAnalysis: (analysisCount: 2 | 3, rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<void>;
   startTeacherGuidedBatchAnalysis: (answerGuideImage: string, rubricSteps?: RubricStep[]) => Promise<void>;
@@ -780,6 +784,48 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     });
   }, []);
 
+  // Unlink ALL pages - reset all linking
+  const unlinkAllPages = useCallback(() => {
+    setItems(prev => 
+      prev.map(item => ({
+        ...item,
+        pageType: 'new',
+        continuationOf: undefined,
+        continuationPages: undefined,
+      }))
+    );
+  }, []);
+
+  // Convert a continuation page to a separate paper (keeps it as 'new' and clears continuation info)
+  // This allows it to be saved to gradebook independently
+  const convertToSeparatePaper = useCallback((itemId: string) => {
+    setItems(prev => {
+      const item = prev.find(i => i.id === itemId);
+      const primaryId = item?.continuationOf;
+      
+      return prev.map(it => {
+        if (it.id === itemId) {
+          // Convert to separate paper - mark as 'new' so it can be saved
+          return { 
+            ...it, 
+            pageType: 'new', 
+            continuationOf: undefined,
+            // Mark it as converted so we know it was originally a continuation
+            wasConvertedFromContinuation: true,
+          };
+        }
+        if (primaryId && it.id === primaryId) {
+          // Remove from primary's continuation list
+          return { 
+            ...it, 
+            continuationPages: (it.continuationPages || []).filter(id => id !== itemId) 
+          };
+        }
+        return it;
+      });
+    });
+  }, []);
+
   // Group pages by the same student - automatically links front/back pages
   const groupPagesByStudent = useCallback((): { studentsGrouped: number; pagesLinked: number } => {
     // Build a map of studentId -> list of item indices (in order)
@@ -1319,6 +1365,8 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     groupPagesByStudent,
     linkContinuation,
     unlinkContinuation,
+    unlinkAllPages,
+    convertToSeparatePaper,
     startBatchAnalysis,
     startConfidenceAnalysis,
     startTeacherGuidedBatchAnalysis,
