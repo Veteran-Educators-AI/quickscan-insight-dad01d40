@@ -79,14 +79,44 @@ const defaultSlideTypeColors: Record<PresentationSlide['type'], { bg: string; ac
   interactive: { bg: 'from-[#0a1628] via-[#0f1f3a] to-[#0a1628]', accent: 'text-rose-400', bgStyle: '#0f172a' },
 };
 
+// Theme CSS color values for proper inline style application
+const themeBackgroundColors: Record<string, { start: string; mid: string; end: string }> = {
+  'neon-city': { start: '#581c87', mid: '#9333ea', end: '#c2410c' },
+  'ocean-wave': { start: '#164e63', mid: '#0369a1', end: '#1e3a8a' },
+  'sunset-glow': { start: '#7c2d12', mid: '#ea580c', end: '#9f1239' },
+  'forest-zen': { start: '#064e3b', mid: '#0d9488', end: '#0891b2' },
+  'galaxy-dreams': { start: '#4c1d95', mid: '#7c3aed', end: '#a21caf' },
+  'candy-pop': { start: '#831843', mid: '#ec4899', end: '#f43f5e' },
+};
+
 // Theme accent color mapping - updated for premium look
 const themeAccentColors: Record<string, string> = {
-  'neon-city': 'text-amber-400',
+  'neon-city': 'text-pink-400',
   'ocean-wave': 'text-cyan-400',
   'sunset-glow': 'text-amber-400',
   'forest-zen': 'text-emerald-400',
   'galaxy-dreams': 'text-violet-400',
   'candy-pop': 'text-rose-400',
+};
+
+// Theme accent hex colors for inline styles
+const themeAccentHexColors: Record<string, string> = {
+  'neon-city': '#f472b6',
+  'ocean-wave': '#22d3ee',
+  'sunset-glow': '#fbbf24',
+  'forest-zen': '#34d399',
+  'galaxy-dreams': '#a78bfa',
+  'candy-pop': '#fb7185',
+};
+
+// Theme glow colors for particles and effects
+const themeGlowColors: Record<string, string> = {
+  'neon-city': 'rgba(236, 72, 153, 0.4)',
+  'ocean-wave': 'rgba(34, 211, 238, 0.4)',
+  'sunset-glow': 'rgba(251, 191, 36, 0.4)',
+  'forest-zen': 'rgba(16, 185, 129, 0.4)',
+  'galaxy-dreams': 'rgba(139, 92, 246, 0.4)',
+  'candy-pop': 'rgba(244, 114, 182, 0.4)',
 };
 
 export function NycologicPresents({ 
@@ -115,9 +145,10 @@ export function NycologicPresents({
   const colors = visualTheme 
     ? { 
         bg: `bg-gradient-to-br ${visualTheme.gradient}`, 
-        accent: themeAccentColors[visualTheme.id] || 'text-amber-400' 
+        accent: themeAccentColors[visualTheme.id] || 'text-amber-400',
+        accentHex: themeAccentHexColors[visualTheme.id] || '#fbbf24'
       }
-    : defaultSlideTypeColors[slide.type];
+    : { ...defaultSlideTypeColors[slide.type], accentHex: '#fbbf24' };
   
   const IconComponent = slide.icon ? slideIcons[slide.icon] : null;
 
@@ -254,34 +285,39 @@ export function NycologicPresents({
     }
   };
 
+  // Get theme-specific colors
+  const themeBgColors = visualTheme?.id ? themeBackgroundColors[visualTheme.id] : null;
+  const themeGlow = visualTheme?.id ? themeGlowColors[visualTheme.id] : 'rgba(251, 191, 36, 0.4)';
+  
   return (
     <div 
       className="fixed inset-0 z-[9999] w-screen h-screen overflow-hidden"
       style={{ 
-        background: visualTheme 
-          ? `linear-gradient(135deg, ${visualTheme.gradient.includes('purple') ? '#1a0a2e' : '#0a1628'} 0%, ${visualTheme.gradient.includes('purple') ? '#2d1b4e' : '#0f1f3a'} 50%, ${visualTheme.gradient.includes('purple') ? '#1a0a2e' : '#0a1628'} 100%)`
+        background: themeBgColors 
+          ? `linear-gradient(135deg, ${themeBgColors.start} 0%, ${themeBgColors.mid} 50%, ${themeBgColors.end} 100%)`
           : 'linear-gradient(135deg, #0a1628 0%, #0f1f3a 50%, #0a1628 100%)',
         minHeight: '100vh',
         minWidth: '100vw',
       }}
     >
-      {/* Subtle radial glow effect */}
+      {/* Subtle radial glow effect - uses theme color */}
       <div 
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(251, 191, 36, 0.08) 0%, transparent 60%), radial-gradient(ellipse at 50% 100%, rgba(251, 191, 36, 0.05) 0%, transparent 50%)',
+          background: `radial-gradient(ellipse at 50% 0%, ${themeGlow.replace('0.4', '0.15')} 0%, transparent 60%), radial-gradient(ellipse at 50% 100%, ${themeGlow.replace('0.4', '0.1')} 0%, transparent 50%)`,
         }}
       />
 
-      {/* Minimal floating particles */}
+      {/* Minimal floating particles - uses theme color */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(15)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute rounded-full bg-amber-400/10"
+            className="absolute rounded-full"
             style={{
               width: `${2 + Math.random() * 4}px`,
               height: `${2 + Math.random() * 4}px`,
+              backgroundColor: themeGlow.replace('0.4', '0.3'),
             }}
             initial={{ 
               x: `${Math.random() * 100}%`, 
@@ -301,10 +337,16 @@ export function NycologicPresents({
         ))}
       </div>
 
-      {/* Subtle corner accents */}
+      {/* Subtle corner accents - uses theme color */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-1/3 -left-1/4 w-1/2 h-1/2 rounded-full bg-amber-500/5 blur-[120px]" />
-        <div className="absolute -bottom-1/3 -right-1/4 w-1/2 h-1/2 rounded-full bg-amber-500/5 blur-[120px]" />
+        <div 
+          className="absolute -top-1/3 -left-1/4 w-1/2 h-1/2 rounded-full blur-[120px]" 
+          style={{ backgroundColor: themeGlow.replace('0.4', '0.08') }}
+        />
+        <div 
+          className="absolute -bottom-1/3 -right-1/4 w-1/2 h-1/2 rounded-full blur-[120px]" 
+          style={{ backgroundColor: themeGlow.replace('0.4', '0.08') }}
+        />
       </div>
 
       {/* Header - clean and minimal */}
@@ -323,7 +365,10 @@ export function NycologicPresents({
               className="h-14 w-14 md:h-16 md:w-16 drop-shadow-2xl"
             />
             <div className="hidden sm:block">
-              <p className="text-amber-400 text-xs md:text-sm font-bold tracking-[0.3em] uppercase">
+              <p 
+                className="text-xs md:text-sm font-bold tracking-[0.3em] uppercase"
+                style={{ color: colors.accentHex }}
+              >
                 NYClogic PRESENTS
               </p>
             </div>
@@ -472,7 +517,10 @@ export function NycologicPresents({
                 transition={{ delay: 0.1 }}
                 className="mx-auto mb-6"
               >
-                <IconComponent className="h-10 w-10 md:h-12 md:w-12 text-amber-400/80" />
+                <IconComponent 
+                  className="h-10 w-10 md:h-12 md:w-12" 
+                  style={{ color: colors.accentHex, opacity: 0.8 }}
+                />
               </motion.div>
             )}
 
@@ -482,7 +530,8 @@ export function NycologicPresents({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.1 }}
-                className="text-amber-400 text-sm md:text-base font-semibold tracking-[0.25em] uppercase mb-4"
+                className="text-sm md:text-base font-semibold tracking-[0.25em] uppercase mb-4"
+                style={{ color: colors.accentHex }}
               >
                 {isEditing && editingField === 'subtitle' ? (
                   <Input
@@ -526,7 +575,7 @@ export function NycologicPresents({
                   dangerouslySetInnerHTML={{ 
                     __html: slide.title.replace(
                       /\*\*(.*?)\*\*/g, 
-                      '<span class="text-amber-400">$1</span>'
+                      `<span style="color: ${colors.accentHex}">$1</span>`
                     )
                   }}
                 />
@@ -547,7 +596,8 @@ export function NycologicPresents({
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 + index * 0.1 }}
-                    className="relative pl-8 border-l-2 border-amber-400/40"
+                    className="relative pl-8 border-l-2"
+                    style={{ borderColor: `${colors.accentHex}66` }}
                   >
                     {isEditing && editingField === `content-${index}` ? (
                       <Textarea
@@ -689,12 +739,13 @@ export function NycologicPresents({
                     opacity: index === currentSlide ? 1 : 0.4,
                   }}
                   transition={{ duration: 0.3, ease: "easeOut" }}
-                  className={cn(
-                    "w-2.5 h-2.5 rounded-full transition-all duration-300",
-                    index === currentSlide 
-                      ? "bg-amber-400 shadow-lg shadow-amber-400/50" 
-                      : "bg-white/60 group-hover:bg-white/80"
-                  )}
+                  className="w-2.5 h-2.5 rounded-full transition-all duration-300"
+                  style={index === currentSlide ? { 
+                    backgroundColor: colors.accentHex, 
+                    boxShadow: `0 10px 15px -3px ${colors.accentHex}80`
+                  } : { 
+                    backgroundColor: 'rgba(255,255,255,0.6)' 
+                  }}
                 />
                 {/* Active indicator ring */}
                 {index === currentSlide && (
@@ -703,7 +754,10 @@ export function NycologicPresents({
                     animate={{ scale: 1, opacity: 1 }}
                     className="absolute inset-0 flex items-center justify-center"
                   >
-                    <div className="w-5 h-5 rounded-full border-2 border-amber-400/50 animate-pulse" />
+                    <div 
+                      className="w-5 h-5 rounded-full border-2 animate-pulse" 
+                      style={{ borderColor: `${colors.accentHex}80` }}
+                    />
                   </motion.div>
                 )}
               </button>
@@ -712,7 +766,7 @@ export function NycologicPresents({
           
           {/* Slide counter with subtle styling */}
           <p className="text-white/40 text-sm font-light tracking-wider">
-            <span className="text-amber-400/80 font-medium">{currentSlide + 1}</span>
+            <span className="font-medium" style={{ color: `${colors.accentHex}cc` }}>{currentSlide + 1}</span>
             <span className="mx-2">of</span>
             <span>{totalSlides}</span>
           </p>
