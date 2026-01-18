@@ -1916,6 +1916,8 @@ export default function Scan() {
                     }}
                     onLinkContinuation={batch.linkContinuation}
                     onUnlinkContinuation={batch.unlinkContinuation}
+                    onUnlinkAllPages={batch.unlinkAllPages}
+                    onConvertToSeparate={batch.convertToSeparatePaper}
                     onReorder={batch.reorderItems}
                     onSaveToGradebook={handleBatchSaveToGradebook}
                     onOverrideGrade={batch.overrideGrade}

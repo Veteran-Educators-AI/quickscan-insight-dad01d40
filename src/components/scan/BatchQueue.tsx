@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn, UserPlus } from 'lucide-react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn, UserPlus, FilePlus2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +68,8 @@ interface BatchQueueProps {
   onStudentCreated?: (studentId: string, studentName: string) => void;
   onLinkContinuation?: (continuationId: string, primaryId: string) => void;
   onUnlinkContinuation?: (continuationId: string) => void;
+  onUnlinkAllPages?: () => void;
+  onConvertToSeparate?: (itemId: string) => void;
   onReorder?: (activeId: string, overId: string) => void;
   onSaveToGradebook?: () => Promise<void>;
   onOverrideGrade?: (itemId: string, newGrade: number, justification: string) => void;
@@ -157,6 +160,8 @@ export function BatchQueue({
   onStudentCreated,
   onLinkContinuation,
   onUnlinkContinuation,
+  onUnlinkAllPages,
+  onConvertToSeparate,
   onReorder,
   onSaveToGradebook,
   onOverrideGrade,
@@ -292,15 +297,40 @@ export function BatchQueue({
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">{items.length} paper(s) in queue</span>
               {hasLinkedPages && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                  onClick={() => setShowComparisonDialog(true)}
-                >
-                  <Eye className="h-3 w-3 mr-1" />
-                  Preview Links
-                </Button>
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    onClick={() => setShowComparisonDialog(true)}
+                  >
+                    <Eye className="h-3 w-3 mr-1" />
+                    Preview Links
+                  </Button>
+                  {onUnlinkAllPages && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              onUnlinkAllPages();
+                              toast.success('All page links removed', { description: 'Each page can now be graded separately' });
+                            }}
+                          >
+                            <Unlink className="h-3 w-3 mr-1" />
+                            Unlink All
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">Remove all page links and grade each page separately</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </>
               )}
             </div>
             {isIdentifying && (
@@ -680,25 +710,56 @@ export function BatchQueue({
                 {/* Manual Link/Unlink buttons */}
                 {!isBusy && (
                   <>
-                    {/* Unlink button for continuation pages */}
-                    {isContinuation && onUnlinkContinuation && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 shrink-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              onClick={() => onUnlinkContinuation(item.id)}
-                            >
-                              <Unlink className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">Unlink from primary paper</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                    {/* Unlink and Convert buttons for continuation pages */}
+                    {isContinuation && (
+                      <div className="flex items-center gap-1">
+                        {onUnlinkContinuation && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 shrink-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                  onClick={() => {
+                                    onUnlinkContinuation(item.id);
+                                    toast.success('Page unlinked', { description: 'Now a separate paper' });
+                                  }}
+                                >
+                                  <Unlink className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Unlink - make separate paper</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        {/* Convert to separate for grading */}
+                        {onConvertToSeparate && item.status === 'completed' && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs text-green-600 border-green-300 hover:bg-green-50"
+                                  onClick={() => {
+                                    onConvertToSeparate(item.id);
+                                    toast.success('Converted to separate paper', { description: 'Can now be saved to gradebook individually' });
+                                  }}
+                                >
+                                  <FilePlus2 className="h-3 w-3 mr-1" />
+                                  Save Separately
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Convert to separate gradebook entry</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
                     )}
                     
                     {/* Link button for unlinked pages (non-continuation) */}
