@@ -142,9 +142,14 @@ export default function Login() {
             alt="NYClogic Ai" 
             className="h-44 w-auto mx-auto mb-2"
           />
-          <h1 className="text-5xl md:text-6xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Darker Grotesque', sans-serif" }}>
-            NYClogic <span className="text-primary">Ai</span>
-          </h1>
+          <div className="flex items-center justify-center gap-3">
+            <h1 className="text-5xl md:text-6xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Darker Grotesque', sans-serif" }}>
+              NYClogic <span className="text-primary">Ai</span>
+            </h1>
+            <span className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-md border border-amber-500/30 animate-pulse">
+              Beta
+            </span>
+          </div>
           <p className="text-muted-foreground mt-2">
             Fast, structured diagnostics aligned to state standards
           </p>
