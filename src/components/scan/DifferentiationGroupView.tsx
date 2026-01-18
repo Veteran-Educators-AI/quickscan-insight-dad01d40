@@ -532,19 +532,17 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
                         </div>
                       )}
 
-                      {/* Student List with Checkboxes */}
+                      {/* Student List - Clean Column Layout */}
                       {group.students.length > 0 ? (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        <div className="divide-y divide-border/50">
                           {group.students.map((item) => {
                             const grade = getEffectiveGrade(item.result);
                             const isSelected = isStudentSelected(group.level, item.id);
                             return (
                               <div
                                 key={item.id}
-                                className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
-                                  isSelected 
-                                    ? 'bg-primary/10 border-primary' 
-                                    : 'bg-background/60 hover:bg-background/80'
+                                className={`flex items-center gap-3 py-2 px-1 cursor-pointer transition-colors hover:bg-background/50 ${
+                                  isSelected ? 'bg-primary/5' : ''
                                 }`}
                                 onClick={() => toggleStudentSelection(group.level, item.id)}
                               >
@@ -553,10 +551,10 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
                                   onCheckedChange={() => toggleStudentSelection(group.level, item.id)}
                                   onClick={(e) => e.stopPropagation()}
                                 />
-                                <span className="text-sm font-medium truncate flex-1">{item.studentName}</span>
-                                <Badge variant="outline" className={`text-xs ${group.color}`}>
+                                <span className="text-sm font-medium flex-1">{item.studentName}</span>
+                                <span className={`text-sm font-semibold tabular-nums ${group.color}`}>
                                   {grade}%
-                                </Badge>
+                                </span>
                               </div>
                             );
                           })}
@@ -567,17 +565,19 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
                         </p>
                       )}
 
-                      {/* Common Misconceptions for this group */}
+                      {/* Common Misconceptions - Clean List */}
                       {misconceptions.length > 0 && (
-                        <div className="pt-2 border-t">
+                        <div className="pt-3 mt-3 border-t border-border/50">
                           <p className="text-xs font-medium text-muted-foreground mb-2">
                             Common focus areas for this group:
                           </p>
-                          <div className="flex flex-wrap gap-1">
+                          <div className="space-y-1.5">
                             {misconceptions.map((m, i) => (
-                              <Badge key={i} variant="secondary" className="text-xs">
-                                {m.misconception} ({m.count})
-                              </Badge>
+                              <div key={i} className="flex items-start gap-2 text-sm">
+                                <span className="text-muted-foreground shrink-0">•</span>
+                                <span className="flex-1 text-foreground/80">{m.misconception}</span>
+                                <span className="text-xs text-muted-foreground shrink-0">({m.count})</span>
+                              </div>
                             ))}
                           </div>
                         </div>
