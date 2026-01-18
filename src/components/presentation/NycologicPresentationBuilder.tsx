@@ -378,8 +378,8 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col z-50">
-        <DialogHeader>
+      <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] h-[95vh] overflow-hidden flex flex-col z-50">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <img src={nyclogicLogo} alt="NYClogic" className="h-6 w-6" />
             NYClogic PRESENTS: Create Presentation
@@ -390,7 +390,7 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 min-h-0 pr-4">
           <div className="space-y-6 pb-4">
             {/* Generation Form */}
             {!presentation && (

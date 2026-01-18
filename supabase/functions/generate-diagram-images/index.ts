@@ -160,26 +160,35 @@ serve(async (req) => {
     
     // Support presentation-style image generation
     if (body.prompt && (body.style === 'clipart' || body.style === 'presentation')) {
-      console.log(`Generating ${body.style} image...`);
+      console.log(`Generating ${body.style} image with Nano Banana (google/gemini-2.5-flash-image-preview)...`);
       
       const isPresentation = body.style === 'presentation';
       
       const clipartPrompt = isPresentation 
-        ? `Create a stunning, professional illustration for an educational presentation. ${body.prompt}. 
-Requirements:
-- Modern, vibrant, and visually striking
-- Suitable for classroom presentations with dark backgrounds
-- Professional and educational style
-- Bold colors and clean composition
-- High quality, detailed illustration
-- No text or labels in the image`
-        : `Create a simple, clean clipart-style icon. ${body.prompt}. 
+        ? `Generate a high-quality, photorealistic or professionally illustrated image for an educational classroom presentation.
+
+Topic/Subject: ${body.prompt}
+
+Image Requirements:
+- Ultra high resolution, sharp and detailed
+- Vibrant, rich colors with good contrast
+- Professional educational illustration style
+- Suitable for display on dark presentation backgrounds
+- NO TEXT, NO LABELS, NO WORDS in the image
+- Clean composition focused on the main subject
+- Modern, engaging visual that captures student attention
+- Think: National Geographic quality, textbook illustration quality`
+        : `Generate a clean, simple clipart-style illustration.
+
+Subject: ${body.prompt}
+
 Requirements:
 - Simple flat vector-style illustration
 - Clean lines, minimal detail
 - Suitable for presentations and educational materials
 - Single object, centered composition
-- Professional and friendly style`;
+- Professional and friendly style
+- NO TEXT or labels`;
 
       let imageUrl = await generateImageWithNanoBanana(clipartPrompt);
       
