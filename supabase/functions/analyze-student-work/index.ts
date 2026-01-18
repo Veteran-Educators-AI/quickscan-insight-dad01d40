@@ -1201,39 +1201,170 @@ Respond in this exact JSON format (no markdown, just raw JSON):
 function fuzzyMatchStudent(name: string, roster: StudentRosterItem[]): StudentRosterItem | null {
   const normalizedInput = name.toLowerCase().trim();
   
+  // Remove common prefixes/suffixes that might appear on papers
+  const cleanedInput = normalizedInput
+    .replace(/^(name|student|by|written by|from)[:\s]*/i, '')
+    .replace(/\s*(period|class|date|pd)[\s\d:]*$/i, '')
+    .trim();
+  
+  console.log('Fuzzy matching input:', { original: name, normalized: normalizedInput, cleaned: cleanedInput });
+  
+  // 1. Exact match (full name or reversed)
   for (const student of roster) {
     const fullName = `${student.first_name} ${student.last_name}`.toLowerCase();
     const reverseName = `${student.last_name} ${student.first_name}`.toLowerCase();
     
-    if (fullName === normalizedInput || reverseName === normalizedInput) {
+    if (fullName === cleanedInput || reverseName === cleanedInput) {
+      console.log('Exact match found:', student);
       return student;
     }
   }
+  
+  // 2. First name only match (common when students write just first name)
+  for (const student of roster) {
+    const firstName = student.first_name.toLowerCase();
+    if (cleanedInput === firstName && firstName.length >= 3) {
+      console.log('First name only match:', student);
+      return student;
+    }
+  }
+  
+  // 3. Last name only match
+  for (const student of roster) {
+    const lastName = student.last_name.toLowerCase();
+    if (cleanedInput === lastName && lastName.length >= 3) {
+      console.log('Last name only match:', student);
+      return student;
+    }
+  }
+  
+  // 4. Partial containment (both names present in any order)
+  for (const student of roster) {
+    const firstName = student.first_name.toLowerCase();
+    const lastName = student.last_name.toLowerCase();
+    
+    if (cleanedInput.includes(firstName) && cleanedInput.includes(lastName)) {
+      console.log('Containment match:', student);
+      return student;
+    }
+    
+    // Check if input ends with last name (common pattern: "John S" for "John Smith")
+    if (cleanedInput.endsWith(lastName) || cleanedInput.startsWith(lastName)) {
+      console.log('Ends/starts with last name match:', student);
+      return student;
+    }
+  }
+  
+  // 5. Initial-based matching (e.g., "J. Smith" or "John S.")
+  for (const student of roster) {
+    const firstName = student.first_name.toLowerCase();
+    const lastName = student.last_name.toLowerCase();
+    const firstInitial = firstName[0];
+    const lastInitial = lastName[0];
+    
+    // "J. Smith" or "J Smith" pattern
+    const initialLastPattern = new RegExp(`^${firstInitial}\\.?\\s*${lastName}$`, 'i');
+    if (initialLastPattern.test(cleanedInput)) {
+      console.log('Initial + last name match:', student);
+      return student;
+    }
+    
+    // "John S." or "John S" pattern
+    const firstInitialPattern = new RegExp(`^${firstName}\\s+${lastInitial}\\.?$`, 'i');
+    if (firstInitialPattern.test(cleanedInput)) {
+      console.log('First + initial match:', student);
+      return student;
+    }
+  }
+  
+  // 6. Nickname matching (common nicknames)
+  const nicknameMap: Record<string, string[]> = {
+    'william': ['will', 'bill', 'billy', 'willy', 'liam'],
+    'robert': ['rob', 'bob', 'bobby', 'robbie'],
+    'richard': ['rick', 'rich', 'dick', 'ricky'],
+    'james': ['jim', 'jimmy', 'jamie'],
+    'michael': ['mike', 'mikey', 'mick'],
+    'christopher': ['chris', 'topher'],
+    'matthew': ['matt', 'matty'],
+    'jennifer': ['jen', 'jenny', 'jenn'],
+    'elizabeth': ['liz', 'lizzy', 'beth', 'betty', 'eliza'],
+    'katherine': ['kate', 'katy', 'katie', 'kat', 'kathy'],
+    'margaret': ['maggie', 'meg', 'peggy', 'marge'],
+    'nicholas': ['nick', 'nicky'],
+    'alexander': ['alex', 'xander'],
+    'benjamin': ['ben', 'benny', 'benji'],
+    'jonathan': ['jon', 'john', 'johnny'],
+    'anthony': ['tony', 'ant'],
+    'joseph': ['joe', 'joey'],
+    'samuel': ['sam', 'sammy'],
+    'daniel': ['dan', 'danny'],
+    'david': ['dave', 'davey'],
+    'thomas': ['tom', 'tommy'],
+    'edward': ['ed', 'eddie', 'ted', 'teddy'],
+    'andrew': ['andy', 'drew'],
+    'joshua': ['josh'],
+    'stephanie': ['steph', 'stephie'],
+    'victoria': ['vicky', 'vic', 'tori'],
+    'samantha': ['sam', 'sammy'],
+    'alexandra': ['alex', 'lexi'],
+    'abigail': ['abby', 'gail'],
+    'madeline': ['maddy', 'maddie'],
+    'olivia': ['liv', 'livvy'],
+    'natalie': ['nat', 'natty'],
+    'rebecca': ['becca', 'becky'],
+    'theodore': ['ted', 'teddy', 'theo'],
+  };
   
   for (const student of roster) {
     const firstName = student.first_name.toLowerCase();
     const lastName = student.last_name.toLowerCase();
     
-    if (normalizedInput.includes(firstName) && normalizedInput.includes(lastName)) {
-      return student;
-    }
-    
-    if (normalizedInput === lastName || normalizedInput.endsWith(lastName)) {
-      return student;
+    // Check if input matches a nickname
+    for (const [formal, nicknames] of Object.entries(nicknameMap)) {
+      if (firstName === formal) {
+        for (const nickname of nicknames) {
+          if (cleanedInput === nickname || 
+              cleanedInput === `${nickname} ${lastName}` ||
+              cleanedInput === `${lastName} ${nickname}`) {
+            console.log('Nickname match:', student, 'via', nickname);
+            return student;
+          }
+        }
+      }
+      // Also check reverse: student has nickname, input has formal name
+      if (nicknames.includes(firstName)) {
+        if (cleanedInput === formal ||
+            cleanedInput === `${formal} ${lastName}` ||
+            cleanedInput === `${lastName} ${formal}`) {
+          console.log('Reverse nickname match:', student, 'via', formal);
+          return student;
+        }
+      }
     }
   }
   
+  // 7. Fuzzy similarity matching with LOWER threshold (0.5 instead of 0.6)
   let bestMatch: StudentRosterItem | null = null;
   let bestScore = 0;
   
   for (const student of roster) {
     const fullName = `${student.first_name} ${student.last_name}`.toLowerCase();
-    const score = calculateSimilarity(normalizedInput, fullName);
+    const reverseName = `${student.last_name} ${student.first_name}`.toLowerCase();
     
-    if (score > bestScore && score > 0.6) {
+    const score1 = calculateSimilarity(cleanedInput, fullName);
+    const score2 = calculateSimilarity(cleanedInput, reverseName);
+    const score = Math.max(score1, score2);
+    
+    if (score > bestScore && score > 0.5) { // Lowered threshold from 0.6 to 0.5
       bestScore = score;
       bestMatch = student;
     }
+  }
+  
+  if (bestMatch) {
+    console.log('Fuzzy match found:', bestMatch, 'with score:', bestScore);
+  } else {
+    console.log('No match found for:', cleanedInput);
   }
   
   return bestMatch;

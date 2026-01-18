@@ -1903,8 +1903,14 @@ export default function Scan() {
                   <BatchQueue
                     items={batch.items}
                     students={students}
+                    classId={selectedClassId}
                     onRemove={batch.removeImage}
                     onAssignStudent={batch.updateItemStudent}
+                    onStudentCreated={async (studentId, studentName) => {
+                      // Refresh the students list when a new student is added
+                      toast.success(`${studentName} added to roster`);
+                      // The useClassStudents hook should auto-refresh, but we can force a re-render
+                    }}
                     onLinkContinuation={batch.linkContinuation}
                     onUnlinkContinuation={batch.unlinkContinuation}
                     onReorder={batch.reorderItems}

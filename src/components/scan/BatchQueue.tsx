@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn } from 'lucide-react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,11 +27,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { BatchItem } from '@/hooks/useBatchAnalysis';
 import { HandwritingComparisonDialog } from './HandwritingComparisonDialog';
 import { MultiAnalysisBreakdownDialog } from './MultiAnalysisBreakdownDialog';
 import { ManualLinkDialog } from './ManualLinkDialog';
 import { BatchImageZoomDialog } from './BatchImageZoomDialog';
+import { AddUnknownStudentDialog } from './AddUnknownStudentDialog';
 import {
   DndContext,
   closestCenter,
@@ -59,8 +61,10 @@ interface Student {
 interface BatchQueueProps {
   items: BatchItem[];
   students: Student[];
+  classId?: string | null;
   onRemove: (id: string) => void;
   onAssignStudent: (itemId: string, studentId: string, studentName: string) => void;
+  onStudentCreated?: (studentId: string, studentName: string) => void;
   onLinkContinuation?: (continuationId: string, primaryId: string) => void;
   onUnlinkContinuation?: (continuationId: string) => void;
   onReorder?: (activeId: string, overId: string) => void;
@@ -146,9 +150,11 @@ const getConfidenceBadge = (confidence: 'high' | 'medium' | 'low' | 'none') => {
 
 export function BatchQueue({ 
   items, 
-  students, 
+  students,
+  classId,
   onRemove, 
   onAssignStudent,
+  onStudentCreated,
   onLinkContinuation,
   onUnlinkContinuation,
   onReorder,
@@ -161,6 +167,7 @@ export function BatchQueue({
   isSaving = false,
   allSaved = false,
 }: BatchQueueProps) {
+  const [addStudentForItem, setAddStudentForItem] = useState<string | null>(null);
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -487,6 +494,36 @@ export function BatchQueue({
                             </ScrollArea>
                           </SelectContent>
                         </Select>
+                        
+                        {/* Add new student button when student not found */}
+                        {classId && onStudentCreated && !item.studentId && (
+                          <AddUnknownStudentDialog
+                            classId={classId}
+                            detectedName={item.identification?.handwrittenName}
+                            onStudentCreated={(studentId, studentName) => {
+                              onStudentCreated(studentId, studentName);
+                              onAssignStudent(item.id, studentId, studentName);
+                            }}
+                            trigger={
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="outline" 
+                                      size="icon" 
+                                      className="h-9 w-9 shrink-0 text-green-600 hover:text-green-700 hover:bg-green-50 border-dashed"
+                                    >
+                                      <UserPlus className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">Add new student to class</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            }
+                          />
+                        )}
                         
                         {/* Auto-assign indicator with confidence badge */}
                         {item.autoAssigned && item.identification && (
