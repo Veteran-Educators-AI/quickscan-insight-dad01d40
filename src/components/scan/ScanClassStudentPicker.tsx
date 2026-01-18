@@ -15,6 +15,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useStudentNames } from '@/lib/StudentNameContext';
@@ -96,7 +97,8 @@ export function ScanClassStudentPicker({
         .from('students')
         .select('id, first_name, last_name, student_id')
         .eq('class_id', selectedClassId)
-        .order('last_name');
+        .order('last_name')
+        .limit(500);
 
       if (!error && data) {
         setStudents(data);
@@ -188,37 +190,44 @@ export function ScanClassStudentPicker({
             <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[250px] p-0">
+        <PopoverContent className="w-[280px] p-0">
           <Command>
             <CommandInput placeholder="Search students..." />
-            <CommandList>
-              <CommandEmpty>No students found.</CommandEmpty>
-              <CommandGroup>
-                {students.map((student) => {
-                  const displayName = getDisplayName(student.id, student.first_name, student.last_name);
-                  return (
-                  <CommandItem
-                    key={student.id}
-                    value={displayName}
-                    onSelect={() => {
-                      onStudentChange(student.id);
-                      setStudentOpen(false);
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        selectedStudentId === student.id ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    <span className="flex-1">
-                      {displayName}
-                    </span>
-                  </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            </CommandList>
+            <ScrollArea className="h-[300px]">
+              <CommandList className="max-h-none">
+                <CommandEmpty>No students found in this class.</CommandEmpty>
+                <CommandGroup heading={`${students.length} students`}>
+                  {students.map((student) => {
+                    const displayName = getDisplayName(student.id, student.first_name, student.last_name);
+                    return (
+                      <CommandItem
+                        key={student.id}
+                        value={`${student.first_name} ${student.last_name} ${displayName}`}
+                        onSelect={() => {
+                          onStudentChange(student.id);
+                          setStudentOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4 shrink-0",
+                            selectedStudentId === student.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <span className="flex-1 truncate">
+                          {displayName}
+                        </span>
+                        {student.student_id && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            #{student.student_id}
+                          </span>
+                        )}
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </ScrollArea>
           </Command>
         </PopoverContent>
       </Popover>
