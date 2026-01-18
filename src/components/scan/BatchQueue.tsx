@@ -458,26 +458,33 @@ export function BatchQueue({
                               )}
                             </SelectValue>
                           </SelectTrigger>
-                          <SelectContent>
-                            {/* Current student if assigned */}
-                            {item.studentId && (
-                              <SelectItem value={item.studentId}>
-                                {item.studentName} (current)
-                              </SelectItem>
-                            )}
-                            {/* Available students */}
-                            {availableStudents.length > 0 ? (
-                              availableStudents.map((student) => (
-                                <SelectItem key={student.id} value={student.id}>
-                                  {student.last_name}, {student.first_name}
-                                  {student.student_id && ` (${student.student_id})`}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                                All students assigned
-                              </div>
-                            )}
+                          <SelectContent className="max-h-[300px]">
+                            <ScrollArea className="h-[280px]">
+                              {/* Show ALL students, marking assigned ones */}
+                              {students.length > 0 ? (
+                                students.map((student) => {
+                                  const isCurrentItem = item.studentId === student.id;
+                                  const isAssignedElsewhere = !isCurrentItem && assignedStudentIds.includes(student.id);
+                                  
+                                  return (
+                                    <SelectItem 
+                                      key={student.id} 
+                                      value={student.id}
+                                      className={isAssignedElsewhere ? 'opacity-50' : ''}
+                                    >
+                                      {student.last_name}, {student.first_name}
+                                      {student.student_id && ` (${student.student_id})`}
+                                      {isCurrentItem && ' ✓'}
+                                      {isAssignedElsewhere && ' (assigned)'}
+                                    </SelectItem>
+                                  );
+                                })
+                              ) : (
+                                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                                  No students in class
+                                </div>
+                              )}
+                            </ScrollArea>
                           </SelectContent>
                         </Select>
                         
