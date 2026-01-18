@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Brain, BookOpen, GraduationCap, CheckCircle, ArrowRight, ArrowLeft, Sparkles, Target, FileText, Loader2, AlertCircle, Trophy, Download, Printer } from 'lucide-react';
+import { Brain, BookOpen, GraduationCap, CheckCircle, ArrowRight, ArrowLeft, Sparkles, Target, FileText, Loader2, AlertCircle, Trophy, Download, Printer, Upload } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +32,7 @@ import {
   TopicCategory,
   JMAPTopic
 } from '@/data/nysTopics';
+import { TeacherAnswerKeyDialog } from './TeacherAnswerKeyDialog';
 
 interface AITrainingWizardProps {
   open: boolean;
@@ -90,6 +91,7 @@ export function AITrainingWizard({ open, onOpenChange, onTrainingComplete }: AIT
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [existingTrainingSamples, setExistingTrainingSamples] = useState(0);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
 
   // Fetch existing training samples count
   useEffect(() => {
@@ -845,6 +847,15 @@ export function AITrainingWizard({ open, onOpenChange, onTrainingComplete }: AIT
                   <Download className="h-3.5 w-3.5" />
                   PDF
                 </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setShowUploadDialog(true)}
+                  className="gap-1 bg-green-600 hover:bg-green-700"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Upload Completed
+                </Button>
                 <Badge variant="outline">{currentQuestion?.difficulty}</Badge>
                 <Badge variant="secondary">{currentQuestion?.standard}</Badge>
               </div>
@@ -1041,21 +1052,32 @@ export function AITrainingWizard({ open, onOpenChange, onTrainingComplete }: AIT
     }
   };
 
+  const contentArea = CONTENT_AREAS.find(c => c.id === selectedContentArea);
+  const contentAreaName = contentArea?.name || 'Training';
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Brain className="h-5 w-5 text-primary" />
-            AI Grading Training
-          </DialogTitle>
-          <DialogDescription>
-            Teach the AI to grade like you by providing model answers
-          </DialogDescription>
-        </DialogHeader>
-        
-        {renderStep()}
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-primary" />
+              AI Grading Training
+            </DialogTitle>
+            <DialogDescription>
+              Teach the AI to grade like you by providing model answers
+            </DialogDescription>
+          </DialogHeader>
+          
+          {renderStep()}
+        </DialogContent>
+      </Dialog>
+
+      <TeacherAnswerKeyDialog
+        open={showUploadDialog}
+        onOpenChange={setShowUploadDialog}
+        className={contentAreaName}
+      />
+    </>
   );
 }
