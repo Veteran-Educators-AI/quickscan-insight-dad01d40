@@ -615,24 +615,24 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
         </CardContent>
       </Card>
 
-      {/* Common Misconceptions */}
+      {/* Common Misconceptions - Clean Column Layout */}
       {summary.commonMisconceptions.length > 0 && (
-        <Card className="border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/20">
+        <Card className="border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
               Common Misconceptions
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2">
+            <div className="divide-y divide-border/50">
               {summary.commonMisconceptions.map((item, i) => (
-                <li key={i} className="flex items-center justify-between text-sm">
-                  <span>{item.misconception}</span>
-                  <Badge variant="secondary">{item.count} student(s)</Badge>
-                </li>
+                <div key={i} className="flex items-start justify-between py-2.5 gap-4">
+                  <span className="text-sm text-foreground/90 leading-relaxed flex-1">{item.misconception}</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">{item.count} student(s)</span>
+                </div>
               ))}
-            </ul>
+            </div>
           </CardContent>
         </Card>
       )}
