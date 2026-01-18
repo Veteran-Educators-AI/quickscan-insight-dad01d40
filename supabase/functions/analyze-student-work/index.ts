@@ -163,7 +163,7 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const { imageBase64, additionalImages, solutionBase64, answerGuideBase64, questionId, rubricSteps, identifyOnly, detectPageType, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric, gradeFloor: customGradeFloor, gradeFloorWithEffort: customGradeFloorWithEffort } = await req.json();
+    const { imageBase64, additionalImages, solutionBase64, answerGuideBase64, questionId, rubricSteps, identifyOnly, detectPageType, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric, gradeFloor: customGradeFloor, gradeFloorWithEffort: customGradeFloorWithEffort, useLearnedStyle } = await req.json();
     
     // Ensure teacherId matches authenticated user
     const effectiveTeacherId = teacherId || authenticatedUserId;
@@ -262,9 +262,10 @@ serve(async (req) => {
     console.log('Feedback verbosity:', feedbackVerbosity);
     console.log('AI training mode:', aiTrainingMode);
 
-    // Fetch grading corrections for AI training (if training mode is enabled)
+    // Fetch grading corrections for AI training (if training mode is enabled or useLearnedStyle is true)
     let gradingStyleContext = '';
-    if (supabase && effectiveTeacherId && aiTrainingMode !== 'off') {
+    const shouldUseLearnedStyle = useLearnedStyle === true || aiTrainingMode !== 'off';
+    if (supabase && effectiveTeacherId && shouldUseLearnedStyle) {
       try {
         const { data: corrections } = await supabase
           .from('grading_corrections')
@@ -297,8 +298,10 @@ serve(async (req) => {
             `• AI gave ${c.ai_grade}, teacher corrected to ${c.corrected_grade}${c.correction_reason ? `: "${c.correction_reason}"` : ''}`
           ).join('\n');
 
+          const learnedModePrefix = useLearnedStyle ? 'CRITICAL: You MUST use this teacher\'s learned grading style for all grading decisions.\n\n' : '';
+          
           gradingStyleContext = `
-TEACHER'S GRADING STYLE (Learned from ${corrections.length} corrections):
+${learnedModePrefix}TEACHER'S GRADING STYLE (Learned from ${corrections.length} corrections):
 
 GRADING TENDENCY:
 - Teacher typically ${avgDiff > 3 ? 'gives HIGHER grades than AI' : avgDiff < -3 ? 'gives LOWER grades than AI' : 'agrees with AI grading'}
@@ -311,9 +314,9 @@ ${topFocuses.map(f => `• ${f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUppe
 RECENT CORRECTION EXAMPLES:
 ${recentExamples}
 
-APPLY THIS STYLE: Grade in a way that aligns with this teacher's demonstrated preferences. ${avgDiff > 3 ? 'Be more generous with partial credit.' : avgDiff < -3 ? 'Be stricter about showing complete work.' : ''}
+${useLearnedStyle ? 'YOU MUST APPLY THIS STYLE: ' : 'APPLY THIS STYLE: '}Grade in a way that aligns with this teacher's demonstrated preferences. ${avgDiff > 3 ? 'Be more generous with partial credit.' : avgDiff < -3 ? 'Be stricter about showing complete work.' : ''}
 `;
-          console.log(`Loaded ${corrections.length} grading corrections for training context`);
+          console.log(`Loaded ${corrections.length} grading corrections for training context${useLearnedStyle ? ' (LEARNED STYLE MODE)' : ''}`);
         }
       } catch (correctionError) {
         console.error('Error fetching grading corrections:', correctionError);

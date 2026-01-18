@@ -1,13 +1,15 @@
 import { useState, useRef } from 'react';
-import { Bot, User, FileImage, Upload, ArrowRight, CheckCircle, X, BookOpen, Scale, Play, Pencil } from 'lucide-react';
+import { Bot, User, FileImage, Upload, ArrowRight, CheckCircle, X, BookOpen, Scale, Play, Pencil, GraduationCap, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
+import { useAILearningStatus } from '@/hooks/useAILearningStatus';
+import { Progress } from '@/components/ui/progress';
 
-export type BatchGradingMode = 'ai' | 'teacher-guided' | 'manual';
+export type BatchGradingMode = 'ai' | 'ai-learned' | 'teacher-guided' | 'manual';
 
 interface BatchGradingModeSelectorProps {
   itemCount: number;
@@ -25,6 +27,7 @@ export function BatchGradingModeSelector({
   const [selectedMode, setSelectedMode] = useState<BatchGradingMode | null>(null);
   const [answerGuideImage, setAnswerGuideImage] = useState<string | null>(null);
   const answerGuideInputRef = useRef<HTMLInputElement>(null);
+  const { isReady: aiLearningReady, correctionCount, readinessPercent, isLoading: learningStatusLoading } = useAILearningStatus();
 
   const handleAnswerGuideUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -51,6 +54,8 @@ export function BatchGradingModeSelector({
   const handleProceed = () => {
     if (selectedMode === 'ai') {
       onSelectMode('ai');
+    } else if (selectedMode === 'ai-learned') {
+      onSelectMode('ai-learned');
     } else if (selectedMode === 'teacher-guided' && answerGuideImage) {
       onSelectMode('teacher-guided', answerGuideImage);
     } else if (selectedMode === 'manual') {
@@ -59,7 +64,7 @@ export function BatchGradingModeSelector({
   };
 
   const needsGuide = selectedMode === 'teacher-guided';
-  const canProceed = selectedMode === 'ai' || selectedMode === 'manual' || (selectedMode === 'teacher-guided' && answerGuideImage);
+  const canProceed = selectedMode === 'ai' || selectedMode === 'ai-learned' || selectedMode === 'manual' || (selectedMode === 'teacher-guided' && answerGuideImage);
 
   return (
     <Card>
@@ -82,11 +87,23 @@ export function BatchGradingModeSelector({
         />
 
         <Tabs value={selectedMode || ''} onValueChange={(v) => setSelectedMode(v as BatchGradingMode)}>
-          <TabsList className="grid grid-cols-3 w-full">
+          <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="ai" className="flex items-center gap-1.5">
               <Bot className="h-4 w-4" />
               <span className="hidden sm:inline">AI Only</span>
               <span className="sm:hidden">AI</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="ai-learned" 
+              className="flex items-center gap-1.5 relative"
+              disabled={!aiLearningReady && !learningStatusLoading}
+            >
+              <Brain className="h-4 w-4" />
+              <span className="hidden sm:inline">AI Learned</span>
+              <span className="sm:hidden">Learned</span>
+              {aiLearningReady && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+              )}
             </TabsTrigger>
             <TabsTrigger value="teacher-guided" className="flex items-center gap-1.5">
               <BookOpen className="h-4 w-4" />
@@ -116,6 +133,39 @@ export function BatchGradingModeSelector({
                 <CheckCircle className="h-3.5 w-3.5 text-green-600" />
                 Fastest option for batch grading
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="ai-learned" className="mt-4">
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                <Brain className="h-5 w-5 text-green-600 mt-0.5" />
+                <div>
+                  <p className="font-medium text-sm">AI Learned Your Style</p>
+                  <p className="text-xs text-muted-foreground">
+                    AI grades using patterns learned from your {correctionCount} grading corrections.
+                    Applies your preferences for strictness, partial credit, and grading focus.
+                  </p>
+                </div>
+              </div>
+              
+              {!aiLearningReady ? (
+                <div className="space-y-2 p-3 rounded-lg bg-muted/50">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Learning progress</span>
+                    <span className="font-medium">{correctionCount}/10 corrections</span>
+                  </div>
+                  <Progress value={readinessPercent} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    Grade more papers and make corrections to teach the AI your style.
+                  </p>
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                  AI has learned from {correctionCount} of your corrections
+                </div>
+              )}
             </div>
           </TabsContent>
 
