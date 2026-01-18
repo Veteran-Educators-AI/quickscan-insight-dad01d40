@@ -586,6 +586,9 @@ export default function Scan() {
       setBatchAnswerGuideImage(answerGuideImage);
       toast.info(`Starting teacher-guided analysis of ${batch.items.length} papers...`);
       await batch.startTeacherGuidedBatchAnalysis(answerGuideImage, mockRubricSteps);
+    } else if (mode === 'ai-learned') {
+      toast.info(`Starting AI analysis with your learned grading style...`);
+      await batch.startBatchAnalysis(mockRubricSteps, 'teacher', undefined, undefined, true);
     } else {
       toast.info(`Starting AI analysis of ${batch.items.length} papers...`);
       await batch.startBatchAnalysis(mockRubricSteps);

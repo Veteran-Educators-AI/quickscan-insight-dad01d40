@@ -113,7 +113,7 @@ interface UseBatchAnalysisReturn {
   groupPagesByStudent: () => { studentsGrouped: number; pagesLinked: number };
   linkContinuation: (continuationId: string, primaryId: string) => void;
   unlinkContinuation: (continuationId: string) => void;
-  startBatchAnalysis: (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string, answerGuideImage?: string) => Promise<void>;
+  startBatchAnalysis: (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string, answerGuideImage?: string, useLearnedStyle?: boolean) => Promise<void>;
   startConfidenceAnalysis: (analysisCount: 2 | 3, rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<void>;
   startTeacherGuidedBatchAnalysis: (answerGuideImage: string, rubricSteps?: RubricStep[]) => Promise<void>;
   overrideGrade: (itemId: string, newGrade: number, justification: string) => void;
@@ -862,7 +862,8 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     allItems: BatchItem[],
     rubricSteps?: RubricStep[], 
     assessmentMode?: 'teacher' | 'ai', 
-    promptText?: string
+    promptText?: string,
+    useLearnedStyle?: boolean
   ): Promise<BatchItem> => {
     try {
       // Get all continuation page images
@@ -885,6 +886,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
           teacherId: user?.id,
           assessmentMode: assessmentMode || 'teacher',
           promptText,
+          useLearnedStyle: useLearnedStyle || false,
         },
       });
 
@@ -916,7 +918,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     }
   };
 
-  const startBatchAnalysis = useCallback(async (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => {
+  const startBatchAnalysis = useCallback(async (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string, answerGuideImage?: string, useLearnedStyle?: boolean) => {
     if (items.length === 0 || isProcessing) return;
 
     setIsProcessing(true);
@@ -951,7 +953,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
         ));
       }
 
-      const result = await analyzeItemWithContinuations(item, currentItems, rubricSteps, assessmentMode, promptText);
+      const result = await analyzeItemWithContinuations(item, currentItems, rubricSteps, assessmentMode, promptText, useLearnedStyle);
 
       // Update primary item with result
       setItems(prev => prev.map((it, idx) => 
