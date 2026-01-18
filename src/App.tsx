@@ -36,6 +36,7 @@ import StudentJoinClass from "./pages/StudentJoinClass";
 import StudentDashboard from "./pages/StudentDashboard";
 import PresentationView from "./pages/PresentationView";
 import PresentationLibrary from "./pages/PresentationLibrary";
+import { BetaFeedbackButton } from "./components/BetaFeedbackButton";
 
 const queryClient = new QueryClient();
 
@@ -135,6 +136,7 @@ const App = () => (
           <BrowserRouter>
             <OnboardingTour />
             <WhatsNewDialog />
+            <BetaFeedbackButton />
             <AppRoutes />
           </BrowserRouter>
         </TooltipProvider>
