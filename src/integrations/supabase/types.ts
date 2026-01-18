@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_generated_images: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          prompt: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          source: string
+          status: string
+          subject: string | null
+          tags: string[] | null
+          teacher_id: string
+          topic: string | null
+          updated_at: string
+          usage_count: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          prompt: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          source?: string
+          status?: string
+          subject?: string | null
+          tags?: string[] | null
+          teacher_id: string
+          topic?: string | null
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          prompt?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          source?: string
+          status?: string
+          subject?: string | null
+          tags?: string[] | null
+          teacher_id?: string
+          topic?: string | null
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generated_images_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_usage_logs: {
         Row: {
           completion_tokens: number | null
