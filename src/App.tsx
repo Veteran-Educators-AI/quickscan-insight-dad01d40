@@ -36,6 +36,7 @@ import StudentJoinClass from "./pages/StudentJoinClass";
 import StudentDashboard from "./pages/StudentDashboard";
 import PresentationView from "./pages/PresentationView";
 import PresentationLibrary from "./pages/PresentationLibrary";
+import TeacherLibrary from "./pages/TeacherLibrary";
 import { BetaFeedbackButton } from "./components/BetaFeedbackButton";
 
 const queryClient = new QueryClient();
@@ -121,6 +122,8 @@ function AppRoutes() {
       {/* Presentation routes */}
       <Route path="/presentation" element={<PresentationView />} />
       <Route path="/presentation/library" element={<ProtectedRoute><PresentationLibrary /></ProtectedRoute>} />
+      {/* Teacher Library */}
+      <Route path="/library" element={<ProtectedRoute><TeacherLibrary /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
