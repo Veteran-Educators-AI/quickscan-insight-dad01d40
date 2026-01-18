@@ -215,7 +215,10 @@ export default function ClassDetail() {
 
         const dataLines = hasHeader ? lines.slice(1) : lines;
 
-        const studentsToAdd = dataLines.map(line => {
+        // Track skipped students for detailed logging
+        const skippedStudents: { line: number; reason: string; data: string }[] = [];
+
+        const studentsToAdd = dataLines.map((line, lineIndex) => {
           const parts = line.split(',').map(p => p.trim().replace(/"/g, ''));
           
           // Extract values based on column mapping
@@ -258,16 +261,53 @@ export default function ClassDetail() {
             }
           }
 
-          return {
+          const student = {
             class_id: id,
-            first_name: firstName,
-            last_name: lastName,
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
             student_id: studentIdValue && !isEmail(studentIdValue) ? studentIdValue : null,
             email: emailValue,
+            _lineNumber: lineIndex + (hasHeader ? 2 : 1), // Track line number for error reporting
+            _rawData: line,
           };
-        }).filter(s => s.first_name && s.last_name);
 
-        if (studentsToAdd.length === 0) {
+          return student;
+        });
+
+        // Separate valid and invalid students with detailed logging
+        const validStudents: typeof studentsToAdd = [];
+        
+        for (const student of studentsToAdd) {
+          const lineNum = student._lineNumber;
+          const rawData = student._rawData;
+          
+          if (!student.first_name && !student.last_name) {
+            skippedStudents.push({
+              line: lineNum,
+              reason: 'Missing both first and last name',
+              data: rawData,
+            });
+          } else if (!student.first_name) {
+            // Allow students with only last name - use "Unknown" as first name
+            validStudents.push({
+              ...student,
+              first_name: 'Unknown',
+            });
+          } else if (!student.last_name) {
+            // Allow students with only first name - use "Unknown" as last name
+            validStudents.push({
+              ...student,
+              last_name: 'Unknown',
+            });
+          } else {
+            validStudents.push(student);
+          }
+        }
+
+        // Clean up internal tracking properties before insert
+        const cleanedStudents = validStudents.map(({ _lineNumber, _rawData, ...rest }) => rest);
+
+        if (cleanedStudents.length === 0) {
           toast({
             title: 'Invalid CSV',
             description: 'No valid student data found. Expected columns: first_name, last_name, student_id, email (in any order)',
@@ -276,15 +316,26 @@ export default function ClassDetail() {
           return;
         }
 
-        const { error } = await supabase.from('students').insert(studentsToAdd);
+        const { error } = await supabase.from('students').insert(cleanedStudents);
         if (error) throw error;
 
-        toast({
-          title: 'Students imported!',
-          description: `Added ${studentsToAdd.length} students`,
-        });
+        // Show detailed import results
+        if (skippedStudents.length > 0) {
+          console.warn('Skipped students during CSV import:', skippedStudents);
+          toast({
+            title: 'Students imported with warnings',
+            description: `Added ${cleanedStudents.length} students. Skipped ${skippedStudents.length} rows (missing names). Check console for details.`,
+            duration: 8000,
+          });
+        } else {
+          toast({
+            title: 'Students imported!',
+            description: `Added ${cleanedStudents.length} students`,
+          });
+        }
         fetchClassData();
       } catch (error: any) {
+        console.error('CSV Import Error:', error);
         toast({
           title: 'Import failed',
           description: error.message || 'Failed to import CSV',
