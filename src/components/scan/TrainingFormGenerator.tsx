@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Printer, FileText, Loader2, AlertCircle, Zap, TrendingDown, Sparkles, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { GEOMETRY_TOPICS, ALGEBRA1_TOPICS, ALGEBRA2_TOPICS, TopicCategory } from '@/data/nysTopics';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -55,6 +56,7 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
   const [showQuickGenerate, setShowQuickGenerate] = useState(false);
   const [isMultiTopicForm, setIsMultiTopicForm] = useState(false);
   const [multiTopicNames, setMultiTopicNames] = useState<string[]>([]);
+  const [selectedForBatch, setSelectedForBatch] = useState<Set<string>>(new Set());
 
   const getTopicsForSubject = (subjectId: string): TopicCategory[] => {
     const subject = SUBJECTS.find(s => s.id === subjectId);
@@ -172,8 +174,13 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
         return scoreB - scoreA;
       });
 
-      setWeakTopics(weak.slice(0, 5)); // Top 5 weak topics
+      const topFive = weak.slice(0, 5);
+      setWeakTopics(topFive);
       setShowQuickGenerate(true);
+      
+      // Auto-select all untrained topics
+      const untrainedNames = topFive.filter(t => !t.hasSamples).map(t => t.topicName);
+      setSelectedForBatch(new Set(untrainedNames));
 
       if (weak.length === 0) {
         toast.success('Great news! No weak topics found. Your students are doing well!');
@@ -190,6 +197,27 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
     } finally {
       setIsLoadingWeakTopics(false);
     }
+  };
+
+  const toggleTopicSelection = (topicName: string) => {
+    setSelectedForBatch(prev => {
+      const next = new Set(prev);
+      if (next.has(topicName)) {
+        next.delete(topicName);
+      } else {
+        next.add(topicName);
+      }
+      return next;
+    });
+  };
+
+  const selectAllUntrained = () => {
+    const untrainedNames = weakTopics.filter(t => !t.hasSamples).map(t => t.topicName);
+    setSelectedForBatch(new Set(untrainedNames));
+  };
+
+  const deselectAll = () => {
+    setSelectedForBatch(new Set());
   };
 
   const handleQuickGenerate = async (topic: WeakTopic) => {
@@ -239,22 +267,22 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
   };
 
   const handleTrainAll = async () => {
-    const untrainedTopics = weakTopics.filter(t => !t.hasSamples);
-    if (untrainedTopics.length === 0) {
-      toast.info('All weak topics already have training samples!');
+    const selectedTopics = weakTopics.filter(t => selectedForBatch.has(t.topicName));
+    if (selectedTopics.length === 0) {
+      toast.error('Please select at least one topic to train');
       return;
     }
 
     setIsGenerating(true);
     setIsMultiTopicForm(true);
-    setMultiTopicNames(untrainedTopics.map(t => t.topicName));
+    setMultiTopicNames(selectedTopics.map(t => t.topicName));
 
     try {
       // Generate 2 questions per topic for a manageable combined form
       const questionsPerTopic = Math.min(2, questionCount);
       const allQuestions: GeneratedQuestion[] = [];
 
-      for (const topic of untrainedTopics) {
+      for (const topic of selectedTopics) {
         const subjectInfo = findSubjectForTopic(topic.topicName);
         if (!subjectInfo) continue;
 
@@ -286,10 +314,10 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
 
       if (allQuestions.length > 0) {
         setGeneratedQuestions(allQuestions);
-        setCurrentTopicName(`${untrainedTopics.length} Untrained Topics`);
+        setCurrentTopicName(`${selectedTopics.length} Selected Topics`);
         setCurrentStandard('Multiple Standards');
         setShowQuickGenerate(false);
-        toast.success(`Generated ${allQuestions.length} questions across ${untrainedTopics.length} topics!`);
+        toast.success(`Generated ${allQuestions.length} questions across ${selectedTopics.length} topics!`);
         onFormGenerated?.();
       } else {
         throw new Error('No questions generated');
@@ -369,9 +397,11 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
     setShowQuickGenerate(false);
     setIsMultiTopicForm(false);
     setMultiTopicNames([]);
+    setSelectedForBatch(new Set());
   };
 
   const untrainedCount = weakTopics.filter(t => !t.hasSamples).length;
+  const selectedCount = selectedForBatch.size;
 
   return (
     <>
@@ -413,18 +443,50 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
               {/* Weak Topics Display */}
               {showQuickGenerate && weakTopics.length > 0 && (
                 <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <TrendingDown className="h-4 w-4 text-destructive" />
-                    Topics Where Students Struggle Most
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <TrendingDown className="h-4 w-4 text-destructive" />
+                      Topics Where Students Struggle Most
+                    </div>
+                    {untrainedCount > 1 && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={selectAllUntrained}
+                          className="text-xs h-7 px-2"
+                        >
+                          Select All
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={deselectAll}
+                          className="text-xs h-7 px-2"
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     {weakTopics.map((topic, idx) => (
                       <div
                         key={topic.topicName}
-                        className={`flex items-center justify-between p-3 bg-background rounded-md border ${
+                        className={`flex items-center gap-3 p-3 bg-background rounded-md border ${
                           !topic.hasSamples ? 'border-amber-500/50 bg-amber-50/30 dark:bg-amber-950/20' : ''
-                        }`}
+                        } ${selectedForBatch.has(topic.topicName) ? 'ring-2 ring-primary ring-offset-1' : ''}`}
                       >
+                        {/* Checkbox for batch selection */}
+                        {!topic.hasSamples && (
+                          <Checkbox
+                            checked={selectedForBatch.has(topic.topicName)}
+                            onCheckedChange={() => toggleTopicSelection(topic.topicName)}
+                            className="shrink-0"
+                          />
+                        )}
+                        {topic.hasSamples && <div className="w-4" />}
+                        
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-sm truncate">{topic.topicName}</p>
@@ -471,8 +533,8 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
                     ))}
                   </div>
                   
-                  {/* Train All Button */}
-                  {untrainedCount > 1 && (
+                  {/* Train Selected Button */}
+                  {selectedCount > 0 && (
                     <Button
                       onClick={handleTrainAll}
                       disabled={isGenerating}
@@ -481,12 +543,12 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
                       {isGenerating ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Generating for All Topics...
+                          Generating for {selectedCount} Topics...
                         </>
                       ) : (
                         <>
                           <Zap className="mr-2 h-4 w-4" />
-                          Train All ({untrainedCount} untrained topics)
+                          Train Selected ({selectedCount} topic{selectedCount !== 1 ? 's' : ''})
                         </>
                       )}
                     </Button>
