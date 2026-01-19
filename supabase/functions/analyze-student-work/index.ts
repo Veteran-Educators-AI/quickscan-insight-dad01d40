@@ -529,6 +529,39 @@ Evaluate the student's work against this standard. When reporting the NYS Standa
     const hallucinationShieldContext = `
 CRITICAL ANALYSIS CONSTRAINTS (Hallucination-Shield Protocol):
 
+MANDATORY PRE-GRADING PROTOCOL:
+** CRITICAL: READ THE QUESTION 3 TIMES BEFORE GRADING **
+Before analyzing any student work, you MUST:
+1. FIRST PASS: Read the question to understand the general topic
+2. SECOND PASS: Identify EXACTLY what is being asked - what specific calculation or answer is required?
+3. THIRD PASS: Confirm the scope - does the question ask for the FULL answer or just a PART of a larger problem?
+
+Example of correct scope identification:
+- Question: "What is the area of the rectangular PART of this figure?"
+  → ONLY grade the rectangle area calculation, NOT the full composite figure area
+- Question: "Calculate the TOTAL area of the composite figure"
+  → Grade for ALL component areas combined
+
+** CRITICAL: DO NOT penalize students for not doing work the question did NOT ask for! **
+
+FULL-PAGE WORK SCANNING PROTOCOL:
+** CRITICAL: SCAN THE ENTIRE PAGE FOR STUDENT WORK **
+Students often write work in unconventional locations:
+1. Margins (top, bottom, left, right)
+2. Headers and blank spaces above questions
+3. Between questions
+4. In any white space on the page
+5. Near diagrams but not directly under answer lines
+
+When extracting OCR text:
+- Scan ALL four corners of the page
+- Look for calculations written above question text
+- Check margins for scratch work
+- Work written ANYWHERE on the page related to a question counts as part of their answer
+- A calculation like "8x4=32" written in the top-right corner still counts as showing work for a rectangle area question
+
+** DO NOT mark a student down for "not showing work" if work IS visible anywhere on the page! **
+
 1. GROUNDING REQUIREMENT: Base your analysis primarily on what you can directly observe in the student's work. 
    - Clearly distinguish between OBSERVED facts and INTERPRETATIONS
    - If work is unclear or illegible, still attempt to interpret but mark as "[INTERPRETATION - VERIFY: probable meaning is X]"
@@ -543,6 +576,7 @@ CRITICAL ANALYSIS CONSTRAINTS (Hallucination-Shield Protocol):
    - "Based on student's work in step 2 where they wrote '[exact quote]'..."
    - "The equation on line 3 shows..."
    - For interpretations: "[INTERPRETATION - VERIFY: This appears to be X based on context]"
+   - For work found in margins: "Student's work in [location] shows '[exact quote]'..."
 
 4. VERIFICATION FLAGS: Mark claims that need teacher confirmation:
    - HIGH CONFIDENCE: Clearly visible and unambiguous
@@ -553,8 +587,10 @@ CRITICAL ANALYSIS CONSTRAINTS (Hallucination-Shield Protocol):
    - DO interpret what student "probably meant" when context makes it clear
    - DO consider mathematical context (e.g., a variable that looks like a number)
    - DO give students credit for reasonable interpretations of their work
+   - DO credit work written ANYWHERE on the page (margins, headers, corners)
    - BUT flag significant interpretations so teachers can verify: "[INTERPRETATION - VERIFY: ...]"
    - Do NOT fabricate entire solutions or understanding that has no basis in visible work
+   - Do NOT penalize for work not asked by the question
 `;
 
     if (isAIMode) {
@@ -635,8 +671,21 @@ Identify the problem being solved, its related NYS standard, and evaluate the st
 
     userPromptText += `\n\nIMPORTANT - BALANCED GRADING PROTOCOL:
 
+** MANDATORY: READ THE QUESTION 3 TIMES **
+Before grading, confirm:
+1. What EXACTLY does the question ask for?
+2. Does it ask for the FULL answer or just a PART?
+3. Only grade what the question ACTUALLY asks - do not penalize for work not requested!
+
+STEP 0 - FULL PAGE SCAN (CRITICAL):
+1. Scan the ENTIRE page - all four corners, margins, headers, blank spaces
+2. Look for student work ANYWHERE on the page (not just under answer lines)
+3. Work written in margins, corners, or near diagrams COUNTS as showing work
+4. A calculation like "8x4=32" in the corner IS showing work for area calculation
+5. DO NOT mark students down for "not showing work" if work exists ANYWHERE on page
+
 STEP 1 - EVIDENCE COLLECTION (with smart interpretation):
-1. Extract all text/equations from the student's work
+1. Extract all text/equations from ALL AREAS of the student's work
 2. For unclear portions, interpret what student likely meant using context
 3. Mark interpretations with "[INTERPRETATION - VERIFY: X]" so teacher can confirm
 4. Consider mathematical context - give students benefit of the doubt
