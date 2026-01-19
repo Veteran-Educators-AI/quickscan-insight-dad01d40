@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { SAMPLE_QUESTIONS } from '@/data/sampleQuestions';
 
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -71,6 +72,35 @@ const svgToDataUri = (svg: string): string => {
     .replace(/'/g, '%27')
     .replace(/"/g, '%22');
   return `data:image/svg+xml,${encoded}`;
+};
+
+const normalizeKey = (value: string) => value.trim().toLowerCase();
+
+const buildFallbackQuestions = (
+  topics: string[],
+  customTopics: { topicName: string; standard: string }[],
+  previewLevel: AdvancementLevel,
+  questionCount: string
+): PreviewQuestion[] => {
+  const topicSet = new Set([...topics, ...customTopics.map((t) => t.topicName)].map(normalizeKey));
+  const standardSet = new Set(customTopics.map((t) => normalizeKey(t.standard)));
+  const matches = SAMPLE_QUESTIONS.filter((question) => {
+    return topicSet.has(normalizeKey(question.topic)) || standardSet.has(normalizeKey(question.standard));
+  });
+
+  if (matches.length === 0) return [];
+
+  const limit = Math.max(1, parseInt(questionCount, 10) || matches.length);
+
+  return matches.slice(0, limit).map((question) => ({
+    questionNumber: question.questionNumber,
+    topic: question.topic,
+    standard: question.standard,
+    question: question.question,
+    difficulty: question.difficulty,
+    advancementLevel: previewLevel,
+    svg: question.svg,
+  }));
 };
 
 export function QuestionPreviewPanel({
@@ -177,11 +207,30 @@ export function QuestionPreviewPanel({
       });
     } catch (error) {
       console.error('Error loading preview:', error);
-      toast({
-        title: 'Preview failed',
-        description: 'Could not generate preview questions.',
-        variant: 'destructive',
-      });
+      const fallbackQuestions = buildFallbackQuestions(
+        selectedTopics,
+        customTopics,
+        previewLevel,
+        questionCount
+      );
+
+      if (fallbackQuestions.length > 0) {
+        setWarmUpQuestions([]);
+        setMainQuestions(fallbackQuestions);
+
+        const fallbackTopics = Array.from(new Set(fallbackQuestions.map((q) => q.topic))).join(', ');
+
+        toast({
+          title: 'Preview loaded',
+          description: `Showing sample questions for ${fallbackTopics}.`,
+        });
+      } else {
+        toast({
+          title: 'Preview failed',
+          description: 'Could not generate preview questions.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsLoading(false);
     }
