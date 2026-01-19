@@ -152,6 +152,34 @@ const SampleAIDetection = () => (
   </div>
 );
 
+const SampleSisterAppPush = () => (
+  <div className="mt-3 p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800 text-left">
+    <div className="flex items-center justify-between mb-2">
+      <span className="font-semibold text-indigo-700 dark:text-indigo-300">📲 Push to NYCLogic Scholar</span>
+      <span className="text-xs bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded">3 students</span>
+    </div>
+    <div className="text-xs space-y-2">
+      <div className="p-2 bg-white dark:bg-gray-800 rounded border flex justify-between items-center">
+        <div>
+          <div className="font-medium">Sofia Rodriguez</div>
+          <div className="text-muted-foreground">Struggling with G.CO.B.8</div>
+        </div>
+        <span className="text-green-500 text-lg">✓</span>
+      </div>
+      <div className="p-2 bg-white dark:bg-gray-800 rounded border flex justify-between items-center">
+        <div>
+          <div className="font-medium">Marcus Chen</div>
+          <div className="text-muted-foreground">Needs practice: SAS proofs</div>
+        </div>
+        <span className="text-green-500 text-lg">✓</span>
+      </div>
+    </div>
+    <div className="mt-2 pt-2 border-t border-indigo-200 dark:border-indigo-800 text-xs text-indigo-600 dark:text-indigo-400">
+      🎮 Students receive personalized practice on their phones!
+    </div>
+  </div>
+);
+
 const tourSteps: Step[] = [
   {
     target: 'body',
@@ -254,6 +282,23 @@ const tourSteps: Step[] = [
           The system flags potentially AI-generated work for your review.
         </p>
         <SampleAIDetection />
+      </div>
+    ),
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tour="nav-reports"]',
+    title: '📲 Push Remediation to Student App',
+    content: (
+      <div className="text-left space-y-2">
+        <p><strong>Personalized practice sent directly to students!</strong></p>
+        <p className="text-sm text-muted-foreground">
+          Based on worksheet results, push standards-aligned remediation courses to the <strong>NYCLogic Scholar</strong> app. Students access it on their phones or computers for targeted practice.
+        </p>
+        <SampleSisterAppPush />
+        <div className="mt-2 p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded text-xs">
+          <strong>How it works:</strong> AI analyzes each student's weaknesses → Creates personalized learning paths → Students earn XP & coins as they master concepts!
+        </div>
       </div>
     ),
     disableBeacon: true,
