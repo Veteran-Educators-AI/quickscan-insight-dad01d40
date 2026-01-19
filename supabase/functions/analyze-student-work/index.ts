@@ -574,6 +574,8 @@ Students often:
 ** ALL WORK IN THE VICINITY OF A QUESTION MUST BE CONSIDERED AS POTENTIALLY PART OF THAT ANSWER **
 
 ** CORRECT ANSWER GRADING RULE - MINIMUM 90% FOR CORRECT ANSWERS **
+*** THIS RULE ONLY APPLIES WHEN THE STUDENT'S ANSWER IS CORRECT ***
+
 CRITICAL RULE: When a student produces a CORRECT ANSWER to a problem:
 - The student MUST receive at MINIMUM 90% credit (grade of 90 or higher)
 - Maximum deduction for lack of shown work is 5-10% ONLY
@@ -583,16 +585,27 @@ CRITICAL RULE: When a student produces a CORRECT ANSWER to a problem:
   * Student only shows answer without full steps
 - CORRECT ANSWER = MASTERY DEMONSTRATED = 90-100%
 
-DEDUCTION GUIDELINES FOR CORRECT ANSWERS:
+DEDUCTION GUIDELINES FOR CORRECT ANSWERS ONLY:
 - Full work shown clearly → 100%
 - Some work shown → 95-100%
 - Minimal work but answer correct → 90-95%
 - Answer correct but NO work at all → 90% (bare minimum)
 - NEVER grade a correct answer below 90%
 
+*** WHEN THE ANSWER IS INCORRECT - NORMAL GRADING APPLIES ***
+If the student's final answer is WRONG, this 90% minimum rule does NOT apply:
+- Grade based on the concepts they demonstrate understanding of
+- Apply standard NYS Regents scoring guidelines (Score 0-4 → Grade 55-100)
+- Partial credit based on correct work shown, even if final answer is wrong
+- Standard point deductions for errors apply normally
+
+SUMMARY:
+- CORRECT answer → Minimum 90%, max 10% deduction for work issues
+- INCORRECT answer → Normal grading based on understanding shown (55-100 scale)
+
 RATIONALE: A correct answer proves the student understands the concept. 
 Penalizing too harshly for not showing work when the answer is RIGHT is unfair.
-The purpose of showing work is to help the teacher understand thinking, not to gatekeep credit.
+However, when the answer is wrong, we need to evaluate understanding through work shown.
 
 FULL-PAGE WORK SCANNING PROTOCOL:
 ** CRITICAL: SCAN THE ENTIRE PAGE FOR STUDENT WORK **

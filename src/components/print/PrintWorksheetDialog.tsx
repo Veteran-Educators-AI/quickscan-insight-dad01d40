@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Printer, Check, Loader2, QrCode, Eye } from 'lucide-react';
+import { Printer, Check, Loader2, QrCode, Eye, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PrintableWorksheet } from './PrintableWorksheet';
 import { AIScanPreviewDialog } from './AIScanPreviewDialog';
+import { StudentScanningGuide } from './StudentScanningGuide';
 import { useAuth } from '@/lib/auth';
 
 interface Student {
@@ -271,6 +272,20 @@ export function PrintWorksheetDialog({ classId, students, trigger, topicName }: 
                   onCheckedChange={setAIOptimizedLayout}
                 />
               </div>
+            </div>
+
+            {/* Student Training Guide */}
+            <div className="flex items-center justify-between rounded-lg border p-3 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20">
+              <div className="space-y-0.5">
+                <Label className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-amber-600" />
+                  Student Training Guide
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Printable one-page guide showing students where to write work and answers for optimal scanning
+                </p>
+              </div>
+              <StudentScanningGuide />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
