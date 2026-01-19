@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy, Brain } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy, Brain, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,7 @@ import { LessonPlanGenerator } from '@/components/questions/LessonPlanGenerator'
 import { LessonPlanLibrary } from '@/components/questions/LessonPlanLibrary';
 import { LessonTopicSelector, type PresentationTheme } from '@/components/questions/LessonTopicSelector';
 import { MasteryChallengeGenerator } from '@/components/questions/MasteryChallengeGenerator';
+import { DiagnosticGapsDialog } from '@/components/reports/DiagnosticGapsSummary';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Questions() {
@@ -455,6 +456,7 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                 <Trophy className="h-4 w-4 mr-2" />
                 Mastery Challenge
               </Button>
+              <DiagnosticGapsDialog />
             </TooltipProvider>
           </div>
         </div>
