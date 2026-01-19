@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw, FileText, Brain, BookOpen } from 'lucide-react';
-import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
+import { resizeImage, blobToBase64, compressImage } from '@/lib/imageUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -174,8 +174,15 @@ export default function Scan() {
     { step_number: 4, description: 'Arrives at correct answer', points: 1 },
   ];
 
-  const handleCameraCapture = useCallback((imageDataUrl: string) => {
-    setCapturedImage(imageDataUrl);
+  const handleCameraCapture = useCallback(async (imageDataUrl: string) => {
+    // Compress image on capture to prevent memory issues on mobile
+    try {
+      const compressed = await compressImage(imageDataUrl, 1200, 0.8);
+      setCapturedImage(compressed);
+    } catch (error) {
+      console.warn('Compression failed, using original:', error);
+      setCapturedImage(imageDataUrl);
+    }
     setScanState('preview');
     setBatchCameraMode(false);
   }, []);
@@ -187,12 +194,20 @@ export default function Scan() {
     
     // Process all images with auto-identification if class is selected
     for (const imageDataUrl of images) {
+      // Compress each image before processing to prevent memory issues
+      let processedImage = imageDataUrl;
+      try {
+        processedImage = await compressImage(imageDataUrl, 1200, 0.8);
+      } catch (error) {
+        console.warn('Compression failed for batch image:', error);
+      }
+      
       if (selectedClassId && students.length > 0) {
-        await batch.addImageWithAutoIdentify(imageDataUrl, students);
+        await batch.addImageWithAutoIdentify(processedImage, students);
       } else if (singleScanClassId && singleScanStudents.length > 0) {
-        await batch.addImageWithAutoIdentify(imageDataUrl, singleScanStudents);
+        await batch.addImageWithAutoIdentify(processedImage, singleScanStudents);
       } else {
-        batch.addImage(imageDataUrl);
+        batch.addImage(processedImage);
       }
     }
     

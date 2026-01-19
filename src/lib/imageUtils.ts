@@ -1,39 +1,120 @@
 /**
+ * Detects if running on a mobile device
+ */
+function isMobileDevice(): boolean {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
+/**
+ * Compresses a base64 image to reduce memory usage, especially on mobile devices.
+ * Returns the compressed image as a data URL.
+ */
+export async function compressImage(imageDataUrl: string, maxWidth = 1200, quality = 0.8): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      // Use lower limits on mobile
+      const isMobile = isMobileDevice();
+      const effectiveMaxWidth = isMobile ? Math.min(maxWidth, 1000) : maxWidth;
+      const effectiveQuality = isMobile ? Math.min(quality, 0.7) : quality;
+      
+      // Calculate new dimensions
+      let width = img.width;
+      let height = img.height;
+      
+      if (width > effectiveMaxWidth) {
+        height = Math.round((height * effectiveMaxWidth) / width);
+        width = effectiveMaxWidth;
+      }
+      
+      // Also limit height to prevent very tall images
+      const maxHeight = isMobile ? 1400 : 1800;
+      if (height > maxHeight) {
+        width = Math.round((width * maxHeight) / height);
+        height = maxHeight;
+      }
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(imageDataUrl);
+        return;
+      }
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', effectiveQuality);
+      
+      // Clean up canvas to free memory
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.width = 1;
+      canvas.height = 1;
+      
+      resolve(compressedDataUrl);
+    };
+    img.onerror = () => reject(new Error('Failed to load image for compression'));
+    img.src = imageDataUrl;
+  });
+}
+
+/**
  * Resizes an image to a maximum width while maintaining aspect ratio.
  * Optimizes for OCR processing by reducing file size.
  */
 export async function resizeImage(file: File | Blob, maxWidth = 1200): Promise<Blob> {
+  const objectUrl = URL.createObjectURL(file);
   const img = new Image();
-  img.src = URL.createObjectURL(file);
+  img.src = objectUrl;
   
   await img.decode();
+  
+  // Use lower limits on mobile
+  const isMobile = isMobileDevice();
+  const effectiveMaxWidth = isMobile ? Math.min(maxWidth, 1000) : maxWidth;
   
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   
   if (!ctx) {
+    URL.revokeObjectURL(objectUrl);
     throw new Error('Could not get canvas context');
   }
   
   // Calculate new dimensions
   let width = img.width;
   let height = img.height;
-  if (width > maxWidth) {
-    height = Math.round((height * maxWidth) / width);
-    width = maxWidth;
+  if (width > effectiveMaxWidth) {
+    height = Math.round((height * effectiveMaxWidth) / width);
+    width = effectiveMaxWidth;
+  }
+  
+  // Also limit height
+  const maxHeight = isMobile ? 1400 : 1800;
+  if (height > maxHeight) {
+    width = Math.round((width * maxHeight) / height);
+    height = maxHeight;
   }
   
   canvas.width = width;
   canvas.height = height;
   ctx.drawImage(img, 0, 0, width, height);
   
-  // Clean up object URL
-  URL.revokeObjectURL(img.src);
+  // Clean up object URL immediately
+  URL.revokeObjectURL(objectUrl);
   
-  // Convert to a smaller Blob
+  // Convert to a smaller Blob with appropriate quality
+  const quality = isMobile ? 0.7 : 0.8;
+  
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
+        // Clean up canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.width = 1;
+        canvas.height = 1;
+        
         if (blob) {
           resolve(blob);
         } else {
@@ -41,7 +122,7 @@ export async function resizeImage(file: File | Blob, maxWidth = 1200): Promise<B
         }
       },
       'image/jpeg',
-      0.8
+      quality
     );
   });
 }

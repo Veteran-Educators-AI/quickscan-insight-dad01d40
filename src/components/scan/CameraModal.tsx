@@ -74,11 +74,14 @@ export function CameraModal({ isOpen, onClose, onCapture, batchMode = false, onB
         streamRef.current = null;
       }
 
+      // Use lower resolution on mobile to prevent memory issues
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: { ideal: mode },
-          width: { ideal: 1920, min: 640 },
-          height: { ideal: 1080, min: 480 },
+          // Lower resolution for mobile devices to prevent memory issues
+          width: { ideal: isMobile ? 1280 : 1920, min: 640 },
+          height: { ideal: isMobile ? 720 : 1080, min: 480 },
         },
         audio: false,
       };
@@ -160,14 +163,42 @@ export function CameraModal({ isOpen, onClose, onCapture, batchMode = false, onB
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    // Set canvas to video dimensions
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Detect mobile and limit resolution to prevent memory issues
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const maxWidth = isMobile ? 1200 : 1600;
+    const maxHeight = isMobile ? 900 : 1200;
+    
+    // Calculate scaled dimensions to reduce memory usage
+    let targetWidth = video.videoWidth;
+    let targetHeight = video.videoHeight;
+    
+    if (targetWidth > maxWidth) {
+      const ratio = maxWidth / targetWidth;
+      targetWidth = maxWidth;
+      targetHeight = Math.round(targetHeight * ratio);
+    }
+    if (targetHeight > maxHeight) {
+      const ratio = maxHeight / targetHeight;
+      targetHeight = maxHeight;
+      targetWidth = Math.round(targetWidth * ratio);
+    }
+
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
 
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.drawImage(video, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      // Draw scaled image to canvas
+      ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+      
+      // Use lower quality for mobile to reduce memory footprint
+      const quality = isMobile ? 0.75 : 0.85;
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      
+      // Clear canvas to free memory immediately
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.width = 1;
+      canvas.height = 1;
       
       // Brief flash effect
       setTimeout(() => {
