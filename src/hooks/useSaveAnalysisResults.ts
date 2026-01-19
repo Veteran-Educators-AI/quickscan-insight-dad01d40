@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { usePushStudentData } from './usePushStudentData';
 import { usePushToSisterApp } from './usePushToSisterApp';
 import { usePerformanceDropAlert } from './usePerformanceDropAlert';
+import { useDuplicateWorkDetection } from './useDuplicateWorkDetection';
 import type { SyncStatus } from '@/components/scan/SyncStatusIndicator';
 
 interface RubricScore {
@@ -40,6 +41,7 @@ interface SaveAnalysisParams {
   topicName?: string;
   topicId?: string;
   classId?: string;
+  skipDuplicateCheck?: boolean; // Allow forcing save even if duplicate detected
 }
 
 async function sendLowRegentsAlert(params: {
@@ -75,6 +77,7 @@ export function useSaveAnalysisResults() {
   const { pushData } = usePushStudentData();
   const { pushToSisterApp } = usePushToSisterApp();
   const { checkAndSendAlert: checkPerformanceDrop, getPreviousGrade } = usePerformanceDropAlert();
+  const { checkForDuplicate } = useDuplicateWorkDetection();
   const [isSaving, setIsSaving] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     sisterAppSync: 'idle',
@@ -100,15 +103,47 @@ export function useSaveAnalysisResults() {
       // Validate required fields
       if (!params.studentId) {
         toast.error('Student ID is required to save results');
+        setIsSaving(false);
         return null;
       }
       
       if (!params.questionId) {
         toast.error('Question ID is required to save results. Please select a question from your library.');
+        setIsSaving(false);
         return null;
       }
 
+      // Check for duplicate work unless explicitly skipped
+      if (!params.skipDuplicateCheck) {
+        const duplicateCheck = await checkForDuplicate(
+          params.studentId,
+          params.questionId,
+          params.result.ocrText,
+          params.imageUrl
+        );
+
+        if (duplicateCheck.isDuplicate) {
+          const gradeInfo = duplicateCheck.existingGrade 
+            ? ` (Grade: ${duplicateCheck.existingGrade}%)` 
+            : '';
+          const dateInfo = duplicateCheck.createdAt 
+            ? ` on ${new Date(duplicateCheck.createdAt).toLocaleDateString()}` 
+            : '';
+          
+          toast.warning(
+            `This work has already been analyzed${dateInfo}${gradeInfo}. Skipping duplicate.`,
+            {
+              description: 'The same student work was detected in a previous scan.',
+              duration: 5000,
+            }
+          );
+          setIsSaving(false);
+          return duplicateCheck.existingAttemptId || null;
+        }
+      }
+
       // 1. Create attempt record
+
       const { data: attempt, error: attemptError } = await supabase
         .from('attempts')
         .insert({
