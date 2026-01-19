@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
-import { sanitizeForPDF } from '@/lib/mathRenderer';
+import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
 
 interface WorksheetPreset {
@@ -37,6 +37,8 @@ const FORM_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'] as const
 type FormLetter = typeof FORM_LETTERS[number];
 
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+
+const formatPdfText = (text: string) => sanitizeForPDF(renderMathText(fixEncodingCorruption(text)));
 
 interface Student {
   id: string;
@@ -822,7 +824,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               yPosition += 6;
 
               pdf.setFont('helvetica', 'normal');
-              const sanitizedQuestion = sanitizeForPDF(question.question);
+              const sanitizedQuestion = formatPdfText(question.question);
               const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
               lines.forEach((line: string) => {
                 pdf.text(line, margin + 5, yPosition);
@@ -866,7 +868,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 pdf.setFontSize(9);
                 pdf.setFont('helvetica', 'italic');
                 pdf.setTextColor(120, 100, 50);
-                const sanitizedHint = sanitizeForPDF(question.hint);
+                const sanitizedHint = formatPdfText(question.hint);
                 const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, contentWidth - 10);
                 hintLines.forEach((line: string) => {
                   pdf.text(line, margin + 5, yPosition);
@@ -917,7 +919,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             yPosition += 6;
 
             pdf.setFont('helvetica', 'normal');
-            const sanitizedQuestion = sanitizeForPDF(question.question);
+            const sanitizedQuestion = formatPdfText(question.question);
             const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
             for (const line of lines) {
               if (yPosition > pageHeight - 30) {
@@ -974,7 +976,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               pdf.setFontSize(9);
               pdf.setFont('helvetica', 'italic');
               pdf.setTextColor(120, 100, 50);
-              const sanitizedHint = sanitizeForPDF(question.hint);
+              const sanitizedHint = formatPdfText(question.hint);
               const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, contentWidth - 10);
               for (const line of hintLines) {
                 if (yPosition > pageHeight - 25) {
@@ -1102,7 +1104,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 pdf.addPage();
                 akY = margin;
               }
-              const questionText = sanitizeForPDF(q.question).substring(0, 80) + (q.question.length > 80 ? '...' : '');
+              const formattedQuestion = formatPdfText(q.question);
+              const questionText = formattedQuestion.substring(0, 80) + (formattedQuestion.length > 80 ? '...' : '');
               pdf.setFontSize(8);
               pdf.text(`W${idx + 1}. ${questionText}`, margin + 2, akY);
               akY += 4;
@@ -1123,7 +1126,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 pdf.addPage();
                 akY = margin;
               }
-              const questionText = sanitizeForPDF(q.question).substring(0, 80) + (q.question.length > 80 ? '...' : '');
+              const formattedQuestion = formatPdfText(q.question);
+              const questionText = formattedQuestion.substring(0, 80) + (formattedQuestion.length > 80 ? '...' : '');
               pdf.setFontSize(8);
               pdf.text(`${idx + 1}. ${questionText}`, margin + 2, akY);
               akY += 4;

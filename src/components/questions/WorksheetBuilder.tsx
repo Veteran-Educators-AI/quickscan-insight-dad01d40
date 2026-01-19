@@ -1048,7 +1048,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
         // Question text - wrap long text, sanitize for PDF to fix encoding issues
         pdf.setFontSize(11);
-        const sanitizedQuestion = sanitizeForPDF(question.question);
+        const sanitizedQuestion = sanitizeForPDF(renderMathText(fixEncodingCorruption(question.question)));
         const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
         
         lines.forEach((line: string) => {
@@ -2664,7 +2664,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     </div>
                     {question && (
                       <p className="text-sm text-muted-foreground line-clamp-2">
-                        {question.question}
+                        {renderMathText(fixEncodingCorruption(question.question))}
                       </p>
                     )}
                     <div className="space-y-1">
