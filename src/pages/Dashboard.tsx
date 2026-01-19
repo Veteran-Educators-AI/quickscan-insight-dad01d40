@@ -74,12 +74,24 @@ export default function Dashboard() {
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [lessonToDelete, setLessonToDelete] = useState<RecentLessonPlan | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [userName, setUserName] = useState<string>('');
 
   useEffect(() => {
     async function fetchStats() {
       if (!user) return;
 
       try {
+        // Fetch user's full name
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile?.full_name) {
+          setUserName(profile.full_name.split(' ')[0]); // Use first name only
+        }
+
         // Fetch class count
         const { count: classCount } = await supabase
           .from('classes')
@@ -219,18 +231,13 @@ export default function Dashboard() {
       <div className="space-y-8">
         {/* Header */}
         <div className="animate-fade-in flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="font-display text-3xl font-bold text-foreground">
-                Welcome back!
-              </h1>
-              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded border border-amber-500/30">
-                Beta
-              </span>
-            </div>
-            <p className="text-muted-foreground mt-1">
-              Here's an overview of your geometry assessments.
-            </p>
+          <div className="flex items-center gap-3">
+            <h1 className="font-display text-3xl font-bold text-foreground">
+              Welcome back{userName ? `, ${userName}` : ''}!
+            </h1>
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded border border-amber-500/30">
+              Beta
+            </span>
           </div>
           
           {/* Unread Comments Badge */}
