@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { handleApiError } from '@/lib/apiErrorHandler';
@@ -6,6 +6,8 @@ import { useQRScanSettings } from '@/hooks/useQRScanSettings';
 import jsQR from 'jsqr';
 import { parseStudentQRCode } from '@/components/print/StudentQRCode';
 import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
+
+const BATCH_STORAGE_KEY = 'scan-genius-batch-data';
 
 interface RubricStep {
   step_number: number;
@@ -139,11 +141,48 @@ interface UseBatchAnalysisReturn {
 export function useBatchAnalysis(): UseBatchAnalysisReturn {
   const { user } = useAuth();
   const { settings: qrScanSettings } = useQRScanSettings();
-  const [items, setItems] = useState<BatchItem[]>([]);
+  const isInitialized = useRef(false);
+  
+  // Load initial state from localStorage
+  const [items, setItems] = useState<BatchItem[]>(() => {
+    try {
+      const stored = localStorage.getItem(BATCH_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          console.log(`Restored ${parsed.length} items from session`);
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to restore batch data:', e);
+    }
+    return [];
+  });
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [summary, setSummary] = useState<BatchSummary | null>(null);
+
+  // Persist items to localStorage when they change
+  useEffect(() => {
+    // Skip initial render to avoid overwriting restored data
+    if (!isInitialized.current) {
+      isInitialized.current = true;
+      return;
+    }
+    
+    try {
+      if (items.length > 0) {
+        localStorage.setItem(BATCH_STORAGE_KEY, JSON.stringify(items));
+      } else {
+        localStorage.removeItem(BATCH_STORAGE_KEY);
+      }
+    } catch (e) {
+      console.error('Failed to persist batch data:', e);
+    }
+  }, [items]);
 
   // Apply grade curve to a result
   const applyGradeCurve = useCallback((result: AnalysisResult): AnalysisResult => {
@@ -265,6 +304,12 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     setItems([]);
     setSummary(null);
     setCurrentIndex(-1);
+    // Clear persisted data
+    try {
+      localStorage.removeItem(BATCH_STORAGE_KEY);
+    } catch (e) {
+      console.error('Failed to clear batch data:', e);
+    }
   }, []);
 
   // Local QR code scanning function - supports both student-only and student+question QR codes
