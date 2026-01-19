@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
-import { sanitizeForPDF } from '@/lib/mathRenderer';
+import { sanitizeForPDF, renderMathText, fixEncodingCorruption } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
 
 interface WorksheetPreset {
@@ -1615,7 +1615,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 return (
                   <div key={idx} className={`p-2 border rounded bg-gray-50 relative group ${isQuestionRegenerating ? 'opacity-50' : ''}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium flex-1">W{idx + 1}. {q.question}</p>
+                      <p className="text-sm font-medium flex-1 whitespace-pre-wrap">W{idx + 1}. {renderMathText(fixEncodingCorruption(q.question))}</p>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -1678,7 +1678,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 return (
                   <div key={idx} className={`p-3 border rounded relative group ${isQuestionRegenerating ? 'opacity-50' : ''}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium flex-1">{idx + 1}. {q.question}</p>
+                      <p className="text-sm font-medium flex-1 whitespace-pre-wrap">{idx + 1}. {renderMathText(fixEncodingCorruption(q.question))}</p>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
