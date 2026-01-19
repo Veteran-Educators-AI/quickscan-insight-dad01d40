@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Printer, FileText, Loader2, Download, AlertCircle, Zap, TrendingDown } from 'lucide-react';
+import { Printer, FileText, Loader2, AlertCircle, Zap, TrendingDown, Sparkles, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { GEOMETRY_TOPICS, ALGEBRA1_TOPICS, ALGEBRA2_TOPICS, TopicCategory } from '@/data/nysTopics';
@@ -30,6 +30,8 @@ interface WeakTopic {
   studentCount: number;
   averageScore: number;
   subject: string;
+  hasSamples: boolean;
+  sampleCount: number;
 }
 
 const SUBJECTS = [
@@ -83,13 +85,23 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
 
     setIsLoadingWeakTopics(true);
     try {
-      // Fetch grade history grouped by topic to find weak areas
-      const { data: gradeData, error } = await supabase
-        .from('grade_history')
-        .select('topic_name, nys_standard, grade, student_id')
-        .eq('teacher_id', user.id);
+      // Fetch grade history and teacher samples in parallel
+      const [gradeResult, samplesResult] = await Promise.all([
+        supabase
+          .from('grade_history')
+          .select('topic_name, nys_standard, grade, student_id')
+          .eq('teacher_id', user.id),
+        supabase
+          .from('teacher_answer_samples')
+          .select('topic_name')
+          .eq('teacher_id', user.id)
+      ]);
 
-      if (error) throw error;
+      if (gradeResult.error) throw gradeResult.error;
+      if (samplesResult.error) throw samplesResult.error;
+
+      const gradeData = gradeResult.data;
+      const samplesData = samplesResult.data;
 
       if (!gradeData || gradeData.length === 0) {
         toast.info('No student data yet. Add some grades first to see weak topics.');
@@ -97,7 +109,14 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
         return;
       }
 
-      // Group by topic and calculate stats
+      // Count samples per topic (normalize topic names for matching)
+      const sampleCounts: Record<string, number> = {};
+      for (const sample of samplesData || []) {
+        const normalizedName = sample.topic_name.toLowerCase().trim();
+        sampleCounts[normalizedName] = (sampleCounts[normalizedName] || 0) + 1;
+      }
+
+      // Group grades by topic and calculate stats
       const topicStats: Record<string, { 
         scores: number[]; 
         students: Set<string>; 
@@ -123,19 +142,28 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
         if (avg < 70) {
           const subjectInfo = findSubjectForTopic(topicName);
           if (subjectInfo) {
+            const normalizedName = topicName.toLowerCase().trim();
+            const sampleCount = sampleCounts[normalizedName] || 0;
             weak.push({
               topicName,
               standard: stats.standard || subjectInfo.standard,
               studentCount: stats.students.size,
               averageScore: Math.round(avg),
               subject: subjectInfo.subject,
+              hasSamples: sampleCount > 0,
+              sampleCount,
             });
           }
         }
       }
 
-      // Sort by number of struggling students and severity
+      // Sort: prioritize topics WITHOUT samples, then by severity
       weak.sort((a, b) => {
+        // First: topics without samples come first
+        if (!a.hasSamples && b.hasSamples) return -1;
+        if (a.hasSamples && !b.hasSamples) return 1;
+        
+        // Second: sort by severity (student count × score gap)
         const scoreA = a.studentCount * (70 - a.averageScore);
         const scoreB = b.studentCount * (70 - b.averageScore);
         return scoreB - scoreA;
@@ -147,6 +175,11 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
       if (weak.length === 0) {
         toast.success('Great news! No weak topics found. Your students are doing well!');
         setShowQuickGenerate(false);
+      } else {
+        const untrainedCount = weak.filter(t => !t.hasSamples).length;
+        if (untrainedCount > 0) {
+          toast.info(`Found ${untrainedCount} weak topic${untrainedCount > 1 ? 's' : ''} without training samples - prioritized first!`);
+        }
       }
     } catch (error) {
       console.error('Error fetching weak topics:', error);
@@ -314,10 +347,26 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
                     {weakTopics.map((topic, idx) => (
                       <div
                         key={topic.topicName}
-                        className="flex items-center justify-between p-3 bg-background rounded-md border"
+                        className={`flex items-center justify-between p-3 bg-background rounded-md border ${
+                          !topic.hasSamples ? 'border-amber-500/50 bg-amber-50/30 dark:bg-amber-950/20' : ''
+                        }`}
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{topic.topicName}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm truncate">{topic.topicName}</p>
+                            {!topic.hasSamples && (
+                              <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                <Sparkles className="h-3 w-3" />
+                                Needs Training
+                              </Badge>
+                            )}
+                            {topic.hasSamples && (
+                              <Badge variant="outline" className="text-xs border-green-500 text-green-600 dark:text-green-400 flex items-center gap-1">
+                                <CheckCircle2 className="h-3 w-3" />
+                                {topic.sampleCount} sample{topic.sampleCount !== 1 ? 's' : ''}
+                              </Badge>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant="secondary" className="text-xs">
                               {topic.studentCount} student{topic.studentCount !== 1 ? 's' : ''}
@@ -334,6 +383,7 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
                         </div>
                         <Button
                           size="sm"
+                          variant={!topic.hasSamples ? "default" : "outline"}
                           onClick={() => handleQuickGenerate(topic)}
                           disabled={isGenerating}
                         >
