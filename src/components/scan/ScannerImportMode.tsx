@@ -679,6 +679,27 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
     return currentIdx < listToUse.length - 1;
   }, [selectedPage, pages, filteredPages, previewSearchQuery]);
 
+  // Parse worksheet name from filename (removes extension, page numbers, cleans up)
+  const parseWorksheetName = useCallback((filename: string): string => {
+    if (!filename) return '';
+    // Remove file extension
+    let name = filename.replace(/\.[^/.]+$/, '');
+    // Remove page numbers like _0001, _0002, (1), (2), -page1, etc.
+    name = name.replace(/[_\-\s]*(page\s*)?\d{1,4}$/i, '');
+    name = name.replace(/\(\d+\)$/, '');
+    name = name.replace(/_+$/, '');
+    // Replace underscores with spaces
+    name = name.replace(/_/g, ' ');
+    // Clean up multiple spaces
+    name = name.replace(/\s+/g, ' ').trim();
+    return name || filename;
+  }, []);
+
+  const worksheetName = useMemo(() => {
+    if (!selectedPageData?.filename) return '';
+    return parseWorksheetName(selectedPageData.filename);
+  }, [selectedPageData?.filename, parseWorksheetName]);
+
   // Keyboard navigation for preview dialog
   useEffect(() => {
     if (!previewOpen) return;
@@ -1135,8 +1156,17 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                 }
               </span>
             </DialogTitle>
-            <DialogDescription>
-              {selectedPageData?.filename}
+            
+            {/* Worksheet Name - Prominently displayed */}
+            {worksheetName && (
+              <div className="flex items-center gap-2 mt-1">
+                <FileImage className="h-4 w-4 text-primary shrink-0" />
+                <span className="font-medium text-base">{worksheetName}</span>
+              </div>
+            )}
+            
+            <DialogDescription className="text-xs">
+              File: {selectedPageData?.filename}
             </DialogDescription>
           </DialogHeader>
           
