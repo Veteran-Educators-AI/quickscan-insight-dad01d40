@@ -1174,7 +1174,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by student name or page number..."
+              placeholder="Search by filename or page number..."
               value={previewSearchQuery}
               onChange={(e) => setPreviewSearchQuery(e.target.value)}
               className="pl-9 pr-9"
@@ -1190,6 +1190,13 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               </Button>
             )}
           </div>
+          
+          {/* No results message */}
+          {previewSearchQuery.trim() && filteredPages.length === 0 && (
+            <div className="text-center py-2 text-sm text-muted-foreground bg-muted/50 rounded">
+              No pages match "{previewSearchQuery}". Try searching by filename (e.g., "Composite Figure") or page number.
+            </div>
+          )}
           
           {/* Navigation + Image Container */}
           <div className="flex items-center gap-2">
