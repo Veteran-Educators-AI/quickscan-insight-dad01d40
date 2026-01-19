@@ -18,6 +18,7 @@ interface GeneratedQuestion {
   difficulty?: string;
   standard?: string;
   diagramSvg?: string;
+  topicName?: string; // For multi-topic forms
 }
 
 interface TrainingFormGeneratorProps {
@@ -52,6 +53,8 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
   const [isLoadingWeakTopics, setIsLoadingWeakTopics] = useState(false);
   const [weakTopics, setWeakTopics] = useState<WeakTopic[]>([]);
   const [showQuickGenerate, setShowQuickGenerate] = useState(false);
+  const [isMultiTopicForm, setIsMultiTopicForm] = useState(false);
+  const [multiTopicNames, setMultiTopicNames] = useState<string[]>([]);
 
   const getTopicsForSubject = (subjectId: string): TopicCategory[] => {
     const subject = SUBJECTS.find(s => s.id === subjectId);
@@ -235,6 +238,72 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
     }
   };
 
+  const handleTrainAll = async () => {
+    const untrainedTopics = weakTopics.filter(t => !t.hasSamples);
+    if (untrainedTopics.length === 0) {
+      toast.info('All weak topics already have training samples!');
+      return;
+    }
+
+    setIsGenerating(true);
+    setIsMultiTopicForm(true);
+    setMultiTopicNames(untrainedTopics.map(t => t.topicName));
+
+    try {
+      // Generate 2 questions per topic for a manageable combined form
+      const questionsPerTopic = Math.min(2, questionCount);
+      const allQuestions: GeneratedQuestion[] = [];
+
+      for (const topic of untrainedTopics) {
+        const subjectInfo = findSubjectForTopic(topic.topicName);
+        if (!subjectInfo) continue;
+
+        const { data, error } = await supabase.functions.invoke('generate-worksheet-questions', {
+          body: {
+            topics: [{
+              topicName: topic.topicName,
+              standard: topic.standard || subjectInfo.standard,
+              subject: topic.subject,
+              category: subjectInfo.category,
+            }],
+            questionCount: questionsPerTopic,
+            difficultyLevels: ['medium', 'hard'],
+            worksheetMode: 'practice',
+            includeAnswerKey: true,
+            includeHints: false,
+          },
+        });
+
+        if (!error && data?.questions) {
+          // Tag each question with its topic
+          const taggedQuestions = data.questions.map((q: GeneratedQuestion) => ({
+            ...q,
+            topicName: topic.topicName,
+          }));
+          allQuestions.push(...taggedQuestions);
+        }
+      }
+
+      if (allQuestions.length > 0) {
+        setGeneratedQuestions(allQuestions);
+        setCurrentTopicName(`${untrainedTopics.length} Untrained Topics`);
+        setCurrentStandard('Multiple Standards');
+        setShowQuickGenerate(false);
+        toast.success(`Generated ${allQuestions.length} questions across ${untrainedTopics.length} topics!`);
+        onFormGenerated?.();
+      } else {
+        throw new Error('No questions generated');
+      }
+    } catch (error) {
+      console.error('Error generating questions:', error);
+      toast.error('Failed to generate questions. Please try again.');
+      setIsMultiTopicForm(false);
+      setMultiTopicNames([]);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!selectedSubject || !selectedTopic) {
       toast.error('Please select a subject and topic');
@@ -253,6 +322,7 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
     setIsGenerating(true);
     setCurrentTopicName(topic.name);
     setCurrentStandard(topic.standard);
+    setIsMultiTopicForm(false);
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-worksheet-questions', {
@@ -297,7 +367,11 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
     setCurrentTopicName('');
     setCurrentStandard('');
     setShowQuickGenerate(false);
+    setIsMultiTopicForm(false);
+    setMultiTopicNames([]);
   };
+
+  const untrainedCount = weakTopics.filter(t => !t.hasSamples).length;
 
   return (
     <>
@@ -396,6 +470,28 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
                       </div>
                     ))}
                   </div>
+                  
+                  {/* Train All Button */}
+                  {untrainedCount > 1 && (
+                    <Button
+                      onClick={handleTrainAll}
+                      disabled={isGenerating}
+                      className="w-full"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Generating for All Topics...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="mr-2 h-4 w-4" />
+                          Train All ({untrainedCount} untrained topics)
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  
                   <Button
                     variant="ghost"
                     size="sm"
@@ -567,7 +663,14 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold">Teacher Training Form</h1>
             <p className="text-lg">{currentTopicName}</p>
-            <p className="text-sm text-gray-500">NYS Standard: {currentStandard}</p>
+            {!isMultiTopicForm && (
+              <p className="text-sm text-gray-500">NYS Standard: {currentStandard}</p>
+            )}
+            {isMultiTopicForm && multiTopicNames.length > 0 && (
+              <p className="text-sm text-gray-500">
+                Topics: {multiTopicNames.join(', ')}
+              </p>
+            )}
             <p className="text-sm text-gray-400 mt-2">
               Solve each problem showing all work. Then scan this completed form to train the AI grader.
             </p>
@@ -579,6 +682,9 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
                 <div className="flex items-start gap-2 mb-4">
                   <span className="font-bold text-lg">{idx + 1}.</span>
                   <div>
+                    {isMultiTopicForm && q.topicName && (
+                      <p className="text-xs text-gray-500 mb-1 font-medium">[{q.topicName}]</p>
+                    )}
                     <p className="text-base">{q.question}</p>
                     {q.diagramSvg && (
                       <div 
