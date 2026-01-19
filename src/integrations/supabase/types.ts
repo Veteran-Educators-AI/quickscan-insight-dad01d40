@@ -1691,6 +1691,59 @@ export type Database = {
           },
         ]
       }
+      teacher_answer_samples: {
+        Row: {
+          created_at: string
+          grading_emphasis: string | null
+          id: string
+          image_url: string
+          key_steps: string[] | null
+          notes: string | null
+          nys_standard: string | null
+          ocr_text: string | null
+          question_context: string | null
+          teacher_id: string
+          topic_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          grading_emphasis?: string | null
+          id?: string
+          image_url: string
+          key_steps?: string[] | null
+          notes?: string | null
+          nys_standard?: string | null
+          ocr_text?: string | null
+          question_context?: string | null
+          teacher_id: string
+          topic_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          grading_emphasis?: string | null
+          id?: string
+          image_url?: string
+          key_steps?: string[] | null
+          notes?: string | null
+          nys_standard?: string | null
+          ocr_text?: string | null
+          question_context?: string | null
+          teacher_id?: string
+          topic_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_answer_samples_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teacher_api_keys: {
         Row: {
           api_key_hash: string

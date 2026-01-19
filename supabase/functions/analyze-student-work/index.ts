@@ -323,6 +323,46 @@ ${useLearnedStyle ? 'YOU MUST APPLY THIS STYLE: ' : 'APPLY THIS STYLE: '}Grade i
       }
     }
 
+    // Fetch teacher answer samples for the topic (NEW: Learn from teacher's own solutions)
+    let teacherAnswerSampleContext = '';
+    if (supabase && effectiveTeacherId && topicName) {
+      try {
+        const { data: samples } = await supabase
+          .from('teacher_answer_samples')
+          .select('topic_name, ocr_text, key_steps, grading_emphasis, question_context')
+          .eq('teacher_id', effectiveTeacherId)
+          .or(`topic_name.ilike.%${topicName}%,nys_standard.ilike.%${standardCode || ''}%`)
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        if (samples && samples.length > 0) {
+          const sampleDescriptions = samples.map((s: any, idx: number) => {
+            let desc = `Sample ${idx + 1} (${s.topic_name}):`;
+            if (s.grading_emphasis) desc += `\n  GRADING FOCUS: ${s.grading_emphasis}`;
+            if (s.ocr_text) desc += `\n  TEACHER'S APPROACH: ${s.ocr_text.substring(0, 500)}...`;
+            if (s.key_steps && s.key_steps.length > 0) desc += `\n  KEY STEPS: ${s.key_steps.join(', ')}`;
+            return desc;
+          }).join('\n\n');
+
+          teacherAnswerSampleContext = `
+TEACHER'S OWN ANSWER SAMPLES FOR THIS TOPIC:
+The teacher has provided their own solutions showing how THEY solve problems like this.
+CRITICAL: Compare the student's work to the teacher's approach and value similar methods/notation.
+
+${sampleDescriptions}
+
+APPLY TEACHER'S APPROACH:
+- Grade based on how well the student matches the teacher's demonstrated method
+- Value the same steps and notation the teacher uses
+- The teacher's emphasis on what matters should guide your scoring
+`;
+          console.log(`Loaded ${samples.length} teacher answer samples for topic context`);
+        }
+      } catch (sampleError) {
+        console.error('Error fetching teacher answer samples:', sampleError);
+      }
+    }
+
     // Fetch past verification decisions to improve AI grading accuracy
     let verificationContext = '';
     if (supabase && effectiveTeacherId) {
@@ -566,6 +606,7 @@ Steps to follow:
 ${hallucinationShieldContext}
 ${verificationContext}
 ${gradingStyleContext}
+${teacherAnswerSampleContext}
 Your task is to:
 1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions - cite exactly what you see
 2. Analyze the student's problem-solving approach using NYS Regents scoring guidelines
