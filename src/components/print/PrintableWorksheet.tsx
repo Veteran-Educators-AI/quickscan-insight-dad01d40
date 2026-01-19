@@ -14,6 +14,8 @@ interface Question {
   jmap_id: string | null;
   prompt_text: string | null;
   prompt_image_url: string | null;
+  topicName?: string; // For multi-topic training forms
+  standard?: string; // For displaying standard info
 }
 
 // Advancement levels A-F (A is best, F is lowest)
@@ -45,6 +47,8 @@ interface PrintableWorksheetProps {
   showQRCodes?: boolean;
   studentLevel?: AdvancementLevel | null;
   topicName?: string;
+  standard?: string;
+  teacherName?: string;
 }
 
 export function PrintableWorksheet({ 
@@ -55,6 +59,8 @@ export function PrintableWorksheet({
   showQRCodes = true,
   studentLevel,
   topicName,
+  standard,
+  teacherName,
 }: PrintableWorksheetProps) {
   const levelInfo = studentLevel ? LEVEL_COLORS[studentLevel] : null;
   const levelDescription = studentLevel ? LEVEL_DESCRIPTIONS[studentLevel] : null;
@@ -64,39 +70,194 @@ export function PrintableWorksheet({
       className="print-worksheet bg-white text-black min-h-screen" 
       style={{ 
         pageBreakAfter: 'always',
-        padding: '0.5in 0.75in',
+        padding: '0.75in 1in',
         maxWidth: '8.5in',
         margin: '0 auto',
         boxSizing: 'border-box',
+        fontFamily: 'Georgia, Times New Roman, serif',
       }}
     >
-      {/* Header with Student QR Code - QR in top-right corner for optimal scanning */}
-      <div className="flex items-start justify-between border-b-2 border-black pb-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ margin: 0 }}>{assessmentName}</h1>
-          <div className="mt-2 text-lg">
-            <p style={{ margin: '0.25rem 0' }}><strong>Name:</strong> {student.first_name} {student.last_name}</p>
-            {student.student_id && (
-              <p style={{ margin: '0.25rem 0' }}><strong>Student ID:</strong> {student.student_id}</p>
+      {/* Enhanced Header with Topic & Standard Banner */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        {/* Title Block */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: '1rem',
+        }}>
+          <div style={{ flex: 1 }}>
+            <h1 style={{ 
+              fontSize: '1.75rem', 
+              fontWeight: 'bold', 
+              margin: 0,
+              fontFamily: 'Helvetica, Arial, sans-serif',
+              letterSpacing: '-0.02em',
+            }}>
+              {assessmentName}
+            </h1>
+            {teacherName && (
+              <p style={{ 
+                fontSize: '0.875rem', 
+                color: '#4b5563', 
+                margin: '0.25rem 0 0 0',
+                fontFamily: 'Helvetica, Arial, sans-serif',
+              }}>
+                Teacher: {teacherName}
+              </p>
             )}
           </div>
-          <div className="text-sm mt-2" style={{ color: '#666' }}>
-            <p style={{ margin: 0 }}>Date: _______________  Period: ____________</p>
-          </div>
+          
+          {/* Student Identification QR Code - Top Right Corner */}
+          {showQRCodes && (
+            <div style={{ 
+              flexShrink: 0, 
+              textAlign: 'center',
+              marginLeft: '1rem',
+            }}>
+              <StudentOnlyQRCode studentId={student.id} size={70} />
+              <p style={{ 
+                fontSize: '0.6rem', 
+                color: '#6b7280', 
+                marginTop: '0.15rem', 
+                fontWeight: 600,
+                fontFamily: 'Helvetica, Arial, sans-serif',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}>
+                Student ID
+              </p>
+            </div>
+          )}
         </div>
-        {/* Student Identification QR Code - Top Right Corner for reliable scanning */}
-        {showQRCodes && (
-          <div style={{ 
-            flexShrink: 0, 
-            textAlign: 'center',
-            marginLeft: '1rem',
+
+        {/* Topic & Standard Banner - Highly Visible */}
+        {(topicName || standard) && (
+          <div style={{
+            background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)',
+            color: 'white',
+            padding: '0.875rem 1.25rem',
+            borderRadius: '0.5rem',
+            marginBottom: '1rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
           }}>
-            <StudentOnlyQRCode studentId={student.id} size={80} />
-            <p style={{ fontSize: '0.65rem', color: '#666', marginTop: '0.25rem', fontWeight: 'bold' }}>
-              SCAN FOR ID
-            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {topicName && (
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <p style={{ 
+                    fontSize: '0.7rem', 
+                    opacity: 0.85, 
+                    margin: 0, 
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    fontFamily: 'Helvetica, Arial, sans-serif',
+                  }}>
+                    Topic Focus
+                  </p>
+                  <p style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: 'bold', 
+                    margin: '0.15rem 0 0 0',
+                    fontFamily: 'Helvetica, Arial, sans-serif',
+                  }}>
+                    {topicName}
+                  </p>
+                </div>
+              )}
+              {standard && (
+                <div style={{ 
+                  textAlign: topicName ? 'right' : 'left',
+                  background: 'rgba(255,255,255,0.15)',
+                  padding: '0.5rem 0.875rem',
+                  borderRadius: '0.375rem',
+                }}>
+                  <p style={{ 
+                    fontSize: '0.65rem', 
+                    opacity: 0.9, 
+                    margin: 0, 
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    fontFamily: 'Helvetica, Arial, sans-serif',
+                  }}>
+                    Standard
+                  </p>
+                  <p style={{ 
+                    fontSize: '0.95rem', 
+                    fontWeight: 600, 
+                    margin: '0.1rem 0 0 0',
+                    fontFamily: 'monospace',
+                  }}>
+                    {standard}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
+
+        {/* Student Info Section */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '0.75rem 1rem',
+          backgroundColor: '#f8fafc',
+          border: '2px solid #e2e8f0',
+          borderRadius: '0.5rem',
+        }}>
+          <div style={{ display: 'flex', gap: '2rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div>
+              <span style={{ 
+                fontSize: '0.7rem', 
+                color: '#64748b', 
+                textTransform: 'uppercase', 
+                letterSpacing: '0.05em',
+                fontFamily: 'Helvetica, Arial, sans-serif',
+              }}>
+                Student Name
+              </span>
+              <p style={{ 
+                fontSize: '1.125rem', 
+                fontWeight: 'bold', 
+                margin: '0.1rem 0 0 0',
+                fontFamily: 'Helvetica, Arial, sans-serif',
+              }}>
+                {student.first_name} {student.last_name}
+              </p>
+            </div>
+            {student.student_id && (
+              <div>
+                <span style={{ 
+                  fontSize: '0.7rem', 
+                  color: '#64748b', 
+                  textTransform: 'uppercase', 
+                  letterSpacing: '0.05em',
+                  fontFamily: 'Helvetica, Arial, sans-serif',
+                }}>
+                  ID
+                </span>
+                <p style={{ 
+                  fontSize: '1rem', 
+                  fontWeight: '500', 
+                  margin: '0.1rem 0 0 0',
+                  fontFamily: 'monospace',
+                }}>
+                  {student.student_id}
+                </p>
+              </div>
+            )}
+          </div>
+          <div style={{ 
+            display: 'flex', 
+            gap: '1.5rem', 
+            color: '#64748b',
+            fontFamily: 'Helvetica, Arial, sans-serif',
+            fontSize: '0.875rem',
+          }}>
+            <span>Date: _______________</span>
+            <span>Period: _______</span>
+          </div>
+        </div>
       </div>
 
       {/* Student Level Indicator */}
@@ -106,7 +267,7 @@ export function PrintableWorksheet({
             display: 'flex',
             alignItems: 'center',
             gap: '1rem',
-            padding: '0.75rem 1rem',
+            padding: '0.875rem 1.25rem',
             marginBottom: '1.5rem',
             borderRadius: '0.5rem',
             backgroundColor: levelInfo.bg,
@@ -115,17 +276,19 @@ export function PrintableWorksheet({
         >
           <div 
             style={{
-              width: '48px',
-              height: '48px',
+              width: '52px',
+              height: '52px',
               borderRadius: '50%',
               backgroundColor: levelInfo.border,
               color: 'white',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '1.5rem',
+              fontSize: '1.75rem',
               fontWeight: 'bold',
               flexShrink: 0,
+              fontFamily: 'Helvetica, Arial, sans-serif',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
             }}
           >
             {studentLevel}
@@ -134,8 +297,9 @@ export function PrintableWorksheet({
             <p style={{ 
               margin: 0, 
               fontWeight: 'bold', 
-              fontSize: '1rem',
+              fontSize: '1.0625rem',
               color: levelInfo.text,
+              fontFamily: 'Helvetica, Arial, sans-serif',
             }}>
               Your Current Level: {studentLevel}
               {topicName && <span style={{ fontWeight: 'normal' }}> in {topicName}</span>}
@@ -145,6 +309,7 @@ export function PrintableWorksheet({
               fontSize: '0.875rem',
               color: levelInfo.text,
               opacity: 0.9,
+              fontFamily: 'Helvetica, Arial, sans-serif',
             }}>
               {levelDescription}
             </p>
@@ -152,33 +317,35 @@ export function PrintableWorksheet({
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
             <p style={{ 
               margin: 0, 
-              fontSize: '0.75rem', 
+              fontSize: '0.7rem', 
               color: levelInfo.text,
               fontWeight: 500,
+              fontFamily: 'Helvetica, Arial, sans-serif',
             }}>
               Scale: A (Best) → F
             </p>
             <div style={{ 
               display: 'flex', 
-              gap: '2px', 
-              marginTop: '0.25rem',
+              gap: '3px', 
+              marginTop: '0.375rem',
               justifyContent: 'flex-end',
             }}>
               {(['A', 'B', 'C', 'D', 'E', 'F'] as AdvancementLevel[]).map(level => (
                 <div
                   key={level}
                   style={{
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '3px',
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '4px',
                     backgroundColor: level === studentLevel ? LEVEL_COLORS[level].border : LEVEL_COLORS[level].bg,
-                    border: `1px solid ${LEVEL_COLORS[level].border}`,
-                    fontSize: '0.6rem',
+                    border: `1.5px solid ${LEVEL_COLORS[level].border}`,
+                    fontSize: '0.65rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: level === studentLevel ? 'bold' : 'normal',
                     color: level === studentLevel ? 'white' : LEVEL_COLORS[level].text,
+                    fontFamily: 'Helvetica, Arial, sans-serif',
                   }}
                 >
                   {level}
@@ -189,8 +356,16 @@ export function PrintableWorksheet({
         </div>
       )}
 
+      {/* Separator Line */}
+      <div style={{
+        height: '2px',
+        background: 'linear-gradient(90deg, #1e3a5f 0%, #3b82f6 50%, #1e3a5f 100%)',
+        marginBottom: '1.5rem',
+        borderRadius: '1px',
+      }} />
+
       {/* Questions */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
         {questions.map((question, index) => (
           <div 
             key={question.id} 
@@ -201,8 +376,35 @@ export function PrintableWorksheet({
               boxSizing: 'border-box',
             }}
           >
+            {/* Per-question topic indicator (for multi-topic worksheets) */}
+            {question.topicName && (
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                backgroundColor: '#dbeafe',
+                border: '1px solid #93c5fd',
+                borderRadius: '0.375rem',
+                padding: '0.25rem 0.75rem',
+                marginBottom: '0.5rem',
+                fontSize: '0.75rem',
+                color: '#1e40af',
+                fontWeight: 600,
+                fontFamily: 'Helvetica, Arial, sans-serif',
+              }}>
+                <span style={{ opacity: 0.7 }}>Topic:</span>
+                <span>{question.topicName}</span>
+                {question.standard && (
+                  <>
+                    <span style={{ opacity: 0.5 }}>•</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.7rem' }}>{question.standard}</span>
+                  </>
+                )}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              {/* QR Code - Left side with clear margin for scanning */}
+              {/* QR Code - Left side */}
               {showQRCodes && (
                 <div style={{ 
                   flexShrink: 0, 
@@ -214,14 +416,18 @@ export function PrintableWorksheet({
                   <StudentQRCode 
                     studentId={student.id} 
                     questionId={question.id} 
-                    size={72}
+                    size={65}
                   />
                   <p style={{ 
-                    fontSize: '0.7rem', 
-                    color: '#333', 
+                    fontSize: '0.75rem', 
+                    color: '#1e3a5f', 
                     marginTop: '0.25rem', 
                     textAlign: 'center',
                     fontWeight: 'bold',
+                    fontFamily: 'Helvetica, Arial, sans-serif',
+                    backgroundColor: '#e0f2fe',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '0.25rem',
                   }}>
                     Q{index + 1}
                   </p>
@@ -232,42 +438,72 @@ export function PrintableWorksheet({
               <div style={{ 
                 flex: 1, 
                 minWidth: 0,
-                maxWidth: showQRCodes ? 'calc(100% - 100px)' : '100%',
+                maxWidth: showQRCodes ? 'calc(100% - 90px)' : '100%',
                 overflow: 'hidden',
                 wordWrap: 'break-word',
                 overflowWrap: 'break-word',
               }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <span style={{ fontWeight: 'bold', fontSize: '1.125rem' }}>{index + 1}.</span>
+                {/* Question Number & Reference */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'baseline', 
+                  gap: '0.625rem', 
+                  marginBottom: '0.625rem',
+                  borderBottom: '1px solid #e5e7eb',
+                  paddingBottom: '0.375rem',
+                }}>
+                  <span style={{ 
+                    fontWeight: 'bold', 
+                    fontSize: '1.25rem',
+                    fontFamily: 'Helvetica, Arial, sans-serif',
+                    color: '#1e3a5f',
+                  }}>
+                    {index + 1}.
+                  </span>
                   {question.jmap_id && (
-                    <span style={{ fontSize: '0.875rem', color: '#666' }}>({question.jmap_id})</span>
+                    <span style={{ 
+                      fontSize: '0.8rem', 
+                      color: '#6b7280',
+                      backgroundColor: '#f3f4f6',
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '0.25rem',
+                      fontFamily: 'monospace',
+                    }}>
+                      Ref: {question.jmap_id}
+                    </span>
                   )}
                 </div>
 
+                {/* Question Text */}
                 {question.prompt_text && (
                   <p style={{ 
-                    marginBottom: '0.75rem', 
-                    fontFamily: 'Georgia, serif',
-                    lineHeight: 1.6,
-                    fontSize: '1rem',
+                    marginBottom: '0.875rem', 
+                    lineHeight: 1.7,
+                    fontSize: '1.0625rem',
                     wordWrap: 'break-word',
                     overflowWrap: 'break-word',
                     whiteSpace: 'pre-wrap',
                     maxWidth: '100%',
+                    color: '#1f2937',
                   }}>
                     {cleanTextForPrint(question.prompt_text)}
                   </p>
                 )}
 
+                {/* Question Image */}
                 {question.prompt_image_url && (
                   <img 
                     src={question.prompt_image_url} 
                     alt={`Question ${index + 1}`}
                     style={{ 
                       maxWidth: '100%',
-                      maxHeight: '200px',
-                      marginBottom: '0.75rem',
+                      maxHeight: '220px',
+                      marginBottom: '0.875rem',
                       objectFit: 'contain',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.375rem',
+                      padding: '0.5rem',
+                      backgroundColor: '#fafafa',
                     }}
                   />
                 )}
@@ -275,13 +511,34 @@ export function PrintableWorksheet({
                 {/* Answer Box */}
                 {showAnswerBox && (
                   <div style={{ 
-                    border: '2px solid #d1d5db',
-                    borderRadius: '0.25rem',
-                    padding: '1rem',
-                    marginTop: '0.75rem',
-                    minHeight: '100px',
+                    border: '2px solid #9ca3af',
+                    borderRadius: '0.375rem',
+                    padding: '1rem 1.25rem',
+                    marginTop: '0.875rem',
+                    minHeight: '120px',
+                    backgroundColor: '#fefefe',
                   }}>
-                    <p style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '0.5rem' }}>Show your work:</p>
+                    <p style={{ 
+                      fontSize: '0.8rem', 
+                      color: '#6b7280', 
+                      marginBottom: '0.75rem',
+                      fontStyle: 'italic',
+                      fontFamily: 'Helvetica, Arial, sans-serif',
+                      borderBottom: '1px dashed #d1d5db',
+                      paddingBottom: '0.5rem',
+                    }}>
+                      Show your work clearly below:
+                    </p>
+                    {/* Lined writing area */}
+                    <div style={{ minHeight: '80px' }}>
+                      {[...Array(4)].map((_, i) => (
+                        <div key={i} style={{
+                          borderBottom: '1px solid #e5e7eb',
+                          height: '1.5rem',
+                          marginBottom: '0.25rem',
+                        }} />
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -290,20 +547,65 @@ export function PrintableWorksheet({
         ))}
       </div>
 
-      {/* Footer with student identifier */}
+      {/* Footer */}
       <div style={{ 
-        marginTop: '2rem',
+        marginTop: '2.5rem',
         paddingTop: '1rem',
-        borderTop: '1px solid #d1d5db',
+        borderTop: '2px solid #1e3a5f',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         fontSize: '0.75rem',
-        color: '#9ca3af',
+        color: '#6b7280',
+        fontFamily: 'Helvetica, Arial, sans-serif',
       }}>
-        <span>{student.last_name}, {student.first_name}{studentLevel ? ` • Level ${studentLevel}` : ''}</span>
-        <span>{assessmentName}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span style={{ fontWeight: '600', color: '#374151' }}>
+            {student.last_name}, {student.first_name}
+          </span>
+          {studentLevel && (
+            <span style={{
+              backgroundColor: levelInfo?.border || '#6b7280',
+              color: 'white',
+              padding: '0.125rem 0.5rem',
+              borderRadius: '0.25rem',
+              fontSize: '0.7rem',
+              fontWeight: 600,
+            }}>
+              Level {studentLevel}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {topicName && (
+            <span style={{ fontStyle: 'italic' }}>{topicName}</span>
+          )}
+          <span style={{ fontWeight: '500' }}>{assessmentName}</span>
+        </div>
       </div>
+
+      {/* Repeated Topic/Standard Reference at Bottom (helpful for multi-page) */}
+      {(topicName || standard) && (
+        <div style={{
+          marginTop: '1rem',
+          padding: '0.5rem 0.75rem',
+          backgroundColor: '#f1f5f9',
+          borderRadius: '0.25rem',
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '2rem',
+          fontSize: '0.7rem',
+          color: '#475569',
+          fontFamily: 'Helvetica, Arial, sans-serif',
+        }}>
+          {topicName && (
+            <span><strong>Topic:</strong> {topicName}</span>
+          )}
+          {standard && (
+            <span><strong>Standard:</strong> {standard}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
