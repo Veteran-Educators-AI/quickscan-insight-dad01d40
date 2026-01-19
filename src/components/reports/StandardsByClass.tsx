@@ -319,9 +319,10 @@ export function StandardsByClass({ classId }: StandardsByClassProps) {
                       >
                         <div className="flex flex-col items-start gap-1">
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="font-mono text-xs">
+                            <span className="font-mono text-xs font-semibold text-primary">
                               {standard.cleanStandard}
-                            </Badge>
+                            </span>
+                            <span className="text-muted-foreground">–</span>
                             <span className="font-medium text-sm">
                               {standard.cleanTopic}
                             </span>
