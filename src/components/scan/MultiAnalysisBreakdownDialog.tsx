@@ -59,7 +59,7 @@ export function MultiAnalysisBreakdownDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
             Multi-Analysis Breakdown
@@ -67,7 +67,7 @@ export function MultiAnalysisBreakdownDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 min-h-0 pr-4" style={{ maxHeight: 'calc(90vh - 100px)' }}>
           {/* Summary Section */}
           <Card className={`mb-4 border-2 ${getConfidenceColor(confidenceScore || 0)}`}>
             <CardContent className="pt-4">
