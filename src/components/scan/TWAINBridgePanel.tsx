@@ -83,14 +83,15 @@ export function TWAINBridgePanel({ onImagesScanned, className }: TWAINBridgePane
     }
   };
 
-  const downloadCompanionApp = () => {
-    // Open GitHub releases page for the scanner bridge
-    window.open('https://github.com/scangenius/scanner-bridge/releases', '_blank');
-    toast.info('Download the scanner-bridge folder and run install.sh (Mac/Linux) or install.bat (Windows)');
+  const showSetupInstructions = () => {
+    toast.info(
+      'The scanner-bridge folder is included in the project source. Clone the repository and run docker-compose up -d in the scanner-bridge folder.',
+      { duration: 8000 }
+    );
   };
 
   const copyDockerCommand = () => {
-    navigator.clipboard.writeText('docker run -d --privileged -p 8765:8765 -v /dev/bus/usb:/dev/bus/usb --name scanner-bridge scangenius/scanner-bridge');
+    navigator.clipboard.writeText('docker run -d --privileged -p 8765:8765 -v /dev/bus/usb:/dev/bus/usb --name scanner-bridge lovable/scanner-bridge');
     toast.success('Docker command copied to clipboard');
   };
 
@@ -156,7 +157,7 @@ export function TWAINBridgePanel({ onImagesScanned, className }: TWAINBridgePane
                     <div className="bg-muted p-3 rounded-md space-y-2">
                       <p className="text-xs font-medium">Quick Start:</p>
                       <ol className="text-xs space-y-1 list-decimal list-inside">
-                        <li>Download the scanner-bridge folder from GitHub</li>
+                        <li>Locate the <code className="bg-background px-1 rounded">scanner-bridge</code> folder in the project</li>
                         <li>Open terminal/command prompt in that folder</li>
                         <li>Run: <code className="bg-background px-1 rounded">docker-compose up -d</code></li>
                         <li>Click "Connect to Bridge" below</li>
@@ -164,9 +165,9 @@ export function TWAINBridgePanel({ onImagesScanned, className }: TWAINBridgePane
                     </div>
                     
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <Button onClick={downloadCompanionApp} className="flex-1">
-                        <Download className="h-4 w-4 mr-2" />
-                        View on GitHub
+                      <Button onClick={showSetupInstructions} variant="outline" className="flex-1">
+                        <Info className="h-4 w-4 mr-2" />
+                        Setup Instructions
                       </Button>
                       <Button variant="outline" onClick={copyDockerCommand} className="flex-1">
                         <Copy className="h-4 w-4 mr-2" />
