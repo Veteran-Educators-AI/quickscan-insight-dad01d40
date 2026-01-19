@@ -17,6 +17,7 @@ import { PerformanceDropAlertSettings } from '@/components/settings/PerformanceD
 import { useOnboardingTour } from '@/hooks/useOnboardingTour';
 import { TeacherAnswerSampleUploader } from '@/components/scan/TeacherAnswerSampleUploader';
 import { TeacherAnswerSampleList } from '@/components/scan/TeacherAnswerSampleList';
+import { TrainingFormGenerator } from '@/components/scan/TrainingFormGenerator';
 
 const DEPLOYED_URL = 'https://eb414783-3d02-49de-9a11-3c5e9daba81a.lovableproject.com';
 
@@ -175,7 +176,17 @@ export default function Settings() {
 
         <AIDetectionSettings />
 
-        {/* Teacher Answer Sample Training */}
+        {/* Teacher AI Training Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Train AI with Your Solutions</CardTitle>
+            <CardDescription>
+              Generate practice forms, solve them by hand, then upload to teach the AI your grading style
+            </CardDescription>
+          </CardHeader>
+        </Card>
+        
+        <TrainingFormGenerator onFormGenerated={() => {}} />
         <TeacherAnswerSampleUploader onSampleSaved={() => setSampleRefresh(prev => prev + 1)} />
         <TeacherAnswerSampleList refreshTrigger={sampleRefresh} />
 
