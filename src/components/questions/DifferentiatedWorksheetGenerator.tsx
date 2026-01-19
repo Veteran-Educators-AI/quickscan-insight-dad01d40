@@ -772,20 +772,20 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           pdf.setLineWidth(0.4);
           pdf.roundedRect(margin, yPosition, contentWidth, 18, 2, 2, 'FD');
           
-          // Warning icon and title
+          // Warning icon (use asterisk/star instead of emoji to avoid encoding issues)
           pdf.setFontSize(9);
           pdf.setFont('helvetica', 'bold');
           pdf.setTextColor(30, 64, 175);
-          pdf.text('📋 IMPORTANT: AI Grading Instructions', margin + 3, yPosition + 5);
+          pdf.text('[!] IMPORTANT: AI Grading Instructions', margin + 3, yPosition + 5);
           
           // Instructions text
           pdf.setFontSize(8);
           pdf.setFont('helvetica', 'normal');
           pdf.setTextColor(55, 65, 81);
-          pdf.text('• Write ALL work inside the bordered "WORK AREA" boxes only.', margin + 5, yPosition + 10);
-          pdf.text('• Write your FINAL ANSWER in the highlighted yellow section.', margin + 5, yPosition + 14);
-          pdf.text('• Work written outside the boxes may NOT be graded by the AI scanner.', pageWidth / 2 + 5, yPosition + 10);
-          pdf.text('• Keep handwriting clear and legible for accurate scanning.', pageWidth / 2 + 5, yPosition + 14);
+          pdf.text('- Write ALL work inside the bordered "WORK AREA" boxes only.', margin + 5, yPosition + 10);
+          pdf.text('- Write your FINAL ANSWER in the highlighted yellow section.', margin + 5, yPosition + 14);
+          pdf.text('- Work written outside the boxes may NOT be graded by the AI scanner.', pageWidth / 2 + 5, yPosition + 10);
+          pdf.text('- Keep handwriting clear and legible for accurate scanning.', pageWidth / 2 + 5, yPosition + 14);
           
           pdf.setTextColor(0);
           pdf.setDrawColor(0);

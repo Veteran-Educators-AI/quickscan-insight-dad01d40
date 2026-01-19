@@ -185,7 +185,7 @@ const superscripts: Record<string, string> = {
   'y': 'ʸ',
 };
 
-// Subscript digits
+// Subscript digits - now includes 'y' for coordinate notation
 const subscripts: Record<string, string> = {
   '0': '₀',
   '1': '₁',
@@ -207,6 +207,7 @@ const subscripts: Record<string, string> = {
   'i': 'ᵢ',
   'n': 'ₙ',
   'x': 'ₓ',
+  'y': 'ᵧ',
 };
 
 // Fractions
@@ -421,6 +422,7 @@ export function sanitizeForPDF(text: string): string {
   // These emojis render as garbled text like "Ø=Ü¡" in jsPDF
   const emojiReplacements: [RegExp, string][] = [
     // Common emojis used in worksheets - replace with text or simple symbols
+    [/📋/g, ''],          // clipboard - remove
     [/💡/g, '->'],        // lightbulb -> arrow for hints
     [/✨/g, '*'],         // sparkles
     [/📝/g, ''],          // memo/pencil
@@ -579,27 +581,29 @@ export function sanitizeForPDF(text: string): string {
     [/ˣ/g, '^x'],
     [/ʸ/g, '^y'],
     
-    // Subscript digits - convert back to underscore notation
-    [/₀/g, '_0'],
-    [/₁/g, '_1'],
-    [/₂/g, '_2'],
-    [/₃/g, '_3'],
-    [/₄/g, '_4'],
-    [/₅/g, '_5'],
-    [/₆/g, '_6'],
-    [/₇/g, '_7'],
-    [/₈/g, '_8'],
-    [/₉/g, '_9'],
-    [/₊/g, '_+'],
-    [/₋/g, '_-'],
-    [/₌/g, '_='],
-    [/₍/g, '_('],
-    [/₎/g, '_)'],
-    [/ₐ/g, '_a'],
-    [/ₑ/g, '_e'],
-    [/ᵢ/g, '_i'],
-    [/ₙ/g, '_n'],
-    [/ₓ/g, '_x'],
+    // Subscript handling for coordinate notation - use small numbers without underscore
+    // This makes (x_1, y_1) and (x_2, y_2) more readable in PDF
+    [/₀/g, '0'],  // Keep as small number, context makes it clear
+    [/₁/g, '1'],
+    [/₂/g, '2'],
+    [/₃/g, '3'],
+    [/₄/g, '4'],
+    [/₅/g, '5'],
+    [/₆/g, '6'],
+    [/₇/g, '7'],
+    [/₈/g, '8'],
+    [/₉/g, '9'],
+    [/₊/g, '+'],
+    [/₋/g, '-'],
+    [/₌/g, '='],
+    [/₍/g, '('],
+    [/₎/g, ')'],
+    [/ₐ/g, 'a'],
+    [/ₑ/g, 'e'],
+    [/ᵢ/g, 'i'],
+    [/ₙ/g, 'n'],
+    [/ₓ/g, 'x'],
+    [/ᵧ/g, 'y'],
     
     // Common fractions
     [/½/g, '1/2'],
