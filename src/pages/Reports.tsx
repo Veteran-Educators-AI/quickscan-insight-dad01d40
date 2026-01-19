@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart3, Users, BookOpen, Share2, Loader2, Check, FileText } from 'lucide-react';
+import { BarChart3, Users, BookOpen, Share2, Loader2, Check, FileText, AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -14,6 +14,7 @@ import { DifferentiationGrouping } from '@/components/reports/DifferentiationGro
 import { EmailResponsesReport } from '@/components/reports/EmailResponsesReport';
 import { ScanAnalysisHistory } from '@/components/reports/ScanAnalysisHistory';
 import { DiagnosticDashboard } from '@/components/reports/DiagnosticDashboard';
+import { DiagnosticGapsSummary } from '@/components/reports/DiagnosticGapsSummary';
 import { StudentProgressTracker } from '@/components/reports/StudentProgressTracker';
 import { LevelProgressionChart } from '@/components/reports/LevelProgressionChart';
 import { RegentsScoreReport } from '@/components/reports/RegentsScoreReport';
@@ -263,6 +264,17 @@ export default function Reports() {
 
             {/* Diagnostic Dashboard */}
             <DiagnosticDashboard classId={selectedClassId === 'all' ? undefined : selectedClassId} />
+
+            {/* Diagnostic Gaps Summary - Cross-class view */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  <h3 className="font-semibold text-lg">Cross-Class Diagnostic Gaps</h3>
+                </div>
+                <DiagnosticGapsSummary />
+              </CardContent>
+            </Card>
 
             {/* AI Training Confidence - Full Card */}
             <TrainingConfidenceIndicator />
