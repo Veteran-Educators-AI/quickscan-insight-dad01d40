@@ -1,10 +1,102 @@
 /**
  * Math Text Renderer Utility
- * Converts plain text math notation to properly formatted Unicode symbols
+ * Converts plain text math notation and LaTeX to properly formatted Unicode symbols
  * for a fluid, textbook-like appearance.
  */
 
-// Symbol mapping for common math notation
+// LaTeX command to Unicode mappings
+const latexCommands: Record<string, string> = {
+  // Greek letters (LaTeX)
+  '\\pi': 'π',
+  '\\theta': 'θ',
+  '\\alpha': 'α',
+  '\\beta': 'β',
+  '\\gamma': 'γ',
+  '\\delta': 'δ',
+  '\\Delta': 'Δ',
+  '\\sigma': 'σ',
+  '\\Sigma': 'Σ',
+  '\\omega': 'ω',
+  '\\Omega': 'Ω',
+  '\\phi': 'φ',
+  '\\Phi': 'Φ',
+  '\\lambda': 'λ',
+  '\\mu': 'μ',
+  '\\rho': 'ρ',
+  '\\tau': 'τ',
+  '\\epsilon': 'ε',
+  '\\infty': '∞',
+  
+  // Relations (LaTeX)
+  '\\neq': '≠',
+  '\\ne': '≠',
+  '\\leq': '≤',
+  '\\le': '≤',
+  '\\geq': '≥',
+  '\\ge': '≥',
+  '\\approx': '≈',
+  '\\sim': '~',
+  '\\equiv': '≡',
+  '\\cong': '≅',
+  '\\pm': '±',
+  '\\mp': '∓',
+  '\\times': '×',
+  '\\div': '÷',
+  '\\cdot': '·',
+  '\\ast': '*',
+  
+  // Arrows (LaTeX)
+  '\\rightarrow': '→',
+  '\\to': '→',
+  '\\leftarrow': '←',
+  '\\leftrightarrow': '↔',
+  '\\Rightarrow': '⇒',
+  '\\Leftarrow': '⇐',
+  '\\Leftrightarrow': '⇔',
+  
+  // Geometry (LaTeX)
+  '\\angle': '∠',
+  '\\perp': '⊥',
+  '\\parallel': '∥',
+  '\\triangle': '△',
+  '\\circ': '°',
+  
+  // Set theory (LaTeX)
+  '\\in': '∈',
+  '\\notin': '∉',
+  '\\subset': '⊂',
+  '\\subseteq': '⊆',
+  '\\supset': '⊃',
+  '\\cup': '∪',
+  '\\cap': '∩',
+  '\\emptyset': '∅',
+  '\\forall': '∀',
+  '\\exists': '∃',
+  
+  // Calculus (LaTeX)
+  '\\partial': '∂',
+  '\\nabla': '∇',
+  '\\int': '∫',
+  '\\sum': 'Σ',
+  '\\prod': '∏',
+  '\\sqrt': '√',
+  
+  // Misc (LaTeX)
+  '\\therefore': '∴',
+  '\\because': '∵',
+  '\\ldots': '…',
+  '\\cdots': '⋯',
+  '\\prime': '′',
+  '\\degree': '°',
+  '\\%': '%',
+  '\\ ': ' ',
+  '\\,': ' ',
+  '\\;': ' ',
+  '\\quad': '  ',
+  '\\qquad': '    ',
+};
+
+// Symbol mapping for common math notation (plain text)
 const mathSymbols: Record<string, string> = {
   // Greek letters
   'pi': 'π',
@@ -137,6 +229,71 @@ const fractions: Record<string, string> = {
 };
 
 /**
+ * Converts LaTeX commands to Unicode symbols
+ * Handles common LaTeX like \neq, \geq, \frac{}{}, etc.
+ */
+function convertLatex(text: string): string {
+  let result = text;
+  
+  // Remove $ delimiters from inline math
+  result = result.replace(/\$([^$]+)\$/g, '$1');
+  
+  // Handle \frac{numerator}{denominator} -> numerator/denominator or (numerator)/(denominator)
+  result = result.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, (match, num, denom) => {
+    // For simple single-char fractions, try Unicode
+    const fracKey = `${num}/${denom}`;
+    if (fractions[fracKey]) {
+      return fractions[fracKey];
+    }
+    // For complex fractions, use parentheses format
+    const cleanNum = num.length > 1 ? `(${num})` : num;
+    const cleanDenom = denom.length > 1 ? `(${denom})` : denom;
+    return `${cleanNum}/${cleanDenom}`;
+  });
+  
+  // Handle nested fracs (second pass for nested structures)
+  result = result.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, (match, num, denom) => {
+    const cleanNum = num.length > 1 ? `(${num})` : num;
+    const cleanDenom = denom.length > 1 ? `(${denom})` : denom;
+    return `${cleanNum}/${cleanDenom}`;
+  });
+  
+  // Handle \sqrt{content} -> √(content) or √content
+  result = result.replace(/\\sqrt\{([^{}]+)\}/g, (match, content) => {
+    return content.length > 1 ? `√(${content})` : `√${content}`;
+  });
+  
+  // Handle \text{content} - just extract the content
+  result = result.replace(/\\text\{([^{}]+)\}/g, '$1');
+  
+  // Handle \left and \right (just remove them, keep the brackets)
+  result = result.replace(/\\left\s*/g, '');
+  result = result.replace(/\\right\s*/g, '');
+  
+  // Handle \{ and \} -> { and }
+  result = result.replace(/\\\{/g, '{');
+  result = result.replace(/\\\}/g, '}');
+  
+  // Sort LaTeX commands by length (longest first) to avoid partial replacements
+  const sortedLatex = Object.entries(latexCommands)
+    .sort((a, b) => b[0].length - a[0].length);
+  
+  for (const [cmd, symbol] of sortedLatex) {
+    // Escape special regex characters in the command
+    const escaped = cmd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    result = result.replace(new RegExp(escaped, 'g'), symbol);
+  }
+  
+  // Clean up any remaining backslashes before common words (like \sin, \cos, \tan, \log, \ln)
+  result = result.replace(/\\(sin|cos|tan|cot|sec|csc|log|ln|lim|max|min|exp)\b/g, '$1');
+  
+  // Remove any remaining single backslashes that might be left over
+  result = result.replace(/\\([a-zA-Z]+)/g, '$1');
+  
+  return result;
+}
+
+/**
  * Converts plain text exponents (like x^2 or x^n) to superscript Unicode
  */
 function convertExponents(text: string): string {
@@ -198,14 +355,15 @@ function convertSymbols(text: string): string {
 
 /**
  * Main function to render math text with proper Unicode symbols
- * Transforms plain text math notation into beautifully formatted text
+ * Transforms plain text math notation and LaTeX into beautifully formatted text
  */
 export function renderMathText(text: string): string {
   if (!text) return '';
   
   let result = text;
   
-  // Apply transformations in order
+  // Apply transformations in order - LaTeX first, then plain text
+  result = convertLatex(result);
   result = convertSymbols(result);
   result = convertExponents(result);
   result = convertSubscripts(result);
