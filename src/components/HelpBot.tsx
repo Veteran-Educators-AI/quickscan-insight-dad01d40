@@ -7,23 +7,33 @@ import {
   Camera, 
   FileText, 
   BarChart3, 
-  Settings as SettingsIcon,
   BookOpen,
-  Lightbulb,
   Zap,
   Shield,
   Play,
   HelpCircle,
   ChevronRight,
   MessageCircle,
-  Sparkles
+  Sparkles,
+  Video,
+  ArrowLeft,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+
+interface Tutorial {
+  title: string;
+  duration: string;
+  path?: string;
+  videoId?: string; // YouTube video ID
+  description?: string;
+}
 
 interface TutorialCategory {
   id: string;
@@ -31,11 +41,7 @@ interface TutorialCategory {
   description: string;
   icon: React.ElementType;
   color: string;
-  tutorials: {
-    title: string;
-    duration: string;
-    path?: string;
-  }[];
+  tutorials: Tutorial[];
 }
 
 const tutorialCategories: TutorialCategory[] = [
@@ -46,9 +52,27 @@ const tutorialCategories: TutorialCategory[] = [
     icon: Sparkles,
     color: 'text-primary',
     tutorials: [
-      { title: 'Create your first class', duration: '2 min', path: '/classes/new' },
-      { title: 'Add students to class', duration: '3 min', path: '/classes' },
-      { title: 'Understanding the dashboard', duration: '2 min', path: '/dashboard' },
+      { 
+        title: 'Create your first class', 
+        duration: '2 min', 
+        path: '/classes/new',
+        videoId: 'dQw4w9WgXcQ', // Placeholder - replace with actual tutorial videos
+        description: 'Learn how to set up your first class and configure basic settings.'
+      },
+      { 
+        title: 'Add students to class', 
+        duration: '3 min', 
+        path: '/classes',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Add students manually or import them from a CSV file.'
+      },
+      { 
+        title: 'Understanding the dashboard', 
+        duration: '2 min', 
+        path: '/dashboard',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Navigate the dashboard and understand key metrics at a glance.'
+      },
     ]
   },
   {
@@ -58,9 +82,25 @@ const tutorialCategories: TutorialCategory[] = [
     icon: Users,
     color: 'text-blue-500',
     tutorials: [
-      { title: 'Import students via CSV', duration: '2 min', path: '/classes' },
-      { title: 'Generate student QR codes', duration: '1 min' },
-      { title: 'Edit class settings', duration: '1 min' },
+      { 
+        title: 'Import students via CSV', 
+        duration: '2 min', 
+        path: '/classes',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Bulk import your student roster using a CSV file.'
+      },
+      { 
+        title: 'Generate student QR codes', 
+        duration: '1 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Create printable QR codes for each student for easy identification.'
+      },
+      { 
+        title: 'Edit class settings', 
+        duration: '1 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Modify class name, period, and other settings.'
+      },
     ]
   },
   {
@@ -70,9 +110,25 @@ const tutorialCategories: TutorialCategory[] = [
     icon: FileText,
     color: 'text-green-500',
     tutorials: [
-      { title: 'Build a worksheet', duration: '4 min', path: '/questions' },
-      { title: 'Create differentiated questions', duration: '3 min' },
-      { title: 'Share worksheets with teachers', duration: '2 min' },
+      { 
+        title: 'Build a worksheet', 
+        duration: '4 min', 
+        path: '/questions',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Create custom worksheets with questions and rubrics.'
+      },
+      { 
+        title: 'Create differentiated questions', 
+        duration: '3 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Generate questions at multiple difficulty levels.'
+      },
+      { 
+        title: 'Share worksheets with teachers', 
+        duration: '2 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Share your worksheets with colleagues via link.'
+      },
     ]
   },
   {
@@ -82,10 +138,31 @@ const tutorialCategories: TutorialCategory[] = [
     icon: Camera,
     color: 'text-orange-500',
     tutorials: [
-      { title: 'Scan with camera', duration: '2 min', path: '/scan' },
-      { title: 'Use USB scanner', duration: '3 min' },
-      { title: 'Batch grade papers', duration: '4 min' },
-      { title: 'Review AI suggestions', duration: '2 min' },
+      { 
+        title: 'Scan with camera', 
+        duration: '2 min', 
+        path: '/scan',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Use your device camera to capture student work.'
+      },
+      { 
+        title: 'Use USB scanner', 
+        duration: '3 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Connect and use a USB document scanner.'
+      },
+      { 
+        title: 'Batch grade papers', 
+        duration: '4 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Grade multiple papers at once for efficiency.'
+      },
+      { 
+        title: 'Review AI suggestions', 
+        duration: '2 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Review and adjust AI-generated scores and feedback.'
+      },
     ]
   },
   {
@@ -95,9 +172,25 @@ const tutorialCategories: TutorialCategory[] = [
     icon: BarChart3,
     color: 'text-purple-500',
     tutorials: [
-      { title: 'View mastery heatmap', duration: '2 min', path: '/reports' },
-      { title: 'Track individual progress', duration: '3 min' },
-      { title: 'Differentiation grouping', duration: '3 min' },
+      { 
+        title: 'View mastery heatmap', 
+        duration: '2 min', 
+        path: '/reports',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Visualize student performance across topics.'
+      },
+      { 
+        title: 'Track individual progress', 
+        duration: '3 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Monitor individual student growth over time.'
+      },
+      { 
+        title: 'Differentiation grouping', 
+        duration: '3 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Group students by skill level for targeted instruction.'
+      },
     ]
   },
   {
@@ -107,9 +200,25 @@ const tutorialCategories: TutorialCategory[] = [
     icon: Shield,
     color: 'text-red-500',
     tutorials: [
-      { title: 'Configure detection settings', duration: '2 min', path: '/settings' },
-      { title: 'Review flagged work', duration: '3 min' },
-      { title: 'Set up parent alerts', duration: '2 min' },
+      { 
+        title: 'Configure detection settings', 
+        duration: '2 min', 
+        path: '/settings',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Set up AI detection thresholds and alerts.'
+      },
+      { 
+        title: 'Review flagged work', 
+        duration: '3 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Review submissions flagged for potential AI use.'
+      },
+      { 
+        title: 'Set up parent alerts', 
+        duration: '2 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Configure automatic parent notifications.'
+      },
     ]
   },
   {
@@ -119,9 +228,25 @@ const tutorialCategories: TutorialCategory[] = [
     icon: Zap,
     color: 'text-amber-500',
     tutorials: [
-      { title: 'Custom grading scales', duration: '3 min' },
-      { title: 'Lesson plan generator', duration: '4 min' },
-      { title: 'Presentation builder', duration: '5 min', path: '/library' },
+      { 
+        title: 'Custom grading scales', 
+        duration: '3 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Create custom grading scales and curves.'
+      },
+      { 
+        title: 'Lesson plan generator', 
+        duration: '4 min',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Generate AI-powered lesson plans from topics.'
+      },
+      { 
+        title: 'Presentation builder', 
+        duration: '5 min', 
+        path: '/library',
+        videoId: 'dQw4w9WgXcQ',
+        description: 'Create interactive presentations for your lessons.'
+      },
     ]
   },
 ];
@@ -149,20 +274,60 @@ const quickHelp = [
   },
 ];
 
+interface VideoPlayerProps {
+  videoId: string;
+  title: string;
+}
+
+function VideoPlayer({ videoId, title }: VideoPlayerProps) {
+  return (
+    <div className="rounded-lg overflow-hidden bg-black">
+      <AspectRatio ratio={16 / 9}>
+        <iframe
+          src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
+          title={title}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="w-full h-full"
+        />
+      </AspectRatio>
+    </div>
+  );
+}
+
 export function HelpBot() {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<TutorialCategory | null>(null);
+  const [selectedTutorial, setSelectedTutorial] = useState<Tutorial | null>(null);
   const [activeQuickHelp, setActiveQuickHelp] = useState<number | null>(null);
 
   const handleCategoryClick = (category: TutorialCategory) => {
     setSelectedCategory(category);
+    setSelectedTutorial(null);
   };
 
-  const handleTutorialClick = (path?: string) => {
+  const handleTutorialClick = (tutorial: Tutorial) => {
+    if (tutorial.videoId) {
+      setSelectedTutorial(tutorial);
+    } else if (tutorial.path) {
+      navigate(tutorial.path);
+      setIsOpen(false);
+    }
+  };
+
+  const handleGoToPage = (path?: string) => {
     if (path) {
       navigate(path);
       setIsOpen(false);
+    }
+  };
+
+  const handleBack = () => {
+    if (selectedTutorial) {
+      setSelectedTutorial(null);
+    } else if (selectedCategory) {
+      setSelectedCategory(null);
     }
   };
 
@@ -213,18 +378,34 @@ export function HelpBot() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed bottom-6 right-6 z-50 w-[360px] max-w-[calc(100vw-3rem)] max-h-[600px] md:max-h-[70vh]"
+              className="fixed bottom-6 right-6 z-50 w-[400px] max-w-[calc(100vw-3rem)] max-h-[650px] md:max-h-[75vh]"
             >
               <Card className="shadow-2xl border-2 overflow-hidden">
                 <CardHeader className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
+                      {(selectedCategory || selectedTutorial) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleBack}
+                          className="text-primary-foreground hover:bg-white/20 h-8 w-8"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                      )}
                       <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
-                        <Bot className="h-5 w-5" />
+                        {selectedTutorial ? <Video className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
                       </div>
                       <div>
-                        <CardTitle className="text-lg">Help Assistant</CardTitle>
-                        <p className="text-xs text-primary-foreground/80">How can I help you today?</p>
+                        <CardTitle className="text-lg">
+                          {selectedTutorial ? 'Video Tutorial' : 'Help Assistant'}
+                        </CardTitle>
+                        <p className="text-xs text-primary-foreground/80">
+                          {selectedTutorial 
+                            ? selectedTutorial.title 
+                            : 'How can I help you today?'}
+                        </p>
                       </div>
                     </div>
                     <Button
@@ -239,10 +420,45 @@ export function HelpBot() {
                 </CardHeader>
                 
                 <CardContent className="p-0">
-                  <ScrollArea className="h-[450px] md:h-[calc(70vh-140px)]">
+                  <ScrollArea className="h-[500px] md:h-[calc(75vh-140px)]">
                     <div className="p-4 space-y-4">
+                      {/* Video Player View */}
+                      {selectedTutorial && selectedTutorial.videoId && (
+                        <div className="space-y-4">
+                          <VideoPlayer 
+                            videoId={selectedTutorial.videoId} 
+                            title={selectedTutorial.title} 
+                          />
+                          
+                          <div className="space-y-2">
+                            <h3 className="font-medium">{selectedTutorial.title}</h3>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Badge variant="secondary" className="gap-1">
+                                <Play className="h-3 w-3" />
+                                {selectedTutorial.duration}
+                              </Badge>
+                            </div>
+                            {selectedTutorial.description && (
+                              <p className="text-sm text-muted-foreground">
+                                {selectedTutorial.description}
+                              </p>
+                            )}
+                          </div>
+
+                          {selectedTutorial.path && (
+                            <Button 
+                              onClick={() => handleGoToPage(selectedTutorial.path)}
+                              className="w-full gap-2"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              Go to {selectedTutorial.title.split(' ')[0]}
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
                       {/* Quick Help Section */}
-                      {!selectedCategory && (
+                      {!selectedCategory && !selectedTutorial && (
                         <>
                           <div className="space-y-2">
                             <h3 className="text-sm font-medium flex items-center gap-2">
@@ -281,12 +497,13 @@ export function HelpBot() {
 
                           <div className="border-t pt-4">
                             <h3 className="text-sm font-medium flex items-center gap-2 mb-3">
-                              <BookOpen className="h-4 w-4 text-muted-foreground" />
-                              Tutorial Categories
+                              <Video className="h-4 w-4 text-muted-foreground" />
+                              Video Tutorials
                             </h3>
                             <div className="grid gap-2">
                               {tutorialCategories.map((category) => {
                                 const Icon = category.icon;
+                                const videoCount = category.tutorials.filter(t => t.videoId).length;
                                 return (
                                   <button
                                     key={category.id}
@@ -298,7 +515,9 @@ export function HelpBot() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <p className="text-sm font-medium truncate">{category.title}</p>
-                                      <p className="text-xs text-muted-foreground truncate">{category.description}</p>
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        {videoCount} video{videoCount !== 1 ? 's' : ''} • {category.description}
+                                      </p>
                                     </div>
                                     <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
                                   </button>
@@ -310,16 +529,8 @@ export function HelpBot() {
                       )}
 
                       {/* Category Detail View */}
-                      {selectedCategory && (
+                      {selectedCategory && !selectedTutorial && (
                         <div className="space-y-4">
-                          <button
-                            onClick={() => setSelectedCategory(null)}
-                            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            <ChevronRight className="h-4 w-4 rotate-180" />
-                            Back to categories
-                          </button>
-                          
                           <div className="flex items-center gap-3">
                             <div className={cn("h-10 w-10 rounded-full bg-secondary flex items-center justify-center", selectedCategory.color)}>
                               <selectedCategory.icon className="h-5 w-5" />
@@ -334,26 +545,32 @@ export function HelpBot() {
                             {selectedCategory.tutorials.map((tutorial, index) => (
                               <button
                                 key={index}
-                                onClick={() => handleTutorialClick(tutorial.path)}
-                                className={cn(
-                                  "w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left",
-                                  tutorial.path 
-                                    ? "bg-secondary/50 hover:bg-secondary cursor-pointer" 
-                                    : "bg-secondary/30 cursor-default"
-                                )}
+                                onClick={() => handleTutorialClick(tutorial)}
+                                className="w-full flex items-center gap-3 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors text-left group"
                               >
-                                <div className="h-8 w-8 rounded-full bg-background flex items-center justify-center">
-                                  <Play className="h-3 w-3 text-primary" />
+                                <div className="h-10 w-10 rounded-lg bg-background flex items-center justify-center relative overflow-hidden">
+                                  {tutorial.videoId ? (
+                                    <>
+                                      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5" />
+                                      <Play className="h-4 w-4 text-primary relative z-10" />
+                                    </>
+                                  ) : (
+                                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                                  )}
                                 </div>
                                 <div className="flex-1">
                                   <p className="text-sm font-medium">{tutorial.title}</p>
-                                  <p className="text-xs text-muted-foreground">{tutorial.duration}</p>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-xs text-muted-foreground">{tutorial.duration}</span>
+                                    {tutorial.videoId && (
+                                      <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                                        <Video className="h-2.5 w-2.5 mr-0.5" />
+                                        Video
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
-                                {tutorial.path && (
-                                  <Badge variant="outline" className="text-xs">
-                                    Go
-                                  </Badge>
-                                )}
+                                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
                               </button>
                             ))}
                           </div>
