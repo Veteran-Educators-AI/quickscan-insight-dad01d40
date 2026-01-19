@@ -878,15 +878,86 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 pdf.setFontSize(11);
               }
 
-              // Smaller answer space for warm-up
+              // AI-Optimized Work/Answer Zone for warm-up
               yPosition += 3;
-              pdf.setDrawColor(200);
-              pdf.setLineWidth(0.2);
-              for (let i = 0; i < 2; i++) {
-                pdf.line(margin + 5, yPosition, pageWidth - margin, yPosition);
-                yPosition += 7;
+              
+              // Check if we need a new page for the zone box
+              const warmUpZoneHeight = 35; // Total height for work area + answer
+              if (yPosition > pageHeight - warmUpZoneHeight - 15) {
+                pdf.addPage();
+                pageCount++;
+                await addContinuationPageHeader(pageCount);
+                yPosition = 25;
               }
-              yPosition += 5;
+              
+              const boxMarginLeft = margin + 3;
+              const boxWidth = contentWidth - 6;
+              const warmUpWorkAreaHeight = 20;
+              const warmUpAnswerHeight = 12;
+              
+              // Main container border (dark blue)
+              pdf.setDrawColor(30, 58, 95);
+              pdf.setLineWidth(0.5);
+              pdf.rect(boxMarginLeft, yPosition, boxWidth, warmUpZoneHeight);
+              
+              // Work Area background (light gray)
+              pdf.setFillColor(248, 250, 252);
+              pdf.rect(boxMarginLeft, yPosition, boxWidth, warmUpWorkAreaHeight, 'F');
+              
+              // Work Area label
+              pdf.setFontSize(7);
+              pdf.setFont('helvetica', 'bold');
+              pdf.setTextColor(30, 58, 95);
+              pdf.text(`WORK AREA W${question.questionNumber}`, boxMarginLeft + 2, yPosition + 4);
+              
+              // Corner markers for AI zone detection
+              pdf.setDrawColor(30, 58, 95);
+              pdf.setLineWidth(0.3);
+              // Top-left
+              pdf.line(boxMarginLeft + 2, yPosition + 6, boxMarginLeft + 2, yPosition + 10);
+              pdf.line(boxMarginLeft + 2, yPosition + 6, boxMarginLeft + 6, yPosition + 6);
+              // Top-right
+              pdf.line(boxMarginLeft + boxWidth - 2, yPosition + 6, boxMarginLeft + boxWidth - 2, yPosition + 10);
+              pdf.line(boxMarginLeft + boxWidth - 6, yPosition + 6, boxMarginLeft + boxWidth - 2, yPosition + 6);
+              // Bottom-left
+              pdf.line(boxMarginLeft + 2, yPosition + warmUpWorkAreaHeight - 4, boxMarginLeft + 2, yPosition + warmUpWorkAreaHeight);
+              pdf.line(boxMarginLeft + 2, yPosition + warmUpWorkAreaHeight, boxMarginLeft + 6, yPosition + warmUpWorkAreaHeight);
+              // Bottom-right
+              pdf.line(boxMarginLeft + boxWidth - 2, yPosition + warmUpWorkAreaHeight - 4, boxMarginLeft + boxWidth - 2, yPosition + warmUpWorkAreaHeight);
+              pdf.line(boxMarginLeft + boxWidth - 6, yPosition + warmUpWorkAreaHeight, boxMarginLeft + boxWidth - 2, yPosition + warmUpWorkAreaHeight);
+              
+              // Dashed line separator
+              pdf.setDrawColor(148, 163, 184);
+              pdf.setLineDashPattern([1, 1], 0);
+              pdf.line(boxMarginLeft, yPosition + warmUpWorkAreaHeight, boxMarginLeft + boxWidth, yPosition + warmUpWorkAreaHeight);
+              pdf.setLineDashPattern([], 0);
+              
+              // Final Answer section (amber background)
+              pdf.setFillColor(254, 243, 199);
+              pdf.rect(boxMarginLeft, yPosition + warmUpWorkAreaHeight, boxWidth, warmUpAnswerHeight, 'F');
+              
+              // Answer border top (amber accent)
+              pdf.setDrawColor(245, 158, 11);
+              pdf.setLineWidth(0.4);
+              pdf.line(boxMarginLeft, yPosition + warmUpWorkAreaHeight, boxMarginLeft + boxWidth, yPosition + warmUpWorkAreaHeight);
+              
+              // Final Answer label
+              pdf.setFontSize(7);
+              pdf.setFont('helvetica', 'bold');
+              pdf.setTextColor(146, 64, 14);
+              pdf.text('FINAL ANSWER', boxMarginLeft + 2, yPosition + warmUpWorkAreaHeight + 4);
+              
+              // Answer line
+              pdf.setDrawColor(180, 140, 80);
+              pdf.setLineWidth(0.2);
+              pdf.line(boxMarginLeft + 25, yPosition + warmUpWorkAreaHeight + 8, boxMarginLeft + boxWidth - 5, yPosition + warmUpWorkAreaHeight + 8);
+              
+              // Reset colors
+              pdf.setDrawColor(0);
+              pdf.setTextColor(0);
+              pdf.setLineWidth(0.2);
+              
+              yPosition += warmUpZoneHeight + 5;
             }
 
             // Separator before main questions
@@ -992,21 +1063,98 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               pdf.setFontSize(11);
             }
 
-            // Answer lines
+            // AI-Optimized Work/Answer Zone for main questions
             yPosition += 5;
-            pdf.setDrawColor(200);
-            pdf.setLineWidth(0.2);
-            for (let i = 0; i < 4; i++) {
-              if (yPosition > pageHeight - 20) {
-                pdf.addPage();
-                pageCount++;
-                await addContinuationPageHeader(pageCount);
-                yPosition = 25; // Start below the continuation header
-              }
-              pdf.line(margin + 5, yPosition, pageWidth - margin, yPosition);
-              yPosition += 8;
+            
+            // Zone dimensions
+            const mainZoneHeight = 55; // Total height for work area + answer
+            const mainWorkAreaHeight = 40;
+            const mainAnswerHeight = 12;
+            const boxMarginLeft = margin + 3;
+            const boxWidth = contentWidth - 6;
+            
+            // Check if we need a new page for the zone box
+            if (yPosition > pageHeight - mainZoneHeight - 15) {
+              pdf.addPage();
+              pageCount++;
+              await addContinuationPageHeader(pageCount);
+              yPosition = 25;
             }
-            yPosition += 5;
+            
+            // Main container border (dark blue)
+            pdf.setDrawColor(30, 58, 95);
+            pdf.setLineWidth(0.5);
+            pdf.rect(boxMarginLeft, yPosition, boxWidth, mainZoneHeight);
+            
+            // Work Area background (light gray)
+            pdf.setFillColor(248, 250, 252);
+            pdf.rect(boxMarginLeft, yPosition, boxWidth, mainWorkAreaHeight, 'F');
+            
+            // Work Area label
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(30, 58, 95);
+            pdf.text(`WORK AREA Q${question.questionNumber}`, boxMarginLeft + 2, yPosition + 5);
+            
+            // Corner markers for AI zone detection
+            pdf.setDrawColor(30, 58, 95);
+            pdf.setLineWidth(0.3);
+            // Top-left corner marker
+            pdf.line(boxMarginLeft + 2, yPosition + 7, boxMarginLeft + 2, yPosition + 12);
+            pdf.line(boxMarginLeft + 2, yPosition + 7, boxMarginLeft + 7, yPosition + 7);
+            // Top-right corner marker
+            pdf.line(boxMarginLeft + boxWidth - 2, yPosition + 7, boxMarginLeft + boxWidth - 2, yPosition + 12);
+            pdf.line(boxMarginLeft + boxWidth - 7, yPosition + 7, boxMarginLeft + boxWidth - 2, yPosition + 7);
+            // Bottom-left corner marker
+            pdf.line(boxMarginLeft + 2, yPosition + mainWorkAreaHeight - 5, boxMarginLeft + 2, yPosition + mainWorkAreaHeight);
+            pdf.line(boxMarginLeft + 2, yPosition + mainWorkAreaHeight, boxMarginLeft + 7, yPosition + mainWorkAreaHeight);
+            // Bottom-right corner marker
+            pdf.line(boxMarginLeft + boxWidth - 2, yPosition + mainWorkAreaHeight - 5, boxMarginLeft + boxWidth - 2, yPosition + mainWorkAreaHeight);
+            pdf.line(boxMarginLeft + boxWidth - 7, yPosition + mainWorkAreaHeight, boxMarginLeft + boxWidth - 2, yPosition + mainWorkAreaHeight);
+            
+            // Work area lines (light guidelines)
+            pdf.setDrawColor(220, 220, 220);
+            pdf.setLineWidth(0.1);
+            for (let i = 1; i <= 3; i++) {
+              const lineY = yPosition + 10 + (i * 8);
+              if (lineY < yPosition + mainWorkAreaHeight - 2) {
+                pdf.line(boxMarginLeft + 5, lineY, boxMarginLeft + boxWidth - 5, lineY);
+              }
+            }
+            
+            // Dashed line separator between work and answer
+            pdf.setDrawColor(148, 163, 184);
+            pdf.setLineDashPattern([1.5, 1.5], 0);
+            pdf.line(boxMarginLeft, yPosition + mainWorkAreaHeight, boxMarginLeft + boxWidth, yPosition + mainWorkAreaHeight);
+            pdf.setLineDashPattern([], 0);
+            
+            // Final Answer section (amber background)
+            pdf.setFillColor(254, 243, 199);
+            pdf.rect(boxMarginLeft, yPosition + mainWorkAreaHeight, boxWidth, mainAnswerHeight, 'F');
+            
+            // Answer border top (amber accent line)
+            pdf.setDrawColor(245, 158, 11);
+            pdf.setLineWidth(0.4);
+            pdf.line(boxMarginLeft, yPosition + mainWorkAreaHeight, boxMarginLeft + boxWidth, yPosition + mainWorkAreaHeight);
+            
+            // Final Answer label
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(146, 64, 14);
+            pdf.text('FINAL ANSWER', boxMarginLeft + 2, yPosition + mainWorkAreaHeight + 5);
+            
+            // Answer line
+            pdf.setDrawColor(180, 140, 80);
+            pdf.setLineWidth(0.2);
+            pdf.line(boxMarginLeft + 30, yPosition + mainWorkAreaHeight + 8, boxMarginLeft + boxWidth - 5, yPosition + mainWorkAreaHeight + 8);
+            
+            // Reset colors and line settings
+            pdf.setDrawColor(0);
+            pdf.setTextColor(0);
+            pdf.setLineWidth(0.2);
+            pdf.setFont('helvetica', 'normal');
+            
+            yPosition += mainZoneHeight + 8;
           }
 
           // Footer with optional QR code
