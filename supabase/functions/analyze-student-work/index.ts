@@ -573,6 +573,18 @@ Students often:
 
 ** ALL WORK IN THE VICINITY OF A QUESTION MUST BE CONSIDERED AS POTENTIALLY PART OF THAT ANSWER **
 
+** MAXIMUM POINT REDUCTION RULE FOR CORRECT ANSWERS **
+CRITICAL: When a student produces a CORRECT ANSWER to a problem:
+- The MAXIMUM point reduction allowed is 5% (e.g., from 100 to 95)
+- This applies even if work shown is minimal, messy, or unconventionally placed
+- CORRECT ANSWER + ANY work showing understanding = MINIMUM 95%
+- You may ONLY deduct points for:
+  * Significant notation errors (max 2-3%)
+  * Missing units when explicitly required (max 2-3%)
+  * Partial work shown when ALL work was explicitly required (max 5%)
+- NEVER reduce a correct answer by more than 5 percentage points
+- A correct answer demonstrates mastery of the concept being tested
+
 FULL-PAGE WORK SCANNING PROTOCOL:
 ** CRITICAL: SCAN THE ENTIRE PAGE FOR STUDENT WORK **
 Students often write work in unconventional locations:
