@@ -21,6 +21,7 @@ import {
   Circle,
   Sparkles
 } from 'lucide-react';
+import { RemediationCompletionsBadge } from '@/components/dashboard/RemediationCompletionsBadge';
 import { VerificationStatsWidget } from '@/components/reports/VerificationStatsWidget';
 import { StudentsNeedingHelpWidget } from '@/components/reports/StudentsNeedingHelpWidget';
 import { Button } from '@/components/ui/button';
@@ -264,28 +265,34 @@ export default function Dashboard() {
             </span>
           </div>
           
-          {/* Unread Comments Badge */}
-          {stats.unreadComments > 0 && (
-            <Link to="/reports">
-              <Card className="border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
-                <CardContent className="p-3 flex items-center gap-3">
-                  <div className="relative">
-                    <MessageSquare className="h-5 w-5 text-primary" />
-                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
-                      {stats.unreadComments > 9 ? '9+' : stats.unreadComments}
-                    </span>
-                  </div>
-                  <div className="text-sm">
-                    <p className="font-medium text-foreground">
-                      {stats.unreadComments} unread {stats.unreadComments === 1 ? 'comment' : 'comments'}
-                    </p>
-                    <p className="text-muted-foreground text-xs">from students</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            </Link>
-          )}
+          {/* Notification Badges */}
+          <div className="flex items-center gap-3">
+            {/* Remediation Completions Badge */}
+            <RemediationCompletionsBadge />
+            
+            {/* Unread Comments Badge */}
+            {stats.unreadComments > 0 && (
+              <Link to="/reports">
+                <Card className="border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <div className="relative">
+                      <MessageSquare className="h-5 w-5 text-primary" />
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                        {stats.unreadComments > 9 ? '9+' : stats.unreadComments}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <p className="font-medium text-foreground">
+                        {stats.unreadComments} unread {stats.unreadComments === 1 ? 'comment' : 'comments'}
+                      </p>
+                      <p className="text-muted-foreground text-xs">from students</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Daily Teaching Tip & Getting Started */}
