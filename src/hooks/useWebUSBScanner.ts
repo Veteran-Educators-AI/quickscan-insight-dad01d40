@@ -163,6 +163,7 @@ interface UseWebUSBScannerReturn {
   cancelScan: () => void;
   updateSettings: (settings: Partial<ScanSettings>) => void;
   clearImages: () => void;
+  clearError: () => void;
   checkCompatibility: () => Promise<CompatibilityCheck | null>;
   reconnectToDevice: (device: USBDevice) => Promise<boolean>;
 }
@@ -322,6 +323,9 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
   useEffect(() => {
     if (!isSupported) return;
 
+    // Clear any stale error state from previous sessions
+    setError(null);
+    
     const checkPairedDevices = async () => {
       try {
         const devices = await navigator.usb!.getDevices();
@@ -335,7 +339,6 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
         // NOTE: We intentionally do NOT auto-reconnect here.
         // The browser remembers paired devices, but the scanner is not actually connected
         // until the user explicitly clicks "Reconnect" or "Connect Scanner".
-        // Auto-reconnecting was confusing users as it showed "paired" before any action.
         if (scanners.length > 0) {
           console.log('Found remembered scanners (not yet connected):', scanners.map(s => s.productName));
         }
@@ -797,6 +800,10 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
     }
   }, []);
 
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
   return {
     isSupported,
     isConnecting,
@@ -816,6 +823,7 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
     cancelScan,
     updateSettings,
     clearImages,
+    clearError,
     checkCompatibility,
     reconnectToDevice,
   };

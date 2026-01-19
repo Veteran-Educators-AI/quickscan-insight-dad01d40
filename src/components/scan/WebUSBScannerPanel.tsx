@@ -57,6 +57,7 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
     cancelScan,
     updateSettings,
     clearImages,
+    clearError,
     checkCompatibility,
     reconnectToDevice,
   } = useWebUSBScanner();
@@ -138,14 +139,22 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="flex items-center justify-between">
               <span>{error}</span>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={requestDevice}
-                className="ml-2"
-              >
-                <RefreshCw className="h-3 w-3 mr-1" /> Retry
-              </Button>
+              <div className="flex gap-2 ml-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={requestDevice}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" /> Retry
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={clearError}
+                >
+                  Dismiss
+                </Button>
+              </div>
             </AlertDescription>
           </Alert>
         )}
