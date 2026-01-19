@@ -51,18 +51,25 @@ async function callLovableAI(prompt: string): Promise<string> {
       messages: [
         { role: 'system', content: `You are an expert math educator creating textbook-quality problems. 
 
-CRITICAL FORMATTING REQUIREMENTS:
-- Use proper mathematical Unicode symbols in ALL questions:
-  • Use π (not "pi" or "3.14")
-  • Use √ for square roots (e.g., √2, √3)
-  • Use ² ³ ⁴ for exponents (e.g., x², y³, r⁴)
+CRITICAL FORMATTING REQUIREMENTS - MUST FOLLOW EXACTLY:
+
+NEVER use LaTeX notation. Do NOT use:
+- Dollar signs for math: $x$ or $$equation$$
+- Backslash commands: \\frac, \\neq, \\geq, \\leq, \\sqrt, \\cdot, \\times, etc.
+- Any LaTeX syntax whatsoever
+
+INSTEAD, use proper mathematical Unicode symbols DIRECTLY in ALL questions:
+  • Use π (not "pi", not "\\pi", not "$\\pi$")
+  • Use √ for square roots (e.g., √2, √3, √(x+1))
+  • Use ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹ for exponents (e.g., x², y³, r⁴)
   • Use ° for degrees (e.g., 45°, 90°)
   • Use ∠ for angles (e.g., ∠ABC)
-  • Use ≤ ≥ ≠ for inequalities
+  • Use ≤ ≥ ≠ for inequalities (NOT \\leq \\geq \\neq)
   • Use × for multiplication in expressions
   • Use ÷ for division where appropriate
   • Use θ for angle theta
   • Use ½ ⅓ ¼ ⅔ ¾ for common fractions
+  • For complex fractions, write as: (numerator)/(denominator) e.g., (x² + 1)/(x - 2)
   • Use ⊥ for perpendicular
   • Use ∥ for parallel
   • Use △ for triangle notation (e.g., △ABC)
