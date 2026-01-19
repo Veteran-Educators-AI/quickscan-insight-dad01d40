@@ -172,12 +172,15 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
                 <span className="text-xs">Works best with scanners that support USB Image Class</span>
               </p>
 
-              {/* Previously paired devices */}
+              {/* Previously remembered devices (browser remembers USB permissions, not actual connection) */}
               {pairedDevices.length > 0 && !isAutoReconnecting && (
-                <div className="mb-4 p-3 rounded-lg bg-muted/50 border">
-                  <p className="text-xs font-medium mb-2 flex items-center justify-center gap-1">
-                    <CheckCircle2 className="h-3 w-3 text-green-500" />
-                    Previously Paired Scanners
+                <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                  <p className="text-xs font-medium mb-1 flex items-center justify-center gap-1 text-amber-700 dark:text-amber-400">
+                    <Usb className="h-3 w-3" />
+                    Remembered Scanners
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-2 text-center">
+                    Click to connect (browser remembers permission, not connection)
                   </p>
                   <div className="space-y-2">
                     {pairedDevices.map((device, idx) => (
@@ -187,7 +190,7 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
                         </span>
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="default"
                           onClick={() => reconnectToDevice(device)}
                           disabled={isConnecting}
                           className="text-xs h-7"
@@ -196,8 +199,8 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
                             <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
                             <>
-                              <RefreshCw className="h-3 w-3 mr-1" />
-                              Reconnect
+                              <Usb className="h-3 w-3 mr-1" />
+                              Connect
                             </>
                           )}
                         </Button>
