@@ -17,17 +17,24 @@ import {
   Sparkles,
   Video,
   ArrowLeft,
-  ExternalLink
+  ExternalLink,
+  ScrollText,
+  Copy,
+  Check,
+  Film
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getVideoScriptById, type VideoScript } from '@/data/tutorialVideoScripts';
 
 interface Tutorial {
+  id?: string; // Script ID for matching with video scripts
   title: string;
   duration: string;
   path?: string;
@@ -53,6 +60,7 @@ const tutorialCategories: TutorialCategory[] = [
     color: 'text-primary',
     tutorials: [
       { 
+        id: 'create-first-class',
         title: 'Create your first class', 
         duration: '2 min', 
         path: '/classes/new',
@@ -60,6 +68,7 @@ const tutorialCategories: TutorialCategory[] = [
         description: 'Learn how to set up your first class and configure basic settings.'
       },
       { 
+        id: 'add-students',
         title: 'Add students to class', 
         duration: '3 min', 
         path: '/classes',
@@ -67,6 +76,7 @@ const tutorialCategories: TutorialCategory[] = [
         description: 'Add students manually or import them from a CSV file.'
       },
       { 
+        id: 'understanding-dashboard',
         title: 'Understanding the dashboard', 
         duration: '2 min', 
         path: '/dashboard',
@@ -83,6 +93,7 @@ const tutorialCategories: TutorialCategory[] = [
     color: 'text-blue-500',
     tutorials: [
       { 
+        id: 'import-csv',
         title: 'Import students via CSV', 
         duration: '2 min', 
         path: '/classes',
@@ -90,12 +101,14 @@ const tutorialCategories: TutorialCategory[] = [
         description: 'Bulk import your student roster using a CSV file.'
       },
       { 
+        id: 'generate-qr-codes',
         title: 'Generate student QR codes', 
         duration: '1 min',
         videoId: 'dQw4w9WgXcQ',
         description: 'Create printable QR codes for each student for easy identification.'
       },
       { 
+        id: 'edit-class-settings',
         title: 'Edit class settings', 
         duration: '1 min',
         videoId: 'dQw4w9WgXcQ',
@@ -111,6 +124,7 @@ const tutorialCategories: TutorialCategory[] = [
     color: 'text-green-500',
     tutorials: [
       { 
+        id: 'build-worksheet',
         title: 'Build a worksheet', 
         duration: '4 min', 
         path: '/questions',
@@ -118,12 +132,14 @@ const tutorialCategories: TutorialCategory[] = [
         description: 'Create custom worksheets with questions and rubrics.'
       },
       { 
+        id: 'differentiated-questions',
         title: 'Create differentiated questions', 
         duration: '3 min',
         videoId: 'dQw4w9WgXcQ',
         description: 'Generate questions at multiple difficulty levels.'
       },
       { 
+        id: 'share-worksheets',
         title: 'Share worksheets with teachers', 
         duration: '2 min',
         videoId: 'dQw4w9WgXcQ',
@@ -139,6 +155,7 @@ const tutorialCategories: TutorialCategory[] = [
     color: 'text-orange-500',
     tutorials: [
       { 
+        id: 'scan-with-camera',
         title: 'Scan with camera', 
         duration: '2 min', 
         path: '/scan',
@@ -146,18 +163,21 @@ const tutorialCategories: TutorialCategory[] = [
         description: 'Use your device camera to capture student work.'
       },
       { 
+        id: 'use-usb-scanner',
         title: 'Use USB scanner', 
         duration: '3 min',
         videoId: 'dQw4w9WgXcQ',
         description: 'Connect and use a USB document scanner.'
       },
       { 
+        id: 'batch-grade',
         title: 'Batch grade papers', 
         duration: '4 min',
         videoId: 'dQw4w9WgXcQ',
         description: 'Grade multiple papers at once for efficiency.'
       },
       { 
+        id: 'review-ai-suggestions',
         title: 'Review AI suggestions', 
         duration: '2 min',
         videoId: 'dQw4w9WgXcQ',
@@ -173,6 +193,7 @@ const tutorialCategories: TutorialCategory[] = [
     color: 'text-purple-500',
     tutorials: [
       { 
+        id: 'mastery-heatmap',
         title: 'View mastery heatmap', 
         duration: '2 min', 
         path: '/reports',
@@ -180,12 +201,14 @@ const tutorialCategories: TutorialCategory[] = [
         description: 'Visualize student performance across topics.'
       },
       { 
+        id: 'individual-progress',
         title: 'Track individual progress', 
         duration: '3 min',
         videoId: 'dQw4w9WgXcQ',
         description: 'Monitor individual student growth over time.'
       },
       { 
+        id: 'differentiation-grouping',
         title: 'Differentiation grouping', 
         duration: '3 min',
         videoId: 'dQw4w9WgXcQ',
@@ -201,6 +224,7 @@ const tutorialCategories: TutorialCategory[] = [
     color: 'text-red-500',
     tutorials: [
       { 
+        id: 'configure-detection',
         title: 'Configure detection settings', 
         duration: '2 min', 
         path: '/settings',
@@ -208,12 +232,14 @@ const tutorialCategories: TutorialCategory[] = [
         description: 'Set up AI detection thresholds and alerts.'
       },
       { 
+        id: 'review-flagged-work',
         title: 'Review flagged work', 
         duration: '3 min',
         videoId: 'dQw4w9WgXcQ',
         description: 'Review submissions flagged for potential AI use.'
       },
       { 
+        id: 'parent-alerts',
         title: 'Set up parent alerts', 
         duration: '2 min',
         videoId: 'dQw4w9WgXcQ',
@@ -229,18 +255,21 @@ const tutorialCategories: TutorialCategory[] = [
     color: 'text-amber-500',
     tutorials: [
       { 
+        id: 'custom-grading-scales',
         title: 'Custom grading scales', 
         duration: '3 min',
         videoId: 'dQw4w9WgXcQ',
         description: 'Create custom grading scales and curves.'
       },
       { 
+        id: 'lesson-plan-generator',
         title: 'Lesson plan generator', 
         duration: '4 min',
         videoId: 'dQw4w9WgXcQ',
         description: 'Generate AI-powered lesson plans from topics.'
       },
       { 
+        id: 'presentation-builder',
         title: 'Presentation builder', 
         duration: '5 min', 
         path: '/library',
@@ -423,39 +452,91 @@ export function HelpBot() {
                   <ScrollArea className="h-[500px] md:h-[calc(75vh-140px)]">
                     <div className="p-4 space-y-4">
                       {/* Video Player View */}
-                      {selectedTutorial && selectedTutorial.videoId && (
-                        <div className="space-y-4">
-                          <VideoPlayer 
-                            videoId={selectedTutorial.videoId} 
-                            title={selectedTutorial.title} 
-                          />
-                          
-                          <div className="space-y-2">
-                            <h3 className="font-medium">{selectedTutorial.title}</h3>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Badge variant="secondary" className="gap-1">
-                                <Play className="h-3 w-3" />
-                                {selectedTutorial.duration}
-                              </Badge>
+                      {selectedTutorial && selectedTutorial.videoId && (() => {
+                        const script = selectedTutorial.id ? getVideoScriptById(selectedTutorial.id) : undefined;
+                        return (
+                          <div className="space-y-4">
+                            <Tabs defaultValue="video" className="w-full">
+                              <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="video" className="gap-1.5">
+                                  <Play className="h-3.5 w-3.5" />
+                                  Video
+                                </TabsTrigger>
+                                <TabsTrigger value="script" className="gap-1.5">
+                                  <ScrollText className="h-3.5 w-3.5" />
+                                  Script
+                                </TabsTrigger>
+                              </TabsList>
+                              <TabsContent value="video" className="mt-3">
+                                <VideoPlayer 
+                                  videoId={selectedTutorial.videoId} 
+                                  title={selectedTutorial.title} 
+                                />
+                              </TabsContent>
+                              <TabsContent value="script" className="mt-3">
+                                {script ? (
+                                  <div className="space-y-3 p-3 bg-muted/50 rounded-lg border">
+                                    <div className="flex items-center justify-between">
+                                      <Badge variant="outline" className="gap-1">
+                                        <Film className="h-3 w-3" />
+                                        AI Video Script
+                                      </Badge>
+                                      <span className="text-xs text-muted-foreground">{script.duration}</span>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <h4 className="text-xs font-medium text-muted-foreground uppercase">Narration</h4>
+                                      <p className="text-sm leading-relaxed">{script.narration}</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <h4 className="text-xs font-medium text-muted-foreground uppercase">Visual Cues</h4>
+                                      <ul className="text-xs space-y-1">
+                                        {script.visualCues.map((cue, idx) => (
+                                          <li key={idx} className="flex items-start gap-2">
+                                            <span className="text-primary font-medium">{idx + 1}.</span>
+                                            <span className="text-muted-foreground">{cue}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                    <div className="pt-2 border-t">
+                                      <p className="text-xs"><span className="font-medium">CTA:</span> {script.callToAction}</p>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="p-4 text-center text-muted-foreground text-sm">
+                                    No script available for this tutorial.
+                                  </div>
+                                )}
+                              </TabsContent>
+                            </Tabs>
+                            
+                            <div className="space-y-2">
+                              <h3 className="font-medium">{selectedTutorial.title}</h3>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Badge variant="secondary" className="gap-1">
+                                  <Play className="h-3 w-3" />
+                                  {selectedTutorial.duration}
+                                </Badge>
+                              </div>
+                              {selectedTutorial.description && (
+                                <p className="text-sm text-muted-foreground">
+                                  {selectedTutorial.description}
+                                </p>
+                              )}
                             </div>
-                            {selectedTutorial.description && (
-                              <p className="text-sm text-muted-foreground">
-                                {selectedTutorial.description}
-                              </p>
+
+                            {selectedTutorial.path && (
+                              <Button 
+                                onClick={() => handleGoToPage(selectedTutorial.path)}
+                                className="w-full gap-2"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                Go to {selectedTutorial.title.split(' ')[0]}
+                              </Button>
                             )}
                           </div>
-
-                          {selectedTutorial.path && (
-                            <Button 
-                              onClick={() => handleGoToPage(selectedTutorial.path)}
-                              className="w-full gap-2"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                              Go to {selectedTutorial.title.split(' ')[0]}
-                            </Button>
-                          )}
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Quick Help Section */}
                       {!selectedCategory && !selectedTutorial && (
