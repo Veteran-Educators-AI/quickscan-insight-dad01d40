@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle, AlertTriangle, Lightbulb, Save, UserPlus, Loader
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import scanGeniusLogo from '@/assets/scan-genius-logo.png';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -160,6 +161,11 @@ export function AnalysisResults({
 
   return (
     <div className="space-y-4">
+      {/* Logo Header */}
+      <div className="flex justify-center py-2">
+        <img src={scanGeniusLogo} alt="Scan Genius" className="h-10 object-contain" />
+      </div>
+
       {/* Training Confidence Indicator - Compact version at top */}
       <TrainingConfidenceIndicator compact className="mb-2" />
 
