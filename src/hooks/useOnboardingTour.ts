@@ -1,12 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth';
 
 const TOUR_COMPLETED_KEY = 'nyclogic-ai-tour-completed';
+
+// Global tour trigger for external components
+let globalTourTrigger: (() => void) | null = null;
+
+export function triggerOnboardingTour() {
+  if (globalTourTrigger) {
+    globalTourTrigger();
+  }
+}
 
 export function useOnboardingTour() {
   const { user } = useAuth();
   const [showTour, setShowTour] = useState(false);
   const [tourReady, setTourReady] = useState(false);
+
+  const resetTour = useCallback(() => {
+    if (user) {
+      localStorage.removeItem(`${TOUR_COMPLETED_KEY}-${user.id}`);
+    }
+    setShowTour(true);
+    setTourReady(true);
+  }, [user]);
+
+  useEffect(() => {
+    // Register the global trigger
+    globalTourTrigger = resetTour;
+    return () => {
+      globalTourTrigger = null;
+    };
+  }, [resetTour]);
 
   useEffect(() => {
     if (!user) return;
@@ -21,6 +46,8 @@ export function useOnboardingTour() {
         setTourReady(true);
       }, 500);
       return () => clearTimeout(timer);
+    } else {
+      setTourReady(true);
     }
   }, [user]);
 
@@ -29,13 +56,6 @@ export function useOnboardingTour() {
       localStorage.setItem(`${TOUR_COMPLETED_KEY}-${user.id}`, 'true');
     }
     setShowTour(false);
-  };
-
-  const resetTour = () => {
-    if (user) {
-      localStorage.removeItem(`${TOUR_COMPLETED_KEY}-${user.id}`);
-    }
-    setShowTour(true);
   };
 
   return {
