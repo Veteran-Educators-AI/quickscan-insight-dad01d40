@@ -15,7 +15,11 @@ import {
   MessageSquare,
   Clock,
   FileText,
-  Trash2
+  Trash2,
+  Lightbulb,
+  CheckCircle2,
+  Circle,
+  Sparkles
 } from 'lucide-react';
 import { VerificationStatsWidget } from '@/components/reports/VerificationStatsWidget';
 import { StudentsNeedingHelpWidget } from '@/components/reports/StudentsNeedingHelpWidget';
@@ -55,6 +59,26 @@ interface RecentLessonPlan {
   subject: string | null;
   created_at: string;
 }
+
+const teacherTips = [
+  "Start each class by reviewing common misconceptions from the last assessment.",
+  "Use student work samples to spark discussion about different problem-solving approaches.",
+  "Celebrate progress, not just perfection—growth mindset matters!",
+  "Quick exit tickets can reveal gaps before they become bigger issues.",
+  "Pair struggling students with peer tutors for collaborative learning.",
+  "Visual representations help students connect abstract concepts to real understanding.",
+  "Give students time to struggle productively before offering hints.",
+  "Regular low-stakes assessments reduce test anxiety and improve retention.",
+  "Ask 'How do you know?' to deepen mathematical reasoning.",
+  "Mistakes are learning opportunities—normalize productive failure."
+];
+
+const gettingStartedSteps = [
+  { id: 1, label: "Create your first class", description: "Add a class with your students' names", href: "/classes/new" },
+  { id: 2, label: "Build a worksheet", description: "Generate AI-powered practice problems", href: "/questions" },
+  { id: 3, label: "Scan student work", description: "Use the camera to grade papers instantly", href: "/scan" },
+  { id: 4, label: "Review reports", description: "See insights on student performance", href: "/reports" },
+];
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -261,6 +285,68 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             </Link>
+          )}
+        </div>
+
+        {/* Daily Teaching Tip & Getting Started */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-in">
+          {/* Daily Teaching Tip */}
+          <Card className="border-amber-200 dark:border-amber-800 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                  <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">
+                    Daily Teaching Tip
+                  </p>
+                  <p className="text-sm text-foreground leading-relaxed">
+                    {teacherTips[new Date().getDate() % teacherTips.length]}
+                  </p>
+                </div>
+                <Sparkles className="h-4 w-4 text-amber-400 dark:text-amber-500 flex-shrink-0" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Getting Started Steps */}
+          {stats.classCount === 0 && (
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5">
+              <CardContent className="p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-3">
+                  Getting Started
+                </p>
+                <div className="space-y-2">
+                  {gettingStartedSteps.map((step) => {
+                    const isComplete = 
+                      (step.id === 1 && stats.classCount > 0) ||
+                      (step.id === 2 && stats.questionCount > 0);
+                    
+                    return (
+                      <Link 
+                        key={step.id} 
+                        to={step.href}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-background/50 transition-colors group"
+                      >
+                        {isComplete ? (
+                          <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                        ) : (
+                          <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${isComplete ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                            {step.label}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">{step.description}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
 
