@@ -529,6 +529,17 @@ Evaluate the student's work against this standard. When reporting the NYS Standa
     const hallucinationShieldContext = `
 CRITICAL ANALYSIS CONSTRAINTS (Hallucination-Shield Protocol):
 
+** MANDATORY 3X ZOOM PRE-ANALYSIS PROTOCOL **
+BEFORE you begin ANY grading, you MUST mentally "zoom in" at 3x magnification across the ENTIRE image:
+1. ZOOM SCAN - TOP ZONE: Examine the top 1/3 of the page at 3x detail - look for work above questions, in headers, margins
+2. ZOOM SCAN - MIDDLE ZONE: Examine the middle 1/3 of the page at 3x detail - the main answer areas
+3. ZOOM SCAN - BOTTOM ZONE: Examine the bottom 1/3 of the page at 3x detail - including margins and blank areas
+4. ZOOM SCAN - LEFT EDGE: Examine the left margin from top to bottom at 3x detail
+5. ZOOM SCAN - RIGHT EDGE: Examine the right margin from top to bottom at 3x detail
+6. ZOOM SCAN - CORNERS: Examine each of the 4 corners at 3x detail for any calculations or notes
+
+You MUST complete this 6-zone zoom scan BEFORE analyzing any answers. Report any work found in each zone.
+
 MANDATORY PRE-GRADING PROTOCOL:
 ** CRITICAL: READ THE QUESTION 3 TIMES BEFORE GRADING **
 Before analyzing any student work, you MUST:
@@ -544,23 +555,44 @@ Example of correct scope identification:
 
 ** CRITICAL: DO NOT penalize students for not doing work the question did NOT ask for! **
 
+EXPANDED SPATIAL ANALYSIS PROTOCOL:
+** CRITICAL: EXPAND YOUR SEARCH RADIUS AROUND EACH QUESTION **
+For EACH question you grade, you MUST search for related work in an EXPANDED RADIUS:
+1. ABOVE THE QUESTION: Look 2-3 inches above the question text for calculations, notes, or work
+2. BELOW THE QUESTION: Look 2-3 inches below the answer space for additional work
+3. LEFT OF THE QUESTION: Check the left margin adjacent to the question (within 2 inches)
+4. RIGHT OF THE QUESTION: Check the right margin adjacent to the question (within 2 inches)
+5. DIAGONAL ZONES: Check the diagonal corners around each question
+6. VICINITY WORK: Any work within 3 inches of a question that relates to that question's topic MUST be considered
+
+Students often:
+- Start calculations above a question then continue below
+- Write in margins next to questions
+- Use blank spaces between questions for scratch work
+- Place final answers in different locations than expected
+
+** ALL WORK IN THE VICINITY OF A QUESTION MUST BE CONSIDERED AS POTENTIALLY PART OF THAT ANSWER **
+
 FULL-PAGE WORK SCANNING PROTOCOL:
 ** CRITICAL: SCAN THE ENTIRE PAGE FOR STUDENT WORK **
 Students often write work in unconventional locations:
-1. Margins (top, bottom, left, right)
+1. Margins (top, bottom, left, right) - up to the very edge of the page
 2. Headers and blank spaces above questions
-3. Between questions
-4. In any white space on the page
+3. Between questions in any white space
+4. In any white space on the page including corners
 5. Near diagrams but not directly under answer lines
+6. Upside down or sideways in margins
+7. In small handwriting that requires close inspection
 
 When extracting OCR text:
-- Scan ALL four corners of the page
+- Scan ALL four corners of the page carefully at maximum detail
 - Look for calculations written above question text
-- Check margins for scratch work
+- Check margins for scratch work and partial calculations
 - Work written ANYWHERE on the page related to a question counts as part of their answer
 - A calculation like "8x4=32" written in the top-right corner still counts as showing work for a rectangle area question
+- Small or faint writing must still be captured
 
-** DO NOT mark a student down for "not showing work" if work IS visible anywhere on the page! **
+** DO NOT mark a student down for "not showing work" if work IS visible ANYWHERE on the page! **
 
 1. GROUNDING REQUIREMENT: Base your analysis primarily on what you can directly observe in the student's work. 
    - Clearly distinguish between OBSERVED facts and INTERPRETATIONS
@@ -576,7 +608,7 @@ When extracting OCR text:
    - "Based on student's work in step 2 where they wrote '[exact quote]'..."
    - "The equation on line 3 shows..."
    - For interpretations: "[INTERPRETATION - VERIFY: This appears to be X based on context]"
-   - For work found in margins: "Student's work in [location] shows '[exact quote]'..."
+   - For work found in margins/vicinity: "Student's work in [specific location] shows '[exact quote]'..."
 
 4. VERIFICATION FLAGS: Mark claims that need teacher confirmation:
    - HIGH CONFIDENCE: Clearly visible and unambiguous
@@ -587,7 +619,7 @@ When extracting OCR text:
    - DO interpret what student "probably meant" when context makes it clear
    - DO consider mathematical context (e.g., a variable that looks like a number)
    - DO give students credit for reasonable interpretations of their work
-   - DO credit work written ANYWHERE on the page (margins, headers, corners)
+   - DO credit work written ANYWHERE on the page (margins, headers, corners, vicinity of questions)
    - BUT flag significant interpretations so teachers can verify: "[INTERPRETATION - VERIFY: ...]"
    - Do NOT fabricate entire solutions or understanding that has no basis in visible work
    - Do NOT penalize for work not asked by the question
