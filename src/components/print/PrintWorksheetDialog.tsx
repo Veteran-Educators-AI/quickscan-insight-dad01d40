@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PrintableWorksheet } from './PrintableWorksheet';
 import { AIScanPreviewDialog } from './AIScanPreviewDialog';
 import { StudentScanningGuide } from './StudentScanningGuide';
+import { ClassroomScanningPoster } from './ClassroomScanningPoster';
 import { useAuth } from '@/lib/auth';
 
 interface Student {
@@ -282,10 +283,13 @@ export function PrintWorksheetDialog({ classId, students, trigger, topicName }: 
                   Student Training Guide
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Printable one-page guide showing students where to write work and answers for optimal scanning
+                  Printable guides showing students where to write work and answers for optimal scanning
                 </p>
               </div>
-              <StudentScanningGuide />
+              <div className="flex gap-2">
+                <StudentScanningGuide />
+                <ClassroomScanningPoster />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
