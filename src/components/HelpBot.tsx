@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bot, 
@@ -7,39 +7,33 @@ import {
   Camera, 
   FileText, 
   BarChart3, 
-  BookOpen,
   Zap,
   Shield,
-  Play,
   HelpCircle,
   ChevronRight,
   MessageCircle,
   Sparkles,
-  Video,
   ArrowLeft,
-  ExternalLink,
-  ScrollText,
-  Copy,
-  Check,
-  Film
+  Send,
+  Loader2,
+  BookOpen,
+  Play
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getVideoScriptById, type VideoScript } from '@/data/tutorialVideoScripts';
+import { triggerOnboardingTour } from '@/hooks/useOnboardingTour';
+import { supabase } from '@/integrations/supabase/client';
 
-interface Tutorial {
-  id?: string; // Script ID for matching with video scripts
-  title: string;
-  duration: string;
-  path?: string;
-  videoId?: string; // YouTube video ID
-  description?: string;
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
 }
 
 interface TutorialCategory {
@@ -48,316 +42,254 @@ interface TutorialCategory {
   description: string;
   icon: React.ElementType;
   color: string;
-  tutorials: Tutorial[];
 }
 
 const tutorialCategories: TutorialCategory[] = [
   {
     id: 'getting-started',
     title: 'Getting Started',
-    description: 'New here? Start with the basics',
+    description: 'Create classes, add students, navigate dashboard',
     icon: Sparkles,
     color: 'text-primary',
-    tutorials: [
-      { 
-        id: 'create-first-class',
-        title: 'Create your first class', 
-        duration: '2 min', 
-        path: '/classes/new',
-        videoId: 'dQw4w9WgXcQ', // Placeholder - replace with actual tutorial videos
-        description: 'Learn how to set up your first class and configure basic settings.'
-      },
-      { 
-        id: 'add-students',
-        title: 'Add students to class', 
-        duration: '3 min', 
-        path: '/classes',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Add students manually or import them from a CSV file.'
-      },
-      { 
-        id: 'understanding-dashboard',
-        title: 'Understanding the dashboard', 
-        duration: '2 min', 
-        path: '/dashboard',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Navigate the dashboard and understand key metrics at a glance.'
-      },
-    ]
   },
   {
     id: 'classes',
     title: 'Class Management',
-    description: 'Organize students and rosters',
+    description: 'Import CSV, generate QR codes, edit settings',
     icon: Users,
     color: 'text-blue-500',
-    tutorials: [
-      { 
-        id: 'import-csv',
-        title: 'Import students via CSV', 
-        duration: '2 min', 
-        path: '/classes',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Bulk import your student roster using a CSV file.'
-      },
-      { 
-        id: 'generate-qr-codes',
-        title: 'Generate student QR codes', 
-        duration: '1 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Create printable QR codes for each student for easy identification.'
-      },
-      { 
-        id: 'edit-class-settings',
-        title: 'Edit class settings', 
-        duration: '1 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Modify class name, period, and other settings.'
-      },
-    ]
   },
   {
     id: 'worksheets',
     title: 'Worksheets & Assessments',
-    description: 'Create and manage assessments',
+    description: 'Build worksheets, differentiated questions',
     icon: FileText,
     color: 'text-green-500',
-    tutorials: [
-      { 
-        id: 'build-worksheet',
-        title: 'Build a worksheet', 
-        duration: '4 min', 
-        path: '/questions',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Create custom worksheets with questions and rubrics.'
-      },
-      { 
-        id: 'differentiated-questions',
-        title: 'Create differentiated questions', 
-        duration: '3 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Generate questions at multiple difficulty levels.'
-      },
-      { 
-        id: 'share-worksheets',
-        title: 'Share worksheets with teachers', 
-        duration: '2 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Share your worksheets with colleagues via link.'
-      },
-    ]
   },
   {
     id: 'scanning',
     title: 'Scanning & Grading',
-    description: 'Capture and grade student work',
+    description: 'Scan work, batch grade, review AI suggestions',
     icon: Camera,
     color: 'text-orange-500',
-    tutorials: [
-      { 
-        id: 'scan-with-camera',
-        title: 'Scan with camera', 
-        duration: '2 min', 
-        path: '/scan',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Use your device camera to capture student work.'
-      },
-      { 
-        id: 'use-usb-scanner',
-        title: 'Use USB scanner', 
-        duration: '3 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Connect and use a USB document scanner.'
-      },
-      { 
-        id: 'batch-grade',
-        title: 'Batch grade papers', 
-        duration: '4 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Grade multiple papers at once for efficiency.'
-      },
-      { 
-        id: 'review-ai-suggestions',
-        title: 'Review AI suggestions', 
-        duration: '2 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Review and adjust AI-generated scores and feedback.'
-      },
-    ]
   },
   {
     id: 'reports',
     title: 'Reports & Analytics',
-    description: 'Track student progress',
+    description: 'Mastery heatmaps, progress tracking',
     icon: BarChart3,
     color: 'text-purple-500',
-    tutorials: [
-      { 
-        id: 'mastery-heatmap',
-        title: 'View mastery heatmap', 
-        duration: '2 min', 
-        path: '/reports',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Visualize student performance across topics.'
-      },
-      { 
-        id: 'individual-progress',
-        title: 'Track individual progress', 
-        duration: '3 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Monitor individual student growth over time.'
-      },
-      { 
-        id: 'differentiation-grouping',
-        title: 'Differentiation grouping', 
-        duration: '3 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Group students by skill level for targeted instruction.'
-      },
-    ]
   },
   {
     id: 'ai-detection',
     title: 'AI Detection',
-    description: 'Maintain academic integrity',
+    description: 'Configure detection, review flagged work',
     icon: Shield,
     color: 'text-red-500',
-    tutorials: [
-      { 
-        id: 'configure-detection',
-        title: 'Configure detection settings', 
-        duration: '2 min', 
-        path: '/settings',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Set up AI detection thresholds and alerts.'
-      },
-      { 
-        id: 'review-flagged-work',
-        title: 'Review flagged work', 
-        duration: '3 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Review submissions flagged for potential AI use.'
-      },
-      { 
-        id: 'parent-alerts',
-        title: 'Set up parent alerts', 
-        duration: '2 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Configure automatic parent notifications.'
-      },
-    ]
   },
   {
     id: 'advanced',
     title: 'Advanced Features',
-    description: 'Power user tips and tricks',
+    description: 'Custom grading, lesson plans, presentations',
     icon: Zap,
     color: 'text-amber-500',
-    tutorials: [
-      { 
-        id: 'custom-grading-scales',
-        title: 'Custom grading scales', 
-        duration: '3 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Create custom grading scales and curves.'
-      },
-      { 
-        id: 'lesson-plan-generator',
-        title: 'Lesson plan generator', 
-        duration: '4 min',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Generate AI-powered lesson plans from topics.'
-      },
-      { 
-        id: 'presentation-builder',
-        title: 'Presentation builder', 
-        duration: '5 min', 
-        path: '/library',
-        videoId: 'dQw4w9WgXcQ',
-        description: 'Create interactive presentations for your lessons.'
-      },
-    ]
   },
 ];
 
-const quickHelp = [
-  {
-    question: "I'm new, where do I start?",
-    answer: "Start by creating a class and adding your students. Then create or import questions for assessments.",
-    category: 'getting-started'
-  },
-  {
-    question: "How do I scan student work?",
-    answer: "Go to the Scan page, select your class and question, then use your camera or upload images. The AI will grade automatically!",
-    category: 'scanning'
-  },
-  {
-    question: "How do I see student progress?",
-    answer: "Check the Reports page for mastery heatmaps, progress tracking, and differentiation grouping.",
-    category: 'reports'
-  },
-  {
-    question: "What does the AI grading do?",
-    answer: "AI analyzes student handwriting, compares it to your rubric, and suggests scores. You can always review and adjust.",
-    category: 'scanning'
-  },
+// Knowledge base for the AI assistant
+const knowledgeBase = `
+NYCLogic AI is an AI-powered grading and assessment platform for teachers. Here's how the software works:
+
+## Getting Started
+1. **Create a Class**: Go to Classes page → Click "New Class" → Enter class name and period → Add students manually or import via CSV
+2. **Add Students**: In your class, click "Add Student" or use "Import CSV" for bulk upload. Each student gets a unique QR code for identification.
+3. **Dashboard**: Shows overview of classes, recent scans, student performance metrics, and quick actions.
+
+## Classes & Students
+- **Class Management**: Create multiple classes, each with its own roster and settings
+- **Student QR Codes**: Print QR codes for each student - they attach these to their work for automatic identification
+- **CSV Import**: Upload a CSV file with columns: First Name, Last Name, Student ID (optional), Email (optional)
+- **Class Periods**: Organize by period (e.g., "Period 1", "Period 2")
+
+## Worksheets & Assessments
+- **Create Worksheets**: Select topics from the NY curriculum, choose difficulty level, generate AI-powered questions
+- **Differentiated Worksheets**: Generate multiple versions (Form A, B, C, etc.) with different questions covering same concepts - prevents copying
+- **Diagnostic Forms**: Create up to 10 unique forms (A-J) for diagnostic assessments
+- **Print Worksheets**: Each worksheet includes student QR code space and question areas
+- **Share Worksheets**: Share with other teachers via link
+
+## Scanning & Grading
+- **Scan Student Work**: Use your phone/tablet camera or document scanner to capture student work
+- **QR Code Detection**: The AI automatically reads the student's QR code to identify them
+- **AI Grading**: The AI analyzes handwritten work, compares to rubric, and suggests scores
+- **Misconception Detection**: AI identifies common errors and misconceptions
+- **Teacher Review**: You can always adjust AI-suggested scores before saving
+- **Batch Grading**: Grade multiple papers at once for efficiency
+
+## Reports & Analytics
+- **Mastery Heatmap**: Visual grid showing student performance across topics (green = mastered, red = needs work)
+- **Student Progress**: Track individual student growth over time
+- **Differentiation Grouping**: Automatically group students by skill level for targeted instruction
+- **Regents Score Prediction**: Predict likely Regents exam scores based on performance
+- **Class Overview**: See averages, trends, and identify struggling students
+
+## AI Detection
+- **Configure Detection**: Set sensitivity threshold for flagging potentially AI-generated work
+- **Review Flagged Work**: Examine submissions flagged for potential AI use
+- **Parent Notifications**: Automatically notify parents when AI use is detected
+- **Handwriting Analysis**: Compare handwriting samples to detect inconsistencies
+
+## Lesson Plans & Presentations
+- **AI Lesson Plans**: Generate complete lesson plans aligned to NY standards
+- **Presentation Builder**: Create interactive presentations with speaker notes
+- **PowerPoint Export**: Export presentations to PowerPoint format
+
+## Settings & Configuration
+- **Grading Scales**: Customize grading scales and grade floors
+- **Notifications**: Configure email and push notifications
+- **Integration**: Connect with Google Classroom, sync grades
+- **API Keys**: Manage API access for integrations
+
+## Tips
+- Print QR codes on adhesive labels for students to stick on their work
+- Use batch scanning for faster grading
+- Review the mastery heatmap weekly to identify topics needing reteaching
+- Create differentiated worksheets to prevent copying during assessments
+`;
+
+const suggestedQuestions = [
+  "How do I create my first class?",
+  "How does AI grading work?",
+  "What are differentiated worksheets?",
+  "How do I scan student work?",
+  "How do I track student progress?",
 ];
-
-interface VideoPlayerProps {
-  videoId: string;
-  title: string;
-}
-
-function VideoPlayer({ videoId, title }: VideoPlayerProps) {
-  return (
-    <div className="rounded-lg overflow-hidden bg-black">
-      <AspectRatio ratio={16 / 9}>
-        <iframe
-          src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
-          title={title}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          className="w-full h-full"
-        />
-      </AspectRatio>
-    </div>
-  );
-}
 
 export function HelpBot() {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<TutorialCategory | null>(null);
-  const [selectedTutorial, setSelectedTutorial] = useState<Tutorial | null>(null);
-  const [activeQuickHelp, setActiveQuickHelp] = useState<number | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showCategories, setShowCategories] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleStartTour = () => {
+    setIsOpen(false);
+    triggerOnboardingTour();
+  };
 
   const handleCategoryClick = (category: TutorialCategory) => {
-    setSelectedCategory(category);
-    setSelectedTutorial(null);
+    // Start the onboarding tour when clicking any category
+    setIsOpen(false);
+    triggerOnboardingTour();
   };
 
-  const handleTutorialClick = (tutorial: Tutorial) => {
-    if (tutorial.videoId) {
-      setSelectedTutorial(tutorial);
-    } else if (tutorial.path) {
-      navigate(tutorial.path);
-      setIsOpen(false);
+  const handleSendMessage = async (question?: string) => {
+    const messageText = question || inputValue.trim();
+    if (!messageText || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: messageText,
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
+    setShowCategories(false);
+
+    try {
+      // Use AI to answer the question based on knowledge base
+      const { data, error } = await supabase.functions.invoke('answer-help-question', {
+        body: { 
+          question: messageText,
+          knowledgeBase: knowledgeBase,
+          conversationHistory: messages.slice(-6).map(m => ({ role: m.role, content: m.content }))
+        }
+      });
+
+      let responseText: string;
+      
+      if (error || !data?.answer) {
+        // Fallback to simple pattern matching if edge function fails
+        responseText = generateFallbackResponse(messageText);
+      } else {
+        responseText = data.answer;
+      }
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: responseText,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (err) {
+      // Fallback response
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: generateFallbackResponse(messageText),
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleGoToPage = (path?: string) => {
-    if (path) {
-      navigate(path);
-      setIsOpen(false);
+  const generateFallbackResponse = (question: string): string => {
+    const q = question.toLowerCase();
+    
+    if (q.includes('class') && (q.includes('create') || q.includes('new') || q.includes('first'))) {
+      return "To create your first class:\n\n1. Go to **Classes** from the navigation\n2. Click **\"New Class\"**\n3. Enter your class name (e.g., \"Period 1 Geometry\")\n4. Add the class period\n5. Click **Create**\n\nThen add students manually or import via CSV. Would you like me to start the interactive tour to show you?";
     }
+    
+    if (q.includes('scan') || q.includes('grade') && q.includes('work')) {
+      return "To scan and grade student work:\n\n1. Go to **Scan** from the navigation\n2. Select the class and worksheet\n3. Use your camera to capture the student's paper\n4. The AI automatically reads the QR code and grades the work\n5. Review and adjust scores if needed\n6. Save the results\n\nTip: For faster grading, use batch mode to grade multiple papers at once!";
+    }
+    
+    if (q.includes('worksheet') && (q.includes('create') || q.includes('build'))) {
+      return "To create a worksheet:\n\n1. Go to **Assessment** from the navigation\n2. Click **\"Build Worksheet\"**\n3. Select topics from the NY curriculum\n4. Choose difficulty level\n5. The AI generates questions for you\n6. Review and edit as needed\n7. Print with student QR code spaces\n\nYou can also create differentiated versions to prevent copying!";
+    }
+    
+    if (q.includes('differentiat') || q.includes('form') && (q.includes('a') || q.includes('b'))) {
+      return "**Differentiated Worksheets** prevent copying by giving different students different versions:\n\n1. When building a worksheet, select **\"Generate Differentiated Worksheets\"**\n2. Choose how many forms (2-10, labeled A-J)\n3. Each form has unique questions covering the same concepts\n4. Assign forms to students sitting near each other\n5. Everyone gets assessed fairly without copying!\n\nGreat for diagnostic assessments.";
+    }
+    
+    if (q.includes('progress') || q.includes('track') || q.includes('report')) {
+      return "To track student progress:\n\n1. Go to **Reports** from the navigation\n2. View the **Mastery Heatmap** - green means mastered, red needs work\n3. Click on any student for detailed progress\n4. Use **Differentiation Grouping** to group students by skill level\n5. Check **Regents Score Prediction** for exam readiness\n\nTip: Review the heatmap weekly to identify topics needing reteaching!";
+    }
+    
+    if (q.includes('ai') && (q.includes('detect') || q.includes('cheat'))) {
+      return "**AI Detection** helps maintain academic integrity:\n\n1. Go to **Settings** → **AI Detection**\n2. Enable AI detection and set sensitivity threshold\n3. When grading, the system flags potentially AI-generated work\n4. Review flagged submissions manually\n5. Optionally enable parent notifications\n\nThe system also compares handwriting samples to detect inconsistencies.";
+    }
+    
+    if (q.includes('qr') || q.includes('code')) {
+      return "**Student QR Codes** enable automatic identification:\n\n1. Go to your class page\n2. Click **\"Print QR Codes\"**\n3. Print on adhesive labels or regular paper\n4. Students attach their QR code to their work\n5. When scanning, the AI reads the code automatically\n\nTip: Print on adhesive labels so students can stick them on worksheets!";
+    }
+    
+    if (q.includes('tour') || q.includes('tutorial') || q.includes('guide')) {
+      return "I can start an interactive tour that walks you through all the features with examples! The tour covers:\n\n• Creating classes and adding students\n• Building worksheets\n• Scanning and grading\n• Viewing reports\n• And more!\n\nWould you like me to start the tour now? Just click **\"Take the Tour\"** below!";
+    }
+    
+    // Default response
+    return "I can help you with:\n\n• **Creating classes** and adding students\n• **Building worksheets** with AI-generated questions\n• **Scanning and grading** student work\n• **Viewing reports** and tracking progress\n• **AI detection** for academic integrity\n• **Lesson plans** and presentations\n\nWhat would you like to know more about? Or click **\"Take the Tour\"** for an interactive walkthrough!";
   };
 
   const handleBack = () => {
-    if (selectedTutorial) {
-      setSelectedTutorial(null);
-    } else if (selectedCategory) {
-      setSelectedCategory(null);
-    }
+    setShowCategories(true);
+    setMessages([]);
   };
 
   const handleGoToHelp = () => {
@@ -413,7 +345,7 @@ export function HelpBot() {
                 <CardHeader className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      {(selectedCategory || selectedTutorial) && (
+                      {!showCategories && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -424,16 +356,12 @@ export function HelpBot() {
                         </Button>
                       )}
                       <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
-                        {selectedTutorial ? <Video className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
+                        <Bot className="h-5 w-5" />
                       </div>
                       <div>
-                        <CardTitle className="text-lg">
-                          {selectedTutorial ? 'Video Tutorial' : 'Help Assistant'}
-                        </CardTitle>
+                        <CardTitle className="text-lg">Help Assistant</CardTitle>
                         <p className="text-xs text-primary-foreground/80">
-                          {selectedTutorial 
-                            ? selectedTutorial.title 
-                            : 'How can I help you today?'}
+                          Ask me anything about the app
                         </p>
                       </div>
                     </div>
@@ -449,128 +377,35 @@ export function HelpBot() {
                 </CardHeader>
                 
                 <CardContent className="p-0">
-                  <ScrollArea className="h-[500px] md:h-[calc(75vh-140px)]">
-                    <div className="p-4 space-y-4">
-                      {/* Video Player View */}
-                      {selectedTutorial && selectedTutorial.videoId && (() => {
-                        const script = selectedTutorial.id ? getVideoScriptById(selectedTutorial.id) : undefined;
-                        return (
-                          <div className="space-y-4">
-                            <Tabs defaultValue="video" className="w-full">
-                              <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="video" className="gap-1.5">
-                                  <Play className="h-3.5 w-3.5" />
-                                  Video
-                                </TabsTrigger>
-                                <TabsTrigger value="script" className="gap-1.5">
-                                  <ScrollText className="h-3.5 w-3.5" />
-                                  Script
-                                </TabsTrigger>
-                              </TabsList>
-                              <TabsContent value="video" className="mt-3">
-                                <VideoPlayer 
-                                  videoId={selectedTutorial.videoId} 
-                                  title={selectedTutorial.title} 
-                                />
-                              </TabsContent>
-                              <TabsContent value="script" className="mt-3">
-                                {script ? (
-                                  <div className="space-y-3 p-3 bg-muted/50 rounded-lg border">
-                                    <div className="flex items-center justify-between">
-                                      <Badge variant="outline" className="gap-1">
-                                        <Film className="h-3 w-3" />
-                                        AI Video Script
-                                      </Badge>
-                                      <span className="text-xs text-muted-foreground">{script.duration}</span>
-                                    </div>
-                                    <div className="space-y-2">
-                                      <h4 className="text-xs font-medium text-muted-foreground uppercase">Narration</h4>
-                                      <p className="text-sm leading-relaxed">{script.narration}</p>
-                                    </div>
-                                    <div className="space-y-2">
-                                      <h4 className="text-xs font-medium text-muted-foreground uppercase">Visual Cues</h4>
-                                      <ul className="text-xs space-y-1">
-                                        {script.visualCues.map((cue, idx) => (
-                                          <li key={idx} className="flex items-start gap-2">
-                                            <span className="text-primary font-medium">{idx + 1}.</span>
-                                            <span className="text-muted-foreground">{cue}</span>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                    <div className="pt-2 border-t">
-                                      <p className="text-xs"><span className="font-medium">CTA:</span> {script.callToAction}</p>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="p-4 text-center text-muted-foreground text-sm">
-                                    No script available for this tutorial.
-                                  </div>
-                                )}
-                              </TabsContent>
-                            </Tabs>
-                            
-                            <div className="space-y-2">
-                              <h3 className="font-medium">{selectedTutorial.title}</h3>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Badge variant="secondary" className="gap-1">
-                                  <Play className="h-3 w-3" />
-                                  {selectedTutorial.duration}
-                                </Badge>
-                              </div>
-                              {selectedTutorial.description && (
-                                <p className="text-sm text-muted-foreground">
-                                  {selectedTutorial.description}
-                                </p>
-                              )}
-                            </div>
-
-                            {selectedTutorial.path && (
-                              <Button 
-                                onClick={() => handleGoToPage(selectedTutorial.path)}
-                                className="w-full gap-2"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                                Go to {selectedTutorial.title.split(' ')[0]}
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })()}
-
-                      {/* Quick Help Section */}
-                      {!selectedCategory && !selectedTutorial && (
+                  <ScrollArea className="h-[400px] md:h-[calc(75vh-200px)]">
+                    <div ref={scrollRef} className="p-4 space-y-4">
+                      {/* Main View with Categories */}
+                      {showCategories && messages.length === 0 && (
                         <>
+                          {/* Take the Tour Button */}
+                          <Button
+                            onClick={handleStartTour}
+                            className="w-full gap-2 bg-gradient-to-r from-primary to-primary/80"
+                            size="lg"
+                          >
+                            <Play className="h-4 w-4" />
+                            Take the Interactive Tour
+                          </Button>
+
+                          {/* Quick Questions */}
                           <div className="space-y-2">
                             <h3 className="text-sm font-medium flex items-center gap-2">
                               <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                              Quick Questions
+                              Common Questions
                             </h3>
-                            <div className="space-y-2">
-                              {quickHelp.map((item, index) => (
+                            <div className="space-y-1.5">
+                              {suggestedQuestions.map((question, index) => (
                                 <button
                                   key={index}
-                                  onClick={() => setActiveQuickHelp(activeQuickHelp === index ? null : index)}
-                                  className={cn(
-                                    "w-full text-left p-3 rounded-lg border transition-all",
-                                    activeQuickHelp === index 
-                                      ? "bg-primary/5 border-primary/30" 
-                                      : "bg-secondary/50 border-transparent hover:bg-secondary"
-                                  )}
+                                  onClick={() => handleSendMessage(question)}
+                                  className="w-full text-left px-3 py-2 text-sm rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
                                 >
-                                  <p className="text-sm font-medium">{item.question}</p>
-                                  <AnimatePresence>
-                                    {activeQuickHelp === index && (
-                                      <motion.p
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: 'auto', opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="text-xs text-muted-foreground mt-2"
-                                      >
-                                        {item.answer}
-                                      </motion.p>
-                                    )}
-                                  </AnimatePresence>
+                                  {question}
                                 </button>
                               ))}
                             </div>
@@ -578,13 +413,12 @@ export function HelpBot() {
 
                           <div className="border-t pt-4">
                             <h3 className="text-sm font-medium flex items-center gap-2 mb-3">
-                              <Video className="h-4 w-4 text-muted-foreground" />
-                              Video Tutorials
+                              <BookOpen className="h-4 w-4 text-muted-foreground" />
+                              Browse by Topic
                             </h3>
                             <div className="grid gap-2">
                               {tutorialCategories.map((category) => {
                                 const Icon = category.icon;
-                                const videoCount = category.tutorials.filter(t => t.videoId).length;
                                 return (
                                   <button
                                     key={category.id}
@@ -597,7 +431,7 @@ export function HelpBot() {
                                     <div className="flex-1 min-w-0">
                                       <p className="text-sm font-medium truncate">{category.title}</p>
                                       <p className="text-xs text-muted-foreground truncate">
-                                        {videoCount} video{videoCount !== 1 ? 's' : ''} • {category.description}
+                                        {category.description}
                                       </p>
                                     </div>
                                     <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
@@ -609,65 +443,77 @@ export function HelpBot() {
                         </>
                       )}
 
-                      {/* Category Detail View */}
-                      {selectedCategory && !selectedTutorial && (
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-3">
-                            <div className={cn("h-10 w-10 rounded-full bg-secondary flex items-center justify-center", selectedCategory.color)}>
-                              <selectedCategory.icon className="h-5 w-5" />
-                            </div>
-                            <div>
-                              <h3 className="font-medium">{selectedCategory.title}</h3>
-                              <p className="text-xs text-muted-foreground">{selectedCategory.description}</p>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            {selectedCategory.tutorials.map((tutorial, index) => (
-                              <button
-                                key={index}
-                                onClick={() => handleTutorialClick(tutorial)}
-                                className="w-full flex items-center gap-3 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors text-left group"
-                              >
-                                <div className="h-10 w-10 rounded-lg bg-background flex items-center justify-center relative overflow-hidden">
-                                  {tutorial.videoId ? (
-                                    <>
-                                      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5" />
-                                      <Play className="h-4 w-4 text-primary relative z-10" />
-                                    </>
-                                  ) : (
-                                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                                  )}
-                                </div>
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium">{tutorial.title}</p>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-xs text-muted-foreground">{tutorial.duration}</span>
-                                    {tutorial.videoId && (
-                                      <Badge variant="outline" className="text-[10px] h-4 px-1.5">
-                                        <Video className="h-2.5 w-2.5 mr-0.5" />
-                                        Video
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-                              </button>
-                            ))}
+                      {/* Chat Messages */}
+                      {messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={cn(
+                            "flex",
+                            message.role === 'user' ? 'justify-end' : 'justify-start'
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "max-w-[85%] rounded-lg px-3 py-2 text-sm",
+                              message.role === 'user'
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-secondary'
+                            )}
+                          >
+                            <div className="whitespace-pre-wrap">{message.content}</div>
                           </div>
                         </div>
+                      ))}
+
+                      {isLoading && (
+                        <div className="flex justify-start">
+                          <div className="bg-secondary rounded-lg px-3 py-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tour Button after conversation */}
+                      {messages.length > 0 && !isLoading && (
+                        <Button
+                          onClick={handleStartTour}
+                          variant="outline"
+                          className="w-full gap-2"
+                          size="sm"
+                        >
+                          <Play className="h-4 w-4" />
+                          Take the Tour
+                        </Button>
                       )}
                     </div>
                   </ScrollArea>
                   
-                  {/* Footer */}
-                  <div className="border-t p-3 bg-muted/30">
+                  {/* Input Area */}
+                  <div className="border-t p-3 space-y-2">
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }}
+                      className="flex gap-2"
+                    >
+                      <Input
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        placeholder="Ask a question..."
+                        disabled={isLoading}
+                        className="flex-1"
+                      />
+                      <Button type="submit" size="icon" disabled={isLoading || !inputValue.trim()}>
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </form>
                     <Button 
-                      variant="outline" 
-                      className="w-full gap-2"
+                      variant="ghost" 
+                      className="w-full gap-2 text-xs h-8"
                       onClick={handleGoToHelp}
                     >
-                      <HelpCircle className="h-4 w-4" />
+                      <HelpCircle className="h-3 w-3" />
                       Full Help Center
                     </Button>
                   </div>
