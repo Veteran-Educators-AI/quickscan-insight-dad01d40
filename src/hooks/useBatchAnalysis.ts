@@ -3,9 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { handleApiError } from '@/lib/apiErrorHandler';
 import { useQRScanSettings } from '@/hooks/useQRScanSettings';
+import { useDuplicateWorkDetection } from '@/hooks/useDuplicateWorkDetection';
 import jsQR from 'jsqr';
 import { parseStudentQRCode } from '@/components/print/StudentQRCode';
 import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
+import { toast } from 'sonner';
 
 const BATCH_STORAGE_KEY = 'scan-genius-batch-data';
 
@@ -141,6 +143,7 @@ interface UseBatchAnalysisReturn {
 export function useBatchAnalysis(): UseBatchAnalysisReturn {
   const { user } = useAuth();
   const { settings: qrScanSettings } = useQRScanSettings();
+  const { checkForDuplicate, quickDuplicateCheck, clearDuplicateCache } = useDuplicateWorkDetection();
   const isInitialized = useRef(false);
   
   // Load initial state from localStorage
@@ -310,7 +313,9 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     } catch (e) {
       console.error('Failed to clear batch data:', e);
     }
-  }, []);
+    // Clear duplicate detection cache for fresh batch
+    clearDuplicateCache();
+  }, [clearDuplicateCache]);
 
   // Local QR code scanning function - supports both student-only and student+question QR codes
   const scanQRCodeFromImage = async (imageDataUrl: string): Promise<{ studentId: string; questionId?: string; type: 'student-only' | 'student-question' } | null> => {
@@ -535,6 +540,64 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
   const analyzeItem = async (item: BatchItem, rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string): Promise<BatchItem> => {
     try {
+      // Check for duplicate work before spending AI credits
+      if (item.studentId && item.questionId) {
+        const duplicateCheck = await checkForDuplicate(
+          item.studentId,
+          item.questionId,
+          undefined, // We don't have OCR text yet
+          item.imageDataUrl
+        );
+
+        if (duplicateCheck.isDuplicate) {
+          const gradeInfo = duplicateCheck.existingGrade 
+            ? `${duplicateCheck.existingGrade}%` 
+            : 'recorded';
+          toast.info(
+            `Skipping duplicate: ${item.studentName || 'Student'}'s work already analyzed (${gradeInfo})`,
+            { duration: 3000 }
+          );
+          return {
+            ...item,
+            status: 'completed',
+            result: {
+              ocrText: '',
+              problemIdentified: 'Duplicate work - previously analyzed',
+              approachAnalysis: 'This work was already analyzed in a previous scan.',
+              rubricScores: [],
+              misconceptions: [],
+              totalScore: { 
+                earned: duplicateCheck.existingGrade ? Math.round(duplicateCheck.existingGrade / 10) : 0, 
+                possible: 10, 
+                percentage: duplicateCheck.existingGrade || 0 
+              },
+              feedback: `This work was already analyzed${duplicateCheck.createdAt ? ` on ${new Date(duplicateCheck.createdAt).toLocaleDateString()}` : ''}.`,
+              grade: duplicateCheck.existingGrade,
+              gradeJustification: 'Duplicate submission - using previous grade',
+            },
+          };
+        }
+      }
+
+      // Quick session-level duplicate check (catches rescans in same session)
+      const quickCheck = await quickDuplicateCheck(
+        item.studentId || 'unknown',
+        item.questionId,
+        item.imageDataUrl
+      );
+
+      if (quickCheck.isDuplicate) {
+        toast.info(
+          `Skipping: Same image already processed this session`,
+          { duration: 2000 }
+        );
+        return {
+          ...item,
+          status: 'failed',
+          error: 'Duplicate image in this batch - already processed',
+        };
+      }
+
       const { data, error } = await supabase.functions.invoke('analyze-student-work', {
         body: {
           imageBase64: item.imageDataUrl,
