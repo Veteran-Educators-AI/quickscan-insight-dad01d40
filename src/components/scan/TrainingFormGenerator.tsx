@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Printer, FileText, Loader2, Download, AlertCircle } from 'lucide-react';
+import { Printer, FileText, Loader2, Download, AlertCircle, Zap, TrendingDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { GEOMETRY_TOPICS, ALGEBRA1_TOPICS, ALGEBRA2_TOPICS, TopicCategory } from '@/data/nysTopics';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/lib/auth';
+import { Badge } from '@/components/ui/badge';
 
 interface GeneratedQuestion {
   question: string;
@@ -22,6 +24,14 @@ interface TrainingFormGeneratorProps {
   onFormGenerated?: () => void;
 }
 
+interface WeakTopic {
+  topicName: string;
+  standard: string | null;
+  studentCount: number;
+  averageScore: number;
+  subject: string;
+}
+
 const SUBJECTS = [
   { id: 'geometry', name: 'Geometry', topics: GEOMETRY_TOPICS },
   { id: 'algebra1', name: 'Algebra 1', topics: ALGEBRA1_TOPICS },
@@ -29,6 +39,7 @@ const SUBJECTS = [
 ];
 
 export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGeneratorProps) {
+  const { user } = useAuth();
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [questionCount, setQuestionCount] = useState<number>(3);
@@ -36,6 +47,9 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
   const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestion[]>([]);
   const [currentTopicName, setCurrentTopicName] = useState<string>('');
   const [currentStandard, setCurrentStandard] = useState<string>('');
+  const [isLoadingWeakTopics, setIsLoadingWeakTopics] = useState(false);
+  const [weakTopics, setWeakTopics] = useState<WeakTopic[]>([]);
+  const [showQuickGenerate, setShowQuickGenerate] = useState(false);
 
   const getTopicsForSubject = (subjectId: string): TopicCategory[] => {
     const subject = SUBJECTS.find(s => s.id === subjectId);
@@ -50,6 +64,142 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
         fullLabel: `${cat.category} - ${t.name}`
       }))
     );
+  };
+
+  // Find which subject a topic belongs to
+  const findSubjectForTopic = (topicName: string): { subject: string; standard: string; category: string } | null => {
+    for (const subject of SUBJECTS) {
+      const flatTopics = getFlatTopics(subject.topics);
+      const found = flatTopics.find(t => t.name.toLowerCase() === topicName.toLowerCase());
+      if (found) {
+        return { subject: subject.id, standard: found.standard, category: found.category };
+      }
+    }
+    return null;
+  };
+
+  const fetchWeakTopics = async () => {
+    if (!user) return;
+
+    setIsLoadingWeakTopics(true);
+    try {
+      // Fetch grade history grouped by topic to find weak areas
+      const { data: gradeData, error } = await supabase
+        .from('grade_history')
+        .select('topic_name, nys_standard, grade, student_id')
+        .eq('teacher_id', user.id);
+
+      if (error) throw error;
+
+      if (!gradeData || gradeData.length === 0) {
+        toast.info('No student data yet. Add some grades first to see weak topics.');
+        setShowQuickGenerate(false);
+        return;
+      }
+
+      // Group by topic and calculate stats
+      const topicStats: Record<string, { 
+        scores: number[]; 
+        students: Set<string>; 
+        standard: string | null;
+      }> = {};
+
+      for (const grade of gradeData) {
+        if (!topicStats[grade.topic_name]) {
+          topicStats[grade.topic_name] = { 
+            scores: [], 
+            students: new Set(), 
+            standard: grade.nys_standard 
+          };
+        }
+        topicStats[grade.topic_name].scores.push(grade.grade);
+        topicStats[grade.topic_name].students.add(grade.student_id);
+      }
+
+      // Find weak topics (average score < 70)
+      const weak: WeakTopic[] = [];
+      for (const [topicName, stats] of Object.entries(topicStats)) {
+        const avg = stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length;
+        if (avg < 70) {
+          const subjectInfo = findSubjectForTopic(topicName);
+          if (subjectInfo) {
+            weak.push({
+              topicName,
+              standard: stats.standard || subjectInfo.standard,
+              studentCount: stats.students.size,
+              averageScore: Math.round(avg),
+              subject: subjectInfo.subject,
+            });
+          }
+        }
+      }
+
+      // Sort by number of struggling students and severity
+      weak.sort((a, b) => {
+        const scoreA = a.studentCount * (70 - a.averageScore);
+        const scoreB = b.studentCount * (70 - b.averageScore);
+        return scoreB - scoreA;
+      });
+
+      setWeakTopics(weak.slice(0, 5)); // Top 5 weak topics
+      setShowQuickGenerate(true);
+
+      if (weak.length === 0) {
+        toast.success('Great news! No weak topics found. Your students are doing well!');
+        setShowQuickGenerate(false);
+      }
+    } catch (error) {
+      console.error('Error fetching weak topics:', error);
+      toast.error('Failed to analyze student data');
+    } finally {
+      setIsLoadingWeakTopics(false);
+    }
+  };
+
+  const handleQuickGenerate = async (topic: WeakTopic) => {
+    const subjectInfo = findSubjectForTopic(topic.topicName);
+    if (!subjectInfo) {
+      toast.error('Could not find topic in curriculum');
+      return;
+    }
+
+    setIsGenerating(true);
+    setCurrentTopicName(topic.topicName);
+    setCurrentStandard(topic.standard || subjectInfo.standard);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-worksheet-questions', {
+        body: {
+          topics: [{
+            topicName: topic.topicName,
+            standard: topic.standard || subjectInfo.standard,
+            subject: topic.subject,
+            category: subjectInfo.category,
+          }],
+          questionCount,
+          difficultyLevels: ['medium', 'hard'],
+          worksheetMode: 'practice',
+          includeAnswerKey: true,
+          includeHints: false,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.questions && data.questions.length > 0) {
+        setGeneratedQuestions(data.questions);
+        setShowQuickGenerate(false);
+        toast.success(`Generated ${data.questions.length} questions for "${topic.topicName}"!`);
+        onFormGenerated?.();
+      } else {
+        throw new Error('No questions generated');
+      }
+    } catch (error) {
+      console.error('Error generating questions:', error);
+      toast.error('Failed to generate questions. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleGenerate = async () => {
@@ -113,6 +263,7 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
     setGeneratedQuestions([]);
     setCurrentTopicName('');
     setCurrentStandard('');
+    setShowQuickGenerate(false);
   };
 
   return (
@@ -130,86 +281,178 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
         <CardContent className="space-y-4">
           {generatedQuestions.length === 0 ? (
             <>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Subject</Label>
-                  <Select value={selectedSubject} onValueChange={(v) => {
-                    setSelectedSubject(v);
-                    setSelectedTopic('');
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select subject" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SUBJECTS.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Number of Questions</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={questionCount}
-                    onChange={(e) => setQuestionCount(Math.min(10, Math.max(1, parseInt(e.target.value) || 3)))}
-                  />
-                </div>
+              {/* Quick Generate Button */}
+              <div className="flex gap-2 mb-4">
+                <Button
+                  variant="outline"
+                  onClick={fetchWeakTopics}
+                  disabled={isLoadingWeakTopics || isGenerating}
+                  className="flex-1"
+                >
+                  {isLoadingWeakTopics ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Analyzing Student Data...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="mr-2 h-4 w-4" />
+                      Quick Generate from Weak Topics
+                    </>
+                  )}
+                </Button>
               </div>
 
-              {selectedSubject && (
-                <div className="space-y-2">
-                  <Label>Topic</Label>
-                  <Select value={selectedTopic} onValueChange={setSelectedTopic}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select topic" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-64">
-                      {getTopicsForSubject(selectedSubject).map(category => (
-                        <div key={category.category}>
-                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted">
-                            {category.category}
+              {/* Weak Topics Display */}
+              {showQuickGenerate && weakTopics.length > 0 && (
+                <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <TrendingDown className="h-4 w-4 text-destructive" />
+                    Topics Where Students Struggle Most
+                  </div>
+                  <div className="space-y-2">
+                    {weakTopics.map((topic, idx) => (
+                      <div
+                        key={topic.topicName}
+                        className="flex items-center justify-between p-3 bg-background rounded-md border"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{topic.topicName}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {topic.studentCount} student{topic.studentCount !== 1 ? 's' : ''}
+                            </Badge>
+                            <Badge variant="destructive" className="text-xs">
+                              Avg: {topic.averageScore}%
+                            </Badge>
+                            {topic.standard && (
+                              <span className="text-xs text-muted-foreground">
+                                {topic.standard}
+                              </span>
+                            )}
                           </div>
-                          {category.topics.map(topic => (
-                            <SelectItem key={topic.name} value={topic.name}>
-                              {topic.name} ({topic.standard})
-                            </SelectItem>
-                          ))}
                         </div>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        <Button
+                          size="sm"
+                          onClick={() => handleQuickGenerate(topic)}
+                          disabled={isGenerating}
+                        >
+                          {isGenerating ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            'Generate'
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowQuickGenerate(false)}
+                    className="w-full"
+                  >
+                    Cancel
+                  </Button>
                 </div>
               )}
 
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  After generating, print the form, solve the problems by hand showing your work, 
-                  then scan your completed work using the Teacher Answer Sample Uploader above.
-                </AlertDescription>
-              </Alert>
+              {/* Manual Selection */}
+              {!showQuickGenerate && (
+                <>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground">
+                        Or select manually
+                      </span>
+                    </div>
+                  </div>
 
-              <Button 
-                onClick={handleGenerate} 
-                disabled={!selectedSubject || !selectedTopic || isGenerating}
-                className="w-full"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating Questions...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Generate Training Form
-                  </>
-                )}
-              </Button>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Subject</Label>
+                      <Select value={selectedSubject} onValueChange={(v) => {
+                        setSelectedSubject(v);
+                        setSelectedTopic('');
+                      }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select subject" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SUBJECTS.map(s => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Number of Questions</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={questionCount}
+                        onChange={(e) => setQuestionCount(Math.min(10, Math.max(1, parseInt(e.target.value) || 3)))}
+                      />
+                    </div>
+                  </div>
+
+                  {selectedSubject && (
+                    <div className="space-y-2">
+                      <Label>Topic</Label>
+                      <Select value={selectedTopic} onValueChange={setSelectedTopic}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select topic" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-64">
+                          {getTopicsForSubject(selectedSubject).map(category => (
+                            <div key={category.category}>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted">
+                                {category.category}
+                              </div>
+                              {category.topics.map(topic => (
+                                <SelectItem key={topic.name} value={topic.name}>
+                                  {topic.name} ({topic.standard})
+                                </SelectItem>
+                              ))}
+                            </div>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      After generating, print the form, solve the problems by hand showing your work, 
+                      then scan your completed work using the Teacher Answer Sample Uploader above.
+                    </AlertDescription>
+                  </Alert>
+
+                  <Button 
+                    onClick={handleGenerate} 
+                    disabled={!selectedSubject || !selectedTopic || isGenerating}
+                    className="w-full"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating Questions...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Generate Training Form
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
             </>
           ) : (
             <div className="space-y-4">
