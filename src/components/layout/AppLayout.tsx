@@ -11,7 +11,6 @@ import {
   Menu, 
   X,
   LogOut,
-  HelpCircle,
   Eye,
   EyeOff,
   FolderOpen
@@ -25,6 +24,7 @@ import { useStudentNames } from '@/lib/StudentNameContext';
 import { cn } from '@/lib/utils';
 import nycologicHeadLogo from '@/assets/nycologic-head-logo.png';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { HelpBot } from '@/components/HelpBot';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -37,7 +37,6 @@ const navItems = [
   { href: '/scan', label: 'Scan', icon: Camera },
   { href: '/library', label: 'Library', icon: FolderOpen },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
-  { href: '/help', label: 'Help', icon: HelpCircle },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -256,6 +255,9 @@ export function AppLayout({ children }: AppLayoutProps) {
       <main className="container py-6">
         {children}
       </main>
+
+      {/* Help Bot */}
+      <HelpBot />
     </div>
   );
 }
