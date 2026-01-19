@@ -1,11 +1,12 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { 
   Upload, Loader2, RotateCcw, RotateCw, ArrowUp, ArrowDown, 
   Trash2, Check, Layers, FileImage, Wand2, GripVertical,
   ZoomIn, ZoomOut, Eye, FolderOpen, RefreshCw, Settings2, Cloud,
-  Zap, Pause, Play, Usb, Monitor
+  Zap, Pause, Play, Usb, Monitor, ChevronLeft, ChevronRight, Search, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -190,6 +191,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const [processProgress, setProcessProgress] = useState(0);
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewSearchQuery, setPreviewSearchQuery] = useState('');
   const [driveImportOpen, setDriveImportOpen] = useState(false);
   const [autoSyncConfigOpen, setAutoSyncConfigOpen] = useState(false);
   const [showUSBScanner, setShowUSBScanner] = useState(false);
@@ -637,9 +639,64 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const openPreview = (pageId: string) => {
     setSelectedPage(pageId);
     setPreviewOpen(true);
+    setPreviewSearchQuery('');
   };
 
   const selectedPageData = pages.find(p => p.id === selectedPage);
+  const selectedPageIndex = pages.findIndex(p => p.id === selectedPage);
+
+  // Filter pages by search query (matches filename)
+  const filteredPages = useMemo(() => {
+    if (!previewSearchQuery.trim()) return pages;
+    const query = previewSearchQuery.toLowerCase().trim();
+    return pages.filter(p => 
+      p.filename.toLowerCase().includes(query) ||
+      `page ${p.order}`.toLowerCase().includes(query)
+    );
+  }, [pages, previewSearchQuery]);
+
+  // Navigation functions for preview dialog
+  const navigatePreview = useCallback((direction: 'prev' | 'next') => {
+    const listToUse = previewSearchQuery.trim() ? filteredPages : pages;
+    const currentIdx = listToUse.findIndex(p => p.id === selectedPage);
+    if (currentIdx === -1) return;
+    
+    const newIdx = direction === 'prev' ? currentIdx - 1 : currentIdx + 1;
+    if (newIdx >= 0 && newIdx < listToUse.length) {
+      setSelectedPage(listToUse[newIdx].id);
+    }
+  }, [selectedPage, pages, filteredPages, previewSearchQuery]);
+
+  const canNavigatePrev = useMemo(() => {
+    const listToUse = previewSearchQuery.trim() ? filteredPages : pages;
+    const currentIdx = listToUse.findIndex(p => p.id === selectedPage);
+    return currentIdx > 0;
+  }, [selectedPage, pages, filteredPages, previewSearchQuery]);
+
+  const canNavigateNext = useMemo(() => {
+    const listToUse = previewSearchQuery.trim() ? filteredPages : pages;
+    const currentIdx = listToUse.findIndex(p => p.id === selectedPage);
+    return currentIdx < listToUse.length - 1;
+  }, [selectedPage, pages, filteredPages, previewSearchQuery]);
+
+  // Keyboard navigation for preview dialog
+  useEffect(() => {
+    if (!previewOpen) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't navigate if user is typing in search
+      if (e.target instanceof HTMLInputElement) return;
+      
+      if (e.key === 'ArrowLeft' && canNavigatePrev) {
+        navigatePreview('prev');
+      } else if (e.key === 'ArrowRight' && canNavigateNext) {
+        navigatePreview('next');
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewOpen, canNavigatePrev, canNavigateNext, navigatePreview]);
 
   return (
     <div className="space-y-4">
@@ -1059,7 +1116,10 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
       </Card>
 
       {/* Preview Dialog */}
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+      <Dialog open={previewOpen} onOpenChange={(open) => {
+        setPreviewOpen(open);
+        if (!open) setPreviewSearchQuery('');
+      }}>
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1068,40 +1128,111 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               {selectedPageData?.autoRotated && (
                 <Badge variant="outline" className="ml-2">Auto-rotated</Badge>
               )}
+              <span className="text-sm font-normal text-muted-foreground ml-auto">
+                {previewSearchQuery.trim() 
+                  ? `${filteredPages.findIndex(p => p.id === selectedPage) + 1} of ${filteredPages.length} results`
+                  : `${selectedPageIndex + 1} of ${pages.length}`
+                }
+              </span>
             </DialogTitle>
             <DialogDescription>
               {selectedPageData?.filename}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col items-center gap-4">
-            <div className="max-h-[60vh] overflow-auto border rounded-lg">
-              {selectedPageData && (
+          
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by student name or page number..."
+              value={previewSearchQuery}
+              onChange={(e) => setPreviewSearchQuery(e.target.value)}
+              className="pl-9 pr-9"
+            />
+            {previewSearchQuery && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                onClick={() => setPreviewSearchQuery('')}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          
+          {/* Navigation + Image Container */}
+          <div className="flex items-center gap-2">
+            {/* Left Navigation Arrow */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigatePreview('prev')}
+              disabled={!canNavigatePrev}
+              className="shrink-0 h-12 w-12"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
+            
+            {/* Image Preview */}
+            <div className="flex-1 max-h-[55vh] overflow-auto border rounded-lg">
+              {selectedPageData ? (
                 <img
                   src={selectedPageData.processedDataUrl}
                   alt={`Page ${selectedPageData.order}`}
-                  className="max-w-full h-auto"
+                  className="max-w-full h-auto mx-auto"
                 />
-              )}
+              ) : previewSearchQuery.trim() && filteredPages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Search className="h-12 w-12 mb-4 opacity-50" />
+                  <p>No pages match your search</p>
+                  <Button 
+                    variant="link" 
+                    onClick={() => setPreviewSearchQuery('')}
+                    className="mt-2"
+                  >
+                    Clear search
+                  </Button>
+                </div>
+              ) : null}
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => selectedPage && handleRotatePage(selectedPage, 'ccw')}
-                disabled={selectedPageData?.isProcessing}
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Rotate Left
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => selectedPage && handleRotatePage(selectedPage, 'cw')}
-                disabled={selectedPageData?.isProcessing}
-              >
-                <RotateCw className="h-4 w-4 mr-2" />
-                Rotate Right
-              </Button>
-            </div>
+            
+            {/* Right Navigation Arrow */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigatePreview('next')}
+              disabled={!canNavigateNext}
+              className="shrink-0 h-12 w-12"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </Button>
           </div>
+          
+          {/* Rotate Controls */}
+          <div className="flex justify-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => selectedPage && handleRotatePage(selectedPage, 'ccw')}
+              disabled={selectedPageData?.isProcessing}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Rotate Left
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => selectedPage && handleRotatePage(selectedPage, 'cw')}
+              disabled={selectedPageData?.isProcessing}
+            >
+              <RotateCw className="h-4 w-4 mr-2" />
+              Rotate Right
+            </Button>
+          </div>
+          
+          {/* Keyboard shortcuts hint */}
+          <p className="text-xs text-center text-muted-foreground">
+            Use ← → arrow keys to navigate between pages
+          </p>
         </DialogContent>
       </Dialog>
 
