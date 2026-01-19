@@ -951,6 +951,12 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               pdf.line(boxMarginLeft + boxWidth - 2, yPosition + warmUpWorkAreaHeight - 4, boxMarginLeft + boxWidth - 2, yPosition + warmUpWorkAreaHeight);
               pdf.line(boxMarginLeft + boxWidth - 6, yPosition + warmUpWorkAreaHeight, boxMarginLeft + boxWidth - 2, yPosition + warmUpWorkAreaHeight);
               
+              // Reminder text at bottom of work area
+              pdf.setFontSize(5.5);
+              pdf.setFont('helvetica', 'italic');
+              pdf.setTextColor(120, 130, 140);
+              pdf.text('Stay inside the lines for AI grading', boxMarginLeft + boxWidth / 2, yPosition + warmUpWorkAreaHeight - 2, { align: 'center' });
+              
               // Dashed line separator
               pdf.setDrawColor(148, 163, 184);
               pdf.setLineDashPattern([1, 1], 0);
@@ -1146,6 +1152,12 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 pdf.line(boxMarginLeft + 5, lineY, boxMarginLeft + boxWidth - 5, lineY);
               }
             }
+            
+            // Reminder text at bottom of work area
+            pdf.setFontSize(6);
+            pdf.setFont('helvetica', 'italic');
+            pdf.setTextColor(120, 130, 140);
+            pdf.text('Stay inside the lines for AI grading', boxMarginLeft + boxWidth / 2, yPosition + mainWorkAreaHeight - 3, { align: 'center' });
             
             // Dashed line separator between work and answer
             pdf.setDrawColor(148, 163, 184);
