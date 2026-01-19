@@ -15,6 +15,8 @@ import { ScanSettings } from '@/components/settings/ScanSettings';
 import { GradeDataCleanup } from '@/components/settings/GradeDataCleanup';
 import { PerformanceDropAlertSettings } from '@/components/settings/PerformanceDropAlertSettings';
 import { useOnboardingTour } from '@/hooks/useOnboardingTour';
+import { TeacherAnswerSampleUploader } from '@/components/scan/TeacherAnswerSampleUploader';
+import { TeacherAnswerSampleList } from '@/components/scan/TeacherAnswerSampleList';
 
 const DEPLOYED_URL = 'https://eb414783-3d02-49de-9a11-3c5e9daba81a.lovableproject.com';
 
@@ -105,6 +107,7 @@ Make sure to configure these permissions in your native projects:
 export default function Settings() {
   const [copied, setCopied] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
+  const [sampleRefresh, setSampleRefresh] = useState(0);
   const { resetTour } = useOnboardingTour();
 
   const handleRestartTour = () => {
@@ -171,6 +174,10 @@ export default function Settings() {
         <PerformanceDropAlertSettings />
 
         <AIDetectionSettings />
+
+        {/* Teacher Answer Sample Training */}
+        <TeacherAnswerSampleUploader onSampleSaved={() => setSampleRefresh(prev => prev + 1)} />
+        <TeacherAnswerSampleList refreshTrigger={sampleRefresh} />
 
         <TwoFactorSettings />
 
