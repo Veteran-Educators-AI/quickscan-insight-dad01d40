@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Printer, Check, Loader2, QrCode } from 'lucide-react';
+import { Printer, Check, Loader2, QrCode, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PrintableWorksheet } from './PrintableWorksheet';
+import { AIScanPreviewDialog } from './AIScanPreviewDialog';
 import { useAuth } from '@/lib/auth';
 
 interface Student {
@@ -54,8 +55,10 @@ export function PrintWorksheetDialog({ classId, students, trigger, topicName }: 
   const [loading, setLoading] = useState(false);
   const [assessmentName, setAssessmentName] = useState('Geometry Assessment');
   const [showPreview, setShowPreview] = useState(false);
+  const [showAIScanPreview, setShowAIScanPreview] = useState(false);
   const [includeQRCodes, setIncludeQRCodes] = useState(true);
   const [includeLevels, setIncludeLevels] = useState(true);
+  const [aiOptimizedLayout, setAIOptimizedLayout] = useState(true);
   const [studentLevels, setStudentLevels] = useState<Map<string, StudentLevel>>(new Map());
 
   useEffect(() => {
@@ -241,6 +244,35 @@ export function PrintWorksheetDialog({ classId, students, trigger, topicName }: 
               />
             </div>
 
+            {/* AI-Optimized Layout Toggle */}
+            <div className="flex items-center justify-between rounded-lg border p-3 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20">
+              <div className="space-y-0.5">
+                <Label htmlFor="ai-layout-toggle" className="flex items-center gap-2 cursor-pointer">
+                  <Eye className="h-4 w-4 text-purple-600" />
+                  AI-Optimized Layout
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Bounded answer zones with clear work areas for improved AI scanning accuracy
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowAIScanPreview(true)}
+                  className="text-xs h-7"
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  Preview Scan Zones
+                </Button>
+                <Switch
+                  id="ai-layout-toggle"
+                  checked={aiOptimizedLayout}
+                  onCheckedChange={setAIOptimizedLayout}
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               {/* Students Selection */}
               <div className="space-y-2">
@@ -369,12 +401,21 @@ export function PrintWorksheetDialog({ classId, students, trigger, topicName }: 
                   showQRCodes={includeQRCodes}
                   studentLevel={includeLevels ? levelInfo?.level : undefined}
                   topicName={includeLevels ? (topicName || levelInfo?.topic_name) : undefined}
+                  aiOptimizedLayout={aiOptimizedLayout}
                 />
               );
             })}
           </div>
         </div>
       )}
+
+      {/* AI Scan Preview Dialog */}
+      <AIScanPreviewDialog
+        open={showAIScanPreview}
+        onOpenChange={setShowAIScanPreview}
+        questions={getSelectedQuestions().length > 0 ? getSelectedQuestions() : questions.slice(0, 3)}
+        studentName={getSelectedStudents()[0]?.first_name || 'Sample Student'}
+      />
 
       {/* Print Styles */}
       <style>{`

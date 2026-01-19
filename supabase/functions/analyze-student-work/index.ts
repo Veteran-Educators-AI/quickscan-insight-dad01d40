@@ -573,17 +573,26 @@ Students often:
 
 ** ALL WORK IN THE VICINITY OF A QUESTION MUST BE CONSIDERED AS POTENTIALLY PART OF THAT ANSWER **
 
-** MAXIMUM POINT REDUCTION RULE FOR CORRECT ANSWERS **
-CRITICAL: When a student produces a CORRECT ANSWER to a problem:
-- The MAXIMUM point reduction allowed is 5% (e.g., from 100 to 95)
-- This applies even if work shown is minimal, messy, or unconventionally placed
-- CORRECT ANSWER + ANY work showing understanding = MINIMUM 95%
-- You may ONLY deduct points for:
-  * Significant notation errors (max 2-3%)
-  * Missing units when explicitly required (max 2-3%)
-  * Partial work shown when ALL work was explicitly required (max 5%)
-- NEVER reduce a correct answer by more than 5 percentage points
-- A correct answer demonstrates mastery of the concept being tested
+** CORRECT ANSWER GRADING RULE - MINIMUM 90% FOR CORRECT ANSWERS **
+CRITICAL RULE: When a student produces a CORRECT ANSWER to a problem:
+- The student MUST receive at MINIMUM 90% credit (grade of 90 or higher)
+- Maximum deduction for lack of shown work is 5-10% ONLY
+- This applies even if:
+  * Work shown is minimal or sparse
+  * Work is messy or unconventionally placed
+  * Student only shows answer without full steps
+- CORRECT ANSWER = MASTERY DEMONSTRATED = 90-100%
+
+DEDUCTION GUIDELINES FOR CORRECT ANSWERS:
+- Full work shown clearly → 100%
+- Some work shown → 95-100%
+- Minimal work but answer correct → 90-95%
+- Answer correct but NO work at all → 90% (bare minimum)
+- NEVER grade a correct answer below 90%
+
+RATIONALE: A correct answer proves the student understands the concept. 
+Penalizing too harshly for not showing work when the answer is RIGHT is unfair.
+The purpose of showing work is to help the teacher understand thinking, not to gatekeep credit.
 
 FULL-PAGE WORK SCANNING PROTOCOL:
 ** CRITICAL: SCAN THE ENTIRE PAGE FOR STUDENT WORK **
