@@ -88,6 +88,12 @@ export interface BatchItem {
   handwritingSimilarity?: HandwritingSimilarity;
   // Flag when a continuation is converted to separate paper for individual grading
   wasConvertedFromContinuation?: boolean;
+  // Filename for grouping multi-page papers by topic
+  filename?: string;
+  worksheetTopic?: string; // Parsed topic name from filename (for grouping)
+  // Multi-page averaging
+  isAveragedResult?: boolean; // True if this result is averaged from multiple papers
+  averagedFromIds?: string[]; // IDs of items that were averaged together
 }
 
 export interface BatchSummary {
@@ -102,7 +108,7 @@ export interface BatchSummary {
 
 interface UseBatchAnalysisReturn {
   items: BatchItem[];
-  addImage: (imageDataUrl: string, studentId?: string, studentName?: string) => string;
+  addImage: (imageDataUrl: string, studentId?: string, studentName?: string, filename?: string) => string;
   addImageWithAutoIdentify: (imageDataUrl: string, studentRoster?: Student[]) => Promise<string>;
   removeImage: (id: string) => void;
   updateItemStudent: (itemId: string, studentId: string, studentName: string) => void;
@@ -113,6 +119,7 @@ interface UseBatchAnalysisReturn {
   detectPageTypes: () => Promise<{ newPapers: number; continuations: number }>;
   detectMultiPageByHandwriting: () => Promise<{ groupsCreated: number; pagesLinked: number }>;
   groupPagesByStudent: () => { studentsGrouped: number; pagesLinked: number };
+  groupPagesByWorksheetTopic: () => { topicsGrouped: number; pagesLinked: number };
   linkContinuation: (continuationId: string, primaryId: string) => void;
   unlinkContinuation: (continuationId: string) => void;
   unlinkAllPages: () => void;
@@ -159,18 +166,37 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     };
   }, [qrScanSettings.gradeCurvePercent]);
 
-const addImage = useCallback((imageDataUrl: string, studentId?: string, studentName?: string): string => {
+  // Parse worksheet topic from filename (removes extension, page numbers, cleans up)
+  const parseWorksheetTopic = useCallback((filename: string): string => {
+    if (!filename) return '';
+    // Remove file extension
+    let name = filename.replace(/\.[^/.]+$/, '');
+    // Remove page numbers like _0001, _0002, (1), (2), -page1, page 2, etc.
+    name = name.replace(/[_\-\s]*(page\s*)?\d{1,4}$/i, '');
+    name = name.replace(/\(\d+\)$/, '');
+    name = name.replace(/_+$/, '');
+    // Replace underscores with spaces
+    name = name.replace(/_/g, ' ');
+    // Clean up multiple spaces
+    name = name.replace(/\s+/g, ' ').trim();
+    return name.toLowerCase() || filename.toLowerCase();
+  }, []);
+
+  const addImage = useCallback((imageDataUrl: string, studentId?: string, studentName?: string, filename?: string): string => {
     const id = crypto.randomUUID();
+    const worksheetTopic = filename ? parseWorksheetTopic(filename) : undefined;
     const newItem: BatchItem = {
       id,
       imageDataUrl,
       studentId,
       studentName: studentName || undefined,
       status: 'pending',
+      filename,
+      worksheetTopic,
     };
     setItems(prev => [...prev, newItem]);
     return id;
-  }, []);
+  }, [parseWorksheetTopic]);
 
   // Auto-identify a single newly added image
   const autoIdentifySingle = useCallback(async (itemId: string, studentRoster: Student[]) => {
@@ -885,6 +911,74 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     return { studentsGrouped, pagesLinked };
   }, [items]);
 
+  // Group pages by worksheet topic AND student name - for multi-page papers from same student on same topic
+  const groupPagesByWorksheetTopic = useCallback((): { topicsGrouped: number; pagesLinked: number } => {
+    // Build a map of (worksheetTopic + studentName) -> list of item indices
+    // This groups papers like "Composite Figure Day 3" page 1 and page 2 for the same student
+    const topicStudentPages: Map<string, number[]> = new Map();
+    
+    items.forEach((item, index) => {
+      // Only group items that have both a worksheet topic and student identification
+      const topic = item.worksheetTopic;
+      const studentKey = item.studentId || item.identification?.matchedStudentId || item.studentName || item.identification?.handwrittenName;
+      
+      if (topic && studentKey) {
+        const groupKey = `${topic}:::${studentKey.toLowerCase()}`;
+        const existing = topicStudentPages.get(groupKey) || [];
+        existing.push(index);
+        topicStudentPages.set(groupKey, existing);
+      }
+    });
+
+    let topicsGrouped = 0;
+    let pagesLinked = 0;
+
+    // For each topic+student combination with multiple pages, link them
+    setItems(prev => {
+      const updated = [...prev];
+      
+      topicStudentPages.forEach((indices, groupKey) => {
+        if (indices.length <= 1) return; // Only one page, nothing to group
+        
+        topicsGrouped++;
+        const primaryIndex = indices[0]; // First page becomes primary
+        const primaryId = updated[primaryIndex].id;
+        const primaryItem = updated[primaryIndex];
+        
+        // Get all continuation IDs (existing + new)
+        const existingContinuations = primaryItem.continuationPages || [];
+        const newContinuationIds = indices.slice(1).map(idx => updated[idx].id);
+        const allContinuationIds = [...new Set([...existingContinuations, ...newContinuationIds])];
+        
+        // Mark primary as 'new' with continuation pages
+        updated[primaryIndex] = {
+          ...primaryItem,
+          pageType: 'new',
+          continuationOf: undefined,
+          continuationPages: allContinuationIds,
+        };
+
+        // Mark subsequent pages as continuations
+        indices.slice(1).forEach(idx => {
+          pagesLinked++;
+          updated[idx] = {
+            ...updated[idx],
+            pageType: 'continuation',
+            continuationOf: primaryId,
+            continuationPages: undefined,
+            // Ensure student info is consistent
+            studentId: primaryItem.studentId,
+            studentName: primaryItem.studentName,
+          };
+        });
+      });
+
+      return updated;
+    });
+
+    return { topicsGrouped, pagesLinked };
+  }, [items]);
+
   // Reorder items (drag and drop)
   const reorderItems = useCallback((activeId: string, overId: string) => {
     setItems(prev => {
@@ -1363,6 +1457,7 @@ const addImage = useCallback((imageDataUrl: string, studentId?: string, studentN
     detectPageTypes,
     detectMultiPageByHandwriting,
     groupPagesByStudent,
+    groupPagesByWorksheetTopic,
     linkContinuation,
     unlinkContinuation,
     unlinkAllPages,
