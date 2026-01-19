@@ -821,43 +821,50 @@ export function AITrainingWizard({ open, onOpenChange, onTrainingComplete }: AIT
         
         return (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold">Answer the Question</h3>
-                <p className="text-sm text-muted-foreground">
-                  Question {currentQuestionIndex + 1} of {trainingQuestions.length}
-                </p>
+            {/* Header with question info */}
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold">Answer the Question</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Question {currentQuestionIndex + 1} of {trainingQuestions.length}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <Badge variant="outline" className="text-xs">{currentQuestion?.difficulty}</Badge>
+                  <Badge variant="secondary" className="text-xs">{currentQuestion?.standard}</Badge>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
+              
+              {/* Action buttons row */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={printTrainingQuestions}
-                  className="gap-1"
+                  className="gap-1.5 h-8"
                 >
                   <Printer className="h-3.5 w-3.5" />
-                  Print
+                  <span className="hidden sm:inline">Print</span>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={downloadQuestionsToPDF}
-                  className="gap-1"
+                  className="gap-1.5 h-8"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  PDF
+                  <span className="hidden sm:inline">PDF</span>
                 </Button>
                 <Button
                   variant="default"
                   size="sm"
                   onClick={() => setShowUploadDialog(true)}
-                  className="gap-1 bg-green-600 hover:bg-green-700"
+                  className="gap-1.5 h-8 bg-green-600 hover:bg-green-700"
                 >
                   <Upload className="h-3.5 w-3.5" />
                   Upload Completed
                 </Button>
-                <Badge variant="outline">{currentQuestion?.difficulty}</Badge>
-                <Badge variant="secondary">{currentQuestion?.standard}</Badge>
               </div>
             </div>
 
@@ -1058,7 +1065,7 @@ export function AITrainingWizard({ open, onOpenChange, onTrainingComplete }: AIT
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Brain className="h-5 w-5 text-primary" />
