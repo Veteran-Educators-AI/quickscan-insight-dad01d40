@@ -1180,18 +1180,94 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           }
         }
 
-        // Work area
+        // AI-Optimized Work Area with bounded zones
         if (showAnswerLines) {
-          pdf.setDrawColor(200);
-          pdf.setLineWidth(0.2);
-          for (let i = 0; i < 5; i++) {
-            if (yPosition > pageHeight - 30) {
-              pdf.addPage();
-              yPosition = margin;
-            }
-            pdf.line(margin + 5, yPosition + (i * 8), pageWidth - margin, yPosition + (i * 8));
+          // Check if we have enough space for the work area box (needs ~70mm)
+          if (yPosition > pageHeight - 75) {
+            pdf.addPage();
+            yPosition = margin;
           }
-          yPosition += 45;
+          
+          const boxMarginLeft = margin + 5;
+          const boxWidth = contentWidth - 5;
+          const workAreaHeight = 35; // mm for work area
+          const answerAreaHeight = 12; // mm for answer box
+          const totalBoxHeight = workAreaHeight + answerAreaHeight + 10;
+          
+          // Main container border (navy blue)
+          pdf.setDrawColor(30, 58, 95); // #1e3a5f
+          pdf.setLineWidth(0.8);
+          pdf.rect(boxMarginLeft, yPosition, boxWidth, totalBoxHeight);
+          
+          // Work Area Section background
+          pdf.setFillColor(248, 250, 252); // #f8fafc light gray
+          pdf.rect(boxMarginLeft, yPosition, boxWidth, workAreaHeight + 8, 'F');
+          
+          // Work Area label
+          pdf.setFillColor(224, 242, 254); // #e0f2fe light blue
+          pdf.roundedRect(boxMarginLeft + 3, yPosition + 2, 32, 5, 1, 1, 'F');
+          pdf.setFontSize(7);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(30, 58, 95);
+          pdf.text(`WORK AREA Q${question.questionNumber}`, boxMarginLeft + 5, yPosition + 5.5);
+          
+          // Instructions text
+          pdf.setFontSize(6);
+          pdf.setFont('helvetica', 'italic');
+          pdf.setTextColor(100, 116, 139); // #64748b
+          pdf.text('Show all calculations & reasoning here', boxMarginLeft + boxWidth - 45, yPosition + 5.5);
+          
+          // Dashed separator line between work and answer areas
+          pdf.setDrawColor(148, 163, 184); // #94a3b8
+          pdf.setLineWidth(0.3);
+          pdf.setLineDashPattern([2, 2], 0);
+          pdf.line(boxMarginLeft, yPosition + workAreaHeight + 7, boxMarginLeft + boxWidth, yPosition + workAreaHeight + 7);
+          pdf.setLineDashPattern([], 0); // Reset dash pattern
+          
+          // Work area lines
+          pdf.setDrawColor(203, 213, 225); // #cbd5e1
+          pdf.setLineWidth(0.15);
+          for (let i = 0; i < 4; i++) {
+            pdf.line(boxMarginLeft + 3, yPosition + 10 + (i * 7), boxMarginLeft + boxWidth - 3, yPosition + 10 + (i * 7));
+          }
+          
+          // Corner markers for AI zone detection
+          pdf.setDrawColor(30, 58, 95);
+          pdf.setLineWidth(0.5);
+          // Top-left corner
+          pdf.line(boxMarginLeft + 2, yPosition + 8, boxMarginLeft + 2, yPosition + 12);
+          pdf.line(boxMarginLeft + 2, yPosition + 8, boxMarginLeft + 6, yPosition + 8);
+          // Top-right corner  
+          pdf.line(boxMarginLeft + boxWidth - 2, yPosition + 8, boxMarginLeft + boxWidth - 2, yPosition + 12);
+          pdf.line(boxMarginLeft + boxWidth - 2, yPosition + 8, boxMarginLeft + boxWidth - 6, yPosition + 8);
+          
+          // Final Answer Section background (yellow/amber)
+          pdf.setFillColor(254, 243, 199); // #fef3c7
+          pdf.rect(boxMarginLeft, yPosition + workAreaHeight + 8, boxWidth, answerAreaHeight, 'F');
+          
+          // Answer section top border (amber)
+          pdf.setDrawColor(245, 158, 11); // #f59e0b
+          pdf.setLineWidth(0.5);
+          pdf.line(boxMarginLeft, yPosition + workAreaHeight + 8, boxMarginLeft + boxWidth, yPosition + workAreaHeight + 8);
+          
+          // Final Answer label
+          pdf.setFillColor(253, 230, 138); // #fde68a
+          pdf.roundedRect(boxMarginLeft + 3, yPosition + workAreaHeight + 10, 22, 5, 1, 1, 'F');
+          pdf.setDrawColor(245, 158, 11);
+          pdf.setLineWidth(0.3);
+          pdf.roundedRect(boxMarginLeft + 3, yPosition + workAreaHeight + 10, 22, 5, 1, 1, 'S');
+          pdf.setFontSize(7);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(146, 64, 14); // #92400e
+          pdf.text('FINAL ANSWER', boxMarginLeft + 5, yPosition + workAreaHeight + 13.5);
+          
+          // Answer line
+          pdf.setDrawColor(217, 119, 6); // #d97706
+          pdf.setLineWidth(0.4);
+          pdf.line(boxMarginLeft + 28, yPosition + workAreaHeight + 15, boxMarginLeft + boxWidth - 5, yPosition + workAreaHeight + 15);
+          
+          pdf.setTextColor(0); // Reset text color
+          yPosition += totalBoxHeight + 8;
         } else {
           yPosition += 15;
         }
@@ -2494,59 +2570,187 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 boxSizing: 'border-box',
               }}
             >
-              <div style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: 'top left', width: `${100 / (previewZoom / 100)}%` }}>
-                <div className="text-center mb-6">
-                  <h1 className="text-2xl font-bold text-black">{worksheetTitle}</h1>
-                  {teacherName && <p className="text-gray-600 mt-1">Teacher: {teacherName}</p>}
-                </div>
-                <div className="flex justify-between text-sm mb-6 border-b border-gray-300 pb-4 text-black">
-                  <span>Name: _______________________</span>
-                  <span>Date: ___________</span>
-                  <span>Period: _____</span>
-                </div>
-                <div className="space-y-8">
-                  {compiledQuestions.map((question) => (
-                    <div key={question.questionNumber} className="space-y-2" style={{ pageBreakInside: 'avoid' }}>
-                      <div className="flex items-baseline gap-2 flex-wrap">
-                        <span className="font-bold text-black">{question.questionNumber}.</span>
-                        {worksheetMode === 'diagnostic' && question.advancementLevel && (
-                          <span className={`text-xs px-2 py-0.5 rounded border font-semibold ${
-                            question.advancementLevel === 'A' ? 'bg-green-100 text-green-800 border-green-300' :
-                            question.advancementLevel === 'B' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
-                            question.advancementLevel === 'C' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
-                            question.advancementLevel === 'D' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                            question.advancementLevel === 'E' ? 'bg-red-100 text-red-800 border-red-300' :
-                            'bg-gray-100 text-gray-800 border-gray-300'
-                          }`}>
-                            Level {question.advancementLevel}
-                          </span>
-                        )}
-                        <span className="text-xs px-2 py-0.5 rounded border bg-gray-100 text-gray-700 border-gray-200">
-                          {question.difficulty}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-500 ml-5">
-                        {question.topic} ({question.standard})
-                      </p>
-                      <p className="ml-5 font-serif leading-relaxed text-base text-black" style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
-                        {renderMathText(fixEncodingCorruption(question.question))}
-                      </p>
-                      {question.svg && (
-                        <div 
-                          className="ml-5 mt-2 flex justify-center"
-                          dangerouslySetInnerHTML={{ __html: question.svg }}
-                        />
-                      )}
-                      {showAnswerLines && (
-                        <div className="ml-5 mt-4 space-y-3">
-                          {[1, 2, 3, 4, 5].map((line) => (
-                            <div key={line} className="border-b border-gray-300" style={{ height: '24px' }} />
-                          ))}
-                        </div>
-                      )}
+                <div style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: 'top left', width: `${100 / (previewZoom / 100)}%` }}>
+                  {/* AI Scanning Instructions Banner */}
+                  {showAnswerLines && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      padding: '0.5rem 0.875rem',
+                      marginBottom: '1rem',
+                      backgroundColor: '#ecfdf5',
+                      border: '1px solid #6ee7b7',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.7rem',
+                      color: '#047857',
+                    }}>
+                      <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        📋 Instructions
+                      </span>
+                      <span style={{ flex: 1 }}>
+                        Write all work in the <strong>Work Area</strong> boxes. Put your final answer in the <strong>Final Answer</strong> section.
+                      </span>
                     </div>
-                  ))}
-                </div>
+                  )}
+                  
+                  <div className="text-center mb-6">
+                    <h1 className="text-2xl font-bold text-black">{worksheetTitle}</h1>
+                    {teacherName && <p className="text-gray-600 mt-1">Teacher: {teacherName}</p>}
+                  </div>
+                  <div className="flex justify-between text-sm mb-6 border-b border-gray-300 pb-4 text-black">
+                    <span>Name: _______________________</span>
+                    <span>Date: ___________</span>
+                    <span>Period: _____</span>
+                  </div>
+                  <div className="space-y-8">
+                    {compiledQuestions.map((question) => (
+                      <div key={question.questionNumber} className="space-y-2" style={{ pageBreakInside: 'avoid' }}>
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="font-bold text-black">{question.questionNumber}.</span>
+                          {worksheetMode === 'diagnostic' && question.advancementLevel && (
+                            <span className={`text-xs px-2 py-0.5 rounded border font-semibold ${
+                              question.advancementLevel === 'A' ? 'bg-green-100 text-green-800 border-green-300' :
+                              question.advancementLevel === 'B' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                              question.advancementLevel === 'C' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                              question.advancementLevel === 'D' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                              question.advancementLevel === 'E' ? 'bg-red-100 text-red-800 border-red-300' :
+                              'bg-gray-100 text-gray-800 border-gray-300'
+                            }`}>
+                              Level {question.advancementLevel}
+                            </span>
+                          )}
+                          <span className="text-xs px-2 py-0.5 rounded border bg-gray-100 text-gray-700 border-gray-200">
+                            {question.difficulty}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-500 ml-5">
+                          {question.topic} ({question.standard})
+                        </p>
+                        <p className="ml-5 font-serif leading-relaxed text-base text-black" style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                          {renderMathText(fixEncodingCorruption(question.question))}
+                        </p>
+                        {question.svg && (
+                          <div 
+                            className="ml-5 mt-2 flex justify-center"
+                            dangerouslySetInnerHTML={{ __html: question.svg }}
+                          />
+                        )}
+                        {/* AI-Optimized Answer Box with Work Area and Final Answer zones */}
+                        {showAnswerLines && (
+                          <div style={{
+                            border: '3px solid #1e3a5f',
+                            borderRadius: '0.5rem',
+                            marginTop: '1rem',
+                            marginLeft: '1.25rem',
+                            backgroundColor: '#ffffff',
+                            overflow: 'hidden',
+                          }}>
+                            {/* Work Area Section */}
+                            <div style={{
+                              borderBottom: '2px dashed #94a3b8',
+                              padding: '0.75rem 1rem',
+                              backgroundColor: '#f8fafc',
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '0.5rem',
+                              }}>
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  color: '#1e3a5f',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.1em',
+                                  backgroundColor: '#e0f2fe',
+                                  padding: '0.2rem 0.6rem',
+                                  borderRadius: '0.25rem',
+                                  border: '1px solid #7dd3fc',
+                                }}>
+                                  ✏️ Work Area Q{question.questionNumber}
+                                </span>
+                                <span style={{
+                                  fontSize: '0.65rem',
+                                  color: '#64748b',
+                                  fontStyle: 'italic',
+                                }}>
+                                  Show all calculations & reasoning here
+                                </span>
+                              </div>
+                              {/* Work lines with zone indicator */}
+                              <div style={{ 
+                                minHeight: '100px',
+                                position: 'relative',
+                              }}>
+                                {[...Array(5)].map((_, i) => (
+                                  <div key={i} style={{
+                                    borderBottom: '1px solid #cbd5e1',
+                                    height: '1.25rem',
+                                  }} />
+                                ))}
+                                {/* Corner zone markers for AI scanning */}
+                                <div style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  width: '12px',
+                                  height: '12px',
+                                  borderLeft: '2px solid #1e3a5f',
+                                  borderTop: '2px solid #1e3a5f',
+                                }} />
+                                <div style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  right: 0,
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRight: '2px solid #1e3a5f',
+                                  borderTop: '2px solid #1e3a5f',
+                                }} />
+                              </div>
+                            </div>
+                            
+                            {/* Final Answer Section */}
+                            <div style={{
+                              padding: '0.75rem 1rem',
+                              backgroundColor: '#fef3c7',
+                              borderTop: '2px solid #f59e0b',
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.75rem',
+                              }}>
+                                <span style={{
+                                  fontSize: '0.8rem',
+                                  fontWeight: 700,
+                                  color: '#92400e',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                  backgroundColor: '#fde68a',
+                                  padding: '0.25rem 0.75rem',
+                                  borderRadius: '0.25rem',
+                                  border: '2px solid #f59e0b',
+                                  whiteSpace: 'nowrap',
+                                }}>
+                                  📝 Final Answer
+                                </span>
+                                <div style={{
+                                  flex: 1,
+                                  borderBottom: '2px solid #d97706',
+                                  minHeight: '1.5rem',
+                                  backgroundColor: '#fffbeb',
+                                  padding: '0.25rem 0.5rem',
+                                }} />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
 
                 {/* Formula Reference Sheet in Print Preview */}
                 {includeFormulaSheet && (() => {
