@@ -49,6 +49,7 @@ interface PrintableWorksheetProps {
   topicName?: string;
   standard?: string;
   teacherName?: string;
+  aiOptimizedLayout?: boolean; // New: Enable AI-optimized bounded answer zones
 }
 
 export function PrintableWorksheet({ 
@@ -61,9 +62,159 @@ export function PrintableWorksheet({
   topicName,
   standard,
   teacherName,
+  aiOptimizedLayout = true, // Default to AI-optimized for all diagnostic worksheets
 }: PrintableWorksheetProps) {
   const levelInfo = studentLevel ? LEVEL_COLORS[studentLevel] : null;
   const levelDescription = studentLevel ? LEVEL_DESCRIPTIONS[studentLevel] : null;
+  
+  // AI-Optimized Answer Box Component with clear boundaries
+  const AIOptimizedAnswerBox = ({ questionNumber }: { questionNumber: number }) => (
+    <div style={{
+      border: '3px solid #1e3a5f',
+      borderRadius: '0.5rem',
+      marginTop: '1rem',
+      backgroundColor: '#ffffff',
+      overflow: 'hidden',
+    }}>
+      {/* Work Area Section */}
+      <div style={{
+        borderBottom: '2px dashed #94a3b8',
+        padding: '0.75rem 1rem',
+        backgroundColor: '#f8fafc',
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '0.5rem',
+        }}>
+          <span style={{
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            color: '#1e3a5f',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            fontFamily: 'Helvetica, Arial, sans-serif',
+            backgroundColor: '#e0f2fe',
+            padding: '0.2rem 0.6rem',
+            borderRadius: '0.25rem',
+            border: '1px solid #7dd3fc',
+          }}>
+            ✏️ Work Area Q{questionNumber}
+          </span>
+          <span style={{
+            fontSize: '0.65rem',
+            color: '#64748b',
+            fontStyle: 'italic',
+            fontFamily: 'Helvetica, Arial, sans-serif',
+          }}>
+            Show all calculations & reasoning here
+          </span>
+        </div>
+        {/* Work lines with zone indicator */}
+        <div style={{ 
+          minHeight: '100px',
+          position: 'relative',
+        }}>
+          {[...Array(5)].map((_, i) => (
+            <div key={i} style={{
+              borderBottom: '1px solid #cbd5e1',
+              height: '1.25rem',
+            }} />
+          ))}
+          {/* Corner zone markers for AI scanning */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '12px',
+            height: '12px',
+            borderLeft: '2px solid #1e3a5f',
+            borderTop: '2px solid #1e3a5f',
+          }} />
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: '12px',
+            height: '12px',
+            borderRight: '2px solid #1e3a5f',
+            borderTop: '2px solid #1e3a5f',
+          }} />
+        </div>
+      </div>
+      
+      {/* Final Answer Section */}
+      <div style={{
+        padding: '0.75rem 1rem',
+        backgroundColor: '#fef3c7',
+        borderTop: '2px solid #f59e0b',
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+        }}>
+          <span style={{
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            color: '#92400e',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            fontFamily: 'Helvetica, Arial, sans-serif',
+            backgroundColor: '#fde68a',
+            padding: '0.25rem 0.75rem',
+            borderRadius: '0.25rem',
+            border: '2px solid #f59e0b',
+            whiteSpace: 'nowrap',
+          }}>
+            📝 Final Answer
+          </span>
+          <div style={{
+            flex: 1,
+            borderBottom: '2px solid #d97706',
+            minHeight: '1.5rem',
+            backgroundColor: '#fffbeb',
+            padding: '0.25rem 0.5rem',
+          }} />
+        </div>
+      </div>
+    </div>
+  );
+  
+  // Standard Answer Box (original style)
+  const StandardAnswerBox = () => (
+    <div style={{ 
+      border: '2px solid #9ca3af',
+      borderRadius: '0.375rem',
+      padding: '1rem 1.25rem',
+      marginTop: '0.875rem',
+      minHeight: '120px',
+      backgroundColor: '#fefefe',
+    }}>
+      <p style={{ 
+        fontSize: '0.8rem', 
+        color: '#6b7280', 
+        marginBottom: '0.75rem',
+        fontStyle: 'italic',
+        fontFamily: 'Helvetica, Arial, sans-serif',
+        borderBottom: '1px dashed #d1d5db',
+        paddingBottom: '0.5rem',
+      }}>
+        Show your work clearly below:
+      </p>
+      {/* Lined writing area */}
+      <div style={{ minHeight: '80px' }}>
+        {[...Array(4)].map((_, i) => (
+          <div key={i} style={{
+            borderBottom: '1px solid #e5e7eb',
+            height: '1.5rem',
+            marginBottom: '0.25rem',
+          }} />
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div 
@@ -356,6 +507,30 @@ export function PrintableWorksheet({
         </div>
       )}
 
+      {/* AI Scanning Instructions Banner (only for AI-optimized layout) */}
+      {aiOptimizedLayout && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          padding: '0.5rem 0.875rem',
+          marginBottom: '1rem',
+          backgroundColor: '#ecfdf5',
+          border: '1px solid #6ee7b7',
+          borderRadius: '0.375rem',
+          fontSize: '0.7rem',
+          color: '#047857',
+          fontFamily: 'Helvetica, Arial, sans-serif',
+        }}>
+          <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            📋 Instructions
+          </span>
+          <span style={{ flex: 1 }}>
+            Write all work in the <strong>Work Area</strong> boxes. Put your final answer in the <strong>Final Answer</strong> section.
+          </span>
+        </div>
+      )}
+
       {/* Separator Line */}
       <div style={{
         height: '2px',
@@ -508,38 +683,13 @@ export function PrintableWorksheet({
                   />
                 )}
 
-                {/* Answer Box */}
+                {/* Answer Box - AI Optimized or Standard */}
                 {showAnswerBox && (
-                  <div style={{ 
-                    border: '2px solid #9ca3af',
-                    borderRadius: '0.375rem',
-                    padding: '1rem 1.25rem',
-                    marginTop: '0.875rem',
-                    minHeight: '120px',
-                    backgroundColor: '#fefefe',
-                  }}>
-                    <p style={{ 
-                      fontSize: '0.8rem', 
-                      color: '#6b7280', 
-                      marginBottom: '0.75rem',
-                      fontStyle: 'italic',
-                      fontFamily: 'Helvetica, Arial, sans-serif',
-                      borderBottom: '1px dashed #d1d5db',
-                      paddingBottom: '0.5rem',
-                    }}>
-                      Show your work clearly below:
-                    </p>
-                    {/* Lined writing area */}
-                    <div style={{ minHeight: '80px' }}>
-                      {[...Array(4)].map((_, i) => (
-                        <div key={i} style={{
-                          borderBottom: '1px solid #e5e7eb',
-                          height: '1.5rem',
-                          marginBottom: '0.25rem',
-                        }} />
-                      ))}
-                    </div>
-                  </div>
+                  aiOptimizedLayout ? (
+                    <AIOptimizedAnswerBox questionNumber={index + 1} />
+                  ) : (
+                    <StandardAnswerBox />
+                  )
                 )}
               </div>
             </div>
