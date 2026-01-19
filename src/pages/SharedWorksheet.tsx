@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
+import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
 
 interface GeneratedQuestion {
@@ -82,6 +83,9 @@ export default function SharedWorksheet() {
     }
   };
 
+  const formatWorksheetText = (text: string) => renderMathText(fixEncodingCorruption(text));
+  const formatWorksheetTextForPdf = (text: string) => sanitizeForPDF(formatWorksheetText(text));
+
   const generatePDF = async () => {
     if (!worksheet) return;
 
@@ -134,7 +138,8 @@ export default function SharedWorksheet() {
         yPosition += 8;
 
         pdf.setFontSize(11);
-        const lines = pdf.splitTextToSize(question.question, contentWidth - 10);
+        const sanitizedQuestion = formatWorksheetTextForPdf(question.question);
+        const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
 
         lines.forEach((line: string) => {
           if (yPosition > pageHeight - 40) {
@@ -289,7 +294,7 @@ export default function SharedWorksheet() {
                   <p className="text-sm text-muted-foreground mb-1">
                     {question.topic} ({question.standard})
                   </p>
-                  <p className="text-sm">{question.question}</p>
+                  <p className="text-sm whitespace-pre-line">{formatWorksheetText(question.question)}</p>
                   {question.svg && (
                     <div 
                       className="mt-2 flex justify-center"
