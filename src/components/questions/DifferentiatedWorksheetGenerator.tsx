@@ -312,10 +312,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [includeGeometry, setIncludeGeometry] = useState(false);
   const [useAIImages, setUseAIImages] = useState(false);
   const [includeStudentQR, setIncludeStudentQR] = useState(true);
+  const [onlyWithoutDiagnostic, setOnlyWithoutDiagnostic] = useState(false);
   
   // Topics from standards menu selection
   const [customTopics, setCustomTopics] = useState<{ topicName: string; standard: string }[]>([]);
-
   // Adaptive levels based on student performance data
   const { 
     students: adaptiveStudents, 
@@ -563,11 +563,21 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   };
 
   const selectAll = () => {
-    setStudents(prev => prev.map(s => ({ ...s, selected: !!s.diagnosticResult || !!s.hasAdaptiveData })));
+    // In diagnostic mode with "only without diagnostic" filter, select students without data
+    if (diagnosticMode && onlyWithoutDiagnostic) {
+      setStudents(prev => prev.map(s => ({ ...s, selected: !s.diagnosticResult && !s.hasAdaptiveData })));
+    } else {
+      setStudents(prev => prev.map(s => ({ ...s, selected: !!s.diagnosticResult || !!s.hasAdaptiveData })));
+    }
   };
 
   const deselectAll = () => {
     setStudents(prev => prev.map(s => ({ ...s, selected: false })));
+  };
+
+  // Select only students without any diagnostic data (for first-time diagnostics)
+  const selectOnlyWithoutDiagnostic = () => {
+    setStudents(prev => prev.map(s => ({ ...s, selected: !s.diagnosticResult && !s.hasAdaptiveData })));
   };
 
   const generateDifferentiatedWorksheets = async () => {
@@ -2442,7 +2452,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
           <Separator />
 
-          {/* Students with Diagnostic Results */}
+          {/* Students Selection */}
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -2450,14 +2460,59 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           ) : selectedClassId ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Students with Diagnostic Data</Label>
+                <Label>
+                  {diagnosticMode ? 'Select Students for Diagnostic' : 'Students with Diagnostic Data'}
+                </Label>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={selectAll}>Select All</Button>
                   <Button variant="ghost" size="sm" onClick={deselectAll}>Deselect All</Button>
                 </div>
               </div>
 
-              {studentsWithDiagnostics.length === 0 ? (
+              {/* Filter option for diagnostic mode */}
+              {diagnosticMode && students.length > 0 && (
+                <div className="flex items-center justify-between p-3 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-100 rounded-lg">
+                      <Users className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <div className="flex-1">
+                      <Label htmlFor="onlyWithoutDiagnostic" className="text-sm font-medium text-amber-900 cursor-pointer">
+                        Only Students Without Diagnostic Record
+                      </Label>
+                      <p className="text-xs text-amber-700 mt-0.5">
+                        Print worksheets only for students who haven't been diagnosed on selected topics
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="onlyWithoutDiagnostic"
+                    checked={onlyWithoutDiagnostic}
+                    onCheckedChange={(checked) => {
+                      setOnlyWithoutDiagnostic(checked);
+                      if (checked) {
+                        selectOnlyWithoutDiagnostic();
+                      } else {
+                        // When turning off filter in diagnostic mode, select all students
+                        setStudents(prev => prev.map(s => ({ ...s, selected: true })));
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Show count of students without diagnostic data */}
+              {diagnosticMode && onlyWithoutDiagnostic && (
+                <div className="p-2 bg-amber-50 border border-amber-200 rounded-md">
+                  <p className="text-sm text-amber-800">
+                    <span className="font-medium">
+                      {students.filter(s => !s.diagnosticResult && !s.hasAdaptiveData).length}
+                    </span> student(s) without diagnostic data on selected topic(s)
+                  </p>
+                </div>
+              )}
+
+              {studentsWithDiagnostics.length === 0 && !diagnosticMode ? (
                 <Card className="border-dashed">
                   <CardContent className="flex flex-col items-center justify-center py-8 text-center">
                     <AlertCircle className="h-10 w-10 text-muted-foreground/50 mb-3" />
@@ -2478,18 +2533,23 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                       const adaptiveInfo = adaptiveStudents.find(s => s.studentId === student.id);
                       const isAdaptiveAdjusted = useAdaptiveDifficulty && student.hasAdaptiveData && adaptiveInfo;
                       
+                      // In diagnostic mode, allow selecting students without data (they get Level C default)
+                      const canSelect = diagnosticMode || hasData;
+                      // When filter is on, dim students who have data
+                      const isDimmed = diagnosticMode && onlyWithoutDiagnostic && hasData;
+                      
                       return (
                         <div
                           key={student.id}
                           className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
                             student.selected ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted/50'
-                          } ${!hasData ? 'opacity-50' : ''}`}
+                          } ${!canSelect || isDimmed ? 'opacity-50' : ''}`}
                         >
                           <div className="flex items-center gap-3">
                             <Checkbox
                               checked={student.selected}
                               onCheckedChange={() => toggleStudent(student.id)}
-                              disabled={!hasData}
+                              disabled={!canSelect || isDimmed}
                             />
                             <div>
                               <p className="font-medium text-sm flex items-center gap-1.5">
@@ -2524,12 +2584,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                             </div>
                           </div>
                           
-                          {hasData && (
+                          {hasData ? (
                             <Badge 
                               variant="outline" 
                               className={`${getLevelColor(student.recommendedLevel)} ${isAdaptiveAdjusted ? 'ring-1 ring-purple-400' : ''}`}
                             >
                               Level {student.recommendedLevel}
+                            </Badge>
+                          ) : diagnosticMode && (
+                            <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-300">
+                              New (Level C)
                             </Badge>
                           )}
                         </div>
