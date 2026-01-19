@@ -707,22 +707,30 @@ export function BatchReport({ items, summary, classId, questionId, onExport, onU
                     />
                   </TableCell>
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {item.studentName}
-                      {item.pageType === 'continuation' && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-600">
-                                <Link className="h-3 w-3 mr-1" />
-                                Linked
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs">This page was linked as a continuation</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        {item.studentName || 'Unknown'}
+                        {item.pageType === 'continuation' && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 text-blue-600">
+                                  <Link className="h-3 w-3 mr-1" />
+                                  Linked
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">This page was linked as a continuation</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                      {/* Show worksheet topic if available */}
+                      {item.worksheetTopic && (
+                        <span className="text-xs text-muted-foreground capitalize truncate max-w-[200px]">
+                          {item.worksheetTopic}
+                        </span>
                       )}
                     </div>
                   </TableCell>

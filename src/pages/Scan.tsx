@@ -1846,11 +1846,23 @@ export default function Scan() {
                   <ScannerImportMode
                     onPagesReady={async (pages) => {
                       setScannerImportPages(pages);
-                      // Add all pages to batch for processing
+                      // Add all pages to batch for processing (with filename for topic grouping)
                       pages.forEach(page => {
-                        batch.addImage(page.dataUrl);
+                        batch.addImage(page.dataUrl, undefined, undefined, page.filename);
                       });
                       toast.success(`${pages.length} pages added for analysis`);
+                      
+                      // Auto-group by worksheet topic if filenames indicate multi-page papers
+                      if (pages.length >= 2) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        const topicResult = batch.groupPagesByWorksheetTopic();
+                        if (topicResult.pagesLinked > 0) {
+                          toast.success(`Auto-grouped ${topicResult.pagesLinked} pages by worksheet topic`, {
+                            description: `${topicResult.topicsGrouped} multi-page papers detected`,
+                            icon: <FileStack className="h-4 w-4" />,
+                          });
+                        }
+                      }
                       
                       // Auto-run handwriting grouping if enabled and more than 1 page
                       if (qrScanSettings.autoHandwritingGroupingEnabled && pages.length >= 2) {

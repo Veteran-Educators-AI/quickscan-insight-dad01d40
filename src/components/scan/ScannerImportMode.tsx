@@ -40,7 +40,7 @@ interface ScanPage {
 }
 
 interface ScannerImportModeProps {
-  onPagesReady: (pages: { dataUrl: string; order: number }[]) => void;
+  onPagesReady: (pages: { dataUrl: string; order: number; filename: string }[]) => void;
   onClose: () => void;
 }
 
@@ -630,7 +630,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
     
     const orderedPages = [...pages]
       .sort((a, b) => a.order - b.order)
-      .map(p => ({ dataUrl: p.processedDataUrl, order: p.order }));
+      .map(p => ({ dataUrl: p.processedDataUrl, order: p.order, filename: p.filename }));
     
     onPagesReady(orderedPages);
     toast.success(`${pages.length} pages ready for analysis`);
