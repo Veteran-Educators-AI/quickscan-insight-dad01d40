@@ -303,7 +303,8 @@ export function RosterImageConverter() {
   };
 
   const downloadCSV = () => {
-    const allStudents = getAllExtractedStudents();
+    const allStudents = getAllExtractedStudents()
+      .sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''));
     if (allStudents.length === 0) return;
 
     // Dynamically collect all unique column keys across all students
@@ -405,7 +406,8 @@ export function RosterImageConverter() {
   };
 
   const downloadExcel = () => {
-    const allStudents = getAllExtractedStudents();
+    const allStudents = getAllExtractedStudents()
+      .sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''));
     if (allStudents.length === 0) return;
 
     // Dynamically collect all unique column keys across all students
