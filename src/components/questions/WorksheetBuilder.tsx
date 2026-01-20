@@ -137,6 +137,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [useNanoBanana, setUseNanoBanana] = useState(false); // Use Nano Banana for realistic shape images
   const [imageSize, setImageSize] = useState(200); // Image size in pixels (100-400)
   const [includeAnswerKey, setIncludeAnswerKey] = useState(false); // Include answer key for teachers
+  const [marginSize, setMarginSize] = useState<'small' | 'medium' | 'large'>('medium'); // Page margin size
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledQuestions, setCompiledQuestions] = useState<GeneratedQuestion[]>([]);
   const [isCompiled, setIsCompiled] = useState(false);
@@ -988,7 +989,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       const pdf = new jsPDF('p', 'mm', 'letter');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 20; // Standard margin for better readability
+      const margin = marginSize === 'small' ? 12 : marginSize === 'large' ? 25 : 20; // Based on user preference
       const contentWidth = pageWidth - margin * 2;
       let yPosition = margin;
 
@@ -2014,6 +2015,24 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     </span>
                   </Label>
                 </div>
+                
+                {/* Page Margin Size */}
+                <div className="space-y-2 pt-2 border-t border-dashed">
+                  <Label className="text-sm flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5" />
+                    Page Margins
+                  </Label>
+                  <Select value={marginSize} onValueChange={(v) => setMarginSize(v as 'small' | 'medium' | 'large')}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="small">Small (12mm) - More content space</SelectItem>
+                      <SelectItem value="medium">Medium (20mm) - Balanced</SelectItem>
+                      <SelectItem value="large">Large (25mm) - More white space</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <Separator />
@@ -2431,28 +2450,40 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               )}
 
               {/* Download/Print/Save Actions */}
-              <div className="flex gap-2">
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    onClick={generatePDF}
+                    disabled={isGenerating}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {isGenerating ? 'Generating...' : 'Download PDF'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handlePreview}
+                    title="Preview before printing"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handlePrint}
+                    title="Print worksheet"
+                  >
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Scrap Paper - grouped with download actions */}
                 <Button
-                  className="flex-1"
-                  onClick={generatePDF}
-                  disabled={isGenerating}
+                  variant="secondary"
+                  className="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 dark:border-amber-800 dark:text-amber-200"
+                  onClick={() => setShowScrapPaperGenerator(true)}
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  {isGenerating ? 'Generating...' : 'Download PDF'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handlePreview}
-                  title="Preview before printing"
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handlePrint}
-                  title="Print worksheet"
-                >
-                  <Printer className="h-4 w-4" />
+                  <NotebookPen className="h-4 w-4 mr-2" />
+                  Print Scrap Paper (AI-Optimized Work Zones)
                 </Button>
               </div>
 
@@ -2479,16 +2510,6 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   </Button>
                 )}
               </div>
-
-              {/* Scrap Paper Generator Button */}
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setShowScrapPaperGenerator(true)}
-              >
-                <NotebookPen className="h-4 w-4 mr-2" />
-                Generate Scrap Paper
-              </Button>
 
               {/* Push to NYCLogic AI Button */}
               <Button
