@@ -19,6 +19,7 @@ import { RemediationActions } from './RemediationActions';
 import { RecommendedNextSteps } from './RecommendedNextSteps';
 import { TeacherVerificationPanel } from './TeacherVerificationPanel';
 import { TrainingConfidenceIndicator } from './TrainingConfidenceIndicator';
+import { AIAnalysisCritiqueDialog } from './AIAnalysisCritiqueDialog';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 
 interface RubricScore {
@@ -242,12 +243,23 @@ export function AnalysisResults({
                 <Badge variant="outline" className="text-xs bg-primary/10">Teacher Override Applied</Badge>
               )}
             </div>
-            <GradeOverrideDialog
-              currentGrade={grade}
-              currentJustification={gradeJustification}
-              onOverride={handleGradeOverride}
-              disabled={isSaving}
-            />
+            <div className="flex items-center gap-2">
+              <AIAnalysisCritiqueDialog
+                aiGrade={grade}
+                aiJustification={gradeJustification}
+                aiMisconceptions={result.misconceptions}
+                aiFeedback={result.feedback}
+                topicName={topicName || 'Unknown Topic'}
+                studentId={studentId || undefined}
+                attemptId={attemptId || undefined}
+              />
+              <GradeOverrideDialog
+                currentGrade={grade}
+                currentJustification={gradeJustification}
+                onOverride={handleGradeOverride}
+                disabled={isSaving}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
