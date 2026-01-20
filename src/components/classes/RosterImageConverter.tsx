@@ -264,9 +264,25 @@ export function RosterImageConverter() {
     });
   };
 
-  // Get the mapped column name
+  // Convert camelCase to Title Case (e.g., "firstName" -> "First Name")
+  const toTitleCase = (str: string): string => {
+    // Add space before capital letters and split
+    const withSpaces = str.replace(/([A-Z])/g, ' $1').trim();
+    // Capitalize first letter of each word
+    return withSpaces
+      .split(' ')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  // Get the mapped column name with Title Case formatting
   const getMappedColumnName = (col: string): string => {
-    return columnMappings[col] || col;
+    // If there's a custom mapping, use it as-is
+    if (columnMappings[col]) {
+      return columnMappings[col];
+    }
+    // Otherwise, convert to Title Case
+    return toTitleCase(col);
   };
 
   // Helper to check if a value looks like a numeric grade
