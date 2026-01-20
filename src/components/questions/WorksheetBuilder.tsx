@@ -138,6 +138,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [imageSize, setImageSize] = useState(200); // Image size in pixels (100-400)
   const [includeAnswerKey, setIncludeAnswerKey] = useState(false); // Include answer key for teachers
   const [marginSize, setMarginSize] = useState<'small' | 'medium' | 'large'>('medium'); // Page margin size
+  const [includeScrapPaper, setIncludeScrapPaper] = useState(false); // Bundle scrap paper with worksheet
+  const [scrapPaperLayout, setScrapPaperLayout] = useState<'single' | 'split-2' | 'split-4'>('split-2'); // Scrap paper layout
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledQuestions, setCompiledQuestions] = useState<GeneratedQuestion[]>([]);
   const [isCompiled, setIsCompiled] = useState(false);
@@ -973,6 +975,121 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     }
   };
 
+  // Helper function to draw a scrap paper work zone
+  const drawScrapWorkZone = (
+    pdf: jsPDF,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    problemNumber: number
+  ) => {
+    // Main container border (navy blue)
+    pdf.setDrawColor(30, 58, 95);
+    pdf.setLineWidth(0.8);
+    pdf.rect(x, y, width, height);
+
+    // Work area background
+    pdf.setFillColor(248, 250, 252);
+    pdf.rect(x + 0.4, y + 0.4, width - 0.8, height - 0.8, 'F');
+
+    // Problem label header
+    const headerHeight = 8;
+    pdf.setFillColor(224, 242, 254);
+    pdf.rect(x + 0.4, y + 0.4, width - 0.8, headerHeight, 'F');
+    
+    // Problem number badge
+    pdf.setFillColor(30, 58, 95);
+    pdf.roundedRect(x + 3, y + 2, 28, 5, 1, 1, 'F');
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(`PROBLEM #${problemNumber}`, x + 5, y + 5.5);
+
+    // Instructions
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'italic');
+    pdf.setTextColor(100, 116, 139);
+    pdf.text('Show all work within this zone', x + width - 38, y + 5.5);
+    pdf.setTextColor(0);
+
+    // Separator line
+    pdf.setDrawColor(148, 163, 184);
+    pdf.setLineWidth(0.3);
+    pdf.line(x, y + headerHeight, x + width, y + headerHeight);
+
+    const contentStartY = y + 10;
+    const contentEndY = y + height - 15;
+
+    // Draw lined paper
+    pdf.setDrawColor(203, 213, 225);
+    pdf.setLineWidth(0.15);
+    const lineSpacing = 6;
+    for (let lineY = contentStartY + lineSpacing; lineY < contentEndY; lineY += lineSpacing) {
+      pdf.line(x + 3, lineY, x + width - 3, lineY);
+    }
+
+    // Corner markers for AI zone detection
+    pdf.setDrawColor(30, 58, 95);
+    pdf.setLineWidth(0.5);
+    const markerSize = 5;
+    const markerOffset = 10;
+
+    // Top-left
+    pdf.line(x + 2, y + markerOffset, x + 2, y + markerOffset + markerSize);
+    pdf.line(x + 2, y + markerOffset, x + 2 + markerSize, y + markerOffset);
+
+    // Top-right
+    pdf.line(x + width - 2, y + markerOffset, x + width - 2, y + markerOffset + markerSize);
+    pdf.line(x + width - 2, y + markerOffset, x + width - 2 - markerSize, y + markerOffset);
+
+    // Bottom-left
+    pdf.line(x + 2, contentEndY - 2, x + 2, contentEndY - 2 - markerSize);
+    pdf.line(x + 2, contentEndY - 2, x + 2 + markerSize, contentEndY - 2);
+
+    // Bottom-right
+    pdf.line(x + width - 2, contentEndY - 2, x + width - 2, contentEndY - 2 - markerSize);
+    pdf.line(x + width - 2, contentEndY - 2, x + width - 2 - markerSize, contentEndY - 2);
+
+    // Final Answer Section
+    const answerSectionHeight = 12;
+    const answerY = y + height - answerSectionHeight - 2;
+
+    // Answer section separator
+    pdf.setDrawColor(148, 163, 184);
+    pdf.setLineDashPattern([2, 2], 0);
+    pdf.setLineWidth(0.3);
+    pdf.line(x + 2, answerY, x + width - 2, answerY);
+    pdf.setLineDashPattern([], 0);
+
+    // Answer section background (amber)
+    pdf.setFillColor(254, 243, 199);
+    pdf.rect(x + 0.4, answerY + 0.5, width - 0.8, answerSectionHeight, 'F');
+
+    // Answer section top border
+    pdf.setDrawColor(245, 158, 11);
+    pdf.setLineWidth(0.5);
+    pdf.line(x, answerY + 0.5, x + width, answerY + 0.5);
+
+    // Final Answer badge
+    pdf.setFillColor(253, 230, 138);
+    pdf.roundedRect(x + 3, answerY + 2.5, 25, 5, 1, 1, 'F');
+    pdf.setDrawColor(245, 158, 11);
+    pdf.setLineWidth(0.3);
+    pdf.roundedRect(x + 3, answerY + 2.5, 25, 5, 1, 1, 'S');
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(146, 64, 14);
+    pdf.text(`ANSWER #${problemNumber}`, x + 4.5, answerY + 6);
+
+    // Answer line
+    pdf.setDrawColor(217, 119, 6);
+    pdf.setLineWidth(0.4);
+    pdf.line(x + 30, answerY + 8, x + width - 5, answerY + 8);
+
+    pdf.setTextColor(0);
+  };
+
   const generatePDF = async () => {
     if (compiledQuestions.length === 0) {
       toast({
@@ -1432,7 +1549,83 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         }
       }
 
-      // Footer
+      // Add Scrap Paper Pages if enabled
+      if (includeScrapPaper) {
+        const problemNumbers = compiledQuestions.map(q => q.questionNumber);
+        const zonesPerPage = scrapPaperLayout === 'single' ? 1 : scrapPaperLayout === 'split-2' ? 2 : 4;
+        const pagesNeeded = Math.ceil(problemNumbers.length / zonesPerPage);
+        
+        let problemIndex = 0;
+        
+        for (let page = 0; page < pagesNeeded; page++) {
+          pdf.addPage();
+          let yPos = margin;
+          
+          // Scrap Paper Header
+          pdf.setFontSize(14);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(30, 58, 95);
+          pdf.text(sanitizeForPDF(`${worksheetTitle} - Scrap Paper`), pageWidth / 2, yPos, { align: 'center' });
+          yPos += 6;
+          
+          // Subheader
+          pdf.setFontSize(9);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setTextColor(100, 116, 139);
+          pdf.text(`Page ${page + 1} of ${pagesNeeded} | AI-Optimized Work Zones`, pageWidth / 2, yPos, { align: 'center' });
+          yPos += 4;
+          
+          // Name/Date line
+          pdf.setFontSize(10);
+          pdf.setTextColor(0);
+          pdf.text('Name: _______________________', margin, yPos);
+          pdf.text('Date: ___________', pageWidth - margin - 40, yPos);
+          yPos += 8;
+          
+          // Instructions banner
+          pdf.setFillColor(236, 253, 245);
+          pdf.setDrawColor(110, 231, 183);
+          pdf.roundedRect(margin, yPos, contentWidth, 8, 2, 2, 'FD');
+          pdf.setFontSize(7);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(4, 120, 87);
+          pdf.text('[!] INSTRUCTIONS:', margin + 3, yPos + 5);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text('Keep all work within the designated zones for AI scanning. Write clearly and stay inside the boxes.', margin + 30, yPos + 5);
+          yPos += 12;
+          
+          const availableHeight = pageHeight - yPos - margin;
+          
+          // Draw work zones based on layout
+          if (scrapPaperLayout === 'single') {
+            const zoneHeight = availableHeight;
+            const problemNum = problemNumbers[problemIndex] || (problemIndex + 1);
+            drawScrapWorkZone(pdf, margin, yPos, contentWidth, zoneHeight, problemNum);
+            problemIndex++;
+          } else if (scrapPaperLayout === 'split-2') {
+            const zoneHeight = (availableHeight - 5) / 2;
+            for (let i = 0; i < 2 && problemIndex < problemNumbers.length; i++) {
+              const problemNum = problemNumbers[problemIndex] || (problemIndex + 1);
+              drawScrapWorkZone(pdf, margin, yPos + (i * (zoneHeight + 5)), contentWidth, zoneHeight, problemNum);
+              problemIndex++;
+            }
+          } else if (scrapPaperLayout === 'split-4') {
+            const zoneWidth = (contentWidth - 5) / 2;
+            const zoneHeight = (availableHeight - 5) / 2;
+            for (let row = 0; row < 2; row++) {
+              for (let col = 0; col < 2 && problemIndex < problemNumbers.length; col++) {
+                const problemNum = problemNumbers[problemIndex] || (problemIndex + 1);
+                const x = margin + (col * (zoneWidth + 5));
+                const y = yPos + (row * (zoneHeight + 5));
+                drawScrapWorkZone(pdf, x, y, zoneWidth, zoneHeight, problemNum);
+                problemIndex++;
+              }
+            }
+          }
+        }
+      }
+
+      // Footer on last page
       pdf.setFontSize(8);
       pdf.setTextColor(150);
       pdf.text('Generated with NYCLogic Ai - NYS Regents Aligned', pageWidth / 2, pageHeight - 10, { align: 'center' });
@@ -1442,7 +1635,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
       toast({
         title: 'Worksheet downloaded!',
-        description: `Your worksheet with ${compiledQuestions.length} question(s) has been saved.`,
+        description: `Your worksheet with ${compiledQuestions.length} question(s)${includeScrapPaper ? ' and scrap paper' : ''} has been saved.`,
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -2032,6 +2225,44 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       <SelectItem value="large">Large (25mm) - More white space</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                
+                {/* Include Scrap Paper Option */}
+                <div className="space-y-3 pt-2 border-t border-dashed">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="includeScrapPaper"
+                      checked={includeScrapPaper}
+                      onChange={(e) => setIncludeScrapPaper(e.target.checked)}
+                      className="rounded border-input"
+                    />
+                    <Label htmlFor="includeScrapPaper" className="text-sm cursor-pointer">
+                      <span className="flex flex-col">
+                        <span className="flex items-center gap-1">
+                          <NotebookPen className="h-3.5 w-3.5 text-amber-600" />
+                          Bundle scrap paper with worksheet
+                        </span>
+                        <span className="text-xs text-muted-foreground ml-5">Adds AI-optimized work zones after questions</span>
+                      </span>
+                    </Label>
+                  </div>
+                  
+                  {includeScrapPaper && (
+                    <div className="ml-5 space-y-2">
+                      <Label className="text-xs text-muted-foreground">Problems per scrap page</Label>
+                      <Select value={scrapPaperLayout} onValueChange={(v) => setScrapPaperLayout(v as 'single' | 'split-2' | 'split-4')}>
+                        <SelectTrigger className="w-full h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="single">1 per page (full space)</SelectItem>
+                          <SelectItem value="split-2">2 per page (balanced)</SelectItem>
+                          <SelectItem value="split-4">4 per page (compact)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               </div>
 
