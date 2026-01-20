@@ -384,7 +384,7 @@ const moneyContextKeywords = [
 
 /**
  * Formats currency values in text when money context is detected
- * Converts bare decimal numbers like "4.00" to "$4.00" in money-related sentences
+ * Converts bare decimal numbers like "4.00" to "$4.00" and adds "dollars" for clarity
  */
 export function formatCurrency(text: string): string {
   if (!text) return '';
@@ -400,32 +400,45 @@ export function formatCurrency(text: string): string {
   let result = text;
   
   // Pattern 1: Numbers with exactly 2 decimal places that don't already have $ (e.g., "4.00", "12.50", "100.99")
-  // This catches common money amounts
-  result = result.replace(/(?<!\$)(?<!\d)\b(\d{1,})\.(00|[0-9]{2})\b(?!\d)/g, (match, whole, cents) => {
-    // Don't convert if it looks like a percentage, measurement, or already part of a larger number
+  // Exclude measurements, percentages, and other non-currency decimals
+  result = result.replace(/(?<!\$)(?<!\d)\b(\d{1,})\.(00|[0-9]{2})\b(?!\s*(?:dollars?|cents?|%|degrees?|°|cm|m|ft|in|kg|lb|g|oz|ml|L|hours?|minutes?|seconds?|years?|months?|days?|miles?|km))(?!\d)/gi, (match, whole, cents) => {
     return `$${whole}.${cents}`;
   });
   
-  // Pattern 2: Whole numbers followed by "dollars" or "cents" without $ sign
+  // Pattern 2: Whole numbers followed by "dollars" or "cents" - add $ sign if missing
   result = result.replace(/(?<!\$)\b(\d+)\s+(dollars?)\b/gi, '$$$1 $2');
   result = result.replace(/(?<!\$)\b(\d+)\s+(cents?)\b/gi, '$1 $2'); // cents stay as is
   
   // Pattern 3: Numbers in context phrases like "costs 5" or "price of 10" 
-  // Only add $ if followed by common money-indicating patterns
-  result = result.replace(/\b(costs?|priced?|charges?|pays?|earns?|spends?|saves?|sells? for|bought for|sold for)\s+(?<!\$)(\d+(?:\.\d{2})?)\b/gi, 
+  // Add $ and format properly
+  result = result.replace(/\b(costs?|priced? at|charges?|pays?|earns?|spends?|saves?|sells? for|bought for|sold for|worth)\s+(?<!\$)(\d+(?:\.\d{2})?)\b(?!\s*(?:dollars?|cents?|%))/gi, 
     (match, verb, amount) => {
-      // Add decimal if missing
       const formattedAmount = amount.includes('.') ? amount : `${amount}.00`;
       return `${verb} $${formattedAmount}`;
     }
   );
   
   // Pattern 4: "of X" patterns like "profit of 25" -> "profit of $25.00"
-  result = result.replace(/\b(profit|revenue|income|savings?|balance|total|discount|fee|tax|tip|cost|price|amount)\s+of\s+(?<!\$)(\d+(?:\.\d{2})?)\b/gi,
+  result = result.replace(/\b(profit|revenue|income|savings?|balance|total|discount|fee|tax|tip|cost|price|amount|loss)\s+of\s+(?<!\$)(\d+(?:\.\d{2})?)\b(?!\s*(?:dollars?|cents?|%))/gi,
     (match, noun, amount) => {
       const formattedAmount = amount.includes('.') ? amount : `${amount}.00`;
       return `${noun} of $${formattedAmount}`;
     }
+  );
+  
+  // Pattern 5: Standalone currency amounts at end of sentence or before punctuation
+  // e.g., "The answer is 25.50." -> "The answer is $25.50."
+  result = result.replace(/\b(?:is|was|equals?|=|totals?|makes?)\s+(?<!\$)(\d+\.\d{2})(?=\s*[.,;:?!]|\s*$)/gi,
+    (match, amount) => {
+      return match.replace(amount, `$${amount}`);
+    }
+  );
+  
+  // Pattern 6: Add "dollars" after standalone $ amounts that don't have it
+  // Only add if the amount is followed by a period, comma, or end of sentence
+  // and doesn't already have "dollars" or "cents" after it
+  result = result.replace(/(\$\d+\.\d{2})(?=\s*[.,;:?!]|\s*$)(?!\s*(?:dollars?|cents?|each|per|for))/gi,
+    (match) => `${match} dollars`
   );
   
   // Cleanup: Remove double dollar signs if any were introduced
