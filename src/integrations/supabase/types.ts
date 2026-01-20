@@ -14,6 +14,101 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_analysis_feedback: {
+        Row: {
+          ai_feedback: string | null
+          ai_grade: number | null
+          ai_justification: string | null
+          ai_misconceptions: string[] | null
+          attempt_id: string | null
+          corrected_grade: number | null
+          created_at: string
+          critique_text: string
+          critique_type: string
+          grade_history_id: string | null
+          id: string
+          is_processed: boolean
+          preferred_approach: string | null
+          processed_at: string | null
+          student_id: string | null
+          teacher_id: string
+          topic_name: string
+          what_ai_got_wrong: string | null
+          what_ai_missed: string | null
+        }
+        Insert: {
+          ai_feedback?: string | null
+          ai_grade?: number | null
+          ai_justification?: string | null
+          ai_misconceptions?: string[] | null
+          attempt_id?: string | null
+          corrected_grade?: number | null
+          created_at?: string
+          critique_text: string
+          critique_type: string
+          grade_history_id?: string | null
+          id?: string
+          is_processed?: boolean
+          preferred_approach?: string | null
+          processed_at?: string | null
+          student_id?: string | null
+          teacher_id: string
+          topic_name: string
+          what_ai_got_wrong?: string | null
+          what_ai_missed?: string | null
+        }
+        Update: {
+          ai_feedback?: string | null
+          ai_grade?: number | null
+          ai_justification?: string | null
+          ai_misconceptions?: string[] | null
+          attempt_id?: string | null
+          corrected_grade?: number | null
+          created_at?: string
+          critique_text?: string
+          critique_type?: string
+          grade_history_id?: string | null
+          id?: string
+          is_processed?: boolean
+          preferred_approach?: string | null
+          processed_at?: string | null
+          student_id?: string | null
+          teacher_id?: string
+          topic_name?: string
+          what_ai_got_wrong?: string | null
+          what_ai_missed?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_analysis_feedback_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_analysis_feedback_grade_history_id_fkey"
+            columns: ["grade_history_id"]
+            isOneToOne: false
+            referencedRelation: "grade_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_analysis_feedback_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_analysis_feedback_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_generated_images: {
         Row: {
           created_at: string
