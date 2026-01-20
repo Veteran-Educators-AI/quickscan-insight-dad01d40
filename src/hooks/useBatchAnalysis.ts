@@ -334,18 +334,38 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
         ctx.drawImage(img, 0, 0);
         
-        // Try scanning different regions
+        // Calculate region sizes based on image dimensions
+        // QR codes are 70-80px with borders, so look for appropriately sized regions
+        const cornerSize = Math.max(200, Math.min(500, Math.floor(img.width / 2.5)));
+        const edgeWidth = Math.max(150, Math.min(400, Math.floor(img.width / 3)));
+        
+        // Try scanning different regions - TOP-RIGHT FIRST (where student QR is placed)
+        // Order matters: most common locations first for performance
         const regions = [
-          { x: 0, y: 0, w: Math.min(400, img.width / 2), h: Math.min(400, img.height / 2) },
-          { x: Math.max(0, img.width - 400), y: 0, w: Math.min(400, img.width / 2), h: Math.min(400, img.height / 2) },
-          { x: 0, y: Math.max(0, img.height - 400), w: Math.min(400, img.width / 2), h: Math.min(400, img.height / 2) },
+          // TOP-RIGHT CORNER (PRIMARY - this is where StudentOnlyQRCode is placed on worksheets)
+          { x: Math.max(0, img.width - cornerSize), y: 0, w: cornerSize, h: cornerSize },
+          // Top edge full width (header area - catches QR even if slightly off)
+          { x: 0, y: 0, w: img.width, h: Math.min(400, img.height / 3) },
+          // Top-left corner (for question QRs)
+          { x: 0, y: 0, w: cornerSize, h: cornerSize },
+          // Right edge full height (catches QR if page slightly rotated)
+          { x: Math.max(0, img.width - edgeWidth), y: 0, w: edgeWidth, h: img.height },
+          // Upper half of image (most QRs are in top portion)
+          { x: 0, y: 0, w: img.width, h: Math.floor(img.height / 2) },
+          // Bottom corners (legacy support)
+          { x: Math.max(0, img.width - cornerSize), y: Math.max(0, img.height - cornerSize), w: cornerSize, h: cornerSize },
+          { x: 0, y: Math.max(0, img.height - cornerSize), w: cornerSize, h: cornerSize },
+          // Full image (final fallback)
           { x: 0, y: 0, w: img.width, h: img.height },
         ];
 
         for (const region of regions) {
           try {
             const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
-            const code = jsQR(imageData.data, region.w, region.h);
+            // Use inversionAttempts for better detection in varied lighting conditions
+            const code = jsQR(imageData.data, region.w, region.h, {
+              inversionAttempts: 'attemptBoth',
+            });
             
             if (code) {
               // Try unified parser first (handles both v1 and v2)
