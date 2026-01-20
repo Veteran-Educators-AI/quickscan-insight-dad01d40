@@ -313,6 +313,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [useAIImages, setUseAIImages] = useState(false);
   const [includeStudentQR, setIncludeStudentQR] = useState(true);
   const [onlyWithoutDiagnostic, setOnlyWithoutDiagnostic] = useState(false);
+  const [marginSize, setMarginSize] = useState<'small' | 'medium' | 'large'>('medium');
   
   // Topics from standards menu selection
   const [customTopics, setCustomTopics] = useState<{ topicName: string; standard: string }[]>([]);
@@ -607,7 +608,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       const pdf = new jsPDF('p', 'mm', 'letter');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 20; // Standard margin for better readability
+      const margin = marginSize === 'small' ? 12 : marginSize === 'large' ? 25 : 20; // Based on user preference
       const contentWidth = pageWidth - margin * 2;
       let isFirstPage = true;
 
@@ -2438,6 +2439,25 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               onCheckedChange={setIncludeStudentQR}
             />
           </div>
+          
+          {/* Page Margin Size */}
+          <div className="space-y-2">
+            <Label className="text-sm flex items-center gap-1">
+              <FileText className="h-3.5 w-3.5" />
+              Page Margins
+            </Label>
+            <Select value={marginSize} onValueChange={(v) => setMarginSize(v as 'small' | 'medium' | 'large')}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="small">Small (12mm) - More content space</SelectItem>
+                <SelectItem value="medium">Medium (20mm) - Balanced</SelectItem>
+                <SelectItem value="large">Large (25mm) - More white space</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <QuestionPreviewPanel
             selectedTopics={selectedTopics}
             customTopics={customTopics}
