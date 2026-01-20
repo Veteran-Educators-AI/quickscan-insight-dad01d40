@@ -988,7 +988,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       const pdf = new jsPDF('p', 'mm', 'letter');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 15; // Reduced from 20mm for better use of page space
+      const margin = 20; // Standard margin for better readability
       const contentWidth = pageWidth - margin * 2;
       let yPosition = margin;
 
