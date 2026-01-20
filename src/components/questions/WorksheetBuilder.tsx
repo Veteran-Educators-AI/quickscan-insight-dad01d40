@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock, NotebookPen } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ import { ImageLibraryPicker } from './ImageLibraryPicker';
 import { useAIImageLibrary } from '@/hooks/useAIImageLibrary';
 import jsPDF from 'jspdf';
 import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
+import { ScrapPaperGenerator } from '@/components/print/ScrapPaperGenerator';
 // Shared assignments are now saved directly to database - no need for usePushToSisterApp
 
 export interface WorksheetQuestion {
@@ -190,6 +191,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [showImageReviewDialog, setShowImageReviewDialog] = useState(false);
   const [imageSelectionQuestionNumber, setImageSelectionQuestionNumber] = useState<number | null>(null);
   const { pendingCount, saveImageForReview, approvedImages } = useAIImageLibrary();
+  
+  // Scrap Paper Generator state
+  const [showScrapPaperGenerator, setShowScrapPaperGenerator] = useState(false);
   
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -2476,6 +2480,16 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 )}
               </div>
 
+              {/* Scrap Paper Generator Button */}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setShowScrapPaperGenerator(true)}
+              >
+                <NotebookPen className="h-4 w-4 mr-2" />
+                Generate Scrap Paper
+              </Button>
+
               {/* Push to NYCLogic AI Button */}
               <Button
                 variant="outline"
@@ -3173,6 +3187,14 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           ? compiledQuestions.find(q => q.questionNumber === imageSelectionQuestionNumber)?.topic
           : undefined
         }
+      />
+
+      {/* Scrap Paper Generator Dialog */}
+      <ScrapPaperGenerator
+        open={showScrapPaperGenerator}
+        onOpenChange={setShowScrapPaperGenerator}
+        problemNumbers={compiledQuestions.map(q => q.questionNumber)}
+        worksheetTitle={worksheetTitle}
       />
     </>
   );
