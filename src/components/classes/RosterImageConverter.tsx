@@ -13,6 +13,7 @@ interface ExtractedStudent {
   lastName: string;
   studentId?: string;
   email?: string;
+  grade?: string;
 }
 
 interface UploadedImage {
@@ -152,13 +153,20 @@ export function RosterImageConverter() {
     const allStudents = getAllExtractedStudents();
     if (allStudents.length === 0) return;
 
-    const headers = ['first_name', 'last_name', 'student_id', 'email'];
-    const rows = allStudents.map((s) => [
-      s.firstName || '',
-      s.lastName || '',
-      s.studentId || '',
-      s.email || '',
-    ]);
+    const hasAnyGrades = allStudents.some((s) => s.grade);
+    const headers = hasAnyGrades 
+      ? ['first_name', 'last_name', 'student_id', 'email', 'grade']
+      : ['first_name', 'last_name', 'student_id', 'email'];
+    
+    const rows = allStudents.map((s) => {
+      const baseRow = [
+        s.firstName || '',
+        s.lastName || '',
+        s.studentId || '',
+        s.email || '',
+      ];
+      return hasAnyGrades ? [...baseRow, s.grade || ''] : baseRow;
+    });
 
     const csvContent = [
       headers.join(','),
@@ -322,16 +330,23 @@ export function RosterImageConverter() {
                       {getAllExtractedStudents().map((student, index) => (
                         <div
                           key={index}
-                          className="text-sm py-1 px-2 bg-muted rounded flex justify-between"
+                          className="text-sm py-1 px-2 bg-muted rounded flex justify-between items-center gap-2"
                         >
-                          <span>
+                          <span className="truncate">
                             {student.firstName} {student.lastName}
                           </span>
-                          {student.studentId && (
-                            <span className="text-muted-foreground">
-                              ID: {student.studentId}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {student.grade && (
+                              <Badge variant="secondary" className="text-xs">
+                                {student.grade}
+                              </Badge>
+                            )}
+                            {student.studentId && (
+                              <span className="text-muted-foreground text-xs">
+                                ID: {student.studentId}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
