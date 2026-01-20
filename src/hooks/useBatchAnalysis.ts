@@ -145,7 +145,9 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   const { user } = useAuth();
   const { settings: qrScanSettings } = useQRScanSettings();
   const { checkForDuplicate, quickDuplicateCheck, clearDuplicateCache } = useDuplicateWorkDetection();
-  const isInitialized = useRef(false);
+  const hasLoadedFromStorage = useRef(false);
+  const lastSavedItems = useRef<string>('');
+  const lastSavedSummary = useRef<string>('');
   
   // Load initial state from localStorage
   const [items, setItems] = useState<BatchItem[]>(() => {
@@ -154,12 +156,14 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          console.log(`Restored ${parsed.length} items from session`);
+          console.log(`[BatchAnalysis] Restored ${parsed.length} items from session`);
+          hasLoadedFromStorage.current = true;
+          lastSavedItems.current = stored;
           return parsed;
         }
       }
     } catch (e) {
-      console.error('Failed to restore batch data:', e);
+      console.error('[BatchAnalysis] Failed to restore batch data:', e);
     }
     return [];
   });
@@ -168,51 +172,65 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(-1);
   
-  // Load summary from localStorage, or regenerate if items have completed results
+  // Load summary from localStorage
   const [summary, setSummary] = useState<BatchSummary | null>(() => {
     try {
       const storedSummary = localStorage.getItem(BATCH_SUMMARY_KEY);
       if (storedSummary) {
         const parsed = JSON.parse(storedSummary);
-        console.log('Restored summary from session');
+        console.log('[BatchAnalysis] Restored summary from session');
+        lastSavedSummary.current = storedSummary;
         return parsed;
       }
     } catch (e) {
-      console.error('Failed to restore summary:', e);
+      console.error('[BatchAnalysis] Failed to restore summary:', e);
     }
     return null;
   });
 
-  // Persist items to localStorage when they change
+  // Persist items to localStorage when they change - use JSON comparison to avoid unnecessary writes
   useEffect(() => {
-    // Skip initial render to avoid overwriting restored data
-    if (!isInitialized.current) {
-      isInitialized.current = true;
-      return;
-    }
-    
     try {
-      if (items.length > 0) {
-        localStorage.setItem(BATCH_STORAGE_KEY, JSON.stringify(items));
-      } else {
-        localStorage.removeItem(BATCH_STORAGE_KEY);
-        localStorage.removeItem(BATCH_SUMMARY_KEY);
+      const serialized = items.length > 0 ? JSON.stringify(items) : '';
+      
+      // Only write if the data actually changed
+      if (serialized !== lastSavedItems.current) {
+        if (items.length > 0) {
+          console.log(`[BatchAnalysis] Persisting ${items.length} items to localStorage`);
+          localStorage.setItem(BATCH_STORAGE_KEY, serialized);
+          lastSavedItems.current = serialized;
+        } else if (lastSavedItems.current !== '') {
+          // Only clear if we previously had data (prevents clearing on initial empty load)
+          console.log('[BatchAnalysis] Clearing items from localStorage');
+          localStorage.removeItem(BATCH_STORAGE_KEY);
+          localStorage.removeItem(BATCH_SUMMARY_KEY);
+          lastSavedItems.current = '';
+          lastSavedSummary.current = '';
+        }
       }
     } catch (e) {
-      console.error('Failed to persist batch data:', e);
+      console.error('[BatchAnalysis] Failed to persist batch data:', e);
     }
   }, [items]);
 
   // Persist summary to localStorage when it changes
   useEffect(() => {
     try {
-      if (summary) {
-        localStorage.setItem(BATCH_SUMMARY_KEY, JSON.stringify(summary));
-      } else {
-        localStorage.removeItem(BATCH_SUMMARY_KEY);
+      const serialized = summary ? JSON.stringify(summary) : '';
+      
+      if (serialized !== lastSavedSummary.current) {
+        if (summary) {
+          console.log('[BatchAnalysis] Persisting summary to localStorage');
+          localStorage.setItem(BATCH_SUMMARY_KEY, serialized);
+          lastSavedSummary.current = serialized;
+        } else if (lastSavedSummary.current !== '') {
+          console.log('[BatchAnalysis] Clearing summary from localStorage');
+          localStorage.removeItem(BATCH_SUMMARY_KEY);
+          lastSavedSummary.current = '';
+        }
       }
     } catch (e) {
-      console.error('Failed to persist summary:', e);
+      console.error('[BatchAnalysis] Failed to persist summary:', e);
     }
   }, [summary]);
 
@@ -385,15 +403,18 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   }, []);
 
   const clearAll = useCallback(() => {
+    console.log('[BatchAnalysis] Clearing all data');
     setItems([]);
     setSummary(null);
     setCurrentIndex(-1);
-    // Clear persisted data
+    // Clear persisted data explicitly
     try {
       localStorage.removeItem(BATCH_STORAGE_KEY);
       localStorage.removeItem(BATCH_SUMMARY_KEY);
+      lastSavedItems.current = '';
+      lastSavedSummary.current = '';
     } catch (e) {
-      console.error('Failed to clear batch data:', e);
+      console.error('[BatchAnalysis] Failed to clear batch data:', e);
     }
     // Clear duplicate detection cache for fresh batch
     clearDuplicateCache();
