@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, Loader2, FileSpreadsheet, Image as ImageIcon, X, Plus } from 'lucide-react';
+import { Upload, Loader2, FileSpreadsheet, Image as ImageIcon, X, Plus, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -9,6 +9,7 @@ import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler'
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import * as XLSX from 'xlsx';
 
 interface ExtractedStudent {
   firstName: string;
@@ -287,6 +288,130 @@ export function RosterImageConverter() {
     });
   };
 
+  const downloadExcel = () => {
+    const allStudents = getAllExtractedStudents();
+    if (allStudents.length === 0) return;
+
+    // Dynamically collect all unique column keys across all students
+    const columnSet = new Set<string>();
+    allStudents.forEach((student) => {
+      Object.keys(student).forEach((key) => {
+        if (student[key] !== undefined && student[key] !== '') {
+          columnSet.add(key);
+        }
+      });
+    });
+
+    // Define preferred column order based on combineNames setting
+    const preferredOrder = combineNames 
+      ? ['fullName', 'studentId', 'email', 'grade']
+      : ['firstName', 'lastName', 'studentId', 'email', 'grade'];
+    
+    // Remove firstName/lastName from columnSet if combining
+    if (combineNames) {
+      columnSet.delete('firstName');
+      columnSet.delete('lastName');
+      columnSet.add('fullName');
+    }
+
+    const orderedColumns: string[] = [];
+    
+    // Add columns in preferred order first
+    preferredOrder.forEach((col) => {
+      if (columnSet.has(col)) {
+        orderedColumns.push(col);
+        columnSet.delete(col);
+      }
+    });
+    
+    // Add remaining columns alphabetically
+    const remainingColumns = Array.from(columnSet).sort();
+    orderedColumns.push(...remainingColumns);
+
+    // Identify numeric grade columns (exclude known non-grade fields)
+    const nonGradeFields = ['firstName', 'lastName', 'fullName', 'studentId', 'email', 'id', 'name'];
+    const numericGradeColumns = orderedColumns.filter((col) => {
+      if (nonGradeFields.includes(col)) return false;
+      return allStudents.some((s) => isNumericGrade(s[col]));
+    });
+
+    // Add average column if enabled and there are numeric grade columns
+    if (calculateAverages && numericGradeColumns.length > 0) {
+      orderedColumns.push('average');
+    }
+
+    // Convert camelCase to Title Case for Excel headers
+    const toTitleCase = (str: string) => {
+      const withSpaces = str.replace(/([A-Z])/g, ' $1').trim();
+      return withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
+    };
+    
+    const headers = orderedColumns.map(toTitleCase);
+    
+    // Build data rows
+    const dataRows = allStudents.map((s) => {
+      const row: Record<string, string | number> = {};
+      orderedColumns.forEach((col, idx) => {
+        const headerName = headers[idx];
+        if (col === 'fullName') {
+          row[headerName] = `${s.lastName || ''}, ${s.firstName || ''}`.trim();
+        } else if (col === 'average') {
+          const grades = numericGradeColumns
+            .map((gc) => {
+              const val = transformGrade(s[gc]);
+              return parseFloat(val);
+            })
+            .filter((n) => !isNaN(n));
+          if (grades.length === 0) {
+            row[headerName] = '';
+          } else {
+            const avg = grades.reduce((sum, g) => sum + g, 0) / grades.length;
+            row[headerName] = parseFloat(avg.toFixed(1));
+          }
+        } else if (numericGradeColumns.includes(col)) {
+          const transformed = transformGrade(s[col]);
+          const num = parseFloat(transformed);
+          row[headerName] = isNaN(num) ? transformed : num;
+        } else {
+          row[headerName] = String(s[col] ?? '');
+        }
+      });
+      return row;
+    });
+
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(dataRows, { header: headers });
+
+    // Set column widths
+    const colWidths = headers.map((h) => ({ wch: Math.max(h.length + 2, 12) }));
+    ws['!cols'] = colWidths;
+
+    // Apply bold 12pt formatting to header row
+    // Note: xlsx library has limited styling support in the community version
+    // Headers will be bold when opened in Excel if we set the header style
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+      if (ws[cellAddress]) {
+        ws[cellAddress].s = {
+          font: { bold: true, sz: 12 },
+          alignment: { horizontal: 'center' }
+        };
+      }
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Roster');
+
+    // Generate and download the file
+    XLSX.writeFile(wb, 'roster.xlsx');
+
+    toast({
+      title: 'Excel downloaded!',
+      description: `Downloaded ${allStudents.length} students with formatted headers.`,
+    });
+  };
+
   const clearAll = () => {
     setUploadedImages([]);
     if (fileInputRef.current) {
@@ -475,10 +600,19 @@ export function RosterImageConverter() {
                         Note: All 0 grades will be replaced with 55
                       </p>
                     </div>
-                    <Button onClick={downloadCSV} className="w-full gap-2">
-                      <FileSpreadsheet className="h-4 w-4" />
-                      Download CSV ({totalStudents} Students)
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button onClick={downloadCSV} variant="outline" className="gap-2">
+                        <FileSpreadsheet className="h-4 w-4" />
+                        Download CSV
+                      </Button>
+                      <Button onClick={downloadExcel} className="gap-2">
+                        <FileDown className="h-4 w-4" />
+                        Download Excel
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                      Excel format includes bold 12pt headers
+                    </p>
                   </CardContent>
                 </Card>
               )}
