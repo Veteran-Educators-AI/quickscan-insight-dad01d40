@@ -628,15 +628,59 @@ interface StandardsPerformanceSectionProps {
   standards: Array<{ standard: string; avgScore: number; count: number }>;
 }
 
+// Check if a standard string is a valid, properly formatted standard code
+function isValidStandardCode(standard: string): boolean {
+  if (!standard || standard.length < 3) return false;
+  
+  // Reject if it contains obvious invalid patterns
+  const invalidPatterns = [
+    /^\*\*/,                    // Starts with **
+    /not applicable/i,          // Contains "not applicable"
+    /no problems/i,             // Contains "no problems"
+    /student's work/i,          // Contains analysis text
+    /rubric/i,                  // Contains rubric references
+    /grading/i,                 // Contains grading text
+    /analysis/i,                // Contains analysis text
+    /understanding/i,           // Contains "understanding"
+    /criteria/i,                // Contains "criteria"
+    /based on/i,                // Contains "based on"
+    /\s{3,}/,                   // Contains 3+ consecutive spaces
+    /^[a-z]/,                   // Starts with lowercase letter
+    /^\d{3,}/,                  // Starts with 3+ digits
+  ];
+  
+  if (invalidPatterns.some(pattern => pattern.test(standard))) {
+    return false;
+  }
+  
+  // Check for valid standard patterns
+  const validPatterns = [
+    /^[A-Z]-[A-Z]+\.[A-Z]\.\d/i,       // A-SSE.A.1, G-GMD.B.4
+    /^\d+\.[A-Z]+\.[A-Z]\.\d/i,        // 7.G.B.6, 8.NS.A.1
+    /^[A-Z]+\.\d+\.[A-Z]/i,            // CCSS.8.G, NGPF.1.A
+    /^[A-Z]{1,2}[\.-][A-Z]{2,}/i,      // G-SRT, A-REI, N-RN
+    /^HSG?-[A-Z]/i,                    // HS geometry standards
+    /^MP\.\d/i,                        // Mathematical practices
+  ];
+  
+  return validPatterns.some(pattern => pattern.test(standard));
+}
+
 function StandardsPerformanceSection({ standards }: StandardsPerformanceSectionProps) {
   const [expandedAreas, setExpandedAreas] = useState<Record<string, boolean>>({});
 
-  // Group standards by subject area
+  // Filter and group standards by subject area - exclude invalid/malformed standards
   const groupedStandards = useMemo(() => {
     const groups: Record<string, Array<{ standard: string; cleanCode: string; avgScore: number; count: number }>> = {};
     
-    standards.forEach(std => {
+    // Only include valid standard codes
+    const validStandards = standards.filter(std => isValidStandardCode(std.standard));
+    
+    validStandards.forEach(std => {
       const area = getSubjectArea(std.standard);
+      // Skip OTHER category entirely - only show recognized subject areas
+      if (area === 'OTHER') return;
+      
       if (!groups[area]) {
         groups[area] = [];
       }
@@ -654,9 +698,10 @@ function StandardsPerformanceSection({ standards }: StandardsPerformanceSectionP
     return groups;
   }, [standards]);
 
-  // Sort subject areas by average score
+  // Sort subject areas by average score - filter out empty groups
   const sortedAreas = useMemo(() => {
     return Object.entries(groupedStandards)
+      .filter(([_, stds]) => stds.length > 0) // Only include areas with standards
       .map(([area, stds]) => ({
         area,
         standards: stds,
