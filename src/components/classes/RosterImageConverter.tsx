@@ -14,6 +14,7 @@ interface ExtractedStudent {
   studentId?: string;
   email?: string;
   grade?: string;
+  [key: string]: string | undefined; // Allow additional dynamic fields
 }
 
 interface UploadedImage {
@@ -164,20 +165,40 @@ export function RosterImageConverter() {
     const allStudents = getAllExtractedStudents();
     if (allStudents.length === 0) return;
 
-    const hasAnyGrades = allStudents.some((s) => s.grade);
-    const headers = hasAnyGrades 
-      ? ['first_name', 'last_name', 'student_id', 'email', 'grade']
-      : ['first_name', 'last_name', 'student_id', 'email'];
-    
-    const rows = allStudents.map((s) => {
-      const baseRow = [
-        s.firstName || '',
-        s.lastName || '',
-        s.studentId || '',
-        s.email || '',
-      ];
-      return hasAnyGrades ? [...baseRow, s.grade || ''] : baseRow;
+    // Dynamically collect all unique column keys across all students
+    const columnSet = new Set<string>();
+    allStudents.forEach((student) => {
+      Object.keys(student).forEach((key) => {
+        if (student[key] !== undefined && student[key] !== '') {
+          columnSet.add(key);
+        }
+      });
     });
+
+    // Define preferred column order, then add any remaining columns
+    const preferredOrder = ['firstName', 'lastName', 'studentId', 'email', 'grade'];
+    const orderedColumns: string[] = [];
+    
+    // Add columns in preferred order first
+    preferredOrder.forEach((col) => {
+      if (columnSet.has(col)) {
+        orderedColumns.push(col);
+        columnSet.delete(col);
+      }
+    });
+    
+    // Add remaining columns alphabetically
+    const remainingColumns = Array.from(columnSet).sort();
+    orderedColumns.push(...remainingColumns);
+
+    // Convert camelCase to snake_case for CSV headers
+    const toSnakeCase = (str: string) => 
+      str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+    
+    const headers = orderedColumns.map(toSnakeCase);
+    const rows = allStudents.map((s) => 
+      orderedColumns.map((col) => s[col] || '')
+    );
 
     const csvContent = [
       headers.join(','),
