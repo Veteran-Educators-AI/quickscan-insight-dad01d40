@@ -355,6 +355,86 @@ function convertSymbols(text: string): string {
 }
 
 /**
+ * Keywords that indicate a money/currency context
+ */
+const moneyContextKeywords = [
+  'cost', 'costs', 'price', 'prices', 'priced',
+  'profit', 'profits', 'revenue', 'revenues',
+  'earn', 'earns', 'earned', 'earning', 'earnings',
+  'spend', 'spends', 'spent', 'spending',
+  'pay', 'pays', 'paid', 'paying', 'payment',
+  'save', 'saves', 'saved', 'saving', 'savings',
+  'charge', 'charges', 'charged', 'charging',
+  'sell', 'sells', 'sold', 'selling',
+  'buy', 'buys', 'bought', 'buying',
+  'money', 'dollar', 'dollars', 'cent', 'cents',
+  'budget', 'budgets', 'budgeted',
+  'fee', 'fees', 'tax', 'taxes',
+  'discount', 'discounts', 'discounted',
+  'tip', 'tips', 'tipped', 'tipping',
+  'salary', 'salaries', 'wage', 'wages',
+  'income', 'expense', 'expenses',
+  'balance', 'deposit', 'deposits', 'withdrawal', 'withdrawals',
+  'account', 'bank', 'loan', 'loans',
+  'interest', 'principal', 'amount owed', 'total cost',
+  'per item', 'each item', 'unit price', 'sale price',
+  'regular price', 'original price', 'final price',
+  'markup', 'markdown', 'wholesale', 'retail',
+];
+
+/**
+ * Formats currency values in text when money context is detected
+ * Converts bare decimal numbers like "4.00" to "$4.00" in money-related sentences
+ */
+export function formatCurrency(text: string): string {
+  if (!text) return '';
+  
+  // Check if text contains money-related keywords
+  const lowerText = text.toLowerCase();
+  const hasMoneyContext = moneyContextKeywords.some(keyword => lowerText.includes(keyword));
+  
+  if (!hasMoneyContext) {
+    return text;
+  }
+  
+  let result = text;
+  
+  // Pattern 1: Numbers with exactly 2 decimal places that don't already have $ (e.g., "4.00", "12.50", "100.99")
+  // This catches common money amounts
+  result = result.replace(/(?<!\$)(?<!\d)\b(\d{1,})\.(00|[0-9]{2})\b(?!\d)/g, (match, whole, cents) => {
+    // Don't convert if it looks like a percentage, measurement, or already part of a larger number
+    return `$${whole}.${cents}`;
+  });
+  
+  // Pattern 2: Whole numbers followed by "dollars" or "cents" without $ sign
+  result = result.replace(/(?<!\$)\b(\d+)\s+(dollars?)\b/gi, '$$$1 $2');
+  result = result.replace(/(?<!\$)\b(\d+)\s+(cents?)\b/gi, '$1 $2'); // cents stay as is
+  
+  // Pattern 3: Numbers in context phrases like "costs 5" or "price of 10" 
+  // Only add $ if followed by common money-indicating patterns
+  result = result.replace(/\b(costs?|priced?|charges?|pays?|earns?|spends?|saves?|sells? for|bought for|sold for)\s+(?<!\$)(\d+(?:\.\d{2})?)\b/gi, 
+    (match, verb, amount) => {
+      // Add decimal if missing
+      const formattedAmount = amount.includes('.') ? amount : `${amount}.00`;
+      return `${verb} $${formattedAmount}`;
+    }
+  );
+  
+  // Pattern 4: "of X" patterns like "profit of 25" -> "profit of $25.00"
+  result = result.replace(/\b(profit|revenue|income|savings?|balance|total|discount|fee|tax|tip|cost|price|amount)\s+of\s+(?<!\$)(\d+(?:\.\d{2})?)\b/gi,
+    (match, noun, amount) => {
+      const formattedAmount = amount.includes('.') ? amount : `${amount}.00`;
+      return `${noun} of $${formattedAmount}`;
+    }
+  );
+  
+  // Cleanup: Remove double dollar signs if any were introduced
+  result = result.replace(/\$\$/g, '$');
+  
+  return result;
+}
+
+/**
  * Main function to render math text with proper Unicode symbols
  * Transforms plain text math notation and LaTeX into beautifully formatted text
  */
@@ -369,6 +449,9 @@ export function renderMathText(text: string): string {
   result = convertExponents(result);
   result = convertSubscripts(result);
   result = convertFractions(result);
+  
+  // Apply currency formatting for money contexts
+  result = formatCurrency(result);
   
   return result;
 }
