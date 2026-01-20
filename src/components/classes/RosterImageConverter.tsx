@@ -197,7 +197,7 @@ export function RosterImageConverter() {
     
     const headers = orderedColumns.map(toSnakeCase);
     const rows = allStudents.map((s) => 
-      orderedColumns.map((col) => s[col] || '')
+      orderedColumns.map((col) => String(s[col] ?? ''))
     );
 
     const csvContent = [
