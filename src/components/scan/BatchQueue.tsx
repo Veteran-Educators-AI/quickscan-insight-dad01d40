@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn, UserPlus, FilePlus2, RotateCcw } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn, UserPlus, FilePlus2, RotateCcw, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -176,11 +176,36 @@ export function BatchQueue({
 }: BatchQueueProps) {
   const [addStudentForItem, setAddStudentForItem] = useState<string | null>(null);
   const [showRestoredBanner, setShowRestoredBanner] = useState(isRestoredFromStorage);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   
-  // Auto-dismiss the restored banner after 5 seconds
+  // Find first unanalyzed paper index
+  const firstUnanalyzedIndex = items.findIndex(item => item.status === 'pending' || item.status === 'identifying');
+  const hasUnanalyzedPapers = firstUnanalyzedIndex !== -1;
+  const analyzedCount = items.filter(item => item.status === 'completed' || item.status === 'failed').length;
+  
+  // Scroll to first unanalyzed paper
+  const scrollToFirstUnanalyzed = useCallback(() => {
+    if (firstUnanalyzedIndex === -1) return;
+    
+    // Find the element with the data-index attribute
+    const scrollArea = scrollAreaRef.current;
+    if (!scrollArea) return;
+    
+    const targetElement = scrollArea.querySelector(`[data-item-index="${firstUnanalyzedIndex}"]`);
+    if (targetElement) {
+      targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Add a brief highlight effect
+      targetElement.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+      setTimeout(() => {
+        targetElement.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
+      }, 2000);
+    }
+  }, [firstUnanalyzedIndex]);
+  
+  // Auto-dismiss the restored banner after 8 seconds (extended to give time for continue button)
   useEffect(() => {
     if (showRestoredBanner) {
-      const timer = setTimeout(() => setShowRestoredBanner(false), 5000);
+      const timer = setTimeout(() => setShowRestoredBanner(false), 8000);
       return () => clearTimeout(timer);
     }
   }, [showRestoredBanner]);
@@ -310,17 +335,33 @@ export function BatchQueue({
               <RotateCcw className="h-4 w-4" />
               <span className="text-sm font-medium">Session restored</span>
               <span className="text-xs text-blue-600 dark:text-blue-400">
-                {items.length} paper(s) recovered from your previous session
+                {analyzedCount} of {items.length} paper(s) already analyzed
               </span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900"
-              onClick={() => setShowRestoredBanner(false)}
-            >
-              <X className="h-3 w-3" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {hasUnanalyzedPapers && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
+                  onClick={() => {
+                    scrollToFirstUnanalyzed();
+                    setShowRestoredBanner(false);
+                  }}
+                >
+                  <Play className="h-3 w-3 mr-1" />
+                  Continue where you left off
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900"
+                onClick={() => setShowRestoredBanner(false)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
         )}
         <div className="p-3 border-b bg-muted/50">
@@ -377,7 +418,7 @@ export function BatchQueue({
             )}
           </div>
         </div>
-        <ScrollArea className="h-[500px]">
+        <ScrollArea className="h-[500px]" ref={scrollAreaRef}>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -404,7 +445,8 @@ export function BatchQueue({
                     disabled={!canDrag}
                   >
                     <div 
-                      className={`flex items-center gap-3 p-3 ${
+                      data-item-index={index}
+                      className={`flex items-center gap-3 p-3 transition-all ${
                         item.status === 'analyzing' ? 'bg-primary/5' : 
                         item.status === 'identifying' ? 'bg-amber-50 dark:bg-amber-950/20' :
                         isContinuation ? 'bg-muted/30 border-l-4 border-l-blue-400 ml-2' : ''
