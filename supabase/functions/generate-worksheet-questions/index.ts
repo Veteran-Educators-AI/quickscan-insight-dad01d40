@@ -633,8 +633,68 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       
       let result = text;
       
-      // First pass: Remove any emoji characters that might cause PDF rendering issues
-      // Emojis don't render well in jsPDF and cause garbled output like "Ø=Ü¡"
+      // FIRST: Convert plain-text math notation to Unicode symbols
+      // This handles cases where the AI outputs "pi", "tan^2", etc. instead of proper Unicode
+      
+      // Convert plain-text "pi" to π symbol (but not in words like "spinning", "pieces")
+      result = result
+        .replace(/\bpi\b(?!\s*[a-zA-Z])/gi, 'π')     // standalone "pi"
+        .replace(/(\d)\s*pi\b/gi, '$1π')              // "2pi" -> "2π"
+        .replace(/pi\/(\d)/gi, 'π/$1')                // "pi/3" -> "π/3"
+        .replace(/(\d)pi\/(\d)/gi, '$1π/$2')          // "2pi/3" -> "2π/3"
+        .replace(/npi\b/gi, 'nπ')                     // "npi" -> "nπ"
+        .replace(/\+\s*nπ/g, ' + nπ')                 // clean up spacing
+        .replace(/kpi\b/gi, 'kπ');                    // "kpi" -> "kπ"
+      
+      // Convert caret notation for exponents to superscripts
+      result = result
+        .replace(/\^2\b/g, '²')
+        .replace(/\^3\b/g, '³')
+        .replace(/\^4\b/g, '⁴')
+        .replace(/\^5\b/g, '⁵')
+        .replace(/\^6\b/g, '⁶')
+        .replace(/\^7\b/g, '⁷')
+        .replace(/\^8\b/g, '⁸')
+        .replace(/\^9\b/g, '⁹')
+        .replace(/\^0\b/g, '⁰')
+        .replace(/\^n\b/gi, 'ⁿ')
+        .replace(/\^(-?\d+)/g, (match, num) => {
+          const superscripts: { [key: string]: string } = {
+            '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+            '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻'
+          };
+          return num.split('').map((c: string) => superscripts[c] || c).join('');
+        });
+      
+      // Convert common math words to symbols
+      result = result
+        .replace(/\bsqrt\s*\(/gi, '√(')              // "sqrt(" -> "√("
+        .replace(/\bsqrt\s*(\d)/gi, '√$1')           // "sqrt2" -> "√2"
+        .replace(/\btheta\b/gi, 'θ')                  // "theta" -> "θ"
+        .replace(/\balpha\b/gi, 'α')                  // "alpha" -> "α"
+        .replace(/\bbeta\b/gi, 'β')                   // "beta" -> "β"
+        .replace(/\bgamma\b/gi, 'γ')                  // "gamma" -> "γ"
+        .replace(/\bdelta\b/gi, 'δ')                  // "delta" -> "δ"
+        .replace(/\binfinity\b/gi, '∞')               // "infinity" -> "∞"
+        .replace(/>=\b/g, '≥')                        // ">=" -> "≥"
+        .replace(/<=\b/g, '≤')                        // "<=" -> "≤"
+        .replace(/!=/g, '≠')                          // "!=" -> "≠"
+        .replace(/<>/g, '≠')                          // "<>" -> "≠"
+        .replace(/\+-/g, '±')                         // "+-" -> "±"
+        .replace(/\b(\d+)\s*degrees?\b/gi, '$1°')     // "90 degrees" -> "90°"
+        .replace(/\bperpendicular\b/gi, '⊥')          // for formulas only
+        .replace(/\bcongruent\b/gi, '≅');             // for formulas only
+      
+      // Convert trig function notation (tan^2 x -> tan²x)
+      result = result
+        .replace(/sin²/g, 'sin²')
+        .replace(/cos²/g, 'cos²')
+        .replace(/tan²/g, 'tan²')
+        .replace(/sec²/g, 'sec²')
+        .replace(/csc²/g, 'csc²')
+        .replace(/cot²/g, 'cot²');
+      
+      // Remove any emoji characters that might cause PDF rendering issues
       result = result
         .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')  // Miscellaneous Symbols, Emoticons
         .replace(/[\u{2600}-\u{26FF}]/gu, '')    // Miscellaneous Symbols
@@ -647,21 +707,15 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         .replace(/📝/g, '')                       // Memo
         .replace(/🎉/g, '');                      // Party popper
       
-      // Second pass: Fix ampersand-interleaved text corruption
-      // This catastrophic encoding pattern inserts & between each character
-      // Example: "&p&a&i&n&t&e&d&" -> "painted"
-      // We need to detect and fix this pattern before other fixes
+      // Fix ampersand-interleaved text corruption
       const ampersandPattern = /(&[a-zA-Z]){3,}/g;
       if (ampersandPattern.test(result)) {
-        // Remove all & characters that are between single letters
         result = result.replace(/&([a-zA-Z])(?=&|$|\s|\.)/g, '$1');
         result = result.replace(/^&([a-zA-Z])/g, '$1');
       }
-      
-      // Fix standalone & before letters (partial corruption)
       result = result.replace(/&([a-zA-Z])&/g, '$1');
       
-      // Second pass: Fix mojibake patterns (UTF-8 decoded as Latin-1/Windows-1252)
+      // Fix mojibake patterns (UTF-8 decoded as Latin-1/Windows-1252)
       const mojibakePatterns: [RegExp, string][] = [
         // Greek letters mojibake
         [/Ï€/g, 'π'],      // π (pi)
@@ -679,7 +733,7 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         [/Ï‰/g, 'ω'],      // ω (omega)
         [/Î»/g, 'λ'],      // λ (lambda)
         [/Î¼/g, 'μ'],      // μ (mu)
-        [/Ï/g, 'ρ'],       // ρ (rho) - careful, this is generic
+        [/Ï/g, 'ρ'],       // ρ (rho)
         
         // Math operators mojibake
         [/â‰¤/g, '≤'],      // ≤
@@ -694,7 +748,7 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         [/â€"/g, '—'],      // em dash
         [/â€™/g, "'"],     // right single quote
         [/â€œ/g, '"'],     // left double quote
-        [/â€/g, '"'],      // right double quote (partial)
+        [/â€/g, '"'],      // right double quote
         [/â€˜/g, "'"],     // left single quote
         [/â€¦/g, '...'],   // ellipsis
         [/â€"/g, '-'],      // en dash
@@ -703,7 +757,7 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         [/â‰…/g, '≅'],      // congruent
         [/âˆ†/g, '△'],      // triangle
         
-        // Fix common Â prefix corruption (UTF-8 BOM or encoding mismatch)
+        // Fix common Â prefix corruption
         [/Â\s*π/g, 'π'],
         [/Âπ/g, 'π'],
         [/πÂ/g, 'π'],
@@ -716,13 +770,13 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         [/Â¾/g, '¾'],
         [/Â±/g, '±'],
         [/Â·/g, '·'],
-        [/Âµ/g, 'μ'],      // mu from Latin-1
+        [/Âµ/g, 'μ'],
         
-        // Fix À (Latin capital A with grave) which often corrupts π
-        [/À(?=\s|$|\.|\,)/g, 'π'],  // À at word boundary -> π
-        [/(\d)\s*À/g, '$1π'],        // number followed by À -> π
+        // Fix À corrupting π
+        [/À(?=\s|$|\.|\,)/g, 'π'],
+        [/(\d)\s*À/g, '$1π'],
         
-        // Fix numbers followed by Â (common in "terms of π" expressions)
+        // Fix numbers followed by Â in "terms of π" expressions
         [/(\d)Â(?=\s|$|\.)/g, '$1π'],
         [/(\d)Â\s*cm/gi, '$1π cm'],
         [/(\d)Â\s*cubic/gi, '$1π cubic'],
@@ -736,15 +790,12 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         result = result.replace(pattern, replacement);
       }
       
-      // Third pass: Clean up remaining artifacts
+      // Clean up remaining artifacts
       result = result
-        // Clean up stray Â characters
         .replace(/Â(?![a-zA-Z0-9°²³])/g, '')
         .replace(/Â\s+/g, ' ')
         .replace(/\s+Â/g, ' ')
-        // Clean up double spaces
         .replace(/\s{2,}/g, ' ')
-        // Trim
         .trim();
       
       return result;
