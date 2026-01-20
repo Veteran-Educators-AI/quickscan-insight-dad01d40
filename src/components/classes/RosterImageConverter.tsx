@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface ExtractedStudent {
   firstName: string;
@@ -29,6 +31,8 @@ export function RosterImageConverter() {
   const [isOpen, setIsOpen] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [combineNames, setCombineNames] = useState(false);
+  const [calculateAverages, setCalculateAverages] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -161,6 +165,23 @@ export function RosterImageConverter() {
     });
   };
 
+  // Helper to check if a value looks like a numeric grade
+  const isNumericGrade = (value: string | undefined): boolean => {
+    if (!value) return false;
+    const num = parseFloat(value);
+    return !isNaN(num) && num >= 0 && num <= 100;
+  };
+
+  // Helper to replace 0 grades with 55
+  const transformGrade = (value: string | undefined): string => {
+    if (!value) return '';
+    const num = parseFloat(value);
+    if (!isNaN(num) && num === 0) {
+      return '55';
+    }
+    return value;
+  };
+
   const downloadCSV = () => {
     const allStudents = getAllExtractedStudents();
     if (allStudents.length === 0) return;
@@ -175,8 +196,18 @@ export function RosterImageConverter() {
       });
     });
 
-    // Define preferred column order, then add any remaining columns
-    const preferredOrder = ['firstName', 'lastName', 'studentId', 'email', 'grade'];
+    // Define preferred column order based on combineNames setting
+    const preferredOrder = combineNames 
+      ? ['fullName', 'studentId', 'email', 'grade']
+      : ['firstName', 'lastName', 'studentId', 'email', 'grade'];
+    
+    // Remove firstName/lastName from columnSet if combining
+    if (combineNames) {
+      columnSet.delete('firstName');
+      columnSet.delete('lastName');
+      columnSet.add('fullName');
+    }
+
     const orderedColumns: string[] = [];
     
     // Add columns in preferred order first
@@ -191,14 +222,49 @@ export function RosterImageConverter() {
     const remainingColumns = Array.from(columnSet).sort();
     orderedColumns.push(...remainingColumns);
 
+    // Identify numeric grade columns (exclude known non-grade fields)
+    const nonGradeFields = ['firstName', 'lastName', 'fullName', 'studentId', 'email', 'id', 'name'];
+    const numericGradeColumns = orderedColumns.filter((col) => {
+      if (nonGradeFields.includes(col)) return false;
+      // Check if at least one student has a numeric value in this column
+      return allStudents.some((s) => isNumericGrade(s[col]));
+    });
+
+    // Add average column if enabled and there are numeric grade columns
+    if (calculateAverages && numericGradeColumns.length > 0) {
+      orderedColumns.push('average');
+    }
+
     // Convert camelCase to snake_case for CSV headers
     const toSnakeCase = (str: string) => 
       str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
     
     const headers = orderedColumns.map(toSnakeCase);
-    const rows = allStudents.map((s) => 
-      orderedColumns.map((col) => String(s[col] ?? ''))
-    );
+    
+    const rows = allStudents.map((s) => {
+      return orderedColumns.map((col) => {
+        if (col === 'fullName') {
+          return `${s.lastName || ''}, ${s.firstName || ''}`.trim();
+        }
+        if (col === 'average') {
+          // Calculate average from numeric grade columns
+          const grades = numericGradeColumns
+            .map((gc) => {
+              const val = transformGrade(s[gc]);
+              return parseFloat(val);
+            })
+            .filter((n) => !isNaN(n));
+          if (grades.length === 0) return '';
+          const avg = grades.reduce((sum, g) => sum + g, 0) / grades.length;
+          return avg.toFixed(1);
+        }
+        // Transform grades (replace 0 with 55) for numeric columns
+        if (numericGradeColumns.includes(col)) {
+          return transformGrade(s[col]);
+        }
+        return String(s[col] ?? '');
+      });
+    });
 
     const csvContent = [
       headers.join(','),
@@ -381,6 +447,33 @@ export function RosterImageConverter() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                    {/* CSV Options */}
+                    <div className="space-y-3 mb-4 p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">CSV Options</p>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="combine-names" className="text-sm cursor-pointer">
+                          Combine names (Last, First)
+                        </Label>
+                        <Switch
+                          id="combine-names"
+                          checked={combineNames}
+                          onCheckedChange={setCombineNames}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="calc-averages" className="text-sm cursor-pointer">
+                          Calculate student averages
+                        </Label>
+                        <Switch
+                          id="calc-averages"
+                          checked={calculateAverages}
+                          onCheckedChange={setCalculateAverages}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Note: All 0 grades will be replaced with 55
+                      </p>
                     </div>
                     <Button onClick={downloadCSV} className="w-full gap-2">
                       <FileSpreadsheet className="h-4 w-4" />
