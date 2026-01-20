@@ -15,8 +15,6 @@ import { ScanSettings } from '@/components/settings/ScanSettings';
 import { GradeDataCleanup } from '@/components/settings/GradeDataCleanup';
 import { PerformanceDropAlertSettings } from '@/components/settings/PerformanceDropAlertSettings';
 import { useOnboardingTour } from '@/hooks/useOnboardingTour';
-import { TeacherAnswerSampleUploader } from '@/components/scan/TeacherAnswerSampleUploader';
-import { TeacherAnswerSampleList } from '@/components/scan/TeacherAnswerSampleList';
 
 const DEPLOYED_URL = 'https://eb414783-3d02-49de-9a11-3c5e9daba81a.lovableproject.com';
 
@@ -175,18 +173,6 @@ export default function Settings() {
 
         <AIDetectionSettings />
 
-        {/* Teacher AI Training Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Train AI with Your Solutions</CardTitle>
-            <CardDescription>
-              Upload your handwritten solutions to teach the AI your grading style. Generate training forms from the Assessments page.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-        
-        <TeacherAnswerSampleUploader onSampleSaved={() => setSampleRefresh(prev => prev + 1)} />
-        <TeacherAnswerSampleList refreshTrigger={sampleRefresh} />
 
         <TwoFactorSettings />
 
