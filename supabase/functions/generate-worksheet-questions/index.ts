@@ -717,88 +717,151 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       
       // Fix mojibake patterns (UTF-8 decoded as Latin-1/Windows-1252)
       const mojibakePatterns: [RegExp, string][] = [
+        // ============================================================
         // CRITICAL: Common diagnostic worksheet corruption patterns
-        // These appear as "d" or quotation marks where θ or π should be
-        [/"d"/g, 'θ'],                // "d" -> θ (theta corrupted)
+        // These appear as "d", "A", Å, À where θ or π should be
+        // ============================================================
+        
+        // Theta (θ) corruption patterns
+        [/"d"/g, 'θ'],                // "d" -> θ
         [/"d/g, 'θ'],                 // "d -> θ
         [/d"/g, 'θ'],                 // d" -> θ
-        [/"A\)/g, 'π)'],              // "A) -> π) (pi corrupted at end)
-        [/\("A/g, '(π'],              // ("A -> (π (pi corrupted at start)
+        [/Ã¸/g, 'θ'],                 // Ã¸ -> θ
+        [/θ̈/g, 'θ'],                  // θ with diaeresis
+        [/Î¸/g, 'θ'],                 // Î¸ -> θ
+        [/\u00f8/g, 'θ'],             // ø -> θ (common substitution)
+        
+        // Pi (π) corruption patterns  
+        [/"A\)/g, 'π)'],              // "A) -> π)
+        [/\("A/g, '(π'],              // ("A -> (π
         [/2"A/g, '2π'],               // 2"A -> 2π
         [/"A/g, 'π'],                 // "A -> π
-        [/Å/g, 'π'],                  // Å -> π (common corruption)
+        [/Å/g, 'π'],                  // Å -> π
         [/2Å/g, '2π'],                // 2Å -> 2π
-        [/< 2À/g, '< 2π'],            // < 2À -> < 2π
-        [/≤ 2À/g, '≤ 2π'],            // ≤ 2À -> ≤ 2π
-        [/0 ≤ "d" < 2"A"/g, '0 ≤ θ < 2π'],  // Full pattern
-        [/0 ≤ "d < 2À/g, '0 ≤ θ < 2π'],     // Partial pattern
-        [/\(0 "d , < 2Å\)/g, '(0 ≤ θ < 2π)'], // Exact match from screenshot
-        [/0 "d , < 2Å/g, '0 ≤ θ < 2π'],     // Without parens
-        [/0 "d" < 2Å/g, '0 ≤ θ < 2π'],      // Variant
-        [/0"d"</g, '0 ≤ θ <'],              // Compressed variant
-        [/"d ,/g, 'θ ≤'],                    // "d , -> θ ≤
-        [/"d,/g, 'θ ≤'],                     // "d, -> θ ≤
+        [/À/g, 'π'],                  // À -> π
+        [/2À/g, '2π'],                // 2À -> 2π
+        [/Ã€/g, 'π'],                 // Ã€ -> π
+        [/Ï€/g, 'π'],                 // Ï€ -> π
+        [/\u03c0/g, 'π'],             // Ensure proper π
+        [/\u00c0/g, 'π'],             // À character code
+        [/\u00c5/g, 'π'],             // Å character code
+        [/ãƒ¼/g, 'π'],                // Japanese character corruption
+        [/ð/g, 'π'],                  // ð -> π
         
-        // Greek letters mojibake
-        [/Ï€/g, 'π'],      // π (pi)
-        [/Î¸/g, 'θ'],      // θ (theta)
-        [/Î±/g, 'α'],      // α (alpha)
-        [/Î²/g, 'β'],      // β (beta)
-        [/Î³/g, 'γ'],      // γ (gamma)
-        [/Î"/g, 'Δ'],      // Δ (Delta)
-        [/Î´/g, 'δ'],      // δ (delta)
-        [/Ïˆ/g, 'ψ'],      // ψ (psi)
-        [/Ï†/g, 'φ'],      // φ (phi)
-        [/Î£/g, 'Σ'],      // Σ (Sigma)
-        [/Ïƒ/g, 'σ'],      // σ (sigma)
-        [/Î©/g, 'Ω'],      // Ω (Omega)
-        [/Ï‰/g, 'ω'],      // ω (omega)
-        [/Î»/g, 'λ'],      // λ (lambda)
-        [/Î¼/g, 'μ'],      // μ (mu)
-        [/Ï/g, 'ρ'],       // ρ (rho)
+        // Full interval patterns (0 ≤ θ < 2π)
+        [/\(0\s*"d"\s*,?\s*<?=?\s*2"A"\)/gi, '(0 ≤ θ < 2π)'],
+        [/\(0\s*"d\s*,?\s*<?=?\s*2Å\)/gi, '(0 ≤ θ < 2π)'],
+        [/\(0\s*"d\s*,?\s*<?=?\s*2À\)/gi, '(0 ≤ θ < 2π)'],
+        [/0\s*≤\s*"d"\s*<\s*2"A"/gi, '0 ≤ θ < 2π'],
+        [/0\s*≤\s*"d\s*<\s*2À/gi, '0 ≤ θ < 2π'],
+        [/0\s*≤\s*"d\s*<\s*2Å/gi, '0 ≤ θ < 2π'],
+        [/0\s*"d\s*,?\s*<\s*2Å/gi, '0 ≤ θ < 2π'],
+        [/0\s*"d"\s*<\s*2Å/gi, '0 ≤ θ < 2π'],
+        [/0"d"</g, '0 ≤ θ <'],
+        [/"d\s*,/g, 'θ ≤'],
+        [/"d,/g, 'θ ≤'],
         
-        // Math operators mojibake
-        [/â‰¤/g, '≤'],      // ≤
-        [/â‰¥/g, '≥'],      // ≥
-        [/â‰ /g, '≠'],      // ≠
-        [/â†'/g, '→'],      // →
-        [/â†/g, '←'],       // ←
-        [/âˆš/g, '√'],      // √
-        [/âˆž/g, '∞'],      // ∞
-        [/Ã—/g, '×'],      // ×
-        [/Ã·/g, '÷'],      // ÷
-        [/â€"/g, '—'],      // em dash
-        [/â€™/g, "'"],     // right single quote
-        [/â€œ/g, '"'],     // left double quote
-        [/â€/g, '"'],      // right double quote
-        [/â€˜/g, "'"],     // left single quote
-        [/â€¦/g, '...'],   // ellipsis
-        [/â€"/g, '-'],      // en dash
-        [/âˆ /g, '∠'],      // angle symbol
-        [/âŠ¥/g, '⊥'],      // perpendicular
-        [/â‰…/g, '≅'],      // congruent
-        [/âˆ†/g, '△'],      // triangle
+        // Square root (√) corruption
+        [/âˆš/g, '√'],
+        [/\u221a/g, '√'],
+        [/V(?=\d)/g, '√'],            // V before number -> √
+        [/\\sqrt/g, '√'],             // LaTeX escape
         
-        // Fix common Â prefix corruption
-        [/Â\s*π/g, 'π'],
-        [/Âπ/g, 'π'],
-        [/πÂ/g, 'π'],
-        [/Â°/g, '°'],
-        [/°Â/g, '°'],
+        // Superscript corruption
         [/Â²/g, '²'],
         [/Â³/g, '³'],
+        [/\^2(?!\d)/g, '²'],
+        [/\^3(?!\d)/g, '³'],
+        [/\^4(?!\d)/g, '⁴'],
+        [/\^5(?!\d)/g, '⁵'],
+        [/\^n\b/gi, 'ⁿ'],
+        
+        // Comparison operators
+        [/â‰¤/g, '≤'],
+        [/â‰¥/g, '≥'],
+        [/â‰ /g, '≠'],
+        [/&lt;=/g, '≤'],
+        [/&gt;=/g, '≥'],
+        [/<=/g, '≤'],
+        [/>=/g, '≥'],
+        [/!=/g, '≠'],
+        [/<>/g, '≠'],
+        
+        // Greek letters mojibake
+        [/Î±/g, 'α'],
+        [/Î²/g, 'β'],
+        [/Î³/g, 'γ'],
+        [/Î"/g, 'Δ'],
+        [/Î´/g, 'δ'],
+        [/Ïˆ/g, 'ψ'],
+        [/Ï†/g, 'φ'],
+        [/Î£/g, 'Σ'],
+        [/Ïƒ/g, 'σ'],
+        [/Î©/g, 'Ω'],
+        [/Ï‰/g, 'ω'],
+        [/Î»/g, 'λ'],
+        [/Î¼/g, 'μ'],
+        [/Ï/g, 'ρ'],
+        [/Îµ/g, 'ε'],
+        [/Î¶/g, 'ζ'],
+        [/Î·/g, 'η'],
+        [/Î¹/g, 'ι'],
+        [/Îº/g, 'κ'],
+        [/Î½/g, 'ν'],
+        [/Î¾/g, 'ξ'],
+        [/Ï€/g, 'π'],
+        [/Ï„/g, 'τ'],
+        [/Ï…/g, 'υ'],
+        [/Ï‡/g, 'χ'],
+        
+        // Arrows and math operators
+        [/â†'/g, '→'],
+        [/â†/g, '←'],
+        [/âˆž/g, '∞'],
+        [/Ã—/g, '×'],
+        [/Ã·/g, '÷'],
+        [/Â±/g, '±'],
+        [/âˆ /g, '∠'],
+        [/âŠ¥/g, '⊥'],
+        [/â‰…/g, '≅'],
+        [/âˆ†/g, '△'],
+        [/∥/g, '∥'],
+        [/Ã¢Ë†Â¥/g, '∥'],
+        
+        // Degree symbol
+        [/Â°/g, '°'],
+        [/°Â/g, '°'],
+        [/\bdegrees?\b/gi, '°'],
+        
+        // Fractions
         [/Â½/g, '½'],
         [/Â¼/g, '¼'],
         [/Â¾/g, '¾'],
-        [/Â±/g, '±'],
+        [/1\/2(?!\d)/g, '½'],
+        [/1\/3(?!\d)/g, '⅓'],
+        [/1\/4(?!\d)/g, '¼'],
+        [/2\/3(?!\d)/g, '⅔'],
+        [/3\/4(?!\d)/g, '¾'],
+        
+        // Quote/apostrophe corruption
+        [/â€"/g, '—'],
+        [/â€™/g, "'"],
+        [/â€œ/g, '"'],
+        [/â€/g, '"'],
+        [/â€˜/g, "'"],
+        [/â€¦/g, '...'],
+        [/â€"/g, '-'],
+        
+        // Common Â prefix corruption cleanup
+        [/Â\s*π/g, 'π'],
+        [/Âπ/g, 'π'],
+        [/πÂ/g, 'π'],
+        [/Âθ/g, 'θ'],
+        [/θÂ/g, 'θ'],
         [/Â·/g, '·'],
         [/Âµ/g, 'μ'],
         
-        // Fix À corrupting π
-        [/À(?=\s|$|\.|\,)/g, 'π'],
-        [/(\d)\s*À/g, '$1π'],
-        
-        // Fix numbers followed by Â in "terms of π" expressions
+        // Number + corrupted π patterns
         [/(\d)Â(?=\s|$|\.)/g, '$1π'],
         [/(\d)Â\s*cm/gi, '$1π cm'],
         [/(\d)Â\s*cubic/gi, '$1π cubic'],
@@ -806,6 +869,22 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         [/(\d)Â\s*meter/gi, '$1π meter'],
         [/(\d)Â\s*inch/gi, '$1π inch'],
         [/(\d)Â\s*unit/gi, '$1π unit'],
+        [/(\d)\s*À/g, '$1π'],
+        [/(\d)\s*Å/g, '$1π'],
+        
+        // Trig function cleanup
+        [/sin\s*²/g, 'sin²'],
+        [/cos\s*²/g, 'cos²'],
+        [/tan\s*²/g, 'tan²'],
+        [/sec\s*²/g, 'sec²'],
+        [/csc\s*²/g, 'csc²'],
+        [/cot\s*²/g, 'cot²'],
+        
+        // cos² patterns with corrupted symbols
+        [/4\s*cos\s*²\s*,/g, '4cos²θ'],
+        [/cos²\s*,/g, 'cos²θ'],
+        [/sin²\s*,/g, 'sin²θ'],
+        [/tan²\s*,/g, 'tan²θ'],
       ];
       
       for (const [pattern, replacement] of mojibakePatterns) {
