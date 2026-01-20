@@ -136,6 +136,7 @@ interface UseBatchAnalysisReturn {
   selectRunAsGrade: (itemId: string, runIndex: number) => void;
   isProcessing: boolean;
   isIdentifying: boolean;
+  isRestoredFromStorage: boolean;
   currentIndex: number;
   summary: BatchSummary | null;
   generateSummary: () => BatchSummary;
@@ -1700,6 +1701,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     selectRunAsGrade,
     isProcessing,
     isIdentifying,
+    isRestoredFromStorage: hasLoadedFromStorage.current,
     currentIndex,
     summary,
     generateSummary,
