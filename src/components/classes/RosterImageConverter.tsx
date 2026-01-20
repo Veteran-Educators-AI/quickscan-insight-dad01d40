@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Upload, Loader2, FileSpreadsheet, Image as ImageIcon, X, Plus, FileDown } from 'lucide-react';
+import { useState, useRef, useMemo } from 'react';
+import { Upload, Loader2, FileSpreadsheet, Image as ImageIcon, X, Plus, FileDown, Settings2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -9,6 +9,9 @@ import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler'
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import * as XLSX from 'xlsx';
 
 interface ExtractedStudent {
@@ -28,12 +31,63 @@ interface UploadedImage {
   error?: string;
 }
 
+interface ColumnMapping {
+  sourceColumn: string;
+  targetColumn: string;
+  include: boolean;
+}
+
+// Common gradebook column presets
+const GRADEBOOK_PRESETS = {
+  default: { label: 'Default', mappings: {} },
+  jupiterGrades: { 
+    label: 'Jupiter Grades', 
+    mappings: { 
+      firstName: 'First Name', 
+      lastName: 'Last Name', 
+      studentId: 'Student ID',
+      email: 'Email Address'
+    } 
+  },
+  powerschool: { 
+    label: 'PowerSchool', 
+    mappings: { 
+      firstName: 'First_Name', 
+      lastName: 'Last_Name', 
+      studentId: 'Student_Number',
+      email: 'Student_Email'
+    } 
+  },
+  googleClassroom: { 
+    label: 'Google Classroom', 
+    mappings: { 
+      firstName: 'First name', 
+      lastName: 'Last name', 
+      studentId: 'Student ID',
+      email: 'Email address'
+    } 
+  },
+  canvas: { 
+    label: 'Canvas LMS', 
+    mappings: { 
+      firstName: 'first_name', 
+      lastName: 'last_name', 
+      studentId: 'sis_user_id',
+      email: 'email'
+    } 
+  },
+};
+
 export function RosterImageConverter() {
   const [isOpen, setIsOpen] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [combineNames, setCombineNames] = useState(false);
   const [calculateAverages, setCalculateAverages] = useState(false);
+  const [columnMappings, setColumnMappings] = useState<Record<string, string>>({});
+  const [excludedColumns, setExcludedColumns] = useState<Set<string>>(new Set());
+  const [showColumnMapping, setShowColumnMapping] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<string>('default');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -166,6 +220,55 @@ export function RosterImageConverter() {
     });
   };
 
+  // Get all unique columns from extracted data
+  const allColumns = useMemo(() => {
+    const allStudents = getAllExtractedStudents();
+    const columnSet = new Set<string>();
+    allStudents.forEach((student) => {
+      Object.keys(student).forEach((key) => {
+        if (student[key] !== undefined && student[key] !== '') {
+          columnSet.add(key);
+        }
+      });
+    });
+    return Array.from(columnSet);
+  }, [uploadedImages]);
+
+  // Apply preset mappings
+  const applyPreset = (presetKey: string) => {
+    setSelectedPreset(presetKey);
+    const preset = GRADEBOOK_PRESETS[presetKey as keyof typeof GRADEBOOK_PRESETS];
+    if (preset) {
+      setColumnMappings(preset.mappings);
+    }
+  };
+
+  // Update a single column mapping
+  const updateColumnMapping = (sourceCol: string, targetCol: string) => {
+    setColumnMappings((prev) => ({
+      ...prev,
+      [sourceCol]: targetCol,
+    }));
+  };
+
+  // Toggle column inclusion
+  const toggleColumnExclusion = (col: string) => {
+    setExcludedColumns((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(col)) {
+        newSet.delete(col);
+      } else {
+        newSet.add(col);
+      }
+      return newSet;
+    });
+  };
+
+  // Get the mapped column name
+  const getMappedColumnName = (col: string): string => {
+    return columnMappings[col] || col;
+  };
+
   // Helper to check if a value looks like a numeric grade
   const isNumericGrade = (value: string | undefined): boolean => {
     if (!value) return false;
@@ -191,7 +294,7 @@ export function RosterImageConverter() {
     const columnSet = new Set<string>();
     allStudents.forEach((student) => {
       Object.keys(student).forEach((key) => {
-        if (student[key] !== undefined && student[key] !== '') {
+        if (student[key] !== undefined && student[key] !== '' && !excludedColumns.has(key)) {
           columnSet.add(key);
         }
       });
@@ -213,14 +316,14 @@ export function RosterImageConverter() {
     
     // Add columns in preferred order first
     preferredOrder.forEach((col) => {
-      if (columnSet.has(col)) {
+      if (columnSet.has(col) && !excludedColumns.has(col)) {
         orderedColumns.push(col);
         columnSet.delete(col);
       }
     });
     
-    // Add remaining columns alphabetically
-    const remainingColumns = Array.from(columnSet).sort();
+    // Add remaining columns alphabetically (excluding excluded ones)
+    const remainingColumns = Array.from(columnSet).filter(col => !excludedColumns.has(col)).sort();
     orderedColumns.push(...remainingColumns);
 
     // Identify numeric grade columns (exclude known non-grade fields)
@@ -236,11 +339,8 @@ export function RosterImageConverter() {
       orderedColumns.push('average');
     }
 
-    // Convert camelCase to snake_case for CSV headers
-    const toSnakeCase = (str: string) => 
-      str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
-    
-    const headers = orderedColumns.map(toSnakeCase);
+    // Apply column mappings for headers
+    const headers = orderedColumns.map((col) => getMappedColumnName(col));
     
     const rows = allStudents.map((s) => {
       return orderedColumns.map((col) => {
@@ -296,7 +396,7 @@ export function RosterImageConverter() {
     const columnSet = new Set<string>();
     allStudents.forEach((student) => {
       Object.keys(student).forEach((key) => {
-        if (student[key] !== undefined && student[key] !== '') {
+        if (student[key] !== undefined && student[key] !== '' && !excludedColumns.has(key)) {
           columnSet.add(key);
         }
       });
@@ -318,14 +418,14 @@ export function RosterImageConverter() {
     
     // Add columns in preferred order first
     preferredOrder.forEach((col) => {
-      if (columnSet.has(col)) {
+      if (columnSet.has(col) && !excludedColumns.has(col)) {
         orderedColumns.push(col);
         columnSet.delete(col);
       }
     });
     
-    // Add remaining columns alphabetically
-    const remainingColumns = Array.from(columnSet).sort();
+    // Add remaining columns alphabetically (excluding excluded ones)
+    const remainingColumns = Array.from(columnSet).filter(col => !excludedColumns.has(col)).sort();
     orderedColumns.push(...remainingColumns);
 
     // Identify numeric grade columns (exclude known non-grade fields)
@@ -340,13 +440,8 @@ export function RosterImageConverter() {
       orderedColumns.push('average');
     }
 
-    // Convert camelCase to Title Case for Excel headers
-    const toTitleCase = (str: string) => {
-      const withSpaces = str.replace(/([A-Z])/g, ' $1').trim();
-      return withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
-    };
-    
-    const headers = orderedColumns.map(toTitleCase);
+    // Apply column mappings for headers
+    const headers = orderedColumns.map((col) => getMappedColumnName(col));
     
     // Build data rows
     const dataRows = allStudents.map((s) => {
@@ -575,7 +670,7 @@ export function RosterImageConverter() {
                     </div>
                     {/* CSV Options */}
                     <div className="space-y-3 mb-4 p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">CSV Options</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Export Options</p>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="combine-names" className="text-sm cursor-pointer">
                           Combine names (Last, First)
@@ -600,6 +695,74 @@ export function RosterImageConverter() {
                         Note: All 0 grades will be replaced with 55
                       </p>
                     </div>
+
+                    {/* Column Mapping Section */}
+                    <Collapsible open={showColumnMapping} onOpenChange={setShowColumnMapping} className="mb-4">
+                      <CollapsibleTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full gap-2 justify-between">
+                          <span className="flex items-center gap-2">
+                            <Settings2 className="h-4 w-4" />
+                            Column Mapping
+                          </span>
+                          {showColumnMapping ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-2">
+                        <div className="p-3 border rounded-lg space-y-3">
+                          {/* Preset selector */}
+                          <div className="space-y-1">
+                            <Label className="text-xs">Gradebook Preset</Label>
+                            <Select value={selectedPreset} onValueChange={applyPreset}>
+                              <SelectTrigger className="h-8 text-sm">
+                                <SelectValue placeholder="Select preset..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(GRADEBOOK_PRESETS).map(([key, preset]) => (
+                                  <SelectItem key={key} value={key}>
+                                    {preset.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Column mappings */}
+                          <div className="space-y-2">
+                            <Label className="text-xs">Column Names</Label>
+                            <div className="max-h-40 overflow-y-auto space-y-2">
+                              {allColumns.map((col) => (
+                                <div key={col} className="flex items-center gap-2">
+                                  <Switch
+                                    checked={!excludedColumns.has(col)}
+                                    onCheckedChange={() => toggleColumnExclusion(col)}
+                                    className="scale-75"
+                                  />
+                                  <span className="text-xs text-muted-foreground w-20 truncate" title={col}>
+                                    {col}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">→</span>
+                                  <Input
+                                    value={columnMappings[col] || ''}
+                                    onChange={(e) => updateColumnMapping(col, e.target.value)}
+                                    placeholder={col}
+                                    className="h-7 text-xs flex-1"
+                                    disabled={excludedColumns.has(col)}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-muted-foreground">
+                            Toggle columns on/off and rename them to match your gradebook's import format.
+                          </p>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                     <div className="grid grid-cols-2 gap-2">
                       <Button onClick={downloadCSV} variant="outline" className="gap-2">
                         <FileSpreadsheet className="h-4 w-4" />
