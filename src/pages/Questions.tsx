@@ -20,6 +20,8 @@ import { LessonPlanLibrary } from '@/components/questions/LessonPlanLibrary';
 import { LessonTopicSelector, type PresentationTheme } from '@/components/questions/LessonTopicSelector';
 import { MasteryChallengeGenerator } from '@/components/questions/MasteryChallengeGenerator';
 import { TrainingFormGenerator } from '@/components/scan/TrainingFormGenerator';
+import { TeacherAnswerSampleUploader } from '@/components/scan/TeacherAnswerSampleUploader';
+import { TeacherAnswerSampleList } from '@/components/scan/TeacherAnswerSampleList';
 import { DiagnosticGapsDialog } from '@/components/reports/DiagnosticGapsSummary';
 import { useToast } from '@/hooks/use-toast';
 
@@ -41,6 +43,7 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
   const [showMasteryChallenge, setShowMasteryChallenge] = useState(false);
   const [showAdaptiveGenerator, setShowAdaptiveGenerator] = useState(false);
   const [showTrainAI, setShowTrainAI] = useState(false);
+  const [sampleRefresh, setSampleRefresh] = useState(0);
 
   // Get selected topics as array for passing to generator
   const getSelectedTopicsArray = () => {
@@ -465,7 +468,7 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                 className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
               >
                 <GraduationCap className="h-4 w-4 mr-2" />
-                Train AI
+                AI Training
               </Button>
               <DiagnosticGapsDialog />
             </TooltipProvider>
@@ -758,19 +761,34 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
         onOpenChange={setShowAdaptiveGenerator}
       />
 
-      {/* Train AI Dialog */}
+      {/* AI Training Dialog */}
       <Dialog open={showTrainAI} onOpenChange={setShowTrainAI}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <GraduationCap className="h-5 w-5" />
-              Train AI
+              AI Training
             </DialogTitle>
             <DialogDescription>
-              Generate practice forms to solve by hand, then scan your answers to teach the AI your grading style
+              Train the AI to grade like you by uploading your solutions or generating practice forms
             </DialogDescription>
           </DialogHeader>
-          <TrainingFormGenerator onFormGenerated={() => setShowTrainAI(false)} />
+          <Tabs defaultValue="upload" className="mt-4">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="upload">Upload Solutions</TabsTrigger>
+              <TabsTrigger value="generate">Generate Forms</TabsTrigger>
+              <TabsTrigger value="samples">My Samples</TabsTrigger>
+            </TabsList>
+            <TabsContent value="upload" className="mt-4">
+              <TeacherAnswerSampleUploader onSampleSaved={() => setSampleRefresh(prev => prev + 1)} />
+            </TabsContent>
+            <TabsContent value="generate" className="mt-4">
+              <TrainingFormGenerator onFormGenerated={() => {}} />
+            </TabsContent>
+            <TabsContent value="samples" className="mt-4">
+              <TeacherAnswerSampleList refreshTrigger={sampleRefresh} />
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
     </AppLayout>
