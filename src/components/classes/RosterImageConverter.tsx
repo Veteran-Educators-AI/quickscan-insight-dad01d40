@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
-import { Upload, Loader2, FileSpreadsheet, Image as ImageIcon, X, Plus, FileDown, Settings2, ChevronDown, ChevronUp, FileUp, Merge } from 'lucide-react';
+import { Upload, Loader2, FileSpreadsheet, Image as ImageIcon, X, Plus, FileDown, Settings2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -12,7 +12,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import * as XLSX from 'xlsx';
 
 interface ExtractedStudent {
@@ -36,13 +35,6 @@ interface ColumnMapping {
   sourceColumn: string;
   targetColumn: string;
   include: boolean;
-}
-
-interface TemplateData {
-  fileName: string;
-  headers: string[];
-  rows: Record<string, string | number>[];
-  matchColumn: string;
 }
 
 // Common gradebook column presets
@@ -96,16 +88,7 @@ export function RosterImageConverter() {
   const [excludedColumns, setExcludedColumns] = useState<Set<string>>(new Set());
   const [showColumnMapping, setShowColumnMapping] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<string>('default');
-  
-  // Template merge state
-  const [templateData, setTemplateData] = useState<TemplateData | null>(null);
-  const [templateMatchColumn, setTemplateMatchColumn] = useState<string>('');
-  const [extractedMatchColumn, setExtractedMatchColumn] = useState<string>('lastName');
-  const [gradeColumnsToMerge, setGradeColumnsToMerge] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<string>('export');
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const templateInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const handleImagesSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -549,242 +532,9 @@ export function RosterImageConverter() {
     }
   };
 
-  // Handle template Excel file upload
-  const handleTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json<Record<string, string | number>>(firstSheet, { defval: '' });
-        
-        if (jsonData.length === 0) {
-          toast({
-            title: 'Empty template',
-            description: 'The uploaded file has no data rows.',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        const headers = Object.keys(jsonData[0]);
-        
-        setTemplateData({
-          fileName: file.name,
-          headers,
-          rows: jsonData,
-          matchColumn: headers[0],
-        });
-        
-        // Auto-detect name column
-        const nameColumn = headers.find(h => 
-          h.toLowerCase().includes('name') || 
-          h.toLowerCase().includes('student')
-        );
-        if (nameColumn) {
-          setTemplateMatchColumn(nameColumn);
-        } else {
-          setTemplateMatchColumn(headers[0]);
-        }
-
-        toast({
-          title: 'Template loaded!',
-          description: `Found ${jsonData.length} students and ${headers.length} columns.`,
-        });
-      } catch (error) {
-        console.error('Error parsing template:', error);
-        toast({
-          title: 'Error reading file',
-          description: 'Could not parse the Excel file. Please ensure it is a valid .xlsx file.',
-          variant: 'destructive',
-        });
-      }
-    };
-    reader.readAsArrayBuffer(file);
-    
-    if (templateInputRef.current) {
-      templateInputRef.current.value = '';
-    }
-  };
-
-  // Toggle grade column selection for merge
-  const toggleGradeColumnMerge = (col: string) => {
-    setGradeColumnsToMerge((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(col)) {
-        newSet.delete(col);
-      } else {
-        newSet.add(col);
-      }
-      return newSet;
-    });
-  };
-
-  // Normalize name for matching
-  const normalizeName = (name: string): string => {
-    return name.toLowerCase().trim().replace(/[^a-z]/g, '');
-  };
-
-  // Match extracted students to template rows
-  const matchStudentToTemplate = (
-    student: ExtractedStudent,
-    templateRow: Record<string, string | number>,
-    matchColumn: string
-  ): boolean => {
-    const templateValue = String(templateRow[matchColumn] || '');
-    
-    // Try different matching strategies
-    const extractedName = `${student.lastName || ''} ${student.firstName || ''}`.trim();
-    const extractedLastFirst = `${student.lastName || ''}, ${student.firstName || ''}`.trim();
-    
-    // Normalize for comparison
-    const normalizedTemplate = normalizeName(templateValue);
-    const normalizedExtracted = normalizeName(extractedName);
-    const normalizedLastFirst = normalizeName(extractedLastFirst);
-    
-    // Check if student ID matches
-    if (student.studentId && String(templateRow[matchColumn]).includes(student.studentId)) {
-      return true;
-    }
-    
-    // Check name matches
-    if (normalizedTemplate === normalizedExtracted || normalizedTemplate === normalizedLastFirst) {
-      return true;
-    }
-    
-    // Check if template contains lastName
-    if (student.lastName && normalizedTemplate.includes(normalizeName(student.lastName))) {
-      // Additional check for first name if available
-      if (student.firstName && normalizedTemplate.includes(normalizeName(student.firstName))) {
-        return true;
-      }
-      // Just last name match is acceptable
-      return true;
-    }
-    
-    return false;
-  };
-
-  // Merge grades into template and download
-  const mergeAndDownload = () => {
-    if (!templateData || gradeColumnsToMerge.size === 0) {
-      toast({
-        title: 'Cannot merge',
-        description: 'Please upload a template and select grade columns to merge.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const extractedStudents = getAllExtractedStudents();
-    if (extractedStudents.length === 0) {
-      toast({
-        title: 'No extracted data',
-        description: 'Please extract students from images first.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Create merged data
-    const mergedRows = templateData.rows.map((templateRow) => {
-      const newRow = { ...templateRow };
-      
-      // Find matching student
-      const matchedStudent = extractedStudents.find((student) =>
-        matchStudentToTemplate(student, templateRow, templateMatchColumn)
-      );
-
-      if (matchedStudent) {
-        // Merge selected grade columns
-        gradeColumnsToMerge.forEach((col) => {
-          if (matchedStudent[col] !== undefined) {
-            const gradeValue = transformGrade(matchedStudent[col]);
-            const headerName = getMappedColumnName(col);
-            // Add to existing columns or create new
-            newRow[headerName] = gradeValue;
-          }
-        });
-      }
-
-      return newRow;
-    });
-
-    // Sort by the match column (assuming it contains names)
-    mergedRows.sort((a, b) => {
-      const aVal = String(a[templateMatchColumn] || '');
-      const bVal = String(b[templateMatchColumn] || '');
-      return aVal.localeCompare(bVal);
-    });
-
-    // Get all headers (original + new grade columns)
-    const newHeaders = [...new Set([
-      ...templateData.headers,
-      ...Array.from(gradeColumnsToMerge).map(getMappedColumnName),
-    ])];
-
-    // Create workbook
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(mergedRows, { header: newHeaders });
-
-    // Set column widths
-    const colWidths = newHeaders.map((h) => ({ wch: Math.max(String(h).length + 2, 12) }));
-    ws['!cols'] = colWidths;
-
-    // Apply header styling
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-    for (let col = range.s.c; col <= range.e.c; col++) {
-      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
-      if (ws[cellAddress]) {
-        ws[cellAddress].s = {
-          font: { bold: true, sz: 12 },
-          alignment: { horizontal: 'center' }
-        };
-      }
-    }
-
-    XLSX.utils.book_append_sheet(wb, ws, 'Merged Grades');
-
-    // Generate filename
-    const baseName = templateData.fileName.replace(/\.[^/.]+$/, '');
-    XLSX.writeFile(wb, `${baseName}_merged.xlsx`);
-
-    // Count matches
-    const matchCount = templateData.rows.filter((row) =>
-      extractedStudents.some((student) => matchStudentToTemplate(student, row, templateMatchColumn))
-    ).length;
-
-    toast({
-      title: 'Merged grades downloaded!',
-      description: `Matched ${matchCount} of ${templateData.rows.length} students. Grades added to ${gradeColumnsToMerge.size} column(s).`,
-    });
-  };
-
-  const clearTemplate = () => {
-    setTemplateData(null);
-    setGradeColumnsToMerge(new Set());
-    if (templateInputRef.current) {
-      templateInputRef.current.value = '';
-    }
-  };
-
   const pendingCount = uploadedImages.filter((img) => img.status === 'pending').length;
   const doneCount = uploadedImages.filter((img) => img.status === 'done').length;
   const totalStudents = getAllExtractedStudents().length;
-  
-  // Get grade columns from extracted data
-  const extractedGradeColumns = useMemo(() => {
-    const nonGradeFields = ['firstName', 'lastName', 'fullName', 'studentId', 'email', 'id', 'name'];
-    return allColumns.filter((col) => {
-      if (nonGradeFields.includes(col)) return false;
-      const students = getAllExtractedStudents();
-      return students.some((s) => isNumericGrade(s[col]));
-    });
-  }, [allColumns]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -936,239 +686,114 @@ export function RosterImageConverter() {
                         </div>
                       ))}
                     </div>
-                    
-                    {/* Export/Merge Tabs */}
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="export" className="gap-1.5 text-xs">
-                          <FileDown className="h-3.5 w-3.5" />
-                          New Export
-                        </TabsTrigger>
-                        <TabsTrigger value="merge" className="gap-1.5 text-xs">
-                          <Merge className="h-3.5 w-3.5" />
-                          Merge to Template
-                        </TabsTrigger>
-                      </TabsList>
+                    {/* CSV Options */}
+                    <div className="space-y-3 mb-4 p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Export Options</p>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="combine-names" className="text-sm cursor-pointer">
+                          Combine names (Last, First)
+                        </Label>
+                        <Switch
+                          id="combine-names"
+                          checked={combineNames}
+                          onCheckedChange={setCombineNames}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="calc-averages" className="text-sm cursor-pointer">
+                          Calculate student averages
+                        </Label>
+                        <Switch
+                          id="calc-averages"
+                          checked={calculateAverages}
+                          onCheckedChange={setCalculateAverages}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Note: All 0 grades will be replaced with 55
+                      </p>
+                    </div>
 
-                      <TabsContent value="export" className="space-y-3 mt-3">
-                        {/* CSV Options */}
-                        <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Export Options</p>
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="combine-names" className="text-sm cursor-pointer">
-                              Combine names (Last, First)
-                            </Label>
-                            <Switch
-                              id="combine-names"
-                              checked={combineNames}
-                              onCheckedChange={setCombineNames}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="calc-averages" className="text-sm cursor-pointer">
-                              Calculate student averages
-                            </Label>
-                            <Switch
-                              id="calc-averages"
-                              checked={calculateAverages}
-                              onCheckedChange={setCalculateAverages}
-                            />
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Note: All 0 grades will be replaced with 55
-                          </p>
-                        </div>
-
-                        {/* Column Mapping Section */}
-                        <Collapsible open={showColumnMapping} onOpenChange={setShowColumnMapping}>
-                          <CollapsibleTrigger asChild>
-                            <Button variant="outline" size="sm" className="w-full gap-2 justify-between">
-                              <span className="flex items-center gap-2">
-                                <Settings2 className="h-4 w-4" />
-                                Column Mapping
-                              </span>
-                              {showColumnMapping ? (
-                                <ChevronUp className="h-4 w-4" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent className="mt-2">
-                            <div className="p-3 border rounded-lg space-y-3">
-                              {/* Preset selector */}
-                              <div className="space-y-1">
-                                <Label className="text-xs">Gradebook Preset</Label>
-                                <Select value={selectedPreset} onValueChange={applyPreset}>
-                                  <SelectTrigger className="h-8 text-sm">
-                                    <SelectValue placeholder="Select preset..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {Object.entries(GRADEBOOK_PRESETS).map(([key, preset]) => (
-                                      <SelectItem key={key} value={key}>
-                                        {preset.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              {/* Column mappings */}
-                              <div className="space-y-2">
-                                <Label className="text-xs">Column Names</Label>
-                                <div className="max-h-40 overflow-y-auto space-y-2">
-                                  {allColumns.map((col) => (
-                                    <div key={col} className="flex items-center gap-2">
-                                      <Switch
-                                        checked={!excludedColumns.has(col)}
-                                        onCheckedChange={() => toggleColumnExclusion(col)}
-                                        className="scale-75"
-                                      />
-                                      <span className="text-xs text-muted-foreground w-20 truncate" title={col}>
-                                        {col}
-                                      </span>
-                                      <span className="text-xs text-muted-foreground">→</span>
-                                      <Input
-                                        value={columnMappings[col] || ''}
-                                        onChange={(e) => updateColumnMapping(col, e.target.value)}
-                                        placeholder={col}
-                                        className="h-7 text-xs flex-1"
-                                        disabled={excludedColumns.has(col)}
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <p className="text-xs text-muted-foreground">
-                                Toggle columns on/off and rename them to match your gradebook's import format.
-                              </p>
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                        
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button onClick={downloadCSV} variant="outline" className="gap-2">
-                            <FileSpreadsheet className="h-4 w-4" />
-                            Download CSV
-                          </Button>
-                          <Button onClick={downloadExcel} className="gap-2">
-                            <FileDown className="h-4 w-4" />
-                            Download Excel
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground text-center">
-                          Excel format includes bold 12pt headers
-                        </p>
-                      </TabsContent>
-
-                      <TabsContent value="merge" className="space-y-3 mt-3">
-                        {/* Template upload */}
-                        <div className="p-3 bg-muted/50 rounded-lg space-y-3">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Your Gradebook Template
-                          </p>
-                          
-                          {!templateData ? (
-                            <div className="text-center py-3">
-                              <input
-                                ref={templateInputRef}
-                                type="file"
-                                accept=".xlsx,.xls"
-                                onChange={handleTemplateUpload}
-                                className="hidden"
-                                id="template-input"
-                              />
-                              <Button asChild variant="outline" size="sm">
-                                <label htmlFor="template-input" className="cursor-pointer gap-2">
-                                  <FileUp className="h-4 w-4" />
-                                  Upload Excel Template
-                                </label>
-                              </Button>
-                              <p className="text-xs text-muted-foreground mt-2">
-                                Upload your existing gradebook to merge extracted grades
-                              </p>
-                            </div>
+                    {/* Column Mapping Section */}
+                    <Collapsible open={showColumnMapping} onOpenChange={setShowColumnMapping} className="mb-4">
+                      <CollapsibleTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full gap-2 justify-between">
+                          <span className="flex items-center gap-2">
+                            <Settings2 className="h-4 w-4" />
+                            Column Mapping
+                          </span>
+                          {showColumnMapping ? (
+                            <ChevronUp className="h-4 w-4" />
                           ) : (
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <FileSpreadsheet className="h-4 w-4 text-green-600" />
-                                  <span className="text-sm font-medium truncate max-w-[180px]" title={templateData.fileName}>
-                                    {templateData.fileName}
-                                  </span>
-                                </div>
-                                <Button variant="ghost" size="sm" onClick={clearTemplate}>
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                              <div className="flex gap-2 text-xs text-muted-foreground">
-                                <Badge variant="secondary">{templateData.rows.length} students</Badge>
-                                <Badge variant="secondary">{templateData.headers.length} columns</Badge>
-                              </div>
-                            </div>
+                            <ChevronDown className="h-4 w-4" />
                           )}
-                        </div>
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-2">
+                        <div className="p-3 border rounded-lg space-y-3">
+                          {/* Preset selector */}
+                          <div className="space-y-1">
+                            <Label className="text-xs">Gradebook Preset</Label>
+                            <Select value={selectedPreset} onValueChange={applyPreset}>
+                              <SelectTrigger className="h-8 text-sm">
+                                <SelectValue placeholder="Select preset..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(GRADEBOOK_PRESETS).map(([key, preset]) => (
+                                  <SelectItem key={key} value={key}>
+                                    {preset.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
 
-                        {templateData && (
-                          <>
-                            {/* Match column selection */}
-                            <div className="p-3 border rounded-lg space-y-3">
-                              <div className="space-y-1">
-                                <Label className="text-xs">Match students by (template column)</Label>
-                                <Select value={templateMatchColumn} onValueChange={setTemplateMatchColumn}>
-                                  <SelectTrigger className="h-8 text-sm">
-                                    <SelectValue placeholder="Select column..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {templateData.headers.map((header) => (
-                                      <SelectItem key={header} value={header}>
-                                        {header}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-
-                            {/* Grade columns to merge */}
-                            <div className="p-3 border rounded-lg space-y-3">
-                              <Label className="text-xs">Select grade columns to merge</Label>
-                              {extractedGradeColumns.length > 0 ? (
-                                <div className="max-h-32 overflow-y-auto space-y-2">
-                                  {extractedGradeColumns.map((col) => (
-                                    <div key={col} className="flex items-center gap-2">
-                                      <Switch
-                                        checked={gradeColumnsToMerge.has(col)}
-                                        onCheckedChange={() => toggleGradeColumnMerge(col)}
-                                        className="scale-75"
-                                      />
-                                      <span className="text-sm">{toTitleCase(col)}</span>
-                                    </div>
-                                  ))}
+                          {/* Column mappings */}
+                          <div className="space-y-2">
+                            <Label className="text-xs">Column Names</Label>
+                            <div className="max-h-40 overflow-y-auto space-y-2">
+                              {allColumns.map((col) => (
+                                <div key={col} className="flex items-center gap-2">
+                                  <Switch
+                                    checked={!excludedColumns.has(col)}
+                                    onCheckedChange={() => toggleColumnExclusion(col)}
+                                    className="scale-75"
+                                  />
+                                  <span className="text-xs text-muted-foreground w-20 truncate" title={col}>
+                                    {col}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">→</span>
+                                  <Input
+                                    value={columnMappings[col] || ''}
+                                    onChange={(e) => updateColumnMapping(col, e.target.value)}
+                                    placeholder={col}
+                                    className="h-7 text-xs flex-1"
+                                    disabled={excludedColumns.has(col)}
+                                  />
                                 </div>
-                              ) : (
-                                <p className="text-xs text-muted-foreground">
-                                  No numeric grade columns found in extracted data.
-                                </p>
-                              )}
+                              ))}
                             </div>
+                          </div>
 
-                            <Button 
-                              onClick={mergeAndDownload} 
-                              className="w-full gap-2"
-                              disabled={gradeColumnsToMerge.size === 0}
-                            >
-                              <Merge className="h-4 w-4" />
-                              Merge & Download
-                            </Button>
-                            <p className="text-xs text-muted-foreground text-center">
-                              Grades will be matched by student name and added to your template
-                            </p>
-                          </>
-                        )}
-                      </TabsContent>
-                    </Tabs>
+                          <p className="text-xs text-muted-foreground">
+                            Toggle columns on/off and rename them to match your gradebook's import format.
+                          </p>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button onClick={downloadCSV} variant="outline" className="gap-2">
+                        <FileSpreadsheet className="h-4 w-4" />
+                        Download CSV
+                      </Button>
+                      <Button onClick={downloadExcel} className="gap-2">
+                        <FileDown className="h-4 w-4" />
+                        Download Excel
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                      Excel format includes bold 12pt headers
+                    </p>
                   </CardContent>
                 </Card>
               )}
