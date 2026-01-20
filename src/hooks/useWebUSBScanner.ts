@@ -217,7 +217,6 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
   
   const scanAbortRef = useRef(false);
   const deviceRef = useRef<USBDevice | null>(null);
-  const autoReconnectAttemptedRef = useRef(false);
 
   // Connect to a specific device (used for auto-reconnect)
   const connectToDevice = useCallback(async (device: USBDevice, isAutoReconnect = false): Promise<boolean> => {
@@ -318,11 +317,11 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
     return connectToDevice(device, false);
   }, [connectToDevice]);
 
-  // Check for previously paired devices on mount and auto-reconnect
+  // Check for previously paired devices on mount (no auto-reconnect)
   useEffect(() => {
     if (!isSupported) return;
 
-    const checkAndReconnect = async () => {
+    const checkPairedDevices = async () => {
       try {
         const devices = await navigator.usb!.getDevices();
         const scanners = devices.filter(d => 
@@ -331,27 +330,14 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
         );
         
         setPairedDevices(scanners);
-        
-        // Auto-reconnect to first available scanner if not already connected
-        if (scanners.length > 0 && !connectedDevice && !autoReconnectAttemptedRef.current) {
-          autoReconnectAttemptedRef.current = true;
-          const scanner = scanners[0];
-          console.log('Auto-reconnecting to previously paired scanner:', scanner.productName);
-          
-          // Small delay to let UI settle
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          const success = await connectToDevice(scanner, true);
-          if (!success) {
-            console.log('Auto-reconnect failed, scanner may need manual reconnection');
-          }
-        }
+        // Note: We don't auto-reconnect - user must explicitly click "Connect"
+        // This prevents "interface is busy" errors from premature connection attempts
       } catch (err) {
         console.error('Error checking paired devices:', err);
       }
     };
 
-    checkAndReconnect();
+    checkPairedDevices();
 
     // Listen for device connections/disconnections
     const handleConnect = async (event: USBConnectionEvent) => {
@@ -370,20 +356,11 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
           setConnectedDevice(prev => prev ? { ...prev, isConnected: true } : null);
           toast.success('Scanner reconnected');
         } else if (!connectedDevice) {
-          // Auto-connect to newly connected scanner if none connected
+          // Just notify user - don't auto-connect to prevent "interface is busy" errors
           toast.info(`Scanner detected: ${device.productName || 'Unknown Scanner'}`, {
-            description: 'Attempting to auto-connect...',
-            duration: 2000,
+            description: 'Click "Connect Scanner" to use it.',
+            duration: 3000,
           });
-          
-          setTimeout(async () => {
-            const success = await connectToDevice(device, true);
-            if (!success) {
-              toast.info('Scanner available for connection', {
-                description: 'Click "Connect Scanner" to use it.',
-              });
-            }
-          }, 1000);
         }
       }
     };

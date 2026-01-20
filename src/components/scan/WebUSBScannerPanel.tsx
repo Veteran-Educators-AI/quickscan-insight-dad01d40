@@ -174,10 +174,13 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
 
               {/* Previously paired devices */}
               {pairedDevices.length > 0 && !isAutoReconnecting && (
-                <div className="mb-4 p-3 rounded-lg bg-muted/50 border">
+                <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-orange-200">
                   <p className="text-xs font-medium mb-2 flex items-center justify-center gap-1">
-                    <CheckCircle2 className="h-3 w-3 text-green-500" />
-                    Previously Paired Scanners
+                    <ShieldCheck className="h-3 w-3 text-orange-500" />
+                    Remembered Scanners
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-2 text-center">
+                    Click to connect (browser remembers permission, not connection)
                   </p>
                   <div className="space-y-2">
                     {pairedDevices.map((device, idx) => (
@@ -187,17 +190,17 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
                         </span>
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="default"
                           onClick={() => reconnectToDevice(device)}
-                          disabled={isConnecting}
+                          disabled={isConnecting || (connectedDevice?.device.serialNumber === device.serialNumber && connectedDevice?.isConnected)}
                           className="text-xs h-7"
                         >
                           {isConnecting ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
                             <>
-                              <RefreshCw className="h-3 w-3 mr-1" />
-                              Reconnect
+                              <Usb className="h-3 w-3 mr-1" />
+                              Connect
                             </>
                           )}
                         </Button>
