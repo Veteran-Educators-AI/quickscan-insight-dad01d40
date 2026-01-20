@@ -885,6 +885,48 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         [/cos²\s*,/g, 'cos²θ'],
         [/sin²\s*,/g, 'sin²θ'],
         [/tan²\s*,/g, 'tan²θ'],
+        
+        // ============================================================
+        // SUBSCRIPT CORRUPTION PATTERNS
+        // w• should be w₁, w, should be w₂, wƒ should be w₃, etc.
+        // ============================================================
+        
+        // Subscript 1 corruption (• bullet often replaces ₁)
+        [/([a-zA-Z])•/g, '$1₁'],           // w• -> w₁
+        [/([a-zA-Z])â€¢/g, '$1₁'],          // mojibake bullet
+        [/([a-zA-Z])\u2022/g, '$1₁'],       // unicode bullet
+        [/([a-zA-Z])·/g, '$1₁'],            // middle dot
+        [/([a-zA-Z])¹/g, '$1₁'],            // superscript 1 -> subscript 1
+        
+        // Subscript 2 corruption (, comma often replaces ₂)
+        [/([a-zA-Z]),\s*(?=and|or|\+|-|=|is|the|that|when|if)/gi, '$1₂ '],  // w, and -> w₂ and
+        [/([a-zA-Z]),(?=\s+[a-zA-Z])/g, '$1₂'],   // w, w -> w₂ w
+        [/([a-zA-Z])²(?=\s+and|\s+or)/gi, '$1₂'], // w² and -> w₂ and (context-aware)
+        
+        // Subscript 3 corruption (ƒ often replaces ₃ or f)
+        [/([a-zA-Z])ƒ/g, '$1₃'],            // wƒ -> w₃ (or could be wf)
+        [/([a-zA-Z])Æ'/g, '$1₃'],           // mojibake for ƒ
+        
+        // Direct subscript number patterns
+        [/_1\b/g, '₁'],
+        [/_2\b/g, '₂'],
+        [/_3\b/g, '₃'],
+        [/_4\b/g, '₄'],
+        [/_5\b/g, '₅'],
+        [/_n\b/gi, 'ₙ'],
+        [/_0\b/g, '₀'],
+        
+        // Common variable subscript patterns
+        [/x_1/gi, 'x₁'],
+        [/x_2/gi, 'x₂'],
+        [/y_1/gi, 'y₁'],
+        [/y_2/gi, 'y₂'],
+        [/a_1/gi, 'a₁'],
+        [/a_2/gi, 'a₂'],
+        [/a_n/gi, 'aₙ'],
+        [/w_1/gi, 'w₁'],
+        [/w_2/gi, 'w₂'],
+        [/w_3/gi, 'w₃'],
       ];
       
       for (const [pattern, replacement] of mojibakePatterns) {
