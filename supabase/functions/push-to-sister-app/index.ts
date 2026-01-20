@@ -51,6 +51,32 @@ interface PushRequest {
   topic_name?: string;       // The topic/subject of the work
 }
 
+/**
+ * Convert internal push request to sister app expected format
+ * The receiving endpoint expects 'action' field, not 'type'
+ */
+function convertToSisterAppFormat(requestData: PushRequest) {
+  return {
+    action: 'grade_completed' as const,
+    student_id: requestData.student_id,
+    data: {
+      activity_type: 'scan_analysis',
+      activity_name: requestData.title,
+      score: requestData.grade,
+      xp_earned: requestData.xp_reward,
+      coins_earned: requestData.coin_reward,
+      topic_name: requestData.topic_name,
+      description: requestData.description,
+      standard_code: requestData.standard_code,
+      class_id: requestData.class_id,
+      student_name: requestData.student_name,
+      printable_url: requestData.printable_url,
+      due_at: requestData.due_at,
+      timestamp: new Date().toISOString(),
+    }
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -112,13 +138,12 @@ serve(async (req) => {
     // ========================================================================
     // SEND DATA TO SISTER APP
     // ========================================================================
-    // Ensure the payload includes the type field for grade data
-    const payloadWithType = {
-      type: 'grade' as const,
-      ...requestData,
-    };
+    // Convert to the format expected by receive-sister-app-data
+    // The receiving endpoint expects 'action' field (e.g., 'grade_completed')
+    // NOT 'type' field which was causing "Unknown payload type" error
+    const sisterAppPayload = convertToSisterAppFormat(requestData);
     
-    console.log('Sending payload to sister app:', JSON.stringify(payloadWithType));
+    console.log('Sending payload to sister app:', JSON.stringify(sisterAppPayload));
     
     // Make POST request to the sister app's endpoint with the grade data
     const response = await fetch(sisterAppEndpoint, {
@@ -127,7 +152,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
         'x-api-key': sisterAppApiKey,  // Authenticate with the API key
       },
-      body: JSON.stringify(payloadWithType),
+      body: JSON.stringify(sisterAppPayload),
     });
 
     // Read the response
