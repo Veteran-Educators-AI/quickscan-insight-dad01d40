@@ -717,6 +717,28 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       
       // Fix mojibake patterns (UTF-8 decoded as Latin-1/Windows-1252)
       const mojibakePatterns: [RegExp, string][] = [
+        // CRITICAL: Common diagnostic worksheet corruption patterns
+        // These appear as "d" or quotation marks where θ or π should be
+        [/"d"/g, 'θ'],                // "d" -> θ (theta corrupted)
+        [/"d/g, 'θ'],                 // "d -> θ
+        [/d"/g, 'θ'],                 // d" -> θ
+        [/"A\)/g, 'π)'],              // "A) -> π) (pi corrupted at end)
+        [/\("A/g, '(π'],              // ("A -> (π (pi corrupted at start)
+        [/2"A/g, '2π'],               // 2"A -> 2π
+        [/"A/g, 'π'],                 // "A -> π
+        [/Å/g, 'π'],                  // Å -> π (common corruption)
+        [/2Å/g, '2π'],                // 2Å -> 2π
+        [/< 2À/g, '< 2π'],            // < 2À -> < 2π
+        [/≤ 2À/g, '≤ 2π'],            // ≤ 2À -> ≤ 2π
+        [/0 ≤ "d" < 2"A"/g, '0 ≤ θ < 2π'],  // Full pattern
+        [/0 ≤ "d < 2À/g, '0 ≤ θ < 2π'],     // Partial pattern
+        [/\(0 "d , < 2Å\)/g, '(0 ≤ θ < 2π)'], // Exact match from screenshot
+        [/0 "d , < 2Å/g, '0 ≤ θ < 2π'],     // Without parens
+        [/0 "d" < 2Å/g, '0 ≤ θ < 2π'],      // Variant
+        [/0"d"</g, '0 ≤ θ <'],              // Compressed variant
+        [/"d ,/g, 'θ ≤'],                    // "d , -> θ ≤
+        [/"d,/g, 'θ ≤'],                     // "d, -> θ ≤
+        
         // Greek letters mojibake
         [/Ï€/g, 'π'],      // π (pi)
         [/Î¸/g, 'θ'],      // θ (theta)
