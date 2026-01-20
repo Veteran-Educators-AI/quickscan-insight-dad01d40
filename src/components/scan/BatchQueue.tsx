@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn, UserPlus, FilePlus2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn, UserPlus, FilePlus2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -77,6 +77,7 @@ interface BatchQueueProps {
   currentIndex: number;
   isProcessing: boolean;
   isIdentifying: boolean;
+  isRestoredFromStorage?: boolean;
   isSaving?: boolean;
   allSaved?: boolean;
 }
@@ -169,10 +170,20 @@ export function BatchQueue({
   currentIndex, 
   isProcessing,
   isIdentifying,
+  isRestoredFromStorage = false,
   isSaving = false,
   allSaved = false,
 }: BatchQueueProps) {
   const [addStudentForItem, setAddStudentForItem] = useState<string | null>(null);
+  const [showRestoredBanner, setShowRestoredBanner] = useState(isRestoredFromStorage);
+  
+  // Auto-dismiss the restored banner after 5 seconds
+  useEffect(() => {
+    if (showRestoredBanner) {
+      const timer = setTimeout(() => setShowRestoredBanner(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showRestoredBanner]);
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -292,6 +303,26 @@ export function BatchQueue({
     <>
     <Card>
       <CardContent className="p-0">
+        {/* Restored from session banner */}
+        {showRestoredBanner && (
+          <div className="flex items-center justify-between gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800">
+            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+              <RotateCcw className="h-4 w-4" />
+              <span className="text-sm font-medium">Session restored</span>
+              <span className="text-xs text-blue-600 dark:text-blue-400">
+                {items.length} paper(s) recovered from your previous session
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900"
+              onClick={() => setShowRestoredBanner(false)}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
         <div className="p-3 border-b bg-muted/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

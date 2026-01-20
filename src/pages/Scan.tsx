@@ -1952,6 +1952,7 @@ export default function Scan() {
                     currentIndex={batch.currentIndex}
                     isProcessing={batch.isProcessing}
                     isIdentifying={batch.isIdentifying}
+                    isRestoredFromStorage={batch.isRestoredFromStorage}
                     isSaving={batchSaving}
                     allSaved={allBatchSaved}
                   />
