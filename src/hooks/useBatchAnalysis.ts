@@ -10,6 +10,7 @@ import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
 import { toast } from 'sonner';
 
 const BATCH_STORAGE_KEY = 'scan-genius-batch-data';
+const BATCH_SUMMARY_KEY = 'scan-genius-batch-summary';
 
 interface RubricStep {
   step_number: number;
@@ -166,7 +167,21 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(-1);
-  const [summary, setSummary] = useState<BatchSummary | null>(null);
+  
+  // Load summary from localStorage, or regenerate if items have completed results
+  const [summary, setSummary] = useState<BatchSummary | null>(() => {
+    try {
+      const storedSummary = localStorage.getItem(BATCH_SUMMARY_KEY);
+      if (storedSummary) {
+        const parsed = JSON.parse(storedSummary);
+        console.log('Restored summary from session');
+        return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to restore summary:', e);
+    }
+    return null;
+  });
 
   // Persist items to localStorage when they change
   useEffect(() => {
@@ -181,11 +196,77 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         localStorage.setItem(BATCH_STORAGE_KEY, JSON.stringify(items));
       } else {
         localStorage.removeItem(BATCH_STORAGE_KEY);
+        localStorage.removeItem(BATCH_SUMMARY_KEY);
       }
     } catch (e) {
       console.error('Failed to persist batch data:', e);
     }
   }, [items]);
+
+  // Persist summary to localStorage when it changes
+  useEffect(() => {
+    try {
+      if (summary) {
+        localStorage.setItem(BATCH_SUMMARY_KEY, JSON.stringify(summary));
+      } else {
+        localStorage.removeItem(BATCH_SUMMARY_KEY);
+      }
+    } catch (e) {
+      console.error('Failed to persist summary:', e);
+    }
+  }, [summary]);
+
+  // Auto-regenerate summary on mount if we have completed items but no summary
+  useEffect(() => {
+    const completedItems = items.filter(item => item.status === 'completed' && item.result);
+    if (completedItems.length > 0 && !summary) {
+      console.log('Auto-regenerating summary for restored items');
+      // Delay to ensure state is fully initialized
+      setTimeout(() => {
+        const validScores = completedItems
+          .map(item => item.result?.grade ?? item.result?.totalScore?.percentage)
+          .filter((s): s is number => typeof s === 'number' && !isNaN(s));
+
+        if (validScores.length > 0) {
+          const avgScore = validScores.reduce((a, b) => a + b, 0) / validScores.length;
+          const highScore = Math.max(...validScores);
+          const lowScore = Math.min(...validScores);
+          const passCount = validScores.filter(s => s >= 65).length;
+          
+          const misconceptionCounts: Record<string, number> = {};
+          completedItems.forEach(item => {
+            (item.result?.misconceptions || []).forEach(m => {
+              misconceptionCounts[m] = (misconceptionCounts[m] || 0) + 1;
+            });
+          });
+          
+          const ranges = [
+            { range: '0-59%', min: 0, max: 59 },
+            { range: '60-69%', min: 60, max: 69 },
+            { range: '70-79%', min: 70, max: 79 },
+            { range: '80-89%', min: 80, max: 89 },
+            { range: '90-100%', min: 90, max: 100 },
+          ];
+          
+          setSummary({
+            totalStudents: completedItems.length,
+            averageScore: Math.round(avgScore * 10) / 10,
+            highestScore: highScore,
+            lowestScore: lowScore,
+            passRate: Math.round((passCount / validScores.length) * 100),
+            commonMisconceptions: Object.entries(misconceptionCounts)
+              .map(([misconception, count]) => ({ misconception, count }))
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 5),
+            scoreDistribution: ranges.map(({ range, min, max }) => ({
+              range,
+              count: validScores.filter(s => s >= min && s <= max).length,
+            })),
+          });
+        }
+      }, 100);
+    }
+  }, []); // Only run on mount
 
   // Apply grade curve to a result
   const applyGradeCurve = useCallback((result: AnalysisResult): AnalysisResult => {
@@ -310,6 +391,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     // Clear persisted data
     try {
       localStorage.removeItem(BATCH_STORAGE_KEY);
+      localStorage.removeItem(BATCH_SUMMARY_KEY);
     } catch (e) {
       console.error('Failed to clear batch data:', e);
     }
