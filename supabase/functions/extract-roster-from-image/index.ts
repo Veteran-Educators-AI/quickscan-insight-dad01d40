@@ -161,6 +161,7 @@ For each student found, extract:
 - Last name
 - Student ID (if visible)
 - Email (if visible)
+- Grade or score (if visible next to the student's name - could be a number, percentage, letter grade like A/B/C, or score like 85/100)
 
 Return the data as a JSON array with this exact structure:
 {
@@ -169,14 +170,20 @@ Return the data as a JSON array with this exact structure:
       "firstName": "John",
       "lastName": "Doe",
       "studentId": "12345",
-      "email": "john.doe@school.edu"
+      "email": "john.doe@school.edu",
+      "grade": "85"
     }
   ]
 }
 
+For the grade field:
+- Include the raw value as seen (e.g., "85", "A+", "92%", "45/50")
+- If no grade is visible for a student, omit the grade field
+- Look for numbers, percentages, or letter grades next to each student's name
+
 If a field is not visible or cannot be determined, omit it from that student's object.
 Only include firstName and lastName as required fields.
-Parse carefully - this may be a handwritten list, printed roster, or screenshot.
+Parse carefully - this may be a handwritten list, printed roster, gradebook screenshot, or scan.
 Return ONLY the JSON, no additional text.`;
 
     // Clean base64 if it has data URL prefix
