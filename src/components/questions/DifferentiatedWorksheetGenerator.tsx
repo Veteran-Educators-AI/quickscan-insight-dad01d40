@@ -795,8 +795,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           pdf.setTextColor(55, 65, 81);
           pdf.text('- Write ALL work inside the bordered "WORK AREA" boxes only.', margin + 5, yPosition + 10);
           pdf.text('- Write your FINAL ANSWER in the highlighted yellow section.', margin + 5, yPosition + 14);
-          pdf.text('- Work written outside the boxes may NOT be graded by the AI scanner.', pageWidth / 2 + 5, yPosition + 10);
-          pdf.text('- Keep handwriting clear and legible for accurate scanning.', pageWidth / 2 + 5, yPosition + 14);
+          pdf.text('- Work outside boxes may NOT be graded by AI.', pageWidth / 2 + 5, yPosition + 10);
+          pdf.text('- Keep handwriting clear and legible for scanning.', pageWidth / 2 + 5, yPosition + 14);
           
           pdf.setTextColor(0);
           pdf.setDrawColor(0);
