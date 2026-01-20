@@ -523,9 +523,9 @@ export function parseMathText(text: string): Array<{ type: 'text' | 'math'; cont
 }
 
 /**
- * Converts Unicode math symbols to ASCII-safe text for PDF rendering
- * jsPDF's default fonts don't support many Unicode math symbols, causing garbled output
- * This function replaces Unicode symbols with their text representations
+ * Sanitizes text for PDF rendering while preserving Unicode math symbols
+ * jsPDF CAN render Unicode math symbols (π, θ, √, ², ≤, ≥) with Helvetica font
+ * This function removes problematic characters like emojis while keeping math symbols
  */
 export function sanitizeForPDF(text: string): string {
   if (!text) return '';
@@ -545,9 +545,6 @@ export function sanitizeForPDF(text: string): string {
     [/✗/g, 'x'],          // x mark
     [/★/g, '*'],          // star
     [/☆/g, '*'],          // white star
-    [/→/g, '->'],         // right arrow
-    [/←/g, '<-'],         // left arrow
-    [/↔/g, '<->'],        // left-right arrow
     [/•/g, '-'],          // bullet
     [/○/g, 'o'],          // circle
     [/●/g, '*'],          // filled circle
@@ -573,54 +570,54 @@ export function sanitizeForPDF(text: string): string {
   // Fix any existing encoding corruption patterns (mojibake)
   // These patterns occur when UTF-8 text is incorrectly decoded as Latin-1
   const mojibakePatterns: [RegExp, string][] = [
-    // Greek letters mojibake
-    [/Ï€/g, 'pi'],        // π
-    [/Î¸/g, 'theta'],     // θ
-    [/Î±/g, 'alpha'],     // α
-    [/Î²/g, 'beta'],      // β
-    [/Î³/g, 'gamma'],     // γ
-    [/Î"/g, 'Delta'],     // Δ
-    [/Î´/g, 'delta'],     // δ
-    [/Ïˆ/g, 'psi'],       // ψ
-    [/Ï†/g, 'phi'],       // φ
-    [/Î£/g, 'Sigma'],     // Σ
-    [/Ïƒ/g, 'sigma'],     // σ
-    [/Î©/g, 'Omega'],     // Ω
-    [/Ï‰/g, 'omega'],     // ω
-    [/Î»/g, 'lambda'],    // λ
-    [/Î¼/g, 'mu'],        // μ
+    // Greek letters mojibake - convert to proper Unicode symbols
+    [/Ï€/g, 'π'],        // π
+    [/Î¸/g, 'θ'],        // θ
+    [/Î±/g, 'α'],        // α
+    [/Î²/g, 'β'],        // β
+    [/Î³/g, 'γ'],        // γ
+    [/Î"/g, 'Δ'],        // Δ
+    [/Î´/g, 'δ'],        // δ
+    [/Ïˆ/g, 'ψ'],        // ψ
+    [/Ï†/g, 'φ'],        // φ
+    [/Î£/g, 'Σ'],        // Σ
+    [/Ïƒ/g, 'σ'],        // σ
+    [/Î©/g, 'Ω'],        // Ω
+    [/Ï‰/g, 'ω'],        // ω
+    [/Î»/g, 'λ'],        // λ
+    [/Î¼/g, 'μ'],        // μ
     
-    // Math operators mojibake
-    [/â‰¤/g, '<='],       // ≤
-    [/â‰¥/g, '>='],       // ≥
-    [/â‰ /g, '!='],       // ≠
-    [/â†'/g, '->'],       // →
-    [/âˆš/g, 'sqrt'],     // √
-    [/âˆž/g, 'infinity'], // ∞
-    [/Ã—/g, 'x'],         // ×
-    [/Ã·/g, '/'],         // ÷
-    [/â€"/g, '-'],        // em dash
-    [/â€™/g, "'"],        // right single quote
-    [/â€œ/g, '"'],        // left double quote
-    [/â€/g, '"'],         // right double quote
+    // Math operators mojibake - convert to proper Unicode symbols
+    [/â‰¤/g, '≤'],       // ≤
+    [/â‰¥/g, '≥'],       // ≥
+    [/â‰ /g, '≠'],       // ≠
+    [/â†'/g, '→'],       // →
+    [/âˆš/g, '√'],       // √
+    [/âˆž/g, '∞'],       // ∞
+    [/Ã—/g, '×'],        // ×
+    [/Ã·/g, '÷'],        // ÷
+    [/â€"/g, '-'],       // em dash
+    [/â€™/g, "'"],       // right single quote
+    [/â€œ/g, '"'],       // left double quote
+    [/â€/g, '"'],        // right double quote
     
     // Common corrupt patterns that appear as "Ø=Ü" (corrupted emoji)
     [/Ø=Ü[¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿]?/g, ''],  // Corrupted emoji patterns
     [/Ã˜=Ã[^\s]*/g, ''],  // Another corruption pattern
     
     // Common Â prefix corruption (UTF-8 BOM or encoding issue)
-    [/Â\s*π/g, 'pi'],
-    [/Âπ/g, 'pi'],
-    [/πÂ/g, 'pi'],
-    [/Â°/g, ' degrees'],
-    [/°Â/g, ' degrees'],
-    [/Â²/g, '^2'],
-    [/Â³/g, '^3'],
-    [/Â½/g, '1/2'],
-    [/Â¼/g, '1/4'],
-    [/Â¾/g, '3/4'],
-    [/Â±/g, '+/-'],
-    [/Â·/g, '*'],
+    [/Â\s*π/g, 'π'],
+    [/Âπ/g, 'π'],
+    [/πÂ/g, 'π'],
+    [/Â°/g, '°'],
+    [/°Â/g, '°'],
+    [/Â²/g, '²'],
+    [/Â³/g, '³'],
+    [/Â½/g, '½'],
+    [/Â¼/g, '¼'],
+    [/Â¾/g, '¾'],
+    [/Â±/g, '±'],
+    [/Â·/g, '·'],
     
     // Fix ampersand-interleaved text (& between each character)
     // This pattern appears when encoding fails catastrophically
@@ -637,143 +634,41 @@ export function sanitizeForPDF(text: string): string {
     result = result.replace(pattern, replacement);
   }
   
-  // Now convert Unicode math symbols to ASCII-safe representations for PDF
-  const pdfSafeReplacements: [RegExp, string][] = [
-    // Greek letters - use word representations
-    [/π/g, 'pi'],
-    [/θ/g, 'theta'],
-    [/α/g, 'alpha'],
-    [/β/g, 'beta'],
-    [/γ/g, 'gamma'],
-    [/δ/g, 'delta'],
-    [/Δ/g, 'Delta'],
-    [/σ/g, 'sigma'],
-    [/Σ/g, 'Sigma'],
-    [/ω/g, 'omega'],
-    [/Ω/g, 'Omega'],
-    [/φ/g, 'phi'],
-    [/Φ/g, 'Phi'],
-    [/λ/g, 'lambda'],
-    [/μ/g, 'mu'],
-    [/ρ/g, 'rho'],
-    [/τ/g, 'tau'],
-    [/ψ/g, 'psi'],
-    
-    // Square root
-    [/√/g, 'sqrt'],
-    
-    // Comparison operators
-    [/≤/g, '<='],
-    [/≥/g, '>='],
-    [/≠/g, '!='],
-    [/≈/g, '~='],
-    
-    // Plus/minus and other operators
-    [/±/g, '+/-'],
-    [/×/g, 'x'],
-    [/÷/g, '/'],
-    [/·/g, '*'],
-    [/∞/g, 'infinity'],
-    
-    // Superscript digits - convert back to caret notation
-    [/⁰/g, '^0'],
-    [/¹/g, '^1'],
-    [/²/g, '^2'],
-    [/³/g, '^3'],
-    [/⁴/g, '^4'],
-    [/⁵/g, '^5'],
-    [/⁶/g, '^6'],
-    [/⁷/g, '^7'],
-    [/⁸/g, '^8'],
-    [/⁹/g, '^9'],
-    [/⁺/g, '^+'],
-    [/⁻/g, '^-'],
-    [/⁼/g, '^='],
-    [/⁽/g, '^('],
-    [/⁾/g, '^)'],
-    [/ⁿ/g, '^n'],
-    [/ˣ/g, '^x'],
-    [/ʸ/g, '^y'],
-    
-    // Subscript handling for coordinate notation - use small numbers without underscore
-    // This makes (x_1, y_1) and (x_2, y_2) more readable in PDF
-    [/₀/g, '0'],  // Keep as small number, context makes it clear
-    [/₁/g, '1'],
-    [/₂/g, '2'],
-    [/₃/g, '3'],
-    [/₄/g, '4'],
-    [/₅/g, '5'],
-    [/₆/g, '6'],
-    [/₇/g, '7'],
-    [/₈/g, '8'],
-    [/₉/g, '9'],
-    [/₊/g, '+'],
-    [/₋/g, '-'],
-    [/₌/g, '='],
-    [/₍/g, '('],
-    [/₎/g, ')'],
-    [/ₐ/g, 'a'],
-    [/ₑ/g, 'e'],
-    [/ᵢ/g, 'i'],
-    [/ₙ/g, 'n'],
-    [/ₓ/g, 'x'],
-    [/ᵧ/g, 'y'],
-    
-    // Common fractions
-    [/½/g, '1/2'],
-    [/⅓/g, '1/3'],
-    [/⅔/g, '2/3'],
-    [/¼/g, '1/4'],
-    [/¾/g, '3/4'],
-    [/⅕/g, '1/5'],
-    [/⅖/g, '2/5'],
-    [/⅗/g, '3/5'],
-    [/⅘/g, '4/5'],
-    [/⅙/g, '1/6'],
-    [/⅚/g, '5/6'],
-    [/⅛/g, '1/8'],
-    [/⅜/g, '3/8'],
-    [/⅝/g, '5/8'],
-    [/⅞/g, '7/8'],
-    
-    // Geometry symbols
-    [/∠/g, 'angle '],
-    [/°/g, ' degrees'],
-    [/⊥/g, ' perpendicular '],
-    [/∥/g, ' parallel '],
-    [/≅/g, ' congruent to '],
-    [/~/g, ' similar to '],
-    [/△/g, 'triangle '],
-    [/○/g, 'circle '],
-    [/□/g, 'square '],
-    
-    // Arrows
+  // IMPORTANT: Keep Unicode math symbols that jsPDF can render correctly!
+  // These include: π, θ, √, ², ³, ≤, ≥, ±, °, ∞, α, β, γ, δ, etc.
+  // Only convert arrows and some geometry symbols that may not render well
+  const safeReplacements: [RegExp, string][] = [
+    // Arrows - convert to ASCII since they may not render consistently
     [/→/g, '->'],
     [/←/g, '<-'],
     [/↔/g, '<->'],
     [/⇒/g, '=>'],
     
-    // Other math symbols
-    [/∴/g, 'therefore'],
-    [/∵/g, 'because'],
+    // Some less common geometry symbols
+    [/⊥/g, ' perp '],
+    [/∥/g, ' || '],
+    [/≅/g, ' = '],  // congruent
+    [/∠/g, 'angle '],
+    
+    // Set theory - less commonly needed
+    [/∴/g, 'therefore '],
+    [/∵/g, 'because '],
     [/∈/g, ' in '],
-    [/⊂/g, ' subset of '],
+    [/⊂/g, ' subset '],
     [/∪/g, ' union '],
     [/∩/g, ' intersection '],
+    
+    // Prime symbols
     [/′/g, "'"],
     [/″/g, "''"],
-    [/•/g, '*'],
   ];
   
-  for (const [pattern, replacement] of pdfSafeReplacements) {
+  for (const [pattern, replacement] of safeReplacements) {
     result = result.replace(pattern, replacement);
   }
   
   // Clean up any double spaces that may have been introduced
   result = result.replace(/\s+/g, ' ').trim();
-  
-  // Clean up spaces before "degrees" when it follows a number
-  result = result.replace(/(\d)\s+degrees/g, '$1 degrees');
   
   return result;
 }
