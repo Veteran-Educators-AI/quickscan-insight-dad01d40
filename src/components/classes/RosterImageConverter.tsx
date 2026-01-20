@@ -144,9 +144,20 @@ export function RosterImageConverter() {
   };
 
   const getAllExtractedStudents = (): ExtractedStudent[] => {
-    return uploadedImages
+    const allStudents = uploadedImages
       .filter((img) => img.status === 'done')
       .flatMap((img) => img.students);
+    
+    // Deduplicate by normalized first + last name
+    const seen = new Set<string>();
+    return allStudents.filter((student) => {
+      const key = `${(student.firstName || '').toLowerCase().trim()}_${(student.lastName || '').toLowerCase().trim()}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
   };
 
   const downloadCSV = () => {
