@@ -333,13 +333,22 @@ function convertFractions(text: string): string {
 function convertSymbols(text: string): string {
   let result = text;
   
-  // Special handling for "pi" - replace in all contexts (case-insensitive)
-  // This ensures pi is always converted to π regardless of context
-  result = result.replace(/\bpi\b/gi, 'π');
+  // Handle sqrt followed by a number or expression (sqrt3 -> √3, sqrt(3) -> √(3))
+  result = result.replace(/\bsqrt\s*\(/gi, '√(');
+  result = result.replace(/\bsqrt\s*(\d+)/gi, '√$1');
+  result = result.replace(/\bsqrt\b/gi, '√');
+  
+  // Handle theta in all contexts (including after trig functions like "cos theta", "sin theta")
+  result = result.replace(/\btheta\b/gi, 'θ');
+  
+  // Handle pi in all contexts - including 2pi, npi patterns
+  result = result.replace(/(\d+)\s*pi\b/gi, '$1π');  // 2pi -> 2π
+  result = result.replace(/\bn\s*pi\b/gi, 'nπ');     // npi -> nπ
+  result = result.replace(/\bpi\b/gi, 'π');          // standalone pi
   
   // Sort by length (longer first) to avoid partial replacements
   const sortedSymbols = Object.entries(mathSymbols)
-    .filter(([word]) => word.toLowerCase() !== 'pi') // Skip pi, already handled
+    .filter(([word]) => !['pi', 'theta', 'sqrt'].includes(word.toLowerCase())) // Skip already handled
     .sort((a, b) => b[0].length - a[0].length);
   
   for (const [word, symbol] of sortedSymbols) {
@@ -350,6 +359,15 @@ function convertSymbols(text: string): string {
       result = result.replace(new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), symbol);
     }
   }
+  
+  // Handle comparison operators that might have spaces around them
+  result = result.replace(/\s*<=\s*/g, ' ≤ ');
+  result = result.replace(/\s*>=\s*/g, ' ≥ ');
+  result = result.replace(/\s*!=\s*/g, ' ≠ ');
+  
+  // Handle exponents in context like sin^2, cos^2, tan^2
+  result = result.replace(/(sin|cos|tan|cot|sec|csc)\^2/gi, '$1²');
+  result = result.replace(/(sin|cos|tan|cot|sec|csc)\^3/gi, '$1³');
   
   return result;
 }
