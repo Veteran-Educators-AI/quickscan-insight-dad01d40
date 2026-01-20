@@ -75,6 +75,14 @@ INSTEAD, use proper mathematical Unicode symbols DIRECTLY in ALL questions:
   • Use △ for triangle notation (e.g., △ABC)
   • Use ≅ for congruent
   • Use ~ for similar
+
+CURRENCY FORMATTING (CRITICAL):
+  • ALL money values MUST include the dollar sign: $4.00, $12.50, $100.00
+  • Always use two decimal places for cents: $5.00 (not $5)
+  • For word problems involving money, profit, cost, price, revenue, savings, etc. - ALWAYS format as currency
+  • Examples: "The item costs $4.00" NOT "The item costs 4.00"
+  • Examples: "He earned a profit of $25.50" NOT "He earned a profit of 25.50"
+  • This helps students understand real-world financial context
   
 Write questions in a fluid, professional textbook style - complete sentences, clear mathematical language, and elegant formatting.
 
