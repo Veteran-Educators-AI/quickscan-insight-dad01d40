@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.generate-diagram-images]
 verify_jwt = false
 
+[functions.generate-storyboard-art]
+verify_jwt = false
+
 [functions.extract-multi-student-regions]
 verify_jwt = false
 

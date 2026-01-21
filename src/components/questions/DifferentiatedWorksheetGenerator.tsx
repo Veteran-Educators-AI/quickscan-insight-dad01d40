@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw, QrCode } from 'lucide-react';
+import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw, QrCode, Palette, BookOpen, ImageIcon } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QuestionPreviewPanel } from './QuestionPreviewPanel';
 import { Button } from '@/components/ui/button';
@@ -314,6 +314,13 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [includeStudentQR, setIncludeStudentQR] = useState(true);
   const [onlyWithoutDiagnostic, setOnlyWithoutDiagnostic] = useState(false);
   const [marginSize, setMarginSize] = useState<'small' | 'medium' | 'large'>('medium');
+  
+  // Storyboard art settings for non-math subjects
+  const [includeStoryboardArt, setIncludeStoryboardArt] = useState(false);
+  const [storyboardSubject, setStoryboardSubject] = useState<'english' | 'history' | 'biology' | 'science' | 'social-studies'>('english');
+  const [storyboardStyle, setStoryboardStyle] = useState<'storyboard' | 'illustration' | 'diagram'>('storyboard');
+  const [storyboardImages, setStoryboardImages] = useState<Record<string, string>>({});
+  const [regeneratingImageKey, setRegeneratingImageKey] = useState<string | null>(null);
   
   // Topics from standards menu selection
   const [customTopics, setCustomTopics] = useState<{ topicName: string; standard: string }[]>([]);
@@ -1024,7 +1031,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           }
 
           // Main Questions
-          for (const question of questions) {
+          for (let questionIdx = 0; questionIdx < questions.length; questionIdx++) {
+            const question = questions[questionIdx];
             if (yPosition > pageHeight - 60) {
               pdf.addPage();
               pageCount++;
@@ -1093,7 +1101,31 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               }
             }
 
-            // Add hint if available
+            // Add storyboard art if available
+            if (includeStoryboardArt) {
+              const storyboardKey = `${cacheKey}-main-${questionIdx}`;
+              const storyboardImageUrl = storyboardImages[storyboardKey];
+              if (storyboardImageUrl) {
+                try {
+                  if (yPosition > pageHeight - 65) {
+                    pdf.addPage();
+                    pageCount++;
+                    await addContinuationPageHeader(pageCount);
+                    yPosition = 25;
+                  }
+                  
+                  const imgWidth = 55;
+                  const imgHeight = 45;
+                  const imgX = (pageWidth - imgWidth) / 2; // Center the image
+                  
+                  yPosition += 3;
+                  pdf.addImage(storyboardImageUrl, 'PNG', imgX, yPosition, imgWidth, imgHeight);
+                  yPosition += imgHeight + 5;
+                } catch (storyboardError) {
+                  console.error('Error adding storyboard image to PDF:', storyboardError);
+                }
+              }
+            }
             if (question.hint && includeHints) {
               yPosition += 2;
               pdf.setFontSize(8);
@@ -1685,7 +1717,108 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     }
   };
 
-  // Render preview worksheet for a student
+  // Generate storyboard art for a question
+  const generateStoryboardArtForQuestion = async (
+    questionText: string,
+    questionKey: string
+  ): Promise<string | null> => {
+    try {
+      console.log(`Generating storyboard art for: ${questionKey}`);
+      setRegeneratingImageKey(questionKey);
+      
+      const { data, error } = await supabase.functions.invoke('generate-storyboard-art', {
+        body: {
+          questionText,
+          subject: storyboardSubject,
+          style: storyboardStyle,
+        },
+      });
+
+      if (error) {
+        console.error('Storyboard art generation error:', error);
+        return null;
+      }
+
+      if (data?.imageUrl) {
+        setStoryboardImages(prev => ({
+          ...prev,
+          [questionKey]: data.imageUrl,
+        }));
+        return data.imageUrl;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error generating storyboard art:', error);
+      return null;
+    } finally {
+      setRegeneratingImageKey(null);
+    }
+  };
+
+  // Regenerate storyboard art for a specific question
+  const regenerateStoryboardArt = async (questionText: string, questionKey: string) => {
+    toast({
+      title: 'Generating new image...',
+      description: 'Creating a fresh storyboard illustration.',
+    });
+    
+    const imageUrl = await generateStoryboardArtForQuestion(questionText, questionKey);
+    
+    if (imageUrl) {
+      toast({
+        title: 'Image regenerated',
+        description: 'New storyboard art has been generated.',
+      });
+    } else {
+      toast({
+        title: 'Generation failed',
+        description: 'Could not generate storyboard art. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Generate storyboard art for all questions in preview
+  const generateAllStoryboardArt = async () => {
+    if (!previewData) return;
+    
+    setIsGenerating(true);
+    setGenerationStatus('Generating storyboard illustrations...');
+    
+    const allQuestions: { key: string; text: string }[] = [];
+    
+    // Collect all questions that need storyboard art
+    Object.entries(previewData.questions).forEach(([cacheKey, questions]) => {
+      questions.warmUp?.forEach((q, idx) => {
+        allQuestions.push({ key: `${cacheKey}-warmUp-${idx}`, text: q.question });
+      });
+      questions.main?.forEach((q, idx) => {
+        allQuestions.push({ key: `${cacheKey}-main-${idx}`, text: q.question });
+      });
+    });
+    
+    let completed = 0;
+    for (const { key, text } of allQuestions) {
+      if (!storyboardImages[key]) {
+        setGenerationProgress((completed / allQuestions.length) * 100);
+        setGenerationStatus(`Generating illustration ${completed + 1} of ${allQuestions.length}...`);
+        await generateStoryboardArtForQuestion(text, key);
+      }
+      completed++;
+    }
+    
+    setIsGenerating(false);
+    setGenerationProgress(0);
+    setGenerationStatus('');
+    
+    toast({
+      title: 'Storyboard art complete',
+      description: `Generated ${completed} illustrations.`,
+    });
+  };
+
+
   const renderStudentPreview = (student: StudentWithDiagnostic, index: number) => {
     if (!previewData) return null;
 
@@ -1868,6 +2001,48 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                         )}
                       </div>
                     )}
+                    {/* Show storyboard art in preview */}
+                    {includeStoryboardArt && (
+                      <div className="mt-2">
+                        {storyboardImages[`${cacheKey}-warmUp-${idx}`] ? (
+                          <div className="relative group/img">
+                            <img 
+                              src={storyboardImages[`${cacheKey}-warmUp-${idx}`]} 
+                              alt="Storyboard illustration" 
+                              className="max-w-[200px] max-h-[150px] border rounded mx-auto"
+                            />
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="absolute top-1 right-1 h-6 opacity-0 group-hover/img:opacity-100 transition-opacity"
+                              onClick={() => regenerateStoryboardArt(q.question, `${cacheKey}-warmUp-${idx}`)}
+                              disabled={regeneratingImageKey === `${cacheKey}-warmUp-${idx}`}
+                            >
+                              {regeneratingImageKey === `${cacheKey}-warmUp-${idx}` ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-xs"
+                            onClick={() => generateStoryboardArtForQuestion(q.question, `${cacheKey}-warmUp-${idx}`)}
+                            disabled={regeneratingImageKey === `${cacheKey}-warmUp-${idx}`}
+                          >
+                            {regeneratingImageKey === `${cacheKey}-warmUp-${idx}` ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              <Palette className="h-3 w-3 mr-1" />
+                            )}
+                            Generate Illustration
+                          </Button>
+                        )}
+                      </div>
+                    )}
                     {q.hint && includeHints && (
                       <p className="text-xs text-muted-foreground mt-1 italic">Hint: {q.hint}</p>
                     )}
@@ -1928,6 +2103,48 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                             alt="Geometry diagram" 
                             className="max-w-[180px] max-h-[180px] border rounded"
                           />
+                        )}
+                      </div>
+                    )}
+                    {/* Show storyboard art in preview */}
+                    {includeStoryboardArt && (
+                      <div className="mt-2">
+                        {storyboardImages[`${cacheKey}-main-${idx}`] ? (
+                          <div className="relative group/img flex justify-center">
+                            <img 
+                              src={storyboardImages[`${cacheKey}-main-${idx}`]} 
+                              alt="Storyboard illustration" 
+                              className="max-w-[220px] max-h-[180px] border rounded"
+                            />
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="absolute top-1 right-1 h-6 opacity-0 group-hover/img:opacity-100 transition-opacity"
+                              onClick={() => regenerateStoryboardArt(q.question, `${cacheKey}-main-${idx}`)}
+                              disabled={regeneratingImageKey === `${cacheKey}-main-${idx}`}
+                            >
+                              {regeneratingImageKey === `${cacheKey}-main-${idx}` ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-xs"
+                            onClick={() => generateStoryboardArtForQuestion(q.question, `${cacheKey}-main-${idx}`)}
+                            disabled={regeneratingImageKey === `${cacheKey}-main-${idx}`}
+                          >
+                            {regeneratingImageKey === `${cacheKey}-main-${idx}` ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              <Palette className="h-3 w-3 mr-1" />
+                            )}
+                            Generate Illustration
+                          </Button>
                         )}
                       </div>
                     )}
@@ -2369,7 +2586,86 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             </div>
           )}
 
-          {/* Adaptive Difficulty Option */}
+          {/* Storyboard Art for Non-Math Subjects */}
+          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-pink-100 rounded-lg">
+                <Palette className="h-5 w-5 text-pink-600" />
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="includeStoryboardArt" className="text-sm font-medium text-pink-900 cursor-pointer flex items-center gap-2">
+                  Storyboard Art Generator
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <ImageIcon className="h-3.5 w-3.5 text-pink-500" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-sm">
+                          Generate high-quality storyboard-style illustrations for subjects like English, History, Biology, and more.
+                          Perfect for making worksheets more engaging and visual.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </Label>
+                <p className="text-xs text-pink-700 mt-0.5">
+                  AI-generated illustrations for English, History, Biology & more
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="includeStoryboardArt"
+              checked={includeStoryboardArt}
+              onCheckedChange={setIncludeStoryboardArt}
+            />
+          </div>
+
+          {includeStoryboardArt && (
+            <div className="ml-6 space-y-3 p-3 bg-rose-50 border border-rose-200 rounded-lg">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-rose-800 flex items-center gap-1">
+                    <BookOpen className="h-3 w-3" />
+                    Subject
+                  </Label>
+                  <Select value={storyboardSubject} onValueChange={(v) => setStoryboardSubject(v as typeof storyboardSubject)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="english">English / Literature</SelectItem>
+                      <SelectItem value="history">History / Social Studies</SelectItem>
+                      <SelectItem value="biology">Biology / Life Science</SelectItem>
+                      <SelectItem value="science">General Science</SelectItem>
+                      <SelectItem value="social-studies">Social Studies</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-rose-800 flex items-center gap-1">
+                    <Palette className="h-3 w-3" />
+                    Art Style
+                  </Label>
+                  <Select value={storyboardStyle} onValueChange={(v) => setStoryboardStyle(v as typeof storyboardStyle)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="storyboard">Storyboard Panel</SelectItem>
+                      <SelectItem value="illustration">Classic Illustration</SelectItem>
+                      <SelectItem value="diagram">Educational Diagram</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <p className="text-xs text-rose-600">
+                💡 Tip: You can regenerate individual images after preview if needed
+              </p>
+            </div>
+          )}
+
+
           <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-100 rounded-lg">
@@ -2784,6 +3080,28 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   <ZoomIn className="h-4 w-4" />
                 </Button>
                 <Separator orientation="vertical" className="h-6" />
+                
+                {/* Generate All Storyboard Art button */}
+                {includeStoryboardArt && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={generateAllStoryboardArt}
+                      disabled={isGenerating}
+                      className="bg-pink-50 border-pink-200 text-pink-700 hover:bg-pink-100"
+                    >
+                      {isGenerating && regeneratingImageKey ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Palette className="h-4 w-4 mr-1" />
+                      )}
+                      Generate All Art
+                    </Button>
+                    <Separator orientation="vertical" className="h-6" />
+                  </>
+                )}
+                
                 <Button
                   variant="outline"
                   size="sm"
