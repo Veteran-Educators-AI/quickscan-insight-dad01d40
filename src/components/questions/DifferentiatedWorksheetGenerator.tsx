@@ -860,14 +860,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               yPosition += 6;
 
               pdf.setFont('helvetica', 'normal');
+              pdf.setFontSize(10); // Slightly smaller font for better fit
               const sanitizedQuestion = formatPdfText(question.question);
-              // Use more conservative text width to prevent overflow (margin + 8 left padding means we need -16 from content width)
-              const textAreaWidth = contentWidth - 16;
+              // Very aggressive text width: use 60% of content width to guarantee no overflow
+              const textAreaWidth = contentWidth * 0.85;
               const lines = pdf.splitTextToSize(sanitizedQuestion, textAreaWidth);
               lines.forEach((line: string) => {
-                pdf.text(line, margin + 8, yPosition);
-                yPosition += 5;
+                pdf.text(line, margin + 5, yPosition);
+                yPosition += 4.5;
               });
+              pdf.setFontSize(11); // Reset font size
 
               // Add geometry diagram if available for warm-up
               if ((question.imageUrl || question.svg) && includeGeometry) {
@@ -903,17 +905,17 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               // Add hint if available
               if (question.hint && includeHints) {
                 yPosition += 2;
-                pdf.setFontSize(9);
-                pdf.setFont('helvetica', 'italic');
-                pdf.setTextColor(120, 100, 50);
-                const sanitizedHint = formatPdfText(question.hint);
-                // Use same conservative width for hints
-                const hintAreaWidth = contentWidth - 16;
-                const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, hintAreaWidth);
-                hintLines.forEach((line: string) => {
-                  pdf.text(line, margin + 8, yPosition);
-                  yPosition += 4;
-                });
+              pdf.setFontSize(8);
+              pdf.setFont('helvetica', 'italic');
+              pdf.setTextColor(120, 100, 50);
+              const sanitizedHint = formatPdfText(question.hint);
+              // Very aggressive text width for hints
+              const hintAreaWidth = contentWidth * 0.85;
+              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, hintAreaWidth);
+              hintLines.forEach((line: string) => {
+                pdf.text(line, margin + 5, yPosition);
+                yPosition += 3.5;
+              });
                 pdf.setTextColor(0);
                 pdf.setFontSize(11);
               }
@@ -1036,9 +1038,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             yPosition += 6;
 
             pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(10); // Slightly smaller font for better fit
             const sanitizedQuestion = formatPdfText(question.question);
-            // Use more conservative text width to prevent overflow (margin + 8 left padding means we need -16 from content width)
-            const textAreaWidth = contentWidth - 16;
+            // Very aggressive text width: use 85% of content width to guarantee no overflow
+            const textAreaWidth = contentWidth * 0.85;
             const lines = pdf.splitTextToSize(sanitizedQuestion, textAreaWidth);
             for (const line of lines) {
               if (yPosition > pageHeight - 30) {
@@ -1047,9 +1050,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 await addContinuationPageHeader(pageCount);
                 yPosition = 25; // Start below the continuation header
               }
-              pdf.text(line, margin + 8, yPosition);
-              yPosition += 5;
+              pdf.text(line, margin + 5, yPosition);
+              yPosition += 4.5;
             }
+            pdf.setFontSize(11); // Reset font size
 
             // Add geometry diagram if available
             if ((question.imageUrl || question.svg) && includeGeometry) {
@@ -1092,12 +1096,12 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             // Add hint if available
             if (question.hint && includeHints) {
               yPosition += 2;
-              pdf.setFontSize(9);
+              pdf.setFontSize(8);
               pdf.setFont('helvetica', 'italic');
               pdf.setTextColor(120, 100, 50);
               const sanitizedHint = formatPdfText(question.hint);
-              // Use same conservative width for hints
-              const hintAreaWidth = contentWidth - 16;
+              // Very aggressive text width for hints
+              const hintAreaWidth = contentWidth * 0.85;
               const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, hintAreaWidth);
               for (const line of hintLines) {
                 if (yPosition > pageHeight - 25) {
@@ -1106,8 +1110,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   await addContinuationPageHeader(pageCount);
                   yPosition = 25; // Start below the continuation header
                 }
-                pdf.text(line, margin + 8, yPosition);
-                yPosition += 4;
+                pdf.text(line, margin + 5, yPosition);
+                yPosition += 3.5;
               }
               pdf.setTextColor(0);
               pdf.setFontSize(11);

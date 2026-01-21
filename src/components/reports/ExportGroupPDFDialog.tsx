@@ -382,11 +382,15 @@ export function ExportGroupPDFDialog({
 
           // Question text
           if (question.prompt_text) {
-            pdf.setFontSize(11);
+            pdf.setFontSize(10); // Slightly smaller for better fit
             pdf.setFont('helvetica', 'normal');
-            const textLines = pdf.splitTextToSize(question.prompt_text, contentWidth - 10);
-            pdf.text(textLines, margin + 5, yPosition);
-            yPosition += textLines.length * 5;
+            // Use 85% of content width to prevent text overflow
+            const textLines = pdf.splitTextToSize(question.prompt_text, contentWidth * 0.85);
+            textLines.forEach((line: string) => {
+              pdf.text(line, margin + 5, yPosition);
+              yPosition += 4.5;
+            });
+            pdf.setFontSize(11); // Reset
           }
 
           yPosition += 4;

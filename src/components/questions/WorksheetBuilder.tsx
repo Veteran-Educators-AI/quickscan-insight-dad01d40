@@ -1265,9 +1265,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         yPosition += 8;
 
         // Question text - wrap long text, sanitize for PDF to fix encoding issues
-        pdf.setFontSize(11);
+        pdf.setFontSize(10); // Slightly smaller for better fit
         const sanitizedQuestion = sanitizeForPDF(renderMathText(fixEncodingCorruption(question.question)));
-        const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
+        // Use 85% of content width to prevent text overflow
+        const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth * 0.85);
         
         lines.forEach((line: string) => {
           if (yPosition > pageHeight - 40) {
@@ -1275,8 +1276,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             yPosition = margin;
           }
           pdf.text(line, margin + 5, yPosition);
-          yPosition += 6;
+          yPosition += 5;
         });
+        pdf.setFontSize(11); // Reset
 
         yPosition += 4;
 
