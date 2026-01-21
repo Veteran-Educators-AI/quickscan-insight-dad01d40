@@ -861,9 +861,11 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
               pdf.setFont('helvetica', 'normal');
               const sanitizedQuestion = formatPdfText(question.question);
-              const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
+              // Use more conservative text width to prevent overflow (margin + 8 left padding means we need -16 from content width)
+              const textAreaWidth = contentWidth - 16;
+              const lines = pdf.splitTextToSize(sanitizedQuestion, textAreaWidth);
               lines.forEach((line: string) => {
-                pdf.text(line, margin + 5, yPosition);
+                pdf.text(line, margin + 8, yPosition);
                 yPosition += 5;
               });
 
@@ -905,9 +907,11 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 pdf.setFont('helvetica', 'italic');
                 pdf.setTextColor(120, 100, 50);
                 const sanitizedHint = formatPdfText(question.hint);
-                const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, contentWidth - 10);
+                // Use same conservative width for hints
+                const hintAreaWidth = contentWidth - 16;
+                const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, hintAreaWidth);
                 hintLines.forEach((line: string) => {
-                  pdf.text(line, margin + 5, yPosition);
+                  pdf.text(line, margin + 8, yPosition);
                   yPosition += 4;
                 });
                 pdf.setTextColor(0);
@@ -1033,7 +1037,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
             pdf.setFont('helvetica', 'normal');
             const sanitizedQuestion = formatPdfText(question.question);
-            const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
+            // Use more conservative text width to prevent overflow (margin + 8 left padding means we need -16 from content width)
+            const textAreaWidth = contentWidth - 16;
+            const lines = pdf.splitTextToSize(sanitizedQuestion, textAreaWidth);
             for (const line of lines) {
               if (yPosition > pageHeight - 30) {
                 pdf.addPage();
@@ -1041,7 +1047,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 await addContinuationPageHeader(pageCount);
                 yPosition = 25; // Start below the continuation header
               }
-              pdf.text(line, margin + 5, yPosition);
+              pdf.text(line, margin + 8, yPosition);
               yPosition += 5;
             }
 
@@ -1090,7 +1096,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               pdf.setFont('helvetica', 'italic');
               pdf.setTextColor(120, 100, 50);
               const sanitizedHint = formatPdfText(question.hint);
-              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, contentWidth - 10);
+              // Use same conservative width for hints
+              const hintAreaWidth = contentWidth - 16;
+              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, hintAreaWidth);
               for (const line of hintLines) {
                 if (yPosition > pageHeight - 25) {
                   pdf.addPage();
@@ -1098,7 +1106,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   await addContinuationPageHeader(pageCount);
                   yPosition = 25; // Start below the continuation header
                 }
-                pdf.text(line, margin + 5, yPosition);
+                pdf.text(line, margin + 8, yPosition);
                 yPosition += 4;
               }
               pdf.setTextColor(0);
