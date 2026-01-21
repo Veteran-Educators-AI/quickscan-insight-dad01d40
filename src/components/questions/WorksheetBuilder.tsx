@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock, NotebookPen } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock, NotebookPen, Scissors } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -102,6 +102,90 @@ interface SavedWorksheet {
   share_code: string | null;
   is_shared: boolean;
 }
+
+// Page Break Indicator Component - shows where pages will split when printing
+const PageBreakIndicators = ({ contentRef }: { contentRef: React.RefObject<HTMLDivElement> }) => {
+  const [pageBreaks, setPageBreaks] = useState<number[]>([]);
+  
+  useEffect(() => {
+    if (!contentRef.current) return;
+    
+    // Standard US Letter: 11in page height, 0.75in padding top and bottom = 9.5in content area
+    // At 96 DPI: 9.5 * 96 = 912px per page content area
+    const pageContentHeight = 912; // pixels
+    
+    const calculateBreaks = () => {
+      if (!contentRef.current) return;
+      const contentHeight = contentRef.current.scrollHeight;
+      const breaks: number[] = [];
+      
+      // Add a break at each page boundary
+      let currentPosition = pageContentHeight;
+      while (currentPosition < contentHeight) {
+        breaks.push(currentPosition);
+        currentPosition += pageContentHeight;
+      }
+      
+      setPageBreaks(breaks);
+    };
+    
+    // Calculate on mount and when content changes
+    calculateBreaks();
+    
+    // Use ResizeObserver to detect content changes
+    const observer = new ResizeObserver(calculateBreaks);
+    observer.observe(contentRef.current);
+    
+    return () => observer.disconnect();
+  }, [contentRef]);
+  
+  if (pageBreaks.length === 0) return null;
+  
+  return (
+    <>
+      {pageBreaks.map((position, index) => (
+        <div
+          key={index}
+          className="print:hidden"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: `${position}px`,
+            zIndex: 10,
+            pointerEvents: 'none',
+          }}
+        >
+          {/* Dashed line */}
+          <div style={{
+            borderTop: '2px dashed #ef4444',
+            position: 'relative',
+          }}>
+            {/* Page number badge */}
+            <div style={{
+              position: 'absolute',
+              left: '50%',
+              transform: 'translateX(-50%) translateY(-50%)',
+              backgroundColor: '#ef4444',
+              color: 'white',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            }}>
+              <Scissors className="h-3 w-3" />
+              Page {index + 1} ends here
+            </div>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+};
 
 interface WorksheetBuilderProps {
   selectedQuestions: WorksheetQuestion[];
@@ -2891,7 +2975,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             </div>
           </div>
 
-          {/* Preview Content Area - render as 8.5x11 page */}
+          {/* Preview Content Area - render as 8.5x11 pages with page break indicators */}
           <div 
             className="print:p-0 print:overflow-visible"
             style={{
@@ -2900,25 +2984,37 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               overflowX: 'auto',
               padding: '2rem',
               display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'flex-start',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0',
             }}
           >
+            {/* Page container with visual page breaks */}
             <div 
               ref={printRef} 
               className="print:shadow-none print:border-none"
               style={{ 
                 width: '8.5in',
-                minHeight: '11in',
-                padding: '0.75in',
-                boxSizing: 'border-box',
                 transform: `scale(${previewZoom / 100})`,
                 transformOrigin: 'top center',
-                backgroundColor: 'white',
-                boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-                border: '1px solid #d1d5db',
               }}
             >
+              {/* Wrapper that shows page boundaries */}
+              <div style={{ position: 'relative' }}>
+                {/* Page break indicators - shown every 11 inches minus padding (9.5in content height) */}
+                <PageBreakIndicators contentRef={printRef} />
+                
+                {/* Actual page content */}
+                <div 
+                  style={{ 
+                    backgroundColor: 'white',
+                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                    border: '1px solid #d1d5db',
+                    padding: '0.75in',
+                    boxSizing: 'border-box',
+                  }}
+                  className="print:shadow-none print:border-none"
+                >
                   {/* AI Scanning Instructions Banner */}
                   {showAnswerLines && (
                     <div style={{
@@ -3160,10 +3256,11 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     </div>
                   </div>
                 )}
-
-                <div className="mt-12 text-center text-xs text-gray-400">
+                <div className="mt-12 text-center text-xs text-gray-400 print:hidden">
                   Generated with NYCLogic Ai - NYS Regents Aligned
                 </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>,
