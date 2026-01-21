@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface StoryboardRequest {
   questionText: string;
-  subject: 'english' | 'history' | 'biology' | 'science' | 'social-studies';
+  subject: 'english' | 'history' | 'biology' | 'chemistry' | 'physics' | 'science' | 'social-studies';
   questionNumber: number;
   style?: 'storyboard' | 'illustration' | 'diagram';
 }
@@ -30,6 +30,16 @@ const getSubjectPrompt = (subject: string, style: string = 'storyboard'): string
       storyboard: 'scientific storyboard panel, nature documentary style, detailed organism illustration, educational accuracy',
       illustration: 'scientific illustration, detailed anatomical drawing, medical textbook quality',
       diagram: 'biological diagram, labeled anatomy, cell structure, scientific accuracy'
+    },
+    chemistry: {
+      storyboard: 'chemistry storyboard panel, molecular visualization, laboratory experiment scene, colorful chemical reactions',
+      illustration: 'scientific illustration, molecular structure artwork, periodic table elements, chemical bonds visualization',
+      diagram: 'chemistry diagram, molecular structure, chemical reaction pathway, electron configuration'
+    },
+    physics: {
+      storyboard: 'physics storyboard panel, force and motion visualization, energy transformation scene, space and cosmos imagery',
+      illustration: 'physics illustration, mechanics visualization, electromagnetic waves, particle physics artwork',
+      diagram: 'physics diagram, force vectors, circuit diagram, wave patterns, energy transfer visualization'
     },
     science: {
       storyboard: 'scientific storyboard panel, experimental process illustration, laboratory scene',

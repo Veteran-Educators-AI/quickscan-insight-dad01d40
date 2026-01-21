@@ -318,7 +318,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   
   // Storyboard art settings for non-math subjects
   const [includeStoryboardArt, setIncludeStoryboardArt] = useState(false);
-  const [storyboardSubject, setStoryboardSubject] = useState<'english' | 'history' | 'biology' | 'science' | 'social-studies'>('english');
+  const [storyboardSubject, setStoryboardSubject] = useState<'english' | 'history' | 'biology' | 'chemistry' | 'physics' | 'science' | 'social-studies'>('english');
   const [storyboardStyle, setStoryboardStyle] = useState<'storyboard' | 'illustration' | 'diagram'>('storyboard');
   const [storyboardImages, setStoryboardImages] = useState<Record<string, string>>({});
   const [regeneratingImageKey, setRegeneratingImageKey] = useState<string | null>(null);
@@ -3094,6 +3094,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                       <SelectItem value="english">English / Literature</SelectItem>
                       <SelectItem value="history">History / Social Studies</SelectItem>
                       <SelectItem value="biology">Biology / Life Science</SelectItem>
+                      <SelectItem value="chemistry">Chemistry</SelectItem>
+                      <SelectItem value="physics">Physics</SelectItem>
                       <SelectItem value="science">General Science</SelectItem>
                       <SelectItem value="social-studies">Social Studies</SelectItem>
                     </SelectContent>
