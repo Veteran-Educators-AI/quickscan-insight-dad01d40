@@ -22,7 +22,7 @@ import { useAuth } from '@/lib/auth';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
 import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
-import { Document, Packer, Paragraph, TextRun, PageOrientation, BorderStyle, AlignmentType, convertInchesToTwip } from 'docx';
+import { Document, Packer, Paragraph, TextRun, PageOrientation, BorderStyle, AlignmentType, convertInchesToTwip, ImageRun } from 'docx';
 
 interface WorksheetPreset {
   id: string;
@@ -589,6 +589,33 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     setStudents(prev => prev.map(s => ({ ...s, selected: !s.diagnosticResult && !s.hasAdaptiveData })));
   };
 
+  // Helper function to fetch image as ArrayBuffer for Word document
+  const fetchImageAsArrayBuffer = async (imageUrl: string): Promise<ArrayBuffer | null> => {
+    try {
+      // Handle data URLs directly
+      if (imageUrl.startsWith('data:')) {
+        const base64Data = imageUrl.split(',')[1];
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+      }
+      
+      // Fetch external URL
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        console.error('Failed to fetch image:', response.statusText);
+        return null;
+      }
+      return await response.arrayBuffer();
+    } catch (error) {
+      console.error('Error fetching image for Word doc:', error);
+      return null;
+    }
+  };
+
   // Generate Word document with same margins as PDF
   const generateWordDocument = async () => {
     if (!previewData) {
@@ -727,6 +754,38 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               })
             );
 
+            // Add geometry image if available (for warm-up)
+            if ((q.imageUrl || q.svg) && includeGeometry) {
+              try {
+                let imageData = q.imageUrl || '';
+                if (q.svg && !q.imageUrl) {
+                  imageData = await svgToPngDataUrl(q.svg, 200, 200);
+                }
+                if (imageData) {
+                  const imageBuffer = await fetchImageAsArrayBuffer(imageData);
+                  if (imageBuffer) {
+                    children.push(
+                      new Paragraph({
+                        children: [
+                          new ImageRun({
+                            data: imageBuffer,
+                            transformation: {
+                              width: 120,
+                              height: 120,
+                            },
+                            type: 'png',
+                          }),
+                        ],
+                        spacing: { before: 100, after: 100 },
+                      })
+                    );
+                  }
+                }
+              } catch (imgError) {
+                console.error('Error adding warm-up image to Word doc:', imgError);
+              }
+            }
+
             if (q.hint && includeHints) {
               children.push(
                 new Paragraph({
@@ -802,6 +861,66 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 spacing: { before: 150, after: 50 },
               })
             );
+
+            // Add geometry image if available (for main questions)
+            if ((q.imageUrl || q.svg) && includeGeometry) {
+              try {
+                let imageData = q.imageUrl || '';
+                if (q.svg && !q.imageUrl) {
+                  imageData = await svgToPngDataUrl(q.svg, 200, 200);
+                }
+                if (imageData) {
+                  const imageBuffer = await fetchImageAsArrayBuffer(imageData);
+                  if (imageBuffer) {
+                    children.push(
+                      new Paragraph({
+                        children: [
+                          new ImageRun({
+                            data: imageBuffer,
+                            transformation: {
+                              width: 150,
+                              height: 150,
+                            },
+                            type: 'png',
+                          }),
+                        ],
+                        spacing: { before: 100, after: 100 },
+                      })
+                    );
+                  }
+                }
+              } catch (imgError) {
+                console.error('Error adding main question image to Word doc:', imgError);
+              }
+            }
+
+            // Also add storyboard art if available
+            const storyboardKey = `${cacheKey}-main-${idx}`;
+            const storyboardImage = storyboardImages[storyboardKey];
+            if (storyboardImage && includeStoryboardArt) {
+              try {
+                const imageBuffer = await fetchImageAsArrayBuffer(storyboardImage);
+                if (imageBuffer) {
+                  children.push(
+                    new Paragraph({
+                      children: [
+                        new ImageRun({
+                          data: imageBuffer,
+                          transformation: {
+                            width: 200,
+                            height: 150,
+                          },
+                          type: 'png',
+                        }),
+                      ],
+                      spacing: { before: 100, after: 100 },
+                    })
+                  );
+                }
+              } catch (imgError) {
+                console.error('Error adding storyboard image to Word doc:', imgError);
+              }
+            }
 
             if (q.hint && includeHints) {
               children.push(
