@@ -3012,6 +3012,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     border: '1px solid #d1d5db',
                     padding: '0.75in',
                     boxSizing: 'border-box',
+                    width: '100%',
+                    maxWidth: '8.5in',
+                    overflow: 'hidden',
                   }}
                   className="print:shadow-none print:border-none"
                 >
@@ -3047,9 +3050,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     <span>Date: ___________</span>
                     <span>Period: _____</span>
                   </div>
-                  <div className="space-y-8">
+                  <div className="space-y-8" style={{ maxWidth: '100%', overflow: 'hidden' }}>
                     {compiledQuestions.map((question) => (
-                      <div key={question.questionNumber} className="space-y-2" style={{ pageBreakInside: 'avoid' }}>
+                      <div key={question.questionNumber} className="space-y-2" style={{ pageBreakInside: 'avoid', maxWidth: '100%', overflow: 'hidden' }}>
                         <div className="flex items-baseline gap-2 flex-wrap">
                           <span className="font-bold text-black">{question.questionNumber}.</span>
                           {worksheetMode === 'diagnostic' && question.advancementLevel && (
@@ -3071,9 +3074,18 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         <p className="text-sm text-gray-500 ml-5">
                           {question.topic} ({question.standard})
                         </p>
-                        <p className="ml-5 font-serif leading-relaxed text-base text-black" style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                        <div 
+                          className="ml-5 font-serif leading-relaxed text-base text-black" 
+                          style={{ 
+                            wordWrap: 'break-word', 
+                            overflowWrap: 'break-word',
+                            wordBreak: 'break-word',
+                            whiteSpace: 'pre-wrap',
+                            maxWidth: '100%',
+                          }}
+                        >
                           {renderMathText(fixEncodingCorruption(question.question))}
-                        </p>
+                        </div>
                         {question.svg && (
                           <div 
                             className="ml-5 mt-2 flex justify-center"
@@ -3087,8 +3099,11 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                             borderRadius: '0.5rem',
                             marginTop: '1rem',
                             marginLeft: '1.25rem',
+                            marginRight: '0',
                             backgroundColor: '#ffffff',
                             overflow: 'hidden',
+                            maxWidth: 'calc(100% - 1.25rem)',
+                            boxSizing: 'border-box',
                           }}>
                             {/* Work Area Section */}
                             <div style={{
