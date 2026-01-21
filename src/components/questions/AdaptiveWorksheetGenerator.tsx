@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useStudentWeaknesses, type StudentPerformanceProfile, type AdvancementLevel } from '@/hooks/useStudentWeaknesses';
-import { sanitizeForPDF } from '@/lib/mathRenderer';
+import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
 
 interface AdaptiveWorksheetGeneratorProps {
@@ -59,6 +59,8 @@ const getLevelColor = (level: AdvancementLevel) => {
   };
   return colors[level];
 };
+
+const formatPdfText = (text: string) => sanitizeForPDF(renderMathText(fixEncodingCorruption(text)));
 
 const getLevelDescription = (level: AdvancementLevel) => {
   const descriptions: Record<AdvancementLevel, string> = {
@@ -441,7 +443,7 @@ export function AdaptiveWorksheetGenerator({ open, onOpenChange }: AdaptiveWorks
           pdf.text(`${q.questionNumber}.`, margin, yPosition);
 
           pdf.setFont('helvetica', 'normal');
-          const questionText = sanitizeForPDF(q.question);
+          const questionText = formatPdfText(q.question);
           const lines = pdf.splitTextToSize(questionText, contentWidth - 10);
           pdf.text(lines, margin + 8, yPosition);
           yPosition += lines.length * 5 + 3;
@@ -458,7 +460,7 @@ export function AdaptiveWorksheetGenerator({ open, onOpenChange }: AdaptiveWorks
           if (includeHints && q.hint) {
             pdf.setFontSize(8);
             pdf.setTextColor(59, 130, 246);
-            const hintLines = pdf.splitTextToSize(`Hint: ${q.hint}`, contentWidth - 15);
+            const hintLines = pdf.splitTextToSize(formatPdfText(`Hint: ${q.hint}`), contentWidth - 15);
             pdf.text(hintLines, margin + 8, yPosition);
             pdf.setTextColor(0);
             pdf.setFontSize(10);

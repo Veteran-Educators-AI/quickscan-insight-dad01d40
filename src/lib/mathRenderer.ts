@@ -685,6 +685,51 @@ export function fixEncodingCorruption(text: string): string {
   
   // Fix mojibake patterns (UTF-8 decoded as Latin-1)
   const mojibakePatterns: [RegExp, string][] = [
+    // Common interval corruption patterns (0 ≤ θ < 2π)
+    [/\(0\s*"d"\s*,?\s*<?=?\s*2Å\)/gi, '(0 ≤ θ < 2π)'],
+    [/\(0\s*"d"\s*,?\s*<?=?\s*2À\)/gi, '(0 ≤ θ < 2π)'],
+    [/\(0\s*"d"\s*,?\s*<?=?\s*2"A"\)/gi, '(0 ≤ θ < 2π)'],
+    [/0\s*≤\s*"d"\s*<\s*2"A"/gi, '0 ≤ θ < 2π'],
+    [/0\s*≤\s*"d"\s*<\s*2Å/gi, '0 ≤ θ < 2π'],
+    [/0\s*≤\s*"d"\s*<\s*2À/gi, '0 ≤ θ < 2π'],
+    [/0\s*"d"\s*,?\s*<\s*2Å/gi, '0 ≤ θ < 2π'],
+    [/0\s*"d"\s*,?\s*<\s*2À/gi, '0 ≤ θ < 2π'],
+    [/0"d"</g, '0 ≤ θ <'],
+    [/"d\s*,/g, 'θ ≤'],
+    [/"d,/g, 'θ ≤'],
+
+    // Theta corruption patterns
+    [/"d"/g, 'θ'],
+    [/"d/g, 'θ'],
+    [/d"/g, 'θ'],
+    [/Ã¸/g, 'θ'],
+    [/θ̈/g, 'θ'],
+    [/ø/g, 'θ'],
+
+    // Pi corruption patterns
+    [/"A\)/g, 'π)'],
+    [/\("A/g, '(π'],
+    [/2"A/g, '2π'],
+    [/"A"/g, 'π'],
+    [/"A/g, 'π'],
+    [/2Å/g, '2π'],
+    [/Å/g, 'π'],
+    [/2À/g, '2π'],
+    [/À/g, 'π'],
+    [/Ã€/g, 'π'],
+    [/ð/g, 'π'],
+
+    // Subscript corruption patterns (w• -> w₁, w, -> w₂, wƒ -> w₃)
+    [/([a-zA-Z])•(?=\s|[=+\-*/),.;:?!]|$)/g, '$1₁'],
+    [/([a-zA-Z])â€¢(?=\s|[=+\-*/),.;:?!]|$)/g, '$1₁'],
+    [/([a-zA-Z])·(?=\s|[=+\-*/),.;:?!]|$)/g, '$1₁'],
+    [/([a-zA-Z])¹(?=\s|[=+\-*/),.;:?!]|$)/g, '$1₁'],
+    [/([a-zA-Z]),\s*(?=and|or|\+|-|=|is|the|that|when|if|has|have)/gi, '$1₂ '],
+    [/([a-zA-Z]),(?=\s*[=+\-*/)\d])/g, '$1₂'],
+    [/([a-zA-Z])²(?=\s+and|\s+or)/gi, '$1₂'],
+    [/([a-zA-Z])ƒ(?=\s|[=+\-*/),.;:?!]|$)/g, '$1₃'],
+    [/([a-zA-Z])Æ'(?=\s|[=+\-*/),.;:?!]|$)/g, '$1₃'],
+
     // Greek letters
     [/Ï€/g, 'π'],
     [/Î¸/g, 'θ'],
@@ -711,6 +756,10 @@ export function fixEncodingCorruption(text: string): string {
     [/âˆž/g, '∞'],
     [/Ã—/g, '×'],
     [/Ã·/g, '÷'],
+    [/âˆ /g, '∠'],
+    [/âŠ¥/g, '⊥'],
+    [/â‰…/g, '≅'],
+    [/âˆ†/g, '△'],
     
     // Common Â prefix patterns
     [/Â\s*π/g, 'π'],
