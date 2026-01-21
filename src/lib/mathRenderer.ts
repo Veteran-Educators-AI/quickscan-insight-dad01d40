@@ -532,6 +532,18 @@ export function sanitizeForPDF(text: string): string {
   
   let result = text;
   
+  // CRITICAL FIX: First check for and fix ampersand-interleaved text pattern
+  // Pattern like "&l&n& &r&i&g&h&t& &t&r&i&a&n&g&l&e&" should become "In a right triangle"
+  // This happens when text is corrupted during encoding
+  if (result.includes('&') && /&[a-zA-Z]&/.test(result)) {
+    // Remove all ampersands that appear between single characters
+    result = result.replace(/&([a-zA-Z])(?=&|$|\s)/g, '$1');
+    result = result.replace(/^&([a-zA-Z])/g, '$1');
+    // Also handle remaining stray ampersands
+    result = result.replace(/&+/g, ' ');
+    result = result.replace(/\s+/g, ' ').trim();
+  }
+  
   // First, remove or replace emoji characters that cause corruption in PDF
   // These emojis render as garbled text like "Ø=Ü¡" in jsPDF
   const emojiReplacements: [RegExp, string][] = [
@@ -619,9 +631,7 @@ export function sanitizeForPDF(text: string): string {
     [/Â±/g, '±'],
     [/Â·/g, '·'],
     
-    // Fix ampersand-interleaved text (& between each character)
-    // This pattern appears when encoding fails catastrophically
-    [/&([a-zA-Z])&([a-zA-Z])&([a-zA-Z])/g, '$1$2$3'],
+    // NOTE: Ampersand-interleaved text is now handled at the beginning of this function
     
     // Clean up remaining stray Â characters
     [/Â(?=\d)/g, ''],
@@ -682,6 +692,18 @@ export function fixEncodingCorruption(text: string): string {
   if (!text) return '';
   
   let result = text;
+  
+  // CRITICAL FIX: First check for and fix ampersand-interleaved text pattern
+  // Pattern like "&l&n& &r&i&g&h&t& &t&r&i&a&n&g&l&e&" should become "In a right triangle"
+  // This happens when text is corrupted during encoding
+  if (result.includes('&') && /&[a-zA-Z]&/.test(result)) {
+    // Remove all ampersands that appear between single characters
+    result = result.replace(/&([a-zA-Z])(?=&|$|\s)/g, '$1');
+    result = result.replace(/^&([a-zA-Z])/g, '$1');
+    // Also handle pattern at word boundaries
+    result = result.replace(/&+/g, ' ');
+    result = result.replace(/\s+/g, ' ').trim();
+  }
   
   // Fix mojibake patterns (UTF-8 decoded as Latin-1)
   const mojibakePatterns: [RegExp, string][] = [
@@ -780,12 +802,6 @@ export function fixEncodingCorruption(text: string): string {
     [/(\d)Â\s*cm/gi, '$1π cm'],
     [/(\d)Â\s*cubic/gi, '$1π cubic'],
     [/(\d)Â\s*square/gi, '$1π square'],
-    
-    // Fix ampersand-interleaved text corruption
-    // Pattern: &a&n&s&w&e&r -> answer
-    [/&([a-zA-Z])(?=&)/g, '$1'],
-    [/&([a-zA-Z])$/g, '$1'],
-    [/^&([a-zA-Z])/g, '$1'],
     
     // Clean up remaining stray characters
     [/Â\s+/g, ' '],
