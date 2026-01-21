@@ -1854,8 +1854,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     variant={worksheetMode === 'basic_assessment' ? 'default' : 'outline'}
                     className={`h-auto py-3 flex flex-col items-center gap-1.5 ${
                       worksheetMode === 'basic_assessment' 
-                        ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2' 
-                        : 'hover:bg-muted'
+                        ? 'bg-blue-600 text-white ring-2 ring-blue-600 ring-offset-2' 
+                        : 'hover:bg-muted border-blue-200'
                     }`}
                     onClick={() => {
                       setWorksheetMode('basic_assessment');
@@ -1866,7 +1866,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   >
                     <FileText className="h-5 w-5" />
                     <span className="font-semibold text-xs">Assessment</span>
-                    <span className="text-[10px] opacity-80 text-center leading-tight">Quizzes & tests</span>
+                    <span className="text-[10px] opacity-80 text-center leading-tight">Equal level for all</span>
                   </Button>
                   <Button
                     type="button"
@@ -1885,20 +1885,36 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   >
                     <Sparkles className="h-5 w-5" />
                     <span className="font-semibold text-xs">Diagnostic</span>
-                    <span className="text-[10px] opacity-80 text-center leading-tight">Levels A-F</span>
+                    <span className="text-[10px] opacity-80 text-center leading-tight">Individualized A-F</span>
                   </Button>
                 </div>
                 
+                {/* Assessment Mode Description */}
+                {worksheetMode === 'basic_assessment' && (
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <FileText className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-blue-900">Adaptive Assessment</p>
+                        <p className="text-xs text-blue-700">
+                          All students receive the same adaptive questions at a consistent difficulty level. 
+                          Fair for quizzes and tests where everyone is assessed equally.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Diagnostic Mode Description */}
                 {worksheetMode === 'diagnostic' && (
                   <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
                     <div className="flex items-start gap-2">
                       <Sparkles className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-purple-900">Diagnostic Worksheet</p>
+                        <p className="text-sm font-medium text-purple-900">Individualized Diagnostic</p>
                         <p className="text-xs text-purple-700">
-                          Questions are labeled with advancement levels A-F. Use student responses to generate 
-                          differentiated follow-up worksheets tailored to each student's level.
+                          Questions span levels A-F to identify each student's understanding. 
+                          Use responses to generate personalized follow-up worksheets.
                         </p>
                         <div className="flex flex-wrap gap-1 mt-2">
                           {['A', 'B', 'C', 'D', 'E', 'F'].map((level) => (
