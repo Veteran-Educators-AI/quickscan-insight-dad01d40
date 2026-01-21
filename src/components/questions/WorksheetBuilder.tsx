@@ -74,7 +74,7 @@ const getBloomInfo = (level?: BloomLevel) => {
 };
 
 // Worksheet mode types
-export type WorksheetMode = 'practice' | 'basic_assessment' | 'diagnostic';
+export type WorksheetMode = 'basic_assessment' | 'diagnostic';
 
 interface SavedWorksheet {
   id: string;
@@ -111,18 +111,18 @@ interface WorksheetBuilderProps {
 export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearAll }: WorksheetBuilderProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [worksheetTitle, setWorksheetTitle] = useState('Math Practice Worksheet');
+  const [worksheetTitle, setWorksheetTitle] = useState('Diagnostic Assessment');
   const [hasUserEditedTitle, setHasUserEditedTitle] = useState(false);
-  const [worksheetMode, setWorksheetMode] = useState<WorksheetMode>('practice');
+  const [worksheetMode, setWorksheetMode] = useState<WorksheetMode>('diagnostic');
   const [teacherName, setTeacherName] = useState('');
 
   // Auto-update title to first topic name when questions are added
   useEffect(() => {
     if (selectedQuestions.length > 0 && !hasUserEditedTitle) {
-      const prefix = worksheetMode === 'basic_assessment' ? 'Assessment: ' : worksheetMode === 'diagnostic' ? 'Diagnostic: ' : '';
+      const prefix = worksheetMode === 'basic_assessment' ? 'Assessment: ' : 'Diagnostic: ';
       setWorksheetTitle(prefix + selectedQuestions[0].topicName);
     } else if (selectedQuestions.length === 0 && !hasUserEditedTitle) {
-      setWorksheetTitle(worksheetMode === 'basic_assessment' ? 'Math Assessment' : worksheetMode === 'diagnostic' ? 'Diagnostic Assessment' : 'Math Practice Worksheet');
+      setWorksheetTitle(worksheetMode === 'basic_assessment' ? 'Math Assessment' : 'Diagnostic Assessment');
     }
   }, [selectedQuestions, hasUserEditedTitle, worksheetMode]);
   const [showAnswerLines, setShowAnswerLines] = useState(true);
@@ -1848,26 +1848,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               {/* Worksheet Type Selection */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">What are you building?</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    type="button"
-                    variant={worksheetMode === 'practice' ? 'default' : 'outline'}
-                    className={`h-auto py-3 flex flex-col items-center gap-1.5 ${
-                      worksheetMode === 'practice' 
-                        ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2' 
-                        : 'hover:bg-muted'
-                    }`}
-                    onClick={() => {
-                      setWorksheetMode('practice');
-                      if (!hasUserEditedTitle) {
-                        setWorksheetTitle(selectedQuestions.length > 0 ? selectedQuestions[0].topicName : 'Math Practice Worksheet');
-                      }
-                    }}
-                  >
-                    <BookOpen className="h-5 w-5" />
-                    <span className="font-semibold text-xs">Practice</span>
-                    <span className="text-[10px] opacity-80 text-center leading-tight">Homework & classwork</span>
-                  </Button>
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
                     variant={worksheetMode === 'basic_assessment' ? 'default' : 'outline'}
