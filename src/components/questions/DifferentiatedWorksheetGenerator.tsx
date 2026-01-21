@@ -3452,11 +3452,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   Close
                 </Button>
                 <Button
-                  variant="outline"
                   size="sm"
                   onClick={generateWordDocument}
                   disabled={isGenerating}
-                  className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   {isGenerating && generationStatus.includes('Word') ? (
                     <Loader2 className="h-4 w-4 mr-1 animate-spin" />
