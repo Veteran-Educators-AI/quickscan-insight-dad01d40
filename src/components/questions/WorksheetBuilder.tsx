@@ -200,6 +200,17 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   
   const printRef = useRef<HTMLDivElement>(null);
 
+  // ESC key handler for preview modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showPreview) {
+        setShowPreview(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPreview]);
+
   // Determine if selected topics are geometry/trigonometry related (for shape generation vs clipart)
   const isGeometryOrTrigSubject = selectedQuestions.some(q => {
     const subject = q.subject?.toLowerCase() || '';
@@ -2781,6 +2792,16 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       {/* Print Preview Modal */}
       {showPreview && (
         <div className="fixed inset-0 bg-muted/90 z-50 flex flex-col print:static print:overflow-visible print:bg-white">
+          {/* Fixed X Close Button - always visible */}
+          <button
+            type="button"
+            onClick={() => setShowPreview(false)}
+            className="print:hidden fixed top-4 right-4 z-[60] w-8 h-8 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg hover:bg-destructive/90 transition-colors"
+            aria-label="Close preview"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
           {/* Preview Header Toolbar */}
           <div className="print:hidden flex items-center justify-between p-3 bg-background border-b shadow-sm">
             <div className="flex items-center gap-4">
@@ -2805,10 +2826,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 </Button>
               </div>
               <span className="text-sm text-muted-foreground">
-                {compiledQuestions.length} question{compiledQuestions.length !== 1 ? 's' : ''}
+                {compiledQuestions.length} question{compiledQuestions.length !== 1 ? 's' : ''} • Press ESC to close
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mr-10">
               <Button variant="outline" onClick={() => setShowPreview(false)}>
                 <X className="h-4 w-4 mr-2" />
                 Close
@@ -2820,7 +2841,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             </div>
           </div>
 
-          {/* Preview Content Area */}
+          {/* Preview Content Area - render each page separately */}
           <div className="flex-1 overflow-y-auto overflow-x-auto p-6 print:p-0 print:overflow-visible" style={{ maxHeight: 'calc(100vh - 64px)' }}>
             <div 
               ref={printRef} 
