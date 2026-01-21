@@ -104,15 +104,21 @@ interface SavedWorksheet {
 }
 
 // Page Break Indicator Component - shows where pages will split when printing
-const PageBreakIndicators = ({ contentRef }: { contentRef: React.RefObject<HTMLDivElement> }) => {
+const PageBreakIndicators = ({
+  contentRef,
+  pageMarginIn,
+}: {
+  contentRef: React.RefObject<HTMLDivElement>;
+  pageMarginIn: number;
+}) => {
   const [pageBreaks, setPageBreaks] = useState<number[]>([]);
   
   useEffect(() => {
     if (!contentRef.current) return;
     
-    // Standard US Letter: 11in page height, 0.75in padding top and bottom = 9.5in content area
-    // At 96 DPI: 9.5 * 96 = 912px per page content area
-    const pageContentHeight = 912; // pixels
+    // Standard US Letter: 11in page height minus margins for content area
+    // At 96 DPI: inches * 96 = pixels per page content area
+    const pageContentHeight = Math.max(1, (11 - (pageMarginIn * 2)) * 96);
     
     const calculateBreaks = () => {
       if (!contentRef.current) return;
@@ -137,7 +143,7 @@ const PageBreakIndicators = ({ contentRef }: { contentRef: React.RefObject<HTMLD
     observer.observe(contentRef.current);
     
     return () => observer.disconnect();
-  }, [contentRef]);
+  }, [contentRef, pageMarginIn]);
   
   if (pageBreaks.length === 0) return null;
   
@@ -258,6 +264,11 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [clipartStatus, setClipartStatus] = useState('');
   const [clipartGenerated, setClipartGenerated] = useState(false);
   const [clipartSize, setClipartSize] = useState(15); // Clipart size in mm (10-40)
+
+  const marginMm = marginSize === 'small' ? 12 : marginSize === 'large' ? 25 : 20;
+  const marginIn = marginMm / 25.4;
+  const marginInCss = marginIn.toFixed(3);
+  const marginPt = marginIn * 72;
   
   // Lightbox state for full-screen image viewing
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
@@ -1202,7 +1213,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       const pdf = new jsPDF('p', 'mm', 'letter');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = marginSize === 'small' ? 12 : marginSize === 'large' ? 25 : 20; // Based on user preference
+      const margin = marginMm; // Based on user preference
       const contentWidth = pageWidth - margin * 2;
       let yPosition = margin;
 
@@ -2988,10 +2999,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   
                   const pageWidth = 612; // 8.5in in points
                   const pageHeight = 792; // 11in in points
-                  const marginLeft = 54; // 0.75in
-                  const marginRight = 54;
-                  const marginTop = 54;
-                  const marginBottom = 54;
+                  const marginLeft = marginPt;
+                  const marginRight = marginPt;
+                  const marginTop = marginPt;
+                  const marginBottom = marginPt;
                   const contentWidth = pageWidth - marginLeft - marginRight;
                   let yPosition = marginTop;
                   
@@ -3168,7 +3179,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   <head>
                     <title>${worksheetTitle}</title>
                     <style>
-                      @page { size: letter; margin: 0.75in; }
+                      @page { size: letter; margin: 0; }
                       * { box-sizing: border-box; }
                       body { 
                         font-family: Georgia, serif; 
@@ -3181,6 +3192,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         width: 100%;
                         max-width: 8.5in;
                         margin: 0 auto;
+                      }
+                      .print-worksheet {
+                        padding: ${marginInCss}in;
+                        box-sizing: border-box;
                       }
                     </style>
                   </head>
@@ -3229,8 +3244,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             >
               {/* Wrapper that shows page boundaries */}
               <div style={{ position: 'relative' }}>
-                {/* Page break indicators - shown every 11 inches minus padding (9.5in content height) */}
-                <PageBreakIndicators contentRef={printRef} />
+                {/* Page break indicators - based on configured page margins */}
+                <PageBreakIndicators contentRef={printRef} pageMarginIn={marginIn} />
                 
                 {/* Actual page content */}
                 <div 
@@ -3239,7 +3254,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     backgroundColor: 'white',
                     boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
                     border: '1px solid #d1d5db',
-                    padding: '0.6in 0.65in',
+                    padding: `${marginInCss}in`,
                     boxSizing: 'border-box',
                     width: '100%',
                     maxWidth: '8.5in',
@@ -3571,7 +3586,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             top: auto !important;
             width: 100% !important;
             max-width: 100% !important;
-            padding: 0.5in 0.6in !important;
+            padding: ${marginInCss}in !important;
             margin: 0 !important;
             box-shadow: none !important;
             border: none !important;
@@ -3612,7 +3627,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           }
           
           @page {
-            margin: 0.5in;
+            margin: 0;
             size: letter;
           }
         }
