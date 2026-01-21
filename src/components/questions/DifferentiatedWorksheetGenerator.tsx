@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw, QrCode, Palette, BookOpen, ImageIcon } from 'lucide-react';
+import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw, QrCode, Palette, BookOpen, ImageIcon, FileType } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QuestionPreviewPanel } from './QuestionPreviewPanel';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import { useAuth } from '@/lib/auth';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
 import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
+import { Document, Packer, Paragraph, TextRun, PageOrientation, BorderStyle, AlignmentType, convertInchesToTwip } from 'docx';
 
 interface WorksheetPreset {
   id: string;
@@ -586,6 +587,333 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   // Select only students without any diagnostic data (for first-time diagnostics)
   const selectOnlyWithoutDiagnostic = () => {
     setStudents(prev => prev.map(s => ({ ...s, selected: !s.diagnosticResult && !s.hasAdaptiveData })));
+  };
+
+  // Generate Word document with same margins as PDF
+  const generateWordDocument = async () => {
+    if (!previewData) {
+      toast({
+        title: 'No preview data',
+        description: 'Please generate a preview first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerationStatus('Creating Word document...');
+    setGenerationProgress(0);
+
+    try {
+      const sections: any[] = [];
+      const numForms = parseInt(formCount);
+      const formsToGenerate = FORM_LETTERS.slice(0, numForms);
+      const totalStudents = previewData.students.length;
+      let processedStudents = 0;
+
+      for (const student of previewData.students) {
+        const studentIdx = previewData.students.filter(s => s.recommendedLevel === student.recommendedLevel)
+          .indexOf(student);
+        const formIndex = studentIdx % numForms;
+        const assignedForm = formsToGenerate[formIndex];
+        const cacheKey = `${assignedForm}-${student.recommendedLevel}`;
+        const questions = previewData.questions[cacheKey];
+
+        setGenerationStatus(`Processing ${student.first_name} ${student.last_name}...`);
+
+        const children: any[] = [];
+        const topicsLabel = selectedTopics.length > 0 ? selectedTopics.join(', ') : 'Math Practice';
+
+        // Header with level and form
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Level ${student.recommendedLevel} - ${getLevelDescription(student.recommendedLevel)}${numForms > 1 ? ` | Form ${assignedForm}` : ''}`,
+                bold: true,
+                size: 32, // 16pt
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 200, after: 100 },
+          })
+        );
+
+        // Topic subtitle
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `${topicsLabel.length > 50 ? topicsLabel.substring(0, 47) + '...' : topicsLabel} - Diagnostic Worksheet`,
+                size: 24, // 12pt
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          })
+        );
+
+        // Student info line
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: 'Name: ', bold: true, size: 22 }),
+              new TextRun({ text: `${student.first_name} ${student.last_name}`, size: 22 }),
+              new TextRun({ text: '          Date: _______________', size: 22 }),
+              ...(numForms > 1 ? [new TextRun({ text: `          Form ${assignedForm}`, bold: true, size: 22 })] : []),
+            ],
+            spacing: { after: 200 },
+          })
+        );
+
+        // AI Grading Instructions Box
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: '[!] IMPORTANT: AI Grading Instructions',
+                bold: true,
+                size: 18,
+              }),
+            ],
+            border: {
+              top: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+              bottom: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+              left: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+              right: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+            },
+            shading: { fill: 'EFF6FF' },
+            spacing: { before: 200 },
+          })
+        );
+
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: '• Write ALL work inside the bordered "WORK AREA" boxes only.  ', size: 16 }),
+              new TextRun({ text: '• Work outside boxes may NOT be graded by AI.', size: 16 }),
+            ],
+            border: {
+              bottom: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+              left: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+              right: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+            },
+            shading: { fill: 'EFF6FF' },
+            spacing: { after: 300 },
+          })
+        );
+
+        // Warm-up section
+        if (questions?.warmUp && questions.warmUp.length > 0) {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: '🔥 Warm-Up: Let\'s Get Started!', bold: true, size: 20, color: '166534' }),
+              ],
+              shading: { fill: 'F0FDF4' },
+              spacing: { before: 200, after: 100 },
+            })
+          );
+
+          for (const q of questions.warmUp) {
+            const sanitizedQuestion = formatPdfText(q.question);
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `${q.questionNumber}. `, bold: true, size: 22 }),
+                  new TextRun({ text: sanitizedQuestion, size: 20 }),
+                ],
+                spacing: { before: 100, after: 50 },
+              })
+            );
+
+            if (q.hint && includeHints) {
+              children.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: 'Hint: ', italics: true, size: 16, color: '6B7280' }),
+                    new TextRun({ text: q.hint, italics: true, size: 16, color: '6B7280' }),
+                  ],
+                  spacing: { after: 100 },
+                })
+              );
+            }
+
+            // Work area box
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: '' })],
+                border: {
+                  top: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                  bottom: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                  left: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                  right: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                },
+                spacing: { before: 50, after: 200 },
+              })
+            );
+            // Empty lines for work area
+            for (let i = 0; i < 3; i++) {
+              children.push(
+                new Paragraph({
+                  children: [new TextRun({ text: '' })],
+                  border: {
+                    left: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                    right: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                  },
+                })
+              );
+            }
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: '' })],
+                border: {
+                  bottom: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                  left: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                  right: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                },
+                spacing: { after: 200 },
+              })
+            );
+          }
+        }
+
+        // Main questions section
+        if (questions?.main && questions.main.length > 0) {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: '📝 Practice Questions', bold: true, size: 20 }),
+              ],
+              spacing: { before: 300, after: 150 },
+            })
+          );
+
+          for (let idx = 0; idx < questions.main.length; idx++) {
+            const q = questions.main[idx];
+            const sanitizedQuestion = formatPdfText(q.question);
+
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `${idx + 1}. `, bold: true, size: 22 }),
+                  new TextRun({ text: sanitizedQuestion, size: 20 }),
+                ],
+                spacing: { before: 150, after: 50 },
+              })
+            );
+
+            if (q.hint && includeHints) {
+              children.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: 'Hint: ', italics: true, size: 16, color: '6B7280' }),
+                    new TextRun({ text: q.hint, italics: true, size: 16, color: '6B7280' }),
+                  ],
+                  spacing: { after: 100 },
+                })
+              );
+            }
+
+            // Work area with label
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: 'WORK AREA:', bold: true, size: 14, color: '374151' })],
+                border: {
+                  top: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                  left: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                  right: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                },
+                spacing: { before: 100 },
+              })
+            );
+
+            // Empty lines for work area (more space for main questions)
+            for (let i = 0; i < 6; i++) {
+              children.push(
+                new Paragraph({
+                  children: [new TextRun({ text: '' })],
+                  border: {
+                    left: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                    right: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                  },
+                })
+              );
+            }
+
+            // Answer section (highlighted)
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: 'ANSWER: _______________________________', bold: true, size: 18 })],
+                shading: { fill: 'FEF9C3' },
+                border: {
+                  top: { style: BorderStyle.SINGLE, size: 4, color: 'EAB308' },
+                  bottom: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                  left: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                  right: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                },
+                spacing: { after: 300 },
+              })
+            );
+          }
+        }
+
+        // Add section with page break for each student (except last)
+        sections.push({
+          properties: {
+            page: {
+              margin: {
+                top: convertInchesToTwip(0.75),
+                right: convertInchesToTwip(0.75),
+                bottom: convertInchesToTwip(0.75),
+                left: convertInchesToTwip(0.75),
+              },
+              size: {
+                orientation: PageOrientation.PORTRAIT,
+                width: convertInchesToTwip(8.5),
+                height: convertInchesToTwip(11),
+              },
+            },
+          },
+          children: children,
+        });
+
+        processedStudents++;
+        setGenerationProgress((processedStudents / totalStudents) * 100);
+      }
+
+      // Create the document
+      const doc = new Document({
+        sections: sections,
+      });
+
+      // Generate and download
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Diagnostic_Worksheets_${selectedTopics[0]?.substring(0, 20) || 'Math'}_${new Date().toISOString().split('T')[0]}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: '📄 Word document ready!',
+        description: `Created ${totalStudents} worksheet${totalStudents !== 1 ? 's' : ''} in Word format.`,
+      });
+
+    } catch (error) {
+      console.error('Error generating Word document:', error);
+      toast({
+        title: 'Word generation failed',
+        description: 'Could not generate Word document.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+      setGenerationProgress(0);
+    }
   };
 
   const generateDifferentiatedWorksheets = async () => {
@@ -3122,6 +3450,20 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 >
                   <X className="h-4 w-4 mr-1" />
                   Close
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={generateWordDocument}
+                  disabled={isGenerating}
+                  className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                >
+                  {isGenerating && generationStatus.includes('Word') ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <FileType className="h-4 w-4 mr-1" />
+                  )}
+                  Word Doc
                 </Button>
                 <Button
                   size="sm"
