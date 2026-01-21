@@ -323,6 +323,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [storyboardImages, setStoryboardImages] = useState<Record<string, string>>({});
   const [regeneratingImageKey, setRegeneratingImageKey] = useState<string | null>(null);
   
+  // Geometry shapes state for on-demand generation
+  const [geometryShapes, setGeometryShapes] = useState<Record<string, string>>({});
+  const [regeneratingShapeKey, setRegeneratingShapeKey] = useState<string | null>(null);
+  
   // Topics from standards menu selection
   const [customTopics, setCustomTopics] = useState<{ topicName: string; standard: string }[]>([]);
   // Adaptive levels based on student performance data
@@ -742,9 +746,12 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             })
           );
 
-          for (const q of questions.warmUp) {
+          for (let warmUpIdx = 0; warmUpIdx < questions.warmUp.length; warmUpIdx++) {
+            const q = questions.warmUp[warmUpIdx];
             const sanitizedQuestion = formatPdfText(q.question);
-            const hasShape = (q.imageUrl || q.svg) && includeGeometry;
+            const shapeKey = `${assignedForm}-${student.recommendedLevel}-warmUp-${warmUpIdx}`;
+            const generatedShapeUrl = geometryShapes[shapeKey];
+            const hasShape = ((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl;
             children.push(
               new Paragraph({
                 children: [
@@ -756,11 +763,11 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               })
             );
 
-            // Add geometry image if available (for warm-up)
-            if ((q.imageUrl || q.svg) && includeGeometry) {
+            // Add geometry image if available (for warm-up) - check generated shapes first
+            if (generatedShapeUrl || ((q.imageUrl || q.svg) && includeGeometry)) {
               try {
-                let imageData = q.imageUrl || '';
-                if (q.svg && !q.imageUrl) {
+                let imageData = generatedShapeUrl || q.imageUrl || '';
+                if (!imageData && q.svg && !q.imageUrl) {
                   imageData = await svgToPngDataUrl(q.svg, 200, 200);
                 }
                 if (imageData) {
@@ -853,7 +860,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           for (let idx = 0; idx < questions.main.length; idx++) {
             const q = questions.main[idx];
             const sanitizedQuestion = formatPdfText(q.question);
-            const hasShape = (q.imageUrl || q.svg) && includeGeometry;
+            const shapeKey = `${assignedForm}-${student.recommendedLevel}-main-${idx}`;
+            const generatedShapeUrl = geometryShapes[shapeKey];
+            const hasShape = ((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl;
 
             children.push(
               new Paragraph({
@@ -866,11 +875,11 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               })
             );
 
-            // Add geometry image if available (for main questions)
-            if ((q.imageUrl || q.svg) && includeGeometry) {
+            // Add geometry image if available (for main questions) - check generated shapes first
+            if (generatedShapeUrl || ((q.imageUrl || q.svg) && includeGeometry)) {
               try {
-                let imageData = q.imageUrl || '';
-                if (q.svg && !q.imageUrl) {
+                let imageData = generatedShapeUrl || q.imageUrl || '';
+                if (!imageData && q.svg && !q.imageUrl) {
                   imageData = await svgToPngDataUrl(q.svg, 200, 200);
                 }
                 if (imageData) {
@@ -2279,6 +2288,74 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     });
   };
 
+  // Generate geometry shape for a specific question
+  const generateGeometryShapeForQuestion = async (
+    questionText: string,
+    questionKey: string
+  ): Promise<string | null> => {
+    try {
+      console.log(`Generating geometry shape for: ${questionKey}`);
+      setRegeneratingShapeKey(questionKey);
+      
+      // Create a prompt based on the question text
+      const shapePrompt = `Create a clear geometric diagram for this math question: "${questionText}". 
+        Include appropriate labels, measurements, and annotations that match the question.`;
+      
+      const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+        body: {
+          questions: [{
+            questionNumber: 1,
+            imagePrompt: shapePrompt,
+          }],
+          useNanoBanana: useAIImages,
+        },
+      });
+
+      if (error) {
+        console.error('Geometry shape generation error:', error);
+        return null;
+      }
+
+      const imageUrl = data?.results?.[0]?.imageUrl;
+      if (imageUrl) {
+        setGeometryShapes(prev => ({
+          ...prev,
+          [questionKey]: imageUrl,
+        }));
+        return imageUrl;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error generating geometry shape:', error);
+      return null;
+    } finally {
+      setRegeneratingShapeKey(null);
+    }
+  };
+
+  // Regenerate geometry shape for a specific question
+  const regenerateGeometryShape = async (questionText: string, questionKey: string) => {
+    toast({
+      title: 'Generating shape...',
+      description: 'Creating a geometry diagram for this question.',
+    });
+    
+    const imageUrl = await generateGeometryShapeForQuestion(questionText, questionKey);
+    
+    if (imageUrl) {
+      toast({
+        title: 'Shape generated',
+        description: 'Geometry diagram has been created.',
+      });
+    } else {
+      toast({
+        title: 'Generation failed',
+        description: 'Could not generate geometry shape. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const renderStudentPreview = (student: StudentWithDiagnostic, index: number) => {
     if (!previewData) return null;
@@ -2445,10 +2522,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                         </Tooltip>
                       </TooltipProvider>
                     </div>
-                    {/* Show geometry shapes in preview */}
-                    {(q.imageUrl || q.svg) && includeGeometry && (
-                      <div className="mt-2 flex justify-center">
-                        {q.svg && !q.imageUrl ? (
+                    {/* Show geometry shapes in preview - from question or generated */}
+                    {((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-warmUp-${idx}`] ? (
+                      <div className="mt-2 flex justify-center relative group/shape">
+                        {geometryShapes[`${cacheKey}-warmUp-${idx}`] ? (
+                          <img 
+                            src={geometryShapes[`${cacheKey}-warmUp-${idx}`]} 
+                            alt="Geometry diagram" 
+                            className="max-w-[150px] max-h-[150px] border rounded"
+                          />
+                        ) : q.svg && !q.imageUrl ? (
                           <div 
                             className="max-w-[150px] max-h-[150px] border rounded overflow-hidden"
                             dangerouslySetInnerHTML={{ __html: q.svg }}
@@ -2460,7 +2543,35 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                             className="max-w-[150px] max-h-[150px] border rounded"
                           />
                         )}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="absolute top-1 right-1 h-6 opacity-0 group-hover/shape:opacity-100 transition-opacity"
+                          onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-warmUp-${idx}`)}
+                          disabled={regeneratingShapeKey === `${cacheKey}-warmUp-${idx}`}
+                        >
+                          {regeneratingShapeKey === `${cacheKey}-warmUp-${idx}` ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3 w-3" />
+                          )}
+                        </Button>
                       </div>
+                    ) : includeGeometry && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 w-full"
+                        onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-warmUp-${idx}`)}
+                        disabled={regeneratingShapeKey === `${cacheKey}-warmUp-${idx}`}
+                      >
+                        {regeneratingShapeKey === `${cacheKey}-warmUp-${idx}` ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : (
+                          <Shapes className="h-3 w-3 mr-1" />
+                        )}
+                        Generate Shape
+                      </Button>
                     )}
                     {/* Show storyboard art in preview */}
                     {includeStoryboardArt && (
@@ -2550,10 +2661,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                         </Tooltip>
                       </TooltipProvider>
                     </div>
-                    {/* Show geometry shapes in preview */}
-                    {(q.imageUrl || q.svg) && includeGeometry && (
-                      <div className="mt-2 flex justify-center">
-                        {q.svg && !q.imageUrl ? (
+                    {/* Show geometry shapes in preview - from question or generated */}
+                    {((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-main-${idx}`] ? (
+                      <div className="mt-2 flex justify-center relative group/shape">
+                        {geometryShapes[`${cacheKey}-main-${idx}`] ? (
+                          <img 
+                            src={geometryShapes[`${cacheKey}-main-${idx}`]} 
+                            alt="Geometry diagram" 
+                            className="max-w-[180px] max-h-[180px] border rounded"
+                          />
+                        ) : q.svg && !q.imageUrl ? (
                           <div 
                             className="max-w-[180px] max-h-[180px] border rounded overflow-hidden"
                             dangerouslySetInnerHTML={{ __html: q.svg }}
@@ -2565,8 +2682,21 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                             className="max-w-[180px] max-h-[180px] border rounded"
                           />
                         )}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="absolute top-1 right-1 h-6 opacity-0 group-hover/shape:opacity-100 transition-opacity"
+                          onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-main-${idx}`)}
+                          disabled={regeneratingShapeKey === `${cacheKey}-main-${idx}`}
+                        >
+                          {regeneratingShapeKey === `${cacheKey}-main-${idx}` ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3 w-3" />
+                          )}
+                        </Button>
                       </div>
-                    )}
+                    ) : null}
                     {/* Show storyboard art in preview */}
                     {includeStoryboardArt && (
                       <div className="mt-2">
@@ -2612,9 +2742,27 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                     {q.hint && includeHints && (
                       <p className="text-xs text-muted-foreground mt-1 italic">Hint: {q.hint}</p>
                     )}
-                    {/* Answer space */}
+                    {/* Answer space with Generate Shape button */}
                     <div className="mt-3 border-t pt-2">
-                      <div className="h-16 border border-dashed rounded bg-gray-50"></div>
+                      <div className="h-16 border border-dashed rounded bg-gray-50 relative flex items-center justify-center">
+                        {/* Show Generate Shape button if no shape exists and geometry is enabled */}
+                        {includeGeometry && !q.imageUrl && !q.svg && !geometryShapes[`${cacheKey}-main-${idx}`] && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                            onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-main-${idx}`)}
+                            disabled={regeneratingShapeKey === `${cacheKey}-main-${idx}`}
+                          >
+                            {regeneratingShapeKey === `${cacheKey}-main-${idx}` ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              <Shapes className="h-3 w-3 mr-1" />
+                            )}
+                            Generate Shape
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
