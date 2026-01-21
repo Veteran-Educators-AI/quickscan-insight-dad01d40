@@ -2975,13 +2975,226 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 Close
               </Button>
               <Button 
-                onClick={() => { window.print(); }}
-                style={{ 
-                  backgroundColor: '#1e40af', 
-                  color: 'white',
-                  fontWeight: 600,
+                variant="outline"
+                onClick={() => {
+                  // Generate professional PDF from worksheet content
+                  const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'pt',
+                    format: 'letter',
+                  });
+                  
+                  const pageWidth = 612; // 8.5in in points
+                  const pageHeight = 792; // 11in in points
+                  const marginLeft = 54; // 0.75in
+                  const marginRight = 54;
+                  const marginTop = 54;
+                  const marginBottom = 54;
+                  const contentWidth = pageWidth - marginLeft - marginRight;
+                  let yPosition = marginTop;
+                  
+                  // Helper function to clean text for PDF (fix encoding issues)
+                  const cleanTextForPDF = (text: string): string => {
+                    let cleaned = fixEncodingCorruption(text);
+                    // Additional cleanup for PDF rendering
+                    cleaned = cleaned
+                      .replace(/\u03B8/g, 'θ') // theta
+                      .replace(/\u03C0/g, 'π') // pi
+                      .replace(/\u221A/g, '√') // sqrt
+                      .replace(/\u00B2/g, '²') // superscript 2
+                      .replace(/\u00B3/g, '³') // superscript 3
+                      .replace(/\u2264/g, '≤') // less than or equal
+                      .replace(/\u2265/g, '≥') // greater than or equal
+                      .replace(/\u00B0/g, '°') // degree
+                      .replace(/\u2220/g, '∠') // angle
+                      .replace(/\u00B1/g, '±'); // plus minus
+                    return cleaned;
+                  };
+                  
+                  // Helper to check page break
+                  const checkPageBreak = (neededHeight: number) => {
+                    if (yPosition + neededHeight > pageHeight - marginBottom) {
+                      pdf.addPage();
+                      yPosition = marginTop;
+                      return true;
+                    }
+                    return false;
+                  };
+                  
+                  // Title
+                  pdf.setFontSize(20);
+                  pdf.setFont('helvetica', 'bold');
+                  pdf.text(cleanTextForPDF(worksheetTitle), pageWidth / 2, yPosition, { align: 'center' });
+                  yPosition += 28;
+                  
+                  // Teacher name
+                  if (teacherName) {
+                    pdf.setFontSize(11);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.text(`Teacher: ${teacherName}`, pageWidth / 2, yPosition, { align: 'center' });
+                    yPosition += 20;
+                  }
+                  
+                  // Name/Date/Period fields
+                  yPosition += 10;
+                  pdf.setFontSize(11);
+                  pdf.setFont('helvetica', 'normal');
+                  pdf.text('Name: ________________________________', marginLeft, yPosition);
+                  pdf.text('Date: ____________', marginLeft + 280, yPosition);
+                  pdf.text('Period: _____', marginLeft + 420, yPosition);
+                  yPosition += 8;
+                  
+                  // Divider line
+                  pdf.setDrawColor(180, 180, 180);
+                  pdf.setLineWidth(0.5);
+                  pdf.line(marginLeft, yPosition, pageWidth - marginRight, yPosition);
+                  yPosition += 25;
+                  
+                  // Questions
+                  compiledQuestions.forEach((q) => {
+                    // Estimate question height
+                    const questionText = cleanTextForPDF(q.question);
+                    const questionLines = pdf.splitTextToSize(questionText, contentWidth - 20);
+                    const estimatedHeight = showAnswerLines ? 180 : 60 + (questionLines.length * 14);
+                    
+                    checkPageBreak(estimatedHeight);
+                    
+                    // Question number and topic header
+                    pdf.setFontSize(11);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(`${q.questionNumber}.`, marginLeft, yPosition);
+                    
+                    pdf.setFontSize(9);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.setTextColor(100, 100, 100);
+                    pdf.text(`[${q.difficulty}] ${cleanTextForPDF(q.topic)}`, marginLeft + 20, yPosition);
+                    pdf.setTextColor(0, 0, 0);
+                    yPosition += 18;
+                    
+                    // Question text
+                    pdf.setFontSize(11);
+                    pdf.setFont('helvetica', 'normal');
+                    questionLines.forEach((line: string) => {
+                      checkPageBreak(16);
+                      pdf.text(line, marginLeft + 15, yPosition);
+                      yPosition += 14;
+                    });
+                    
+                    // Work area box if enabled
+                    if (showAnswerLines) {
+                      yPosition += 8;
+                      const boxHeight = 100;
+                      checkPageBreak(boxHeight + 30);
+                      
+                      // Draw work area box
+                      pdf.setDrawColor(30, 58, 95);
+                      pdf.setLineWidth(1.5);
+                      pdf.rect(marginLeft, yPosition, contentWidth, boxHeight);
+                      
+                      // Work Area label
+                      pdf.setFontSize(8);
+                      pdf.setTextColor(100, 100, 100);
+                      pdf.text('Work Area', marginLeft + 5, yPosition + 12);
+                      pdf.setTextColor(0, 0, 0);
+                      
+                      yPosition += boxHeight + 10;
+                      
+                      // Final Answer line
+                      pdf.setFontSize(10);
+                      pdf.text('Final Answer: ___________________________________________', marginLeft + 15, yPosition);
+                      yPosition += 25;
+                    } else {
+                      yPosition += 15;
+                    }
+                  });
+                  
+                  // Answer Key on new page if answers exist
+                  const questionsWithAnswers = compiledQuestions.filter(q => q.answer);
+                  if (questionsWithAnswers.length > 0) {
+                    pdf.addPage();
+                    yPosition = marginTop;
+                    
+                    pdf.setFontSize(18);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('Answer Key', pageWidth / 2, yPosition, { align: 'center' });
+                    yPosition += 35;
+                    
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'normal');
+                    questionsWithAnswers.forEach((q) => {
+                      checkPageBreak(30);
+                      const answerText = `${q.questionNumber}. ${cleanTextForPDF(q.answer || '')}`;
+                      const answerLines = pdf.splitTextToSize(answerText, contentWidth);
+                      answerLines.forEach((line: string) => {
+                        pdf.text(line, marginLeft, yPosition);
+                        yPosition += 14;
+                      });
+                      yPosition += 8;
+                    });
+                  }
+                  
+                  // Download
+                  const fileName = `${worksheetTitle.replace(/[^a-z0-9]/gi, '_')}_worksheet.pdf`;
+                  pdf.save(fileName);
+                  toast({ title: "PDF Downloaded", description: `Saved as ${fileName}` });
                 }}
               >
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+              <Button onClick={() => {
+                // Print the worksheet content properly
+                const printContent = printRef.current;
+                if (!printContent) {
+                  toast({ title: "Error", description: "Could not find content to print", variant: "destructive" });
+                  return;
+                }
+                
+                // Create a new window for printing
+                const printWindow = window.open('', '_blank');
+                if (!printWindow) {
+                  toast({ title: "Error", description: "Popup blocked. Please allow popups.", variant: "destructive" });
+                  return;
+                }
+                
+                // Get the worksheet HTML
+                const worksheetHTML = printContent.innerHTML;
+                
+                printWindow.document.write(`
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                    <title>${worksheetTitle}</title>
+                    <style>
+                      @page { size: letter; margin: 0.75in; }
+                      * { box-sizing: border-box; }
+                      body { 
+                        font-family: Georgia, serif; 
+                        margin: 0; 
+                        padding: 0;
+                        color: #000;
+                        background: #fff;
+                      }
+                      .worksheet-page {
+                        width: 100%;
+                        max-width: 8.5in;
+                        margin: 0 auto;
+                      }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="worksheet-page">${worksheetHTML}</div>
+                    <script>
+                      window.onload = function() {
+                        window.print();
+                        window.onafterprint = function() { window.close(); };
+                      };
+                    </script>
+                  </body>
+                  </html>
+                `);
+                printWindow.document.close();
+              }}>
                 <Printer className="h-4 w-4 mr-2" />
                 Print from Preview
               </Button>
