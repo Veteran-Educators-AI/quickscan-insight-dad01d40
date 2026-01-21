@@ -26,7 +26,10 @@ import {
   Shield,
   ShieldCheck,
   ShieldAlert,
-  AlertTriangle
+  AlertTriangle,
+  ExternalLink,
+  FolderOpen,
+  AppWindow
 } from 'lucide-react';
 import { useWebUSBScanner } from '@/hooks/useWebUSBScanner';
 import { cn } from '@/lib/utils';
@@ -254,7 +257,83 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
                       <div className="pt-2 border-t mt-2">
                         <p className="text-xs text-muted-foreground">
                           <strong>Note:</strong> Not all scanners support WebUSB. If your scanner doesn't appear, 
-                          try using the file import or camera options instead.
+                          try using a desktop scanning app with the Watch Folder feature.
+                        </p>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                {/* Use Desktop App Guide */}
+                <Collapsible className="w-full max-w-md">
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" size="sm" className="text-xs">
+                      <AppWindow className="h-3 w-3 mr-1" />
+                      Use Desktop Scanning App Instead
+                      <ChevronDown className="h-3 w-3 ml-1" />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 text-left space-y-3">
+                      <h4 className="font-medium text-sm flex items-center gap-2">
+                        <AppWindow className="h-4 w-4 text-primary" /> 
+                        Recommended: Desktop App + Watch Folder
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        For the most reliable scanning experience, use a free desktop app with our Watch Folder feature:
+                      </p>
+                      
+                      <div className="space-y-3">
+                        <div className="p-3 rounded bg-background border">
+                          <p className="font-medium text-sm mb-1">Step 1: Install a Scanning App</p>
+                          <div className="space-y-2">
+                            <a 
+                              href="https://www.naps2.com/" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-xs text-primary hover:underline"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              <strong>NAPS2</strong> (Free, Windows/Mac/Linux)
+                            </a>
+                            <a 
+                              href="https://www.hamrick.com/" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-xs text-primary hover:underline"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              <strong>VueScan</strong> (Paid, supports 6000+ scanners)
+                            </a>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              These apps work with almost any scanner using standard drivers.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded bg-background border">
+                          <p className="font-medium text-sm mb-1">Step 2: Configure Output Folder</p>
+                          <p className="text-xs text-muted-foreground">
+                            In NAPS2 or VueScan, set the output folder to save scanned images (e.g., <code className="px-1 py-0.5 bg-muted rounded">C:\Scans</code> or <code className="px-1 py-0.5 bg-muted rounded">~/Documents/Scans</code>)
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded bg-background border">
+                          <p className="font-medium text-sm mb-1 flex items-center gap-1">
+                            <FolderOpen className="h-3 w-3" />
+                            Step 3: Enable Watch Folder
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            In the Scanner Import panel, click <strong>"Watch Folder"</strong> and select the same folder. 
+                            New scans will automatically appear here!
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                          This workflow is faster and more reliable than WebUSB for most scanners.
                         </p>
                       </div>
                     </div>
