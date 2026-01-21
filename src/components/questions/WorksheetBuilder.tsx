@@ -3050,11 +3050,24 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     <span>Date: ___________</span>
                     <span>Period: _____</span>
                   </div>
-                  <div className="space-y-8" style={{ maxWidth: '100%', overflow: 'hidden' }}>
+                  <div style={{ width: '100%' }}>
                     {compiledQuestions.map((question) => (
-                      <div key={question.questionNumber} className="space-y-2" style={{ pageBreakInside: 'avoid', maxWidth: '100%', overflow: 'hidden' }}>
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="font-bold text-black">{question.questionNumber}.</span>
+                      <div 
+                        key={question.questionNumber} 
+                        style={{ 
+                          pageBreakInside: 'avoid',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '0.375rem',
+                          padding: '0.75rem',
+                          marginBottom: '1rem',
+                          backgroundColor: '#fafafa',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        {/* Question header */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                          <span style={{ fontWeight: 700, color: 'black' }}>{question.questionNumber}.</span>
                           {worksheetMode === 'diagnostic' && question.advancementLevel && (
                             <span className={`text-xs px-2 py-0.5 rounded border font-semibold ${
                               question.advancementLevel === 'A' ? 'bg-green-100 text-green-800 border-green-300' :
@@ -3071,38 +3084,48 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                             {question.difficulty}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-500 ml-5">
+                        
+                        {/* Topic/Standard */}
+                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginLeft: '1rem', marginBottom: '0.5rem' }}>
                           {question.topic} ({question.standard})
                         </p>
+                        
+                        {/* Question text - with strict width control */}
                         <div 
-                          className="ml-5 font-serif leading-relaxed text-base text-black" 
                           style={{ 
+                            marginLeft: '1rem',
+                            fontFamily: 'serif',
+                            lineHeight: '1.6',
+                            fontSize: '1rem',
+                            color: 'black',
                             wordWrap: 'break-word', 
                             overflowWrap: 'break-word',
-                            wordBreak: 'break-word',
-                            whiteSpace: 'pre-wrap',
-                            maxWidth: '100%',
+                            wordBreak: 'normal',
+                            hyphens: 'auto',
+                            width: 'calc(100% - 1rem)',
+                            maxWidth: 'calc(100% - 1rem)',
                           }}
                         >
                           {renderMathText(fixEncodingCorruption(question.question))}
                         </div>
+                        
+                        {/* SVG if present */}
                         {question.svg && (
                           <div 
-                            className="ml-5 mt-2 flex justify-center"
+                            style={{ marginLeft: '1rem', marginTop: '0.5rem', display: 'flex', justifyContent: 'center' }}
                             dangerouslySetInnerHTML={{ __html: question.svg }}
                           />
                         )}
+                        
                         {/* AI-Optimized Answer Box with Work Area and Final Answer zones */}
                         {showAnswerLines && (
                           <div style={{
                             border: '3px solid #1e3a5f',
                             borderRadius: '0.5rem',
-                            marginTop: '1rem',
-                            marginLeft: '1.25rem',
-                            marginRight: '0',
+                            marginTop: '0.75rem',
                             backgroundColor: '#ffffff',
                             overflow: 'hidden',
-                            maxWidth: 'calc(100% - 1.25rem)',
+                            width: '100%',
                             boxSizing: 'border-box',
                           }}>
                             {/* Work Area Section */}
