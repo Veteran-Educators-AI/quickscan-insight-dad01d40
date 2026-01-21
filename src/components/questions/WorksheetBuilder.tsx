@@ -2890,39 +2890,45 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             flexDirection: 'column',
           }}
         >
-          {/* Large Fixed X Close Button - TOP RIGHT CORNER */}
+          {/* Large Fixed X Close Button - TOP RIGHT CORNER - Very Prominent */}
           <button
             type="button"
             onClick={() => setShowPreview(false)}
+            className="print:hidden"
             style={{
               position: 'fixed',
-              top: '1rem',
-              right: '1rem',
-              zIndex: 100000,
-              width: '48px',
-              height: '48px',
+              top: '0.75rem',
+              right: '0.75rem',
+              zIndex: 100001,
+              width: '56px',
+              height: '56px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: '50%',
               backgroundColor: '#dc2626',
               color: 'white',
-              border: '3px solid white',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+              border: '4px solid white',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.6), 0 0 0 2px #dc2626',
               cursor: 'pointer',
-              transition: 'transform 0.2s, background-color 0.2s',
+              transition: 'transform 0.2s, background-color 0.2s, box-shadow 0.2s',
+              fontWeight: 'bold',
+              fontSize: '1.5rem',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#b91c1c';
-              e.currentTarget.style.transform = 'scale(1.1)';
+              e.currentTarget.style.transform = 'scale(1.15)';
+              e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.7), 0 0 0 3px #b91c1c';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = '#dc2626';
               e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.6), 0 0 0 2px #dc2626';
             }}
             aria-label="Close preview"
+            title="Close Preview (ESC)"
           >
-            <X className="h-7 w-7" strokeWidth={3} />
+            <X className="h-8 w-8" strokeWidth={3.5} />
           </button>
 
           {/* Preview Header Toolbar */}
@@ -3190,7 +3196,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 printWindow.document.close();
               }}>
                 <Printer className="h-4 w-4 mr-2" />
-                Print
+                Print from Preview
               </Button>
             </div>
           </div>
@@ -3231,29 +3237,30 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     backgroundColor: 'white',
                     boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
                     border: '1px solid #d1d5db',
-                    padding: '0.75in',
+                    padding: '0.6in 0.65in',
                     boxSizing: 'border-box',
                     width: '100%',
                     maxWidth: '8.5in',
-                    overflow: 'hidden',
+                    overflow: 'visible',
+                    fontFamily: "'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif",
                   }}
                 >
-                  {/* AI Scanning Instructions Banner */}
+                  {/* Instructions Banner - Print friendly */}
                   {showAnswerLines && (
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '1rem',
-                      padding: '0.5rem 0.875rem',
-                      marginBottom: '1rem',
-                      backgroundColor: '#ecfdf5',
-                      border: '1px solid #6ee7b7',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.7rem',
-                      color: '#047857',
+                      gap: '0.75rem',
+                      padding: '0.4rem 0.75rem',
+                      marginBottom: '0.75rem',
+                      backgroundColor: '#f0fdf4',
+                      border: '1px solid #86efac',
+                      borderRadius: '0.25rem',
+                      fontSize: '0.65rem',
+                      color: '#166534',
                     }}>
-                      <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        📋 Instructions
+                      <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                        Instructions:
                       </span>
                       <span style={{ flex: 1 }}>
                         Write all work in the <strong>Work Area</strong> boxes. Put your final answer in the <strong>Final Answer</strong> section.
@@ -3276,54 +3283,67 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         key={question.questionNumber} 
                         style={{ 
                           pageBreakInside: 'avoid',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '0.375rem',
-                          padding: '0.75rem',
-                          marginBottom: '1rem',
-                          backgroundColor: '#fafafa',
+                          marginBottom: '1.5rem',
                           width: '100%',
                           boxSizing: 'border-box',
                         }}
                       >
-                        {/* Question header */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                          <span style={{ fontWeight: 700, color: 'black' }}>{question.questionNumber}.</span>
+                        {/* Question header - single line with number, bloom level, difficulty */}
+                        <div style={{ 
+                          display: 'flex', 
+                          flexWrap: 'wrap', 
+                          alignItems: 'baseline', 
+                          gap: '0.5rem', 
+                          marginBottom: '0.125rem',
+                          borderBottom: '1px solid #1e3a5f',
+                          paddingBottom: '0.25rem',
+                        }}>
+                          <span style={{ fontWeight: 700, color: 'black', fontSize: '0.9rem' }}>
+                            {question.questionNumber}. [{question.bloomLevel || 'Remember'}: {question.bloomVerb || 'state'}]
+                          </span>
                           {worksheetMode === 'diagnostic' && question.advancementLevel && (
-                            <span className={`text-xs px-2 py-0.5 rounded border font-semibold ${
-                              question.advancementLevel === 'A' ? 'bg-green-100 text-green-800 border-green-300' :
-                              question.advancementLevel === 'B' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
-                              question.advancementLevel === 'C' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
-                              question.advancementLevel === 'D' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                              question.advancementLevel === 'E' ? 'bg-red-100 text-red-800 border-red-300' :
-                              'bg-gray-100 text-gray-800 border-gray-300'
-                            }`}>
-                              Level {question.advancementLevel}
+                            <span style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              color: question.advancementLevel === 'A' ? '#166534' :
+                                     question.advancementLevel === 'B' ? '#047857' :
+                                     question.advancementLevel === 'C' ? '#a16207' :
+                                     question.advancementLevel === 'D' ? '#c2410c' :
+                                     question.advancementLevel === 'E' ? '#b91c1c' : '#374151',
+                            }}>
+                              [Level {question.advancementLevel}]
                             </span>
                           )}
-                          <span className="text-xs px-2 py-0.5 rounded border bg-gray-100 text-gray-700 border-gray-200">
-                            {question.difficulty}
+                          <span style={{ fontSize: '0.75rem', color: '#374151' }}>
+                            [{question.difficulty}]
                           </span>
                         </div>
                         
-                        {/* Topic/Standard */}
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginLeft: '1rem', marginBottom: '0.5rem' }}>
+                        {/* Topic/Standard - compact italic */}
+                        <p style={{ 
+                          fontSize: '0.75rem', 
+                          color: '#6b7280', 
+                          marginLeft: '1rem', 
+                          marginBottom: '0.375rem',
+                          fontStyle: 'italic',
+                        }}>
                           {question.topic} ({question.standard})
                         </p>
                         
-                        {/* Question text - with strict width control */}
+                        {/* Question text - single spaced, proper margins */}
                         <div 
                           style={{ 
                             marginLeft: '1rem',
+                            marginRight: '0.5rem',
                             fontFamily: 'serif',
-                            lineHeight: '1.6',
-                            fontSize: '1rem',
+                            lineHeight: '1.3',
+                            fontSize: '0.95rem',
                             color: 'black',
                             wordWrap: 'break-word', 
                             overflowWrap: 'break-word',
                             wordBreak: 'normal',
                             hyphens: 'auto',
-                            width: 'calc(100% - 1rem)',
-                            maxWidth: 'calc(100% - 1rem)',
+                            letterSpacing: '0.02em',
                           }}
                         >
                           {renderMathText(fixEncodingCorruption(question.question))}
@@ -3337,68 +3357,64 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                           />
                         )}
                         
-                        {/* AI-Optimized Answer Box with Work Area and Final Answer zones */}
+                        {/* Work Area Box - Clean design matching reference */}
                         {showAnswerLines && (
                           <div style={{
-                            border: '3px solid #1e3a5f',
-                            borderRadius: '0.5rem',
-                            marginTop: '0.75rem',
+                            border: '2px solid #1e3a5f',
+                            marginTop: '0.5rem',
+                            marginLeft: '1rem',
+                            marginRight: '0.5rem',
                             backgroundColor: '#ffffff',
                             overflow: 'hidden',
-                            width: '100%',
                             boxSizing: 'border-box',
                           }}>
                             {/* Work Area Section */}
                             <div style={{
                               borderBottom: '2px dashed #94a3b8',
-                              padding: '0.75rem 1rem',
-                              backgroundColor: '#f8fafc',
+                              padding: '0.5rem 0.75rem',
+                              backgroundColor: '#ffffff',
                             }}>
                               <div style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                marginBottom: '0.5rem',
+                                marginBottom: '0.375rem',
                               }}>
                                 <span style={{
-                                  fontSize: '0.75rem',
+                                  fontSize: '0.7rem',
                                   fontWeight: 700,
                                   color: '#1e3a5f',
                                   textTransform: 'uppercase',
-                                  letterSpacing: '0.1em',
-                                  backgroundColor: '#e0f2fe',
-                                  padding: '0.2rem 0.6rem',
-                                  borderRadius: '0.25rem',
-                                  border: '1px solid #7dd3fc',
+                                  letterSpacing: '0.05em',
                                 }}>
-                                  ✏️ Work Area Q{question.questionNumber}
+                                  Work Area Q{question.questionNumber}
                                 </span>
                                 <span style={{
-                                  fontSize: '0.65rem',
+                                  fontSize: '0.6rem',
                                   color: '#64748b',
                                   fontStyle: 'italic',
                                 }}>
                                   Show all calculations & reasoning here
                                 </span>
                               </div>
-                              {/* Work lines with zone indicator */}
+                              {/* Work lines with corner markers */}
                               <div style={{ 
-                                minHeight: '100px',
+                                minHeight: '90px',
                                 position: 'relative',
                               }}>
                                 {[...Array(5)].map((_, i) => (
                                   <div key={i} style={{
-                                    borderBottom: '1px solid #cbd5e1',
-                                    height: '1.25rem',
+                                    borderBottom: '1px solid #d1d5db',
+                                    height: '1.1rem',
                                   }} />
                                 ))}
-                                {/* Corner zone markers for AI scanning */}
+                                {/* Corner markers */}
                                 <div style={{
                                   position: 'absolute',
                                   top: 0,
                                   left: 0,
-                                  width: '12px',
-                                  height: '12px',
+                                  width: '10px',
+                                  height: '10px',
                                   borderLeft: '2px solid #1e3a5f',
                                   borderTop: '2px solid #1e3a5f',
                                 }} />
@@ -3406,45 +3422,43 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                                   position: 'absolute',
                                   top: 0,
                                   right: 0,
-                                  width: '12px',
-                                  height: '12px',
+                                  width: '10px',
+                                  height: '10px',
                                   borderRight: '2px solid #1e3a5f',
                                   borderTop: '2px solid #1e3a5f',
                                 }} />
                               </div>
                             </div>
                             
-                            {/* Final Answer Section */}
+                            {/* Final Answer Section - Yellow background */}
                             <div style={{
-                              padding: '0.75rem 1rem',
+                              padding: '0.5rem 0.75rem',
                               backgroundColor: '#fef3c7',
                               borderTop: '2px solid #f59e0b',
                             }}>
                               <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '0.75rem',
+                                gap: '0.5rem',
                               }}>
                                 <span style={{
-                                  fontSize: '0.8rem',
+                                  fontSize: '0.7rem',
                                   fontWeight: 700,
                                   color: '#92400e',
                                   textTransform: 'uppercase',
-                                  letterSpacing: '0.05em',
+                                  letterSpacing: '0.03em',
                                   backgroundColor: '#fde68a',
-                                  padding: '0.25rem 0.75rem',
-                                  borderRadius: '0.25rem',
-                                  border: '2px solid #f59e0b',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '0.2rem',
+                                  border: '1.5px solid #f59e0b',
                                   whiteSpace: 'nowrap',
                                 }}>
-                                  📝 Final Answer
+                                  Final Answer
                                 </span>
                                 <div style={{
                                   flex: 1,
-                                  borderBottom: '2px solid #d97706',
-                                  minHeight: '1.5rem',
-                                  backgroundColor: '#fffbeb',
-                                  padding: '0.25rem 0.5rem',
+                                  borderBottom: '1.5px solid #d97706',
+                                  minHeight: '1.25rem',
                                 }} />
                               </div>
                             </div>
@@ -3528,39 +3542,75 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       {/* Print Styles */}
       <style>{`
         @media print {
+          /* Reset everything for clean print */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          
           /* Hide everything by default */
-          body > *:not([class*="print-worksheet"]) {
+          body > * {
             display: none !important;
+            visibility: hidden !important;
+          }
+          
+          /* Show only the worksheet container */
+          body > div:last-child,
+          body > div:last-child * {
+            visibility: visible !important;
           }
           
           /* Show only the worksheet */
           .print-worksheet {
             display: block !important;
             visibility: visible !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
+            position: static !important;
+            left: auto !important;
+            top: auto !important;
             width: 100% !important;
-            max-width: none !important;
-            padding: 0 !important;
+            max-width: 100% !important;
+            padding: 0.5in 0.6in !important;
             margin: 0 !important;
             box-shadow: none !important;
             border: none !important;
             transform: none !important;
             background: white !important;
+            box-sizing: border-box !important;
+            overflow: visible !important;
+            /* Ensure proper font for math symbols */
+            font-family: 'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif !important;
           }
           
           .print-worksheet * {
             visibility: visible !important;
+            /* Inherit font for math symbols */
+            font-family: inherit !important;
+          }
+          
+          /* Ensure math text uses serif font for proper symbol rendering */
+          .print-worksheet [style*="font-family: serif"],
+          .print-worksheet .font-serif {
+            font-family: 'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif !important;
           }
           
           /* Hide print-only hidden elements */
           .print\\:hidden {
             display: none !important;
+            visibility: hidden !important;
+          }
+          
+          /* Ensure borders print correctly */
+          .print-worksheet div[style*="border"] {
+            border-color: #1e3a5f !important;
+          }
+          
+          /* Keep page breaks working */
+          .print-worksheet > div {
+            page-break-inside: avoid;
           }
           
           @page {
-            margin: 0.75in;
+            margin: 0.5in;
             size: letter;
           }
         }
