@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Printer, Check, Loader2, QrCode, Eye, BookOpen } from 'lucide-react';
+import { Printer, Check, Loader2, QrCode, Eye, BookOpen, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -62,6 +62,17 @@ export function PrintWorksheetDialog({ classId, students, trigger, topicName }: 
   const [includeLevels, setIncludeLevels] = useState(true);
   const [aiOptimizedLayout, setAIOptimizedLayout] = useState(true);
   const [studentLevels, setStudentLevels] = useState<Map<string, StudentLevel>>(new Map());
+
+  // Handle ESC key to close preview
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showPreview) {
+        setShowPreview(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPreview]);
 
   useEffect(() => {
     if (open) {
@@ -402,9 +413,20 @@ export function PrintWorksheetDialog({ classId, students, trigger, topicName }: 
       {/* Hidden Print Content */}
       {showPreview && (
         <div className="fixed inset-0 bg-white z-50 overflow-auto print:static print:overflow-visible">
-          <div className="print:hidden p-4 bg-muted border-b flex items-center justify-between">
-            <p>Print preview - press Ctrl+P or Cmd+P to print</p>
+          {/* Fixed close button in top-right corner */}
+          <Button 
+            variant="destructive" 
+            size="icon" 
+            className="print:hidden fixed top-4 right-4 z-[60] shadow-lg"
+            onClick={() => setShowPreview(false)}
+          >
+            <X className="h-5 w-5" />
+          </Button>
+          
+          <div className="print:hidden p-4 bg-muted border-b flex items-center justify-between sticky top-0 z-[55]">
+            <p className="text-sm">Print preview - press Ctrl+P or Cmd+P to print, or press <kbd className="px-1.5 py-0.5 bg-background rounded border text-xs">ESC</kbd> to close</p>
             <Button variant="outline" onClick={() => setShowPreview(false)}>
+              <X className="h-4 w-4 mr-2" />
               Close Preview
             </Button>
           </div>

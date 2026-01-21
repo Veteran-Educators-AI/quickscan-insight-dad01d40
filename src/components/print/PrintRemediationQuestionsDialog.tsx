@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Printer, Lightbulb, QrCode } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Printer, Lightbulb, QrCode, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
@@ -81,6 +81,17 @@ export function PrintRemediationQuestionsDialog({
   const handleClosePreview = () => {
     setShowPreview(false);
   };
+
+  // Handle ESC key to close preview
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showPreview) {
+        handleClosePreview();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPreview]);
 
   // Limit to 8 questions for 2-page max
   const displayQuestions = questions.slice(0, 8);
@@ -222,9 +233,20 @@ export function PrintRemediationQuestionsDialog({
       {/* Print Preview - Matching Diagnostic Worksheet Format */}
       {showPreview && (
         <div className="fixed inset-0 bg-white z-50 overflow-auto print:static print:overflow-visible">
-          <div className="print:hidden p-4 bg-muted border-b flex items-center justify-between">
-            <p>Print preview - press Ctrl+P or Cmd+P to print</p>
+          {/* Fixed close button in top-right corner */}
+          <Button 
+            variant="destructive" 
+            size="icon" 
+            className="print:hidden fixed top-4 right-4 z-[60] shadow-lg"
+            onClick={handleClosePreview}
+          >
+            <X className="h-5 w-5" />
+          </Button>
+          
+          <div className="print:hidden p-4 bg-muted border-b flex items-center justify-between sticky top-0 z-[55]">
+            <p className="text-sm">Print preview - press Ctrl+P or Cmd+P to print, or press <kbd className="px-1.5 py-0.5 bg-background rounded border text-xs">ESC</kbd> to close</p>
             <Button variant="outline" onClick={handleClosePreview}>
+              <X className="h-4 w-4 mr-2" />
               Close Preview
             </Button>
           </div>
