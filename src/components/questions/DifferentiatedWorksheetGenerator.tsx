@@ -3487,6 +3487,33 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 <Badge variant="outline">
                   {Object.keys(previewData.questions).length} unique form/level combinations
                 </Badge>
+                {/* Geometry shapes indicator */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div 
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer transition-colors ${
+                          includeGeometry 
+                            ? 'bg-blue-100 text-blue-700 border border-blue-300' 
+                            : 'bg-gray-100 text-gray-500 border border-gray-200'
+                        }`}
+                        onClick={() => setIncludeGeometry(!includeGeometry)}
+                      >
+                        <Shapes className="h-3.5 w-3.5" />
+                        <span className="text-xs font-medium">
+                          Shapes {includeGeometry ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">
+                        {includeGeometry 
+                          ? 'Geometry shapes will be included in PDF/Word. Click to turn off.' 
+                          : 'Geometry shapes are disabled. Click to enable.'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Batch regenerate controls */}
