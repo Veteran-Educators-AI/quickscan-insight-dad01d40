@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { QRCodeSVG } from 'qrcode.react';
+import { fixEncodingCorruption, renderMathText } from '@/lib/mathRenderer';
 
 interface RemediationQuestion {
   questionNumber: number;
@@ -372,7 +373,7 @@ export function PrintRemediationQuestionsDialog({
                     marginBottom: '0.4rem',
                     wordWrap: 'break-word',
                   }}>
-                    {q.question}
+                    {renderMathText(fixEncodingCorruption(q.question))}
                   </p>
 
                   {/* Hint - Compact */}
@@ -386,7 +387,9 @@ export function PrintRemediationQuestionsDialog({
                       fontSize: '0.65rem',
                     }}>
                       <span style={{ fontWeight: '600', color: '#92400e' }}>💡 </span>
-                      <span style={{ color: '#78350f', fontStyle: 'italic' }}>{q.hint}</span>
+                      <span style={{ color: '#78350f', fontStyle: 'italic' }}>
+                        {renderMathText(fixEncodingCorruption(q.hint))}
+                      </span>
                     </div>
                   )}
 
