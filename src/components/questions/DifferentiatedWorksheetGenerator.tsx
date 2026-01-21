@@ -1317,7 +1317,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             yPosition += 12;
             pdf.setTextColor(0);
 
-            for (const question of warmUpQuestions) {
+            for (let warmUpIdx = 0; warmUpIdx < warmUpQuestions.length; warmUpIdx++) {
+              const question = warmUpQuestions[warmUpIdx];
               if (yPosition > pageHeight - 50) {
                 pdf.addPage();
                 pageCount++;
@@ -1341,8 +1342,12 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               });
               pdf.setFontSize(11); // Reset font size
 
-              // Add geometry diagram if available for warm-up
-              if ((question.imageUrl || question.svg) && includeGeometry) {
+              // Add geometry diagram if available for warm-up (check on-demand shapes first)
+              const warmUpShapeKey = `${cacheKey}-warmUp-${warmUpIdx}`;
+              const warmUpGeneratedShapeUrl = geometryShapes[warmUpShapeKey];
+              const hasWarmUpShape = warmUpGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry);
+              
+              if (hasWarmUpShape) {
                 try {
                   if (yPosition > pageHeight - 55) {
                     pdf.addPage();
@@ -1352,9 +1357,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   const imgHeight = 40;
                   yPosition += 3;
                   
-                  // Convert SVG to PNG if needed
-                  let imageData = question.imageUrl || '';
-                  if (question.svg && !question.imageUrl) {
+                  // Prioritize on-demand generated shape, then imageUrl, then SVG
+                  let imageData = warmUpGeneratedShapeUrl || question.imageUrl || '';
+                  if (!imageData && question.svg) {
                     try {
                       imageData = await svgToPngDataUrl(question.svg, 200, 200);
                     } catch (convErr) {
@@ -1524,8 +1529,12 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             }
             pdf.setFontSize(11); // Reset font size
 
-            // Add geometry diagram if available
-            if ((question.imageUrl || question.svg) && includeGeometry) {
+            // Add geometry diagram if available (check on-demand shapes first)
+            const mainShapeKey = `${cacheKey}-main-${questionIdx}`;
+            const mainGeneratedShapeUrl = geometryShapes[mainShapeKey];
+            const hasMainShape = mainGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry);
+            
+            if (hasMainShape) {
               try {
                 // Check if we need a new page for the image
                 if (yPosition > pageHeight - 70) {
@@ -1535,9 +1544,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   yPosition = 25; // Start below the continuation header
                 }
                 
-                // Convert SVG to PNG if needed
-                let imageData = question.imageUrl || '';
-                if (question.svg && !question.imageUrl) {
+                // Prioritize on-demand generated shape, then imageUrl, then SVG
+                let imageData = mainGeneratedShapeUrl || question.imageUrl || '';
+                if (!imageData && question.svg) {
                   try {
                     imageData = await svgToPngDataUrl(question.svg, 200, 200);
                   } catch (convErr) {
