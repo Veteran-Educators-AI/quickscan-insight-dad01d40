@@ -615,8 +615,12 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       const pdf = new jsPDF('p', 'mm', 'letter');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = marginSize === 'small' ? 12 : marginSize === 'large' ? 25 : 20; // Based on user preference
+      // Use consistent 19mm (~0.75in) margins to match print preview exactly
+      const margin = marginSize === 'small' ? 15 : marginSize === 'large' ? 25 : 19;
       const contentWidth = pageWidth - margin * 2;
+      // Conservative text width to prevent ANY overflow - 80% of content area
+      const safeTextWidth = contentWidth * 0.80;
+      const textIndent = margin + 8; // Consistent left indent for all text
       let isFirstPage = true;
 
       const numForms = parseInt(formCount);
@@ -869,11 +873,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               pdf.setFont('helvetica', 'normal');
               pdf.setFontSize(10); // Slightly smaller font for better fit
               const sanitizedQuestion = formatPdfText(question.question);
-              // Very aggressive text width: use 60% of content width to guarantee no overflow
-              const textAreaWidth = contentWidth * 0.85;
-              const lines = pdf.splitTextToSize(sanitizedQuestion, textAreaWidth);
+              // Use safe text width to prevent margin overflow
+              const lines = pdf.splitTextToSize(sanitizedQuestion, safeTextWidth);
               lines.forEach((line: string) => {
-                pdf.text(line, margin + 5, yPosition);
+                pdf.text(line, textIndent, yPosition);
                 yPosition += 4.5;
               });
               pdf.setFontSize(11); // Reset font size
@@ -901,7 +904,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   }
                   
                   if (imageData) {
-                    pdf.addImage(imageData, 'PNG', margin + 5, yPosition, imgWidth, imgHeight);
+                    pdf.addImage(imageData, 'PNG', textIndent, yPosition, imgWidth, imgHeight);
                     yPosition += imgHeight + 3;
                   }
                 } catch (imgError) {
@@ -912,17 +915,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               // Add hint if available
               if (question.hint && includeHints) {
                 yPosition += 2;
-              pdf.setFontSize(8);
-              pdf.setFont('helvetica', 'italic');
-              pdf.setTextColor(120, 100, 50);
-              const sanitizedHint = formatPdfText(question.hint);
-              // Very aggressive text width for hints
-              const hintAreaWidth = contentWidth * 0.85;
-              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, hintAreaWidth);
-              hintLines.forEach((line: string) => {
-                pdf.text(line, margin + 5, yPosition);
-                yPosition += 3.5;
-              });
+                pdf.setFontSize(8);
+                pdf.setFont('helvetica', 'italic');
+                pdf.setTextColor(120, 100, 50);
+                const sanitizedHint = formatPdfText(question.hint);
+                // Use safe text width for hints
+                const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, safeTextWidth);
+                hintLines.forEach((line: string) => {
+                  pdf.text(line, textIndent, yPosition);
+                  yPosition += 3.5;
+                });
                 pdf.setTextColor(0);
                 pdf.setFontSize(11);
               }
@@ -939,8 +941,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 yPosition = 25;
               }
               
-              const boxMarginLeft = margin + 3;
-              const boxWidth = contentWidth - 6;
+              const boxMarginLeft = margin + 2;
+              const boxWidth = contentWidth - 4; // Slightly smaller to stay safely inside margins
               const warmUpWorkAreaHeight = 20;
               const warmUpAnswerHeight = 12;
               
@@ -1048,9 +1050,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             pdf.setFont('helvetica', 'normal');
             pdf.setFontSize(10); // Slightly smaller font for better fit
             const sanitizedQuestion = formatPdfText(question.question);
-            // Very aggressive text width: use 85% of content width to guarantee no overflow
-            const textAreaWidth = contentWidth * 0.85;
-            const lines = pdf.splitTextToSize(sanitizedQuestion, textAreaWidth);
+            // Use safe text width to prevent margin overflow
+            const lines = pdf.splitTextToSize(sanitizedQuestion, safeTextWidth);
             for (const line of lines) {
               if (yPosition > pageHeight - 30) {
                 pdf.addPage();
@@ -1058,7 +1059,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 await addContinuationPageHeader(pageCount);
                 yPosition = 25; // Start below the continuation header
               }
-              pdf.text(line, margin + 5, yPosition);
+              pdf.text(line, textIndent, yPosition);
               yPosition += 4.5;
             }
             pdf.setFontSize(11); // Reset font size
@@ -1089,7 +1090,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   // Add the image to the PDF
                   const imgWidth = 50; // mm
                   const imgHeight = 50; // mm
-                  const imgX = margin + 5;
+                  const imgX = textIndent;
                   
                   yPosition += 3;
                   pdf.addImage(imageData, 'PNG', imgX, yPosition, imgWidth, imgHeight);
@@ -1132,9 +1133,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               pdf.setFont('helvetica', 'italic');
               pdf.setTextColor(120, 100, 50);
               const sanitizedHint = formatPdfText(question.hint);
-              // Very aggressive text width for hints
-              const hintAreaWidth = contentWidth * 0.85;
-              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, hintAreaWidth);
+              // Use safe text width for hints
+              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, safeTextWidth);
               for (const line of hintLines) {
                 if (yPosition > pageHeight - 25) {
                   pdf.addPage();
@@ -1142,7 +1142,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   await addContinuationPageHeader(pageCount);
                   yPosition = 25; // Start below the continuation header
                 }
-                pdf.text(line, margin + 5, yPosition);
+                pdf.text(line, textIndent, yPosition);
                 yPosition += 3.5;
               }
               pdf.setTextColor(0);
@@ -1156,8 +1156,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             const mainZoneHeight = 55; // Total height for work area + answer
             const mainWorkAreaHeight = 40;
             const mainAnswerHeight = 12;
-            const boxMarginLeft = margin + 3;
-            const boxWidth = contentWidth - 6;
+            const boxMarginLeft = margin + 2;
+            const boxWidth = contentWidth - 4; // Slightly smaller to stay safely inside margins
             
             // Check if we need a new page for the zone box
             if (yPosition > pageHeight - mainZoneHeight - 15) {
@@ -1345,10 +1345,15 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 akY = margin;
               }
               const formattedQuestion = formatPdfText(q.question);
-              const questionText = formattedQuestion.substring(0, 80) + (formattedQuestion.length > 80 ? '...' : '');
+              // Use safe text width for answer key too
+              const akTextWidth = safeTextWidth * 0.9;
+              const questionLines = pdf.splitTextToSize(`W${idx + 1}. ${formattedQuestion}`, akTextWidth);
               pdf.setFontSize(8);
-              pdf.text(`W${idx + 1}. ${questionText}`, margin + 2, akY);
-              akY += 4;
+              questionLines.slice(0, 2).forEach((line: string) => {
+                pdf.text(line, margin + 2, akY);
+                akY += 3.5;
+              });
+              akY += 1;
             });
             akY += 3;
           }
@@ -1367,10 +1372,15 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 akY = margin;
               }
               const formattedQuestion = formatPdfText(q.question);
-              const questionText = formattedQuestion.substring(0, 80) + (formattedQuestion.length > 80 ? '...' : '');
+              // Use safe text width for answer key too
+              const akTextWidth = safeTextWidth * 0.9;
+              const questionLines = pdf.splitTextToSize(`${idx + 1}. ${formattedQuestion}`, akTextWidth);
               pdf.setFontSize(8);
-              pdf.text(`${idx + 1}. ${questionText}`, margin + 2, akY);
-              akY += 4;
+              questionLines.slice(0, 2).forEach((line: string) => {
+                pdf.text(line, margin + 2, akY);
+                akY += 3.5;
+              });
+              akY += 1;
             });
           }
           
