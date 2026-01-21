@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock, NotebookPen } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
@@ -2789,21 +2790,70 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         </CardContent>
       </Card>
 
-      {/* Print Preview Modal */}
-      {showPreview && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex flex-col print:static print:overflow-visible print:bg-white">
-          {/* Large Fixed X Close Button - always visible in top right corner */}
+      {/* Print Preview Modal - Uses Portal to render at document root */}
+      {showPreview && createPortal(
+        <div 
+          className="print:static print:overflow-visible print:bg-white"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 99999,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Large Fixed X Close Button - TOP RIGHT CORNER */}
           <button
             type="button"
             onClick={() => setShowPreview(false)}
-            className="print:hidden fixed top-6 right-6 z-[100] w-12 h-12 flex items-center justify-center rounded-full bg-red-600 text-white shadow-2xl hover:bg-red-700 transition-all hover:scale-110 border-2 border-white"
+            style={{
+              position: 'fixed',
+              top: '1rem',
+              right: '1rem',
+              zIndex: 100000,
+              width: '48px',
+              height: '48px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              backgroundColor: '#dc2626',
+              color: 'white',
+              border: '3px solid white',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+              cursor: 'pointer',
+              transition: 'transform 0.2s, background-color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#b91c1c';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#dc2626';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
             aria-label="Close preview"
           >
-            <X className="h-6 w-6" strokeWidth={3} />
+            <X className="h-7 w-7" strokeWidth={3} />
           </button>
 
           {/* Preview Header Toolbar */}
-          <div className="print:hidden flex items-center justify-between p-3 bg-background border-b shadow-sm">
+          <div 
+            className="print:hidden"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.75rem 1rem',
+              backgroundColor: 'white',
+              borderBottom: '1px solid #e5e7eb',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            }}
+          >
             <div className="flex items-center gap-4">
               <h2 className="font-semibold text-lg">Print Preview</h2>
               <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
@@ -2829,7 +2879,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 {compiledQuestions.length} question{compiledQuestions.length !== 1 ? 's' : ''} • Press ESC to close
               </span>
             </div>
-            <div className="flex items-center gap-2 mr-16">
+            <div className="flex items-center gap-2" style={{ marginRight: '4rem' }}>
               <Button variant="outline" onClick={() => setShowPreview(false)}>
                 <X className="h-4 w-4 mr-2" />
                 Close
@@ -2842,10 +2892,21 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           </div>
 
           {/* Preview Content Area - render as 8.5x11 page */}
-          <div className="flex-1 overflow-y-auto overflow-x-auto p-8 print:p-0 print:overflow-visible flex justify-center" style={{ maxHeight: 'calc(100vh - 64px)' }}>
+          <div 
+            className="print:p-0 print:overflow-visible"
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              overflowX: 'auto',
+              padding: '2rem',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+            }}
+          >
             <div 
               ref={printRef} 
-              className="bg-white shadow-2xl print:shadow-none border border-gray-300 print:border-none"
+              className="print:shadow-none print:border-none"
               style={{ 
                 width: '8.5in',
                 minHeight: '11in',
@@ -2853,6 +2914,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 boxSizing: 'border-box',
                 transform: `scale(${previewZoom / 100})`,
                 transformOrigin: 'top center',
+                backgroundColor: 'white',
+                boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                border: '1px solid #d1d5db',
               }}
             >
                   {/* AI Scanning Instructions Banner */}
@@ -3102,7 +3166,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Print Styles */}
