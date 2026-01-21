@@ -2791,15 +2791,15 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
       {/* Print Preview Modal */}
       {showPreview && (
-        <div className="fixed inset-0 bg-muted/90 z-50 flex flex-col print:static print:overflow-visible print:bg-white">
-          {/* Fixed X Close Button - always visible */}
+        <div className="fixed inset-0 bg-black/70 z-50 flex flex-col print:static print:overflow-visible print:bg-white">
+          {/* Large Fixed X Close Button - always visible in top right corner */}
           <button
             type="button"
             onClick={() => setShowPreview(false)}
-            className="print:hidden fixed top-4 right-4 z-[60] w-8 h-8 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg hover:bg-destructive/90 transition-colors"
+            className="print:hidden fixed top-6 right-6 z-[100] w-12 h-12 flex items-center justify-center rounded-full bg-red-600 text-white shadow-2xl hover:bg-red-700 transition-all hover:scale-110 border-2 border-white"
             aria-label="Close preview"
           >
-            <X className="h-4 w-4" />
+            <X className="h-6 w-6" strokeWidth={3} />
           </button>
 
           {/* Preview Header Toolbar */}
@@ -2829,7 +2829,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 {compiledQuestions.length} question{compiledQuestions.length !== 1 ? 's' : ''} • Press ESC to close
               </span>
             </div>
-            <div className="flex items-center gap-2 mr-10">
+            <div className="flex items-center gap-2 mr-16">
               <Button variant="outline" onClick={() => setShowPreview(false)}>
                 <X className="h-4 w-4 mr-2" />
                 Close
@@ -2841,20 +2841,20 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             </div>
           </div>
 
-          {/* Preview Content Area - render each page separately */}
-          <div className="flex-1 overflow-y-auto overflow-x-auto p-6 print:p-0 print:overflow-visible" style={{ maxHeight: 'calc(100vh - 64px)' }}>
+          {/* Preview Content Area - render as 8.5x11 page */}
+          <div className="flex-1 overflow-y-auto overflow-x-auto p-8 print:p-0 print:overflow-visible flex justify-center" style={{ maxHeight: 'calc(100vh - 64px)' }}>
             <div 
               ref={printRef} 
-              className="bg-white mx-auto shadow-xl print:shadow-none"
+              className="bg-white shadow-2xl print:shadow-none border border-gray-300 print:border-none"
               style={{ 
-                width: `${8.5 * (previewZoom / 100)}in`,
-                minHeight: `${11 * (previewZoom / 100)}in`,
-                padding: `${0.75 * (previewZoom / 100)}in`,
-                transform: 'origin-top',
+                width: '8.5in',
+                minHeight: '11in',
+                padding: '0.75in',
                 boxSizing: 'border-box',
+                transform: `scale(${previewZoom / 100})`,
+                transformOrigin: 'top center',
               }}
             >
-                <div style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: 'top left', width: `${100 / (previewZoom / 100)}%` }}>
                   {/* AI Scanning Instructions Banner */}
                   {showAnswerLines && (
                     <div style={{
@@ -3100,7 +3100,6 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 <div className="mt-12 text-center text-xs text-gray-400">
                   Generated with NYCLogic Ai - NYS Regents Aligned
                 </div>
-              </div>
             </div>
           </div>
         </div>
