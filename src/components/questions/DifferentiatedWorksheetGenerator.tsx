@@ -744,11 +744,13 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
           for (const q of questions.warmUp) {
             const sanitizedQuestion = formatPdfText(q.question);
+            const hasShape = (q.imageUrl || q.svg) && includeGeometry;
             children.push(
               new Paragraph({
                 children: [
                   new TextRun({ text: `${q.questionNumber}. `, bold: true, size: 22 }),
                   new TextRun({ text: sanitizedQuestion, size: 20 }),
+                  ...(hasShape ? [new TextRun({ text: '  📐 Diagram', size: 16, color: '2563EB', italics: true })] : []),
                 ],
                 spacing: { before: 100, after: 50 },
               })
@@ -851,12 +853,14 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           for (let idx = 0; idx < questions.main.length; idx++) {
             const q = questions.main[idx];
             const sanitizedQuestion = formatPdfText(q.question);
+            const hasShape = (q.imageUrl || q.svg) && includeGeometry;
 
             children.push(
               new Paragraph({
                 children: [
                   new TextRun({ text: `${idx + 1}. `, bold: true, size: 22 }),
                   new TextRun({ text: sanitizedQuestion, size: 20 }),
+                  ...(hasShape ? [new TextRun({ text: '  📐 Diagram', size: 16, color: '2563EB', italics: true })] : []),
                 ],
                 spacing: { before: 150, after: 50 },
               })
