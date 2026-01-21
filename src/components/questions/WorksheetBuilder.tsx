@@ -3024,29 +3024,30 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     backgroundColor: 'white',
                     boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
                     border: '1px solid #d1d5db',
-                    padding: '0.75in',
+                    padding: '0.6in 0.65in',
                     boxSizing: 'border-box',
                     width: '100%',
                     maxWidth: '8.5in',
-                    overflow: 'hidden',
+                    overflow: 'visible',
+                    fontFamily: "'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif",
                   }}
                 >
-                  {/* AI Scanning Instructions Banner */}
+                  {/* Instructions Banner - Print friendly */}
                   {showAnswerLines && (
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '1rem',
-                      padding: '0.5rem 0.875rem',
-                      marginBottom: '1rem',
-                      backgroundColor: '#ecfdf5',
-                      border: '1px solid #6ee7b7',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.7rem',
-                      color: '#047857',
+                      gap: '0.75rem',
+                      padding: '0.4rem 0.75rem',
+                      marginBottom: '0.75rem',
+                      backgroundColor: '#f0fdf4',
+                      border: '1px solid #86efac',
+                      borderRadius: '0.25rem',
+                      fontSize: '0.65rem',
+                      color: '#166534',
                     }}>
-                      <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        📋 Instructions
+                      <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                        Instructions:
                       </span>
                       <span style={{ flex: 1 }}>
                         Write all work in the <strong>Work Area</strong> boxes. Put your final answer in the <strong>Final Answer</strong> section.
@@ -3328,39 +3329,75 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       {/* Print Styles */}
       <style>{`
         @media print {
+          /* Reset everything for clean print */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          
           /* Hide everything by default */
-          body > *:not([class*="print-worksheet"]) {
+          body > * {
             display: none !important;
+            visibility: hidden !important;
+          }
+          
+          /* Show only the worksheet container */
+          body > div:last-child,
+          body > div:last-child * {
+            visibility: visible !important;
           }
           
           /* Show only the worksheet */
           .print-worksheet {
             display: block !important;
             visibility: visible !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
+            position: static !important;
+            left: auto !important;
+            top: auto !important;
             width: 100% !important;
-            max-width: none !important;
-            padding: 0 !important;
+            max-width: 100% !important;
+            padding: 0.5in 0.6in !important;
             margin: 0 !important;
             box-shadow: none !important;
             border: none !important;
             transform: none !important;
             background: white !important;
+            box-sizing: border-box !important;
+            overflow: visible !important;
+            /* Ensure proper font for math symbols */
+            font-family: 'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif !important;
           }
           
           .print-worksheet * {
             visibility: visible !important;
+            /* Inherit font for math symbols */
+            font-family: inherit !important;
+          }
+          
+          /* Ensure math text uses serif font for proper symbol rendering */
+          .print-worksheet [style*="font-family: serif"],
+          .print-worksheet .font-serif {
+            font-family: 'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif !important;
           }
           
           /* Hide print-only hidden elements */
           .print\\:hidden {
             display: none !important;
+            visibility: hidden !important;
+          }
+          
+          /* Ensure borders print correctly */
+          .print-worksheet div[style*="border"] {
+            border-color: #1e3a5f !important;
+          }
+          
+          /* Keep page breaks working */
+          .print-worksheet > div {
+            page-break-inside: avoid;
           }
           
           @page {
-            margin: 0.75in;
+            margin: 0.5in;
             size: letter;
           }
         }
