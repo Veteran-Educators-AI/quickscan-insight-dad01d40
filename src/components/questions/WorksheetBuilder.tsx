@@ -2986,28 +2986,126 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   
                   const pageWidth = 612; // 8.5in in points
                   const pageHeight = 792; // 11in in points
-                  const marginLeft = 54; // 0.75in
-                  const marginRight = 54;
-                  const marginTop = 54;
-                  const marginBottom = 54;
+                  const marginLeft = 72; // 1 inch margins
+                  const marginRight = 72;
+                  const marginTop = 72;
+                  const marginBottom = 72;
                   const contentWidth = pageWidth - marginLeft - marginRight;
                   let yPosition = marginTop;
                   
-                  // Helper function to clean text for PDF (fix encoding issues)
-                  const cleanTextForPDF = (text: string): string => {
+                  // Helper function to convert math symbols to ASCII for PDF
+                  // jsPDF's default fonts don't support Unicode math symbols
+                  const convertMathForPDF = (text: string): string => {
+                    if (!text) return '';
                     let cleaned = fixEncodingCorruption(text);
-                    // Additional cleanup for PDF rendering
+                    
+                    // Convert Greek letters to readable text
                     cleaned = cleaned
-                      .replace(/\u03B8/g, 'θ') // theta
-                      .replace(/\u03C0/g, 'π') // pi
-                      .replace(/\u221A/g, '√') // sqrt
-                      .replace(/\u00B2/g, '²') // superscript 2
-                      .replace(/\u00B3/g, '³') // superscript 3
-                      .replace(/\u2264/g, '≤') // less than or equal
-                      .replace(/\u2265/g, '≥') // greater than or equal
-                      .replace(/\u00B0/g, '°') // degree
-                      .replace(/\u2220/g, '∠') // angle
-                      .replace(/\u00B1/g, '±'); // plus minus
+                      .replace(/θ/g, 'theta')
+                      .replace(/\u03B8/g, 'theta')
+                      .replace(/π/g, 'pi')
+                      .replace(/\u03C0/g, 'pi')
+                      .replace(/α/g, 'alpha')
+                      .replace(/\u03B1/g, 'alpha')
+                      .replace(/β/g, 'beta')
+                      .replace(/\u03B2/g, 'beta')
+                      .replace(/γ/g, 'gamma')
+                      .replace(/\u03B3/g, 'gamma')
+                      .replace(/δ/g, 'delta')
+                      .replace(/\u03B4/g, 'delta')
+                      .replace(/Δ/g, 'Delta')
+                      .replace(/\u0394/g, 'Delta')
+                      .replace(/σ/g, 'sigma')
+                      .replace(/\u03C3/g, 'sigma')
+                      .replace(/Σ/g, 'Sigma')
+                      .replace(/\u03A3/g, 'Sigma')
+                      .replace(/ω/g, 'omega')
+                      .replace(/\u03C9/g, 'omega')
+                      .replace(/φ/g, 'phi')
+                      .replace(/\u03C6/g, 'phi')
+                      .replace(/λ/g, 'lambda')
+                      .replace(/\u03BB/g, 'lambda')
+                      .replace(/μ/g, 'mu')
+                      .replace(/\u03BC/g, 'mu');
+                    
+                    // Convert math operators to ASCII
+                    cleaned = cleaned
+                      .replace(/√/g, 'sqrt')
+                      .replace(/\u221A/g, 'sqrt')
+                      .replace(/²/g, '^2')
+                      .replace(/\u00B2/g, '^2')
+                      .replace(/³/g, '^3')
+                      .replace(/\u00B3/g, '^3')
+                      .replace(/⁴/g, '^4')
+                      .replace(/⁵/g, '^5')
+                      .replace(/⁶/g, '^6')
+                      .replace(/⁷/g, '^7')
+                      .replace(/⁸/g, '^8')
+                      .replace(/⁹/g, '^9')
+                      .replace(/⁰/g, '^0')
+                      .replace(/ⁿ/g, '^n')
+                      .replace(/₀/g, '_0')
+                      .replace(/₁/g, '_1')
+                      .replace(/₂/g, '_2')
+                      .replace(/₃/g, '_3')
+                      .replace(/≤/g, '<=')
+                      .replace(/\u2264/g, '<=')
+                      .replace(/≥/g, '>=')
+                      .replace(/\u2265/g, '>=')
+                      .replace(/≠/g, '!=')
+                      .replace(/\u2260/g, '!=')
+                      .replace(/±/g, '+/-')
+                      .replace(/\u00B1/g, '+/-')
+                      .replace(/×/g, 'x')
+                      .replace(/\u00D7/g, 'x')
+                      .replace(/÷/g, '/')
+                      .replace(/\u00F7/g, '/')
+                      .replace(/·/g, '*')
+                      .replace(/∞/g, 'infinity')
+                      .replace(/\u221E/g, 'infinity');
+                    
+                    // Convert geometry symbols
+                    cleaned = cleaned
+                      .replace(/°/g, ' degrees')
+                      .replace(/\u00B0/g, ' degrees')
+                      .replace(/∠/g, 'angle ')
+                      .replace(/\u2220/g, 'angle ')
+                      .replace(/⊥/g, ' perpendicular to ')
+                      .replace(/∥/g, ' parallel to ')
+                      .replace(/≅/g, ' congruent to ')
+                      .replace(/△/g, 'triangle ')
+                      .replace(/→/g, ' -> ')
+                      .replace(/←/g, ' <- ')
+                      .replace(/↔/g, ' <-> ')
+                      .replace(/⇒/g, ' => ');
+                    
+                    // Convert fractions
+                    cleaned = cleaned
+                      .replace(/½/g, '1/2')
+                      .replace(/⅓/g, '1/3')
+                      .replace(/⅔/g, '2/3')
+                      .replace(/¼/g, '1/4')
+                      .replace(/¾/g, '3/4')
+                      .replace(/⅕/g, '1/5')
+                      .replace(/⅖/g, '2/5')
+                      .replace(/⅗/g, '3/5')
+                      .replace(/⅘/g, '4/5')
+                      .replace(/⅙/g, '1/6')
+                      .replace(/⅚/g, '5/6')
+                      .replace(/⅛/g, '1/8')
+                      .replace(/⅜/g, '3/8')
+                      .replace(/⅝/g, '5/8')
+                      .replace(/⅞/g, '7/8');
+                    
+                    // Clean up any remaining problematic characters
+                    cleaned = cleaned
+                      .replace(/[^\x00-\x7F]/g, (char) => {
+                        // Replace any remaining non-ASCII with a space
+                        return ' ';
+                      })
+                      .replace(/\s+/g, ' ')
+                      .trim();
+                    
                     return cleaned;
                   };
                   
@@ -3022,115 +3120,128 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   };
                   
                   // Title
-                  pdf.setFontSize(20);
+                  pdf.setFontSize(18);
                   pdf.setFont('helvetica', 'bold');
-                  pdf.text(cleanTextForPDF(worksheetTitle), pageWidth / 2, yPosition, { align: 'center' });
-                  yPosition += 28;
+                  pdf.text(convertMathForPDF(worksheetTitle), pageWidth / 2, yPosition, { align: 'center' });
+                  yPosition += 24;
                   
                   // Teacher name
                   if (teacherName) {
-                    pdf.setFontSize(11);
+                    pdf.setFontSize(10);
                     pdf.setFont('helvetica', 'normal');
                     pdf.text(`Teacher: ${teacherName}`, pageWidth / 2, yPosition, { align: 'center' });
-                    yPosition += 20;
+                    yPosition += 18;
                   }
                   
                   // Name/Date/Period fields
-                  yPosition += 10;
-                  pdf.setFontSize(11);
-                  pdf.setFont('helvetica', 'normal');
-                  pdf.text('Name: ________________________________', marginLeft, yPosition);
-                  pdf.text('Date: ____________', marginLeft + 280, yPosition);
-                  pdf.text('Period: _____', marginLeft + 420, yPosition);
                   yPosition += 8;
+                  pdf.setFontSize(10);
+                  pdf.setFont('helvetica', 'normal');
+                  pdf.text('Name: _____________________________', marginLeft, yPosition);
+                  pdf.text('Date: ___________', marginLeft + 250, yPosition);
+                  pdf.text('Period: _____', marginLeft + 380, yPosition);
+                  yPosition += 6;
                   
                   // Divider line
-                  pdf.setDrawColor(180, 180, 180);
+                  pdf.setDrawColor(100, 100, 100);
                   pdf.setLineWidth(0.5);
                   pdf.line(marginLeft, yPosition, pageWidth - marginRight, yPosition);
-                  yPosition += 25;
+                  yPosition += 20;
                   
                   // Questions
                   compiledQuestions.forEach((q) => {
                     // Estimate question height
-                    const questionText = cleanTextForPDF(q.question);
-                    const questionLines = pdf.splitTextToSize(questionText, contentWidth - 20);
-                    const estimatedHeight = showAnswerLines ? 180 : 60 + (questionLines.length * 14);
+                    const questionText = convertMathForPDF(q.question);
+                    const questionLines = pdf.splitTextToSize(questionText, contentWidth - 25);
+                    const estimatedHeight = showAnswerLines ? 170 : 50 + (questionLines.length * 13);
                     
                     checkPageBreak(estimatedHeight);
                     
-                    // Question number and topic header
-                    pdf.setFontSize(11);
+                    // Question number and metadata on same line
+                    pdf.setFontSize(10);
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text(`${q.questionNumber}.`, marginLeft, yPosition);
+                    const headerText = `${q.questionNumber}. [${q.difficulty}] ${convertMathForPDF(q.topic)}`;
+                    pdf.text(headerText, marginLeft, yPosition);
+                    yPosition += 16;
                     
-                    pdf.setFontSize(9);
-                    pdf.setFont('helvetica', 'normal');
-                    pdf.setTextColor(100, 100, 100);
-                    pdf.text(`[${q.difficulty}] ${cleanTextForPDF(q.topic)}`, marginLeft + 20, yPosition);
-                    pdf.setTextColor(0, 0, 0);
-                    yPosition += 18;
-                    
-                    // Question text
+                    // Question text - indented
                     pdf.setFontSize(11);
-                    pdf.setFont('helvetica', 'normal');
+                    pdf.setFont('times', 'normal');
                     questionLines.forEach((line: string) => {
-                      checkPageBreak(16);
-                      pdf.text(line, marginLeft + 15, yPosition);
-                      yPosition += 14;
+                      checkPageBreak(15);
+                      pdf.text(line, marginLeft + 20, yPosition);
+                      yPosition += 13;
                     });
                     
                     // Work area box if enabled
                     if (showAnswerLines) {
-                      yPosition += 8;
-                      const boxHeight = 100;
-                      checkPageBreak(boxHeight + 30);
+                      yPosition += 6;
+                      const boxHeight = 90;
+                      checkPageBreak(boxHeight + 35);
                       
                       // Draw work area box
                       pdf.setDrawColor(30, 58, 95);
-                      pdf.setLineWidth(1.5);
-                      pdf.rect(marginLeft, yPosition, contentWidth, boxHeight);
+                      pdf.setLineWidth(1);
+                      pdf.rect(marginLeft + 20, yPosition, contentWidth - 25, boxHeight);
                       
                       // Work Area label
                       pdf.setFontSize(8);
-                      pdf.setTextColor(100, 100, 100);
-                      pdf.text('Work Area', marginLeft + 5, yPosition + 12);
+                      pdf.setFont('helvetica', 'normal');
+                      pdf.setTextColor(80, 80, 80);
+                      pdf.text('Work Area', marginLeft + 25, yPosition + 10);
                       pdf.setTextColor(0, 0, 0);
                       
-                      yPosition += boxHeight + 10;
+                      yPosition += boxHeight + 8;
                       
                       // Final Answer line
                       pdf.setFontSize(10);
-                      pdf.text('Final Answer: ___________________________________________', marginLeft + 15, yPosition);
-                      yPosition += 25;
+                      pdf.setFont('helvetica', 'bold');
+                      pdf.text('Final Answer:', marginLeft + 20, yPosition);
+                      pdf.setFont('helvetica', 'normal');
+                      pdf.line(marginLeft + 90, yPosition, pageWidth - marginRight - 20, yPosition);
+                      yPosition += 20;
                     } else {
-                      yPosition += 15;
+                      yPosition += 12;
                     }
                   });
                   
-                  // Answer Key on new page if answers exist
-                  const questionsWithAnswers = compiledQuestions.filter(q => q.answer);
-                  if (questionsWithAnswers.length > 0) {
-                    pdf.addPage();
-                    yPosition = marginTop;
-                    
-                    pdf.setFontSize(18);
-                    pdf.setFont('helvetica', 'bold');
-                    pdf.text('Answer Key', pageWidth / 2, yPosition, { align: 'center' });
-                    yPosition += 35;
-                    
-                    pdf.setFontSize(10);
-                    pdf.setFont('helvetica', 'normal');
-                    questionsWithAnswers.forEach((q) => {
-                      checkPageBreak(30);
-                      const answerText = `${q.questionNumber}. ${cleanTextForPDF(q.answer || '')}`;
-                      const answerLines = pdf.splitTextToSize(answerText, contentWidth);
-                      answerLines.forEach((line: string) => {
-                        pdf.text(line, marginLeft, yPosition);
-                        yPosition += 14;
+                  // Answer Key on new page if enabled and answers exist
+                  if (includeAnswerKey) {
+                    const questionsWithAnswers = compiledQuestions.filter(q => q.answer);
+                    if (questionsWithAnswers.length > 0) {
+                      pdf.addPage();
+                      yPosition = marginTop;
+                      
+                      pdf.setFontSize(16);
+                      pdf.setFont('helvetica', 'bold');
+                      pdf.text('ANSWER KEY', pageWidth / 2, yPosition, { align: 'center' });
+                      yPosition += 12;
+                      
+                      pdf.setFontSize(10);
+                      pdf.setFont('helvetica', 'italic');
+                      pdf.setTextColor(150, 0, 0);
+                      pdf.text('For Teacher Use Only', pageWidth / 2, yPosition, { align: 'center' });
+                      pdf.setTextColor(0, 0, 0);
+                      yPosition += 25;
+                      
+                      pdf.setFontSize(10);
+                      pdf.setFont('helvetica', 'normal');
+                      questionsWithAnswers.forEach((q) => {
+                        checkPageBreak(35);
+                        const answerText = convertMathForPDF(q.answer || '');
+                        const answerLines = pdf.splitTextToSize(`${q.questionNumber}. ${answerText}`, contentWidth - 10);
+                        answerLines.forEach((line: string, idx: number) => {
+                          if (idx === 0) {
+                            pdf.setFont('helvetica', 'bold');
+                          } else {
+                            pdf.setFont('helvetica', 'normal');
+                          }
+                          pdf.text(line, marginLeft, yPosition);
+                          yPosition += 13;
+                        });
+                        yPosition += 6;
                       });
-                      yPosition += 8;
-                    });
+                    }
                   }
                   
                   // Download
