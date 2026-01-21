@@ -944,7 +944,7 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       return result;
     }
 
-    // Parse the JSON response
+    // Parse the JSON response with robust handling for truncated responses
     let questions: GeneratedQuestion[];
     try {
       // Clean up the response - remove markdown code blocks if present
@@ -958,7 +958,51 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       if (cleanContent.endsWith('```')) {
         cleanContent = cleanContent.slice(0, -3);
       }
-      questions = JSON.parse(cleanContent.trim());
+      cleanContent = cleanContent.trim();
+      
+      // Check if response appears truncated (doesn't end with valid JSON array closing)
+      if (!cleanContent.endsWith(']')) {
+        console.warn('Detected truncated JSON response, attempting to recover...');
+        
+        // Try to find the last complete question object
+        const lastCompleteObjMatch = cleanContent.match(/^(\[[\s\S]*\})\s*,?\s*\{[^}]*$/);
+        if (lastCompleteObjMatch) {
+          // Close the array after the last complete object
+          cleanContent = lastCompleteObjMatch[1] + ']';
+          console.log('Recovered partial response with', (cleanContent.match(/\{/g) || []).length, 'questions');
+        } else {
+          // Try to find any complete array portion
+          const arrayMatch = cleanContent.match(/^\[[\s\S]*?\}(?=\s*,\s*\{|\s*\])/);
+          if (arrayMatch) {
+            cleanContent = arrayMatch[0] + ']';
+            console.log('Recovered minimal response');
+          } else {
+            console.error('Cannot recover truncated response:', cleanContent.substring(0, 200));
+            throw new Error('AI response was truncated. Please try with fewer questions or a simpler topic.');
+          }
+        }
+      }
+      
+      // Parse the JSON
+      questions = JSON.parse(cleanContent);
+      
+      // Validate we got an array
+      if (!Array.isArray(questions)) {
+        throw new Error('Response is not an array');
+      }
+      
+      // Filter out any incomplete question objects
+      questions = questions.filter(q => 
+        q && typeof q === 'object' && 
+        q.question && typeof q.question === 'string' &&
+        q.topic && typeof q.topic === 'string'
+      );
+      
+      if (questions.length === 0) {
+        throw new Error('No valid questions in response');
+      }
+      
+      console.log(`Successfully parsed ${questions.length} questions`);
       
       // Sanitize all question text to fix encoding issues
       questions = questions.map(q => ({
@@ -969,8 +1013,9 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         imagePrompt: q.imagePrompt ? sanitizeMathText(q.imagePrompt) : q.imagePrompt,
       }));
     } catch (parseError) {
-      console.error('Failed to parse AI response:', content);
-      throw new Error('Failed to parse generated questions');
+      console.error('Failed to parse AI response:', content.substring(0, 500));
+      console.error('Parse error:', parseError);
+      throw new Error('Failed to parse generated questions. The AI response may have been truncated. Please try again with fewer questions.');
     }
 
     return new Response(
