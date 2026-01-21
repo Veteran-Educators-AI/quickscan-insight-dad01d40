@@ -2968,6 +2968,137 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 <X className="h-4 w-4 mr-2" />
                 Close
               </Button>
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  // Generate PDF from worksheet content
+                  const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'in',
+                    format: 'letter',
+                  });
+                  
+                  const pageWidth = 8.5;
+                  const pageHeight = 11;
+                  const margin = 0.75;
+                  const contentWidth = pageWidth - (margin * 2);
+                  let yPosition = margin;
+                  
+                  // Title
+                  pdf.setFontSize(18);
+                  pdf.setFont('helvetica', 'bold');
+                  const titleLines = pdf.splitTextToSize(worksheetTitle, contentWidth);
+                  pdf.text(titleLines, pageWidth / 2, yPosition, { align: 'center' });
+                  yPosition += 0.15 * titleLines.length + 0.1;
+                  
+                  // Teacher name
+                  if (teacherName) {
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.text(`Teacher: ${teacherName}`, pageWidth / 2, yPosition, { align: 'center' });
+                    yPosition += 0.25;
+                  }
+                  
+                  // Name/Date/Period line
+                  pdf.setFontSize(10);
+                  pdf.text('Name: _______________________', margin, yPosition);
+                  pdf.text('Date: ___________', pageWidth / 2 - 0.5, yPosition);
+                  pdf.text('Period: _____', pageWidth - margin - 0.8, yPosition);
+                  yPosition += 0.15;
+                  pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+                  yPosition += 0.4;
+                  
+                  // Questions
+                  pdf.setFontSize(11);
+                  compiledQuestions.forEach((q, index) => {
+                    // Check if we need a new page
+                    if (yPosition > pageHeight - 2) {
+                      pdf.addPage();
+                      yPosition = margin;
+                    }
+                    
+                    // Question number and text
+                    pdf.setFont('helvetica', 'bold');
+                    const questionHeader = `${q.questionNumber}. [${q.difficulty}] ${q.topic}`;
+                    pdf.text(questionHeader, margin, yPosition);
+                    yPosition += 0.2;
+                    
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.setFontSize(10);
+                    const cleanedQuestion = fixEncodingCorruption(q.question);
+                    const questionLines = pdf.splitTextToSize(cleanedQuestion, contentWidth - 0.25);
+                    questionLines.forEach((line: string) => {
+                      if (yPosition > pageHeight - 0.75) {
+                        pdf.addPage();
+                        yPosition = margin;
+                      }
+                      pdf.text(line, margin + 0.25, yPosition);
+                      yPosition += 0.18;
+                    });
+                    
+                    // Work area box if enabled
+                    if (showAnswerLines) {
+                      yPosition += 0.1;
+                      const boxHeight = 1.5;
+                      if (yPosition + boxHeight > pageHeight - margin) {
+                        pdf.addPage();
+                        yPosition = margin;
+                      }
+                      pdf.setDrawColor(30, 58, 95);
+                      pdf.setLineWidth(0.02);
+                      pdf.rect(margin, yPosition, contentWidth, boxHeight);
+                      pdf.setFontSize(7);
+                      pdf.setTextColor(100);
+                      pdf.text('Work Area', margin + 0.1, yPosition + 0.15);
+                      pdf.setTextColor(0);
+                      yPosition += boxHeight + 0.1;
+                      
+                      // Final answer line
+                      pdf.setFontSize(9);
+                      pdf.text('Final Answer: _________________________________', margin + 0.25, yPosition);
+                      yPosition += 0.3;
+                    }
+                    
+                    yPosition += 0.25;
+                    pdf.setFontSize(11);
+                  });
+                  
+                  // Generate answer key on last page if any questions have answers
+                  const questionsWithAnswers = compiledQuestions.filter(q => q.answer);
+                  if (questionsWithAnswers.length > 0) {
+                    pdf.addPage();
+                    yPosition = margin;
+                    pdf.setFontSize(16);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('Answer Key', pageWidth / 2, yPosition, { align: 'center' });
+                    yPosition += 0.4;
+                    
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'normal');
+                    questionsWithAnswers.forEach((q) => {
+                      if (yPosition > pageHeight - 0.75) {
+                        pdf.addPage();
+                        yPosition = margin;
+                      }
+                      const answerText = `${q.questionNumber}. ${fixEncodingCorruption(q.answer || '')}`;
+                      const answerLines = pdf.splitTextToSize(answerText, contentWidth);
+                      answerLines.forEach((line: string) => {
+                        pdf.text(line, margin, yPosition);
+                        yPosition += 0.18;
+                      });
+                      yPosition += 0.1;
+                    });
+                  }
+                  
+                  // Download the PDF
+                  const fileName = `${worksheetTitle.replace(/[^a-z0-9]/gi, '_')}_worksheet.pdf`;
+                  pdf.save(fileName);
+                  toast({ title: "PDF Downloaded", description: `Saved as ${fileName}` });
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
               <Button onClick={() => { window.print(); }}>
                 <Printer className="h-4 w-4 mr-2" />
                 Print
