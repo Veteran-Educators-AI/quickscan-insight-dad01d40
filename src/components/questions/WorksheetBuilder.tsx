@@ -3006,6 +3006,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 
                 {/* Actual page content */}
                 <div 
+                  className="print-worksheet print:shadow-none print:border-none"
                   style={{ 
                     backgroundColor: 'white',
                     boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
@@ -3016,7 +3017,6 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     maxWidth: '8.5in',
                     overflow: 'hidden',
                   }}
-                  className="print:shadow-none print:border-none"
                 >
                   {/* AI Scanning Instructions Banner */}
                   {showAnswerLines && (
@@ -3285,14 +3285,40 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       {/* Print Styles */}
       <style>{`
         @media print {
-          body * {
-            visibility: hidden;
+          /* Hide everything by default */
+          body > *:not([class*="print-worksheet"]) {
+            display: none !important;
           }
-          .print-worksheet, .print-worksheet * {
-            visibility: visible;
+          
+          /* Show only the worksheet */
+          .print-worksheet {
+            display: block !important;
+            visibility: visible !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+            transform: none !important;
+            background: white !important;
           }
+          
+          .print-worksheet * {
+            visibility: visible !important;
+          }
+          
+          /* Hide print-only hidden elements */
+          .print\\:hidden {
+            display: none !important;
+          }
+          
           @page {
             margin: 0.75in;
+            size: letter;
           }
         }
       `}</style>
