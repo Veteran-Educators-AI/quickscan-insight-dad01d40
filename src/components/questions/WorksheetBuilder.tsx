@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock, NotebookPen, Scissors } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock, NotebookPen, Scissors, FileType } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ import { AIImageReviewDialog } from './AIImageReviewDialog';
 import { ImageLibraryPicker } from './ImageLibraryPicker';
 import { useAIImageLibrary } from '@/hooks/useAIImageLibrary';
 import jsPDF from 'jspdf';
+import { Document, Packer, Paragraph, TextRun, BorderStyle, AlignmentType, convertInchesToTwip, ImageRun } from 'docx';
 import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
 import { ScrapPaperGenerator } from '@/components/print/ScrapPaperGenerator';
 // Shared assignments are now saved directly to database - no need for usePushToSisterApp
@@ -1758,6 +1759,231 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     }
   };
 
+  // Generate Word document (.docx)
+  const generateWordDocument = async () => {
+    if (compiledQuestions.length === 0) {
+      toast({
+        title: 'No questions compiled',
+        description: 'Please compile the worksheet first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      const children: any[] = [];
+
+      // Header
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: worksheetTitle,
+              bold: true,
+              size: 36, // 18pt
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+        })
+      );
+
+      if (teacherName) {
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Teacher: ${teacherName}`,
+                size: 24, // 12pt
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 150 },
+          })
+        );
+      }
+
+      // Student info line
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: 'Name: _______________________   Date: ___________   Period: _____', size: 22 }),
+          ],
+          spacing: { after: 300 },
+        })
+      );
+
+      // Separator
+      children.push(
+        new Paragraph({
+          children: [],
+          border: {
+            bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+          },
+          spacing: { after: 300 },
+        })
+      );
+
+      // Questions
+      for (const question of compiledQuestions) {
+        const sanitizedQuestion = sanitizeForPDF(renderMathText(fixEncodingCorruption(question.question)));
+        const difficultyText = question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1);
+        const bloomLabel = question.bloomLevel 
+          ? question.bloomLevel.charAt(0).toUpperCase() + question.bloomLevel.slice(1)
+          : '';
+
+        let headerParts: string[] = [`${question.questionNumber}.`];
+        if (bloomLabel) {
+          headerParts.push(`[${bloomLabel}${question.bloomVerb ? `: ${question.bloomVerb}` : ''}]`);
+        }
+        if (worksheetMode === 'diagnostic' && question.advancementLevel) {
+          headerParts.push(`[Level ${question.advancementLevel}]`);
+        }
+        headerParts.push(`[${difficultyText}]`);
+
+        // Question header
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: headerParts.join(' '), bold: true, size: 22 }),
+            ],
+            spacing: { before: 200, after: 100 },
+          })
+        );
+
+        // Topic and standard
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({ 
+                text: `${question.topic} (${question.standard})`, 
+                size: 18, 
+                italics: true,
+                color: '666666',
+              }),
+            ],
+            spacing: { after: 100 },
+          })
+        );
+
+        // Question text
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: sanitizedQuestion, size: 20 }),
+            ],
+            spacing: { after: 150 },
+          })
+        );
+
+        // Work area box (simplified for Word)
+        if (showAnswerLines) {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'WORK AREA:', bold: true, size: 14, color: '1e3a5f' }),
+              ],
+              border: {
+                top: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
+                left: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
+                right: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
+              },
+              shading: { fill: 'F8FAFC' },
+              spacing: { before: 100 },
+            })
+          );
+
+          // Empty work area lines
+          for (let i = 0; i < 4; i++) {
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: '' })],
+                border: {
+                  left: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
+                  right: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
+                },
+                shading: { fill: 'F8FAFC' },
+              })
+            );
+          }
+
+          // Answer section
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'FINAL ANSWER: ', bold: true, size: 18, color: '92400E' }),
+                new TextRun({ text: '________________________________', size: 18 }),
+              ],
+              border: {
+                bottom: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
+                left: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
+                right: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
+              },
+              shading: { fill: 'FEF3C7' },
+              spacing: { after: 300 },
+            })
+          );
+        }
+      }
+
+      // Footer
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ 
+              text: 'Generated with NYCLogic Ai - NYS Regents Aligned', 
+              size: 16, 
+              italics: true,
+              color: '999999',
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 400 },
+        })
+      );
+
+      const doc = new Document({
+        sections: [{
+          properties: {
+            page: {
+              margin: {
+                top: convertInchesToTwip(marginMm / 25.4),
+                bottom: convertInchesToTwip(marginMm / 25.4),
+                left: convertInchesToTwip(marginMm / 25.4),
+                right: convertInchesToTwip(marginMm / 25.4),
+              },
+            },
+          },
+          children,
+        }],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${worksheetTitle.replace(/\s+/g, '_')}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Word document downloaded!',
+        description: `Your worksheet with ${compiledQuestions.length} question(s) has been saved as .docx.`,
+      });
+    } catch (error) {
+      console.error('Error generating Word document:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate Word document. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handlePrint = () => {
     if (compiledQuestions.length === 0) {
       toast({
@@ -2796,6 +3022,15 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   >
                     <Download className="h-4 w-4 mr-2" />
                     {isGenerating ? 'Generating...' : 'Download PDF'}
+                  </Button>
+                  <Button
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={generateWordDocument}
+                    disabled={isGenerating}
+                    title="Download as Word document"
+                  >
+                    <FileType className="h-4 w-4 mr-2" />
+                    Word
                   </Button>
                   <Button
                     variant="outline"
