@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw, QrCode, Palette, BookOpen, ImageIcon } from 'lucide-react';
+import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw, QrCode, Palette, BookOpen, ImageIcon, FileType } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QuestionPreviewPanel } from './QuestionPreviewPanel';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import { useAuth } from '@/lib/auth';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
 import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
+import { Document, Packer, Paragraph, TextRun, PageOrientation, BorderStyle, AlignmentType, convertInchesToTwip, ImageRun } from 'docx';
 
 interface WorksheetPreset {
   id: string;
@@ -317,10 +318,14 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   
   // Storyboard art settings for non-math subjects
   const [includeStoryboardArt, setIncludeStoryboardArt] = useState(false);
-  const [storyboardSubject, setStoryboardSubject] = useState<'english' | 'history' | 'biology' | 'science' | 'social-studies'>('english');
+  const [storyboardSubject, setStoryboardSubject] = useState<'english' | 'history' | 'biology' | 'chemistry' | 'physics' | 'science' | 'social-studies'>('english');
   const [storyboardStyle, setStoryboardStyle] = useState<'storyboard' | 'illustration' | 'diagram'>('storyboard');
   const [storyboardImages, setStoryboardImages] = useState<Record<string, string>>({});
   const [regeneratingImageKey, setRegeneratingImageKey] = useState<string | null>(null);
+  
+  // Geometry shapes state for on-demand generation
+  const [geometryShapes, setGeometryShapes] = useState<Record<string, string>>({});
+  const [regeneratingShapeKey, setRegeneratingShapeKey] = useState<string | null>(null);
   
   // Topics from standards menu selection
   const [customTopics, setCustomTopics] = useState<{ topicName: string; standard: string }[]>([]);
@@ -588,6 +593,461 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     setStudents(prev => prev.map(s => ({ ...s, selected: !s.diagnosticResult && !s.hasAdaptiveData })));
   };
 
+  // Helper function to fetch image as ArrayBuffer for Word document
+  const fetchImageAsArrayBuffer = async (imageUrl: string): Promise<ArrayBuffer | null> => {
+    try {
+      // Handle data URLs directly
+      if (imageUrl.startsWith('data:')) {
+        const base64Data = imageUrl.split(',')[1];
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+      }
+      
+      // Fetch external URL
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        console.error('Failed to fetch image:', response.statusText);
+        return null;
+      }
+      return await response.arrayBuffer();
+    } catch (error) {
+      console.error('Error fetching image for Word doc:', error);
+      return null;
+    }
+  };
+
+  // Generate Word document with same margins as PDF
+  const generateWordDocument = async () => {
+    if (!previewData) {
+      toast({
+        title: 'No preview data',
+        description: 'Please generate a preview first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerationStatus('Creating Word document...');
+    setGenerationProgress(0);
+
+    try {
+      const sections: any[] = [];
+      const numForms = parseInt(formCount);
+      const formsToGenerate = FORM_LETTERS.slice(0, numForms);
+      const totalStudents = previewData.students.length;
+      let processedStudents = 0;
+
+      for (const student of previewData.students) {
+        const studentIdx = previewData.students.filter(s => s.recommendedLevel === student.recommendedLevel)
+          .indexOf(student);
+        const formIndex = studentIdx % numForms;
+        const assignedForm = formsToGenerate[formIndex];
+        const cacheKey = `${assignedForm}-${student.recommendedLevel}`;
+        const questions = previewData.questions[cacheKey];
+
+        setGenerationStatus(`Processing ${student.first_name} ${student.last_name}...`);
+
+        const children: any[] = [];
+        const topicsLabel = selectedTopics.length > 0 ? selectedTopics.join(', ') : 'Math Practice';
+
+        // Header with level and form
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Level ${student.recommendedLevel} - ${getLevelDescription(student.recommendedLevel)}${numForms > 1 ? ` | Form ${assignedForm}` : ''}`,
+                bold: true,
+                size: 32, // 16pt
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 200, after: 100 },
+          })
+        );
+
+        // Topic subtitle
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `${topicsLabel.length > 50 ? topicsLabel.substring(0, 47) + '...' : topicsLabel} - Diagnostic Worksheet`,
+                size: 24, // 12pt
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          })
+        );
+
+        // Student info line
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: 'Name: ', bold: true, size: 22 }),
+              new TextRun({ text: `${student.first_name} ${student.last_name}`, size: 22 }),
+              new TextRun({ text: '          Date: _______________', size: 22 }),
+              ...(numForms > 1 ? [new TextRun({ text: `          Form ${assignedForm}`, bold: true, size: 22 })] : []),
+            ],
+            spacing: { after: 200 },
+          })
+        );
+
+        // AI Grading Instructions Box
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: '[!] IMPORTANT: AI Grading Instructions',
+                bold: true,
+                size: 18,
+              }),
+            ],
+            border: {
+              top: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+              bottom: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+              left: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+              right: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+            },
+            shading: { fill: 'EFF6FF' },
+            spacing: { before: 200 },
+          })
+        );
+
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: '• Write ALL work inside the bordered "WORK AREA" boxes only.  ', size: 16 }),
+              new TextRun({ text: '• Work outside boxes may NOT be graded by AI.', size: 16 }),
+            ],
+            border: {
+              bottom: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+              left: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+              right: { style: BorderStyle.SINGLE, size: 6, color: '3B82F6' },
+            },
+            shading: { fill: 'EFF6FF' },
+            spacing: { after: 300 },
+          })
+        );
+
+        // Warm-up section
+        if (questions?.warmUp && questions.warmUp.length > 0) {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: '🔥 Warm-Up: Let\'s Get Started!', bold: true, size: 20, color: '166534' }),
+              ],
+              shading: { fill: 'F0FDF4' },
+              spacing: { before: 200, after: 100 },
+            })
+          );
+
+          for (let warmUpIdx = 0; warmUpIdx < questions.warmUp.length; warmUpIdx++) {
+            const q = questions.warmUp[warmUpIdx];
+            const sanitizedQuestion = formatPdfText(q.question);
+            const shapeKey = `${assignedForm}-${student.recommendedLevel}-warmUp-${warmUpIdx}`;
+            const generatedShapeUrl = geometryShapes[shapeKey];
+            const hasShape = ((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl;
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `${q.questionNumber}. `, bold: true, size: 22 }),
+                  new TextRun({ text: sanitizedQuestion, size: 20 }),
+                  ...(hasShape ? [new TextRun({ text: '  📐 Diagram', size: 16, color: '2563EB', italics: true })] : []),
+                ],
+                spacing: { before: 100, after: 50 },
+              })
+            );
+
+            // Add geometry image if available (for warm-up) - check generated shapes first
+            if (generatedShapeUrl || ((q.imageUrl || q.svg) && includeGeometry)) {
+              try {
+                let imageData = generatedShapeUrl || q.imageUrl || '';
+                if (!imageData && q.svg && !q.imageUrl) {
+                  imageData = await svgToPngDataUrl(q.svg, 200, 200);
+                }
+                if (imageData) {
+                  const imageBuffer = await fetchImageAsArrayBuffer(imageData);
+                  if (imageBuffer) {
+                    children.push(
+                      new Paragraph({
+                        children: [
+                          new ImageRun({
+                            data: imageBuffer,
+                            transformation: {
+                              width: 120,
+                              height: 120,
+                            },
+                            type: 'png',
+                          }),
+                        ],
+                        spacing: { before: 100, after: 100 },
+                      })
+                    );
+                  }
+                }
+              } catch (imgError) {
+                console.error('Error adding warm-up image to Word doc:', imgError);
+              }
+            }
+
+            if (q.hint && includeHints) {
+              children.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: 'Hint: ', italics: true, size: 16, color: '6B7280' }),
+                    new TextRun({ text: q.hint, italics: true, size: 16, color: '6B7280' }),
+                  ],
+                  spacing: { after: 100 },
+                })
+              );
+            }
+
+            // Work area box
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: '' })],
+                border: {
+                  top: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                  bottom: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                  left: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                  right: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                },
+                spacing: { before: 50, after: 200 },
+              })
+            );
+            // Empty lines for work area
+            for (let i = 0; i < 3; i++) {
+              children.push(
+                new Paragraph({
+                  children: [new TextRun({ text: '' })],
+                  border: {
+                    left: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                    right: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                  },
+                })
+              );
+            }
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: '' })],
+                border: {
+                  bottom: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                  left: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                  right: { style: BorderStyle.DASHED, size: 4, color: '9CA3AF' },
+                },
+                spacing: { after: 200 },
+              })
+            );
+          }
+        }
+
+        // Main questions section
+        if (questions?.main && questions.main.length > 0) {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: '📝 Practice Questions', bold: true, size: 20 }),
+              ],
+              spacing: { before: 300, after: 150 },
+            })
+          );
+
+          for (let idx = 0; idx < questions.main.length; idx++) {
+            const q = questions.main[idx];
+            const sanitizedQuestion = formatPdfText(q.question);
+            const shapeKey = `${assignedForm}-${student.recommendedLevel}-main-${idx}`;
+            const generatedShapeUrl = geometryShapes[shapeKey];
+            const hasShape = ((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl;
+
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `${idx + 1}. `, bold: true, size: 22 }),
+                  new TextRun({ text: sanitizedQuestion, size: 20 }),
+                  ...(hasShape ? [new TextRun({ text: '  📐 Diagram', size: 16, color: '2563EB', italics: true })] : []),
+                ],
+                spacing: { before: 150, after: 50 },
+              })
+            );
+
+            // Add geometry image if available (for main questions) - check generated shapes first
+            if (generatedShapeUrl || ((q.imageUrl || q.svg) && includeGeometry)) {
+              try {
+                let imageData = generatedShapeUrl || q.imageUrl || '';
+                if (!imageData && q.svg && !q.imageUrl) {
+                  imageData = await svgToPngDataUrl(q.svg, 200, 200);
+                }
+                if (imageData) {
+                  const imageBuffer = await fetchImageAsArrayBuffer(imageData);
+                  if (imageBuffer) {
+                    children.push(
+                      new Paragraph({
+                        children: [
+                          new ImageRun({
+                            data: imageBuffer,
+                            transformation: {
+                              width: 150,
+                              height: 150,
+                            },
+                            type: 'png',
+                          }),
+                        ],
+                        spacing: { before: 100, after: 100 },
+                      })
+                    );
+                  }
+                }
+              } catch (imgError) {
+                console.error('Error adding main question image to Word doc:', imgError);
+              }
+            }
+
+            // Also add storyboard art if available
+            const storyboardKey = `${cacheKey}-main-${idx}`;
+            const storyboardImage = storyboardImages[storyboardKey];
+            if (storyboardImage && includeStoryboardArt) {
+              try {
+                const imageBuffer = await fetchImageAsArrayBuffer(storyboardImage);
+                if (imageBuffer) {
+                  children.push(
+                    new Paragraph({
+                      children: [
+                        new ImageRun({
+                          data: imageBuffer,
+                          transformation: {
+                            width: 200,
+                            height: 150,
+                          },
+                          type: 'png',
+                        }),
+                      ],
+                      spacing: { before: 100, after: 100 },
+                    })
+                  );
+                }
+              } catch (imgError) {
+                console.error('Error adding storyboard image to Word doc:', imgError);
+              }
+            }
+
+            if (q.hint && includeHints) {
+              children.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: 'Hint: ', italics: true, size: 16, color: '6B7280' }),
+                    new TextRun({ text: q.hint, italics: true, size: 16, color: '6B7280' }),
+                  ],
+                  spacing: { after: 100 },
+                })
+              );
+            }
+
+            // Work area with label
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: 'WORK AREA:', bold: true, size: 14, color: '374151' })],
+                border: {
+                  top: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                  left: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                  right: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                },
+                spacing: { before: 100 },
+              })
+            );
+
+            // Empty lines for work area (more space for main questions)
+            for (let i = 0; i < 6; i++) {
+              children.push(
+                new Paragraph({
+                  children: [new TextRun({ text: '' })],
+                  border: {
+                    left: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                    right: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                  },
+                })
+              );
+            }
+
+            // Answer section (highlighted)
+            children.push(
+              new Paragraph({
+                children: [new TextRun({ text: 'ANSWER: _______________________________', bold: true, size: 18 })],
+                shading: { fill: 'FEF9C3' },
+                border: {
+                  top: { style: BorderStyle.SINGLE, size: 4, color: 'EAB308' },
+                  bottom: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                  left: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                  right: { style: BorderStyle.SINGLE, size: 8, color: '374151' },
+                },
+                spacing: { after: 300 },
+              })
+            );
+          }
+        }
+
+        // Add section with page break for each student (except last)
+        sections.push({
+          properties: {
+            page: {
+              margin: {
+                top: convertInchesToTwip(0.75),
+                right: convertInchesToTwip(0.75),
+                bottom: convertInchesToTwip(0.75),
+                left: convertInchesToTwip(0.75),
+              },
+              size: {
+                orientation: PageOrientation.PORTRAIT,
+                width: convertInchesToTwip(8.5),
+                height: convertInchesToTwip(11),
+              },
+            },
+          },
+          children: children,
+        });
+
+        processedStudents++;
+        setGenerationProgress((processedStudents / totalStudents) * 100);
+      }
+
+      // Create the document
+      const doc = new Document({
+        sections: sections,
+      });
+
+      // Generate and download
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Diagnostic_Worksheets_${selectedTopics[0]?.substring(0, 20) || 'Math'}_${new Date().toISOString().split('T')[0]}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: '📄 Word document ready!',
+        description: `Created ${totalStudents} worksheet${totalStudents !== 1 ? 's' : ''} in Word format.`,
+      });
+
+    } catch (error) {
+      console.error('Error generating Word document:', error);
+      toast({
+        title: 'Word generation failed',
+        description: 'Could not generate Word document.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+      setGenerationProgress(0);
+    }
+  };
+
   const generateDifferentiatedWorksheets = async () => {
     const selectedStudents = students.filter(s => s.selected);
     if (selectedStudents.length === 0) {
@@ -615,8 +1075,12 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       const pdf = new jsPDF('p', 'mm', 'letter');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = marginSize === 'small' ? 12 : marginSize === 'large' ? 25 : 20; // Based on user preference
+      // Use consistent 19mm (~0.75in) margins to match print preview exactly
+      const margin = marginSize === 'small' ? 15 : marginSize === 'large' ? 25 : 19;
       const contentWidth = pageWidth - margin * 2;
+      // Conservative text width to prevent ANY overflow - 80% of content area
+      const safeTextWidth = contentWidth * 0.80;
+      const textIndent = margin + 8; // Consistent left indent for all text
       let isFirstPage = true;
 
       const numForms = parseInt(formCount);
@@ -853,7 +1317,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             yPosition += 12;
             pdf.setTextColor(0);
 
-            for (const question of warmUpQuestions) {
+            for (let warmUpIdx = 0; warmUpIdx < warmUpQuestions.length; warmUpIdx++) {
+              const question = warmUpQuestions[warmUpIdx];
               if (yPosition > pageHeight - 50) {
                 pdf.addPage();
                 pageCount++;
@@ -869,17 +1334,20 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               pdf.setFont('helvetica', 'normal');
               pdf.setFontSize(10); // Slightly smaller font for better fit
               const sanitizedQuestion = formatPdfText(question.question);
-              // Very aggressive text width: use 60% of content width to guarantee no overflow
-              const textAreaWidth = contentWidth * 0.85;
-              const lines = pdf.splitTextToSize(sanitizedQuestion, textAreaWidth);
+              // Use safe text width to prevent margin overflow
+              const lines = pdf.splitTextToSize(sanitizedQuestion, safeTextWidth);
               lines.forEach((line: string) => {
-                pdf.text(line, margin + 5, yPosition);
+                pdf.text(line, textIndent, yPosition);
                 yPosition += 4.5;
               });
               pdf.setFontSize(11); // Reset font size
 
-              // Add geometry diagram if available for warm-up
-              if ((question.imageUrl || question.svg) && includeGeometry) {
+              // Add geometry diagram if available for warm-up (check on-demand shapes first)
+              const warmUpShapeKey = `${cacheKey}-warmUp-${warmUpIdx}`;
+              const warmUpGeneratedShapeUrl = geometryShapes[warmUpShapeKey];
+              const hasWarmUpShape = warmUpGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry);
+              
+              if (hasWarmUpShape) {
                 try {
                   if (yPosition > pageHeight - 55) {
                     pdf.addPage();
@@ -889,9 +1357,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   const imgHeight = 40;
                   yPosition += 3;
                   
-                  // Convert SVG to PNG if needed
-                  let imageData = question.imageUrl || '';
-                  if (question.svg && !question.imageUrl) {
+                  // Prioritize on-demand generated shape, then imageUrl, then SVG
+                  let imageData = warmUpGeneratedShapeUrl || question.imageUrl || '';
+                  if (!imageData && question.svg) {
                     try {
                       imageData = await svgToPngDataUrl(question.svg, 200, 200);
                     } catch (convErr) {
@@ -901,7 +1369,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   }
                   
                   if (imageData) {
-                    pdf.addImage(imageData, 'PNG', margin + 5, yPosition, imgWidth, imgHeight);
+                    pdf.addImage(imageData, 'PNG', textIndent, yPosition, imgWidth, imgHeight);
                     yPosition += imgHeight + 3;
                   }
                 } catch (imgError) {
@@ -912,17 +1380,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               // Add hint if available
               if (question.hint && includeHints) {
                 yPosition += 2;
-              pdf.setFontSize(8);
-              pdf.setFont('helvetica', 'italic');
-              pdf.setTextColor(120, 100, 50);
-              const sanitizedHint = formatPdfText(question.hint);
-              // Very aggressive text width for hints
-              const hintAreaWidth = contentWidth * 0.85;
-              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, hintAreaWidth);
-              hintLines.forEach((line: string) => {
-                pdf.text(line, margin + 5, yPosition);
-                yPosition += 3.5;
-              });
+                pdf.setFontSize(8);
+                pdf.setFont('helvetica', 'italic');
+                pdf.setTextColor(120, 100, 50);
+                const sanitizedHint = formatPdfText(question.hint);
+                // Use safe text width for hints
+                const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, safeTextWidth);
+                hintLines.forEach((line: string) => {
+                  pdf.text(line, textIndent, yPosition);
+                  yPosition += 3.5;
+                });
                 pdf.setTextColor(0);
                 pdf.setFontSize(11);
               }
@@ -939,8 +1406,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 yPosition = 25;
               }
               
-              const boxMarginLeft = margin + 3;
-              const boxWidth = contentWidth - 6;
+              const boxMarginLeft = margin + 2;
+              const boxWidth = contentWidth - 4; // Slightly smaller to stay safely inside margins
               const warmUpWorkAreaHeight = 20;
               const warmUpAnswerHeight = 12;
               
@@ -1048,9 +1515,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             pdf.setFont('helvetica', 'normal');
             pdf.setFontSize(10); // Slightly smaller font for better fit
             const sanitizedQuestion = formatPdfText(question.question);
-            // Very aggressive text width: use 85% of content width to guarantee no overflow
-            const textAreaWidth = contentWidth * 0.85;
-            const lines = pdf.splitTextToSize(sanitizedQuestion, textAreaWidth);
+            // Use safe text width to prevent margin overflow
+            const lines = pdf.splitTextToSize(sanitizedQuestion, safeTextWidth);
             for (const line of lines) {
               if (yPosition > pageHeight - 30) {
                 pdf.addPage();
@@ -1058,13 +1524,17 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 await addContinuationPageHeader(pageCount);
                 yPosition = 25; // Start below the continuation header
               }
-              pdf.text(line, margin + 5, yPosition);
+              pdf.text(line, textIndent, yPosition);
               yPosition += 4.5;
             }
             pdf.setFontSize(11); // Reset font size
 
-            // Add geometry diagram if available
-            if ((question.imageUrl || question.svg) && includeGeometry) {
+            // Add geometry diagram if available (check on-demand shapes first)
+            const mainShapeKey = `${cacheKey}-main-${questionIdx}`;
+            const mainGeneratedShapeUrl = geometryShapes[mainShapeKey];
+            const hasMainShape = mainGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry);
+            
+            if (hasMainShape) {
               try {
                 // Check if we need a new page for the image
                 if (yPosition > pageHeight - 70) {
@@ -1074,9 +1544,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   yPosition = 25; // Start below the continuation header
                 }
                 
-                // Convert SVG to PNG if needed
-                let imageData = question.imageUrl || '';
-                if (question.svg && !question.imageUrl) {
+                // Prioritize on-demand generated shape, then imageUrl, then SVG
+                let imageData = mainGeneratedShapeUrl || question.imageUrl || '';
+                if (!imageData && question.svg) {
                   try {
                     imageData = await svgToPngDataUrl(question.svg, 200, 200);
                   } catch (convErr) {
@@ -1089,7 +1559,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   // Add the image to the PDF
                   const imgWidth = 50; // mm
                   const imgHeight = 50; // mm
-                  const imgX = margin + 5;
+                  const imgX = textIndent;
                   
                   yPosition += 3;
                   pdf.addImage(imageData, 'PNG', imgX, yPosition, imgWidth, imgHeight);
@@ -1132,9 +1602,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               pdf.setFont('helvetica', 'italic');
               pdf.setTextColor(120, 100, 50);
               const sanitizedHint = formatPdfText(question.hint);
-              // Very aggressive text width for hints
-              const hintAreaWidth = contentWidth * 0.85;
-              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, hintAreaWidth);
+              // Use safe text width for hints
+              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, safeTextWidth);
               for (const line of hintLines) {
                 if (yPosition > pageHeight - 25) {
                   pdf.addPage();
@@ -1142,7 +1611,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   await addContinuationPageHeader(pageCount);
                   yPosition = 25; // Start below the continuation header
                 }
-                pdf.text(line, margin + 5, yPosition);
+                pdf.text(line, textIndent, yPosition);
                 yPosition += 3.5;
               }
               pdf.setTextColor(0);
@@ -1156,8 +1625,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             const mainZoneHeight = 55; // Total height for work area + answer
             const mainWorkAreaHeight = 40;
             const mainAnswerHeight = 12;
-            const boxMarginLeft = margin + 3;
-            const boxWidth = contentWidth - 6;
+            const boxMarginLeft = margin + 2;
+            const boxWidth = contentWidth - 4; // Slightly smaller to stay safely inside margins
             
             // Check if we need a new page for the zone box
             if (yPosition > pageHeight - mainZoneHeight - 15) {
@@ -1345,10 +1814,15 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 akY = margin;
               }
               const formattedQuestion = formatPdfText(q.question);
-              const questionText = formattedQuestion.substring(0, 80) + (formattedQuestion.length > 80 ? '...' : '');
+              // Use safe text width for answer key too
+              const akTextWidth = safeTextWidth * 0.9;
+              const questionLines = pdf.splitTextToSize(`W${idx + 1}. ${formattedQuestion}`, akTextWidth);
               pdf.setFontSize(8);
-              pdf.text(`W${idx + 1}. ${questionText}`, margin + 2, akY);
-              akY += 4;
+              questionLines.slice(0, 2).forEach((line: string) => {
+                pdf.text(line, margin + 2, akY);
+                akY += 3.5;
+              });
+              akY += 1;
             });
             akY += 3;
           }
@@ -1367,10 +1841,15 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 akY = margin;
               }
               const formattedQuestion = formatPdfText(q.question);
-              const questionText = formattedQuestion.substring(0, 80) + (formattedQuestion.length > 80 ? '...' : '');
+              // Use safe text width for answer key too
+              const akTextWidth = safeTextWidth * 0.9;
+              const questionLines = pdf.splitTextToSize(`${idx + 1}. ${formattedQuestion}`, akTextWidth);
               pdf.setFontSize(8);
-              pdf.text(`${idx + 1}. ${questionText}`, margin + 2, akY);
-              akY += 4;
+              questionLines.slice(0, 2).forEach((line: string) => {
+                pdf.text(line, margin + 2, akY);
+                akY += 3.5;
+              });
+              akY += 1;
             });
           }
           
@@ -1818,6 +2297,74 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     });
   };
 
+  // Generate geometry shape for a specific question
+  const generateGeometryShapeForQuestion = async (
+    questionText: string,
+    questionKey: string
+  ): Promise<string | null> => {
+    try {
+      console.log(`Generating geometry shape for: ${questionKey}`);
+      setRegeneratingShapeKey(questionKey);
+      
+      // Create a prompt based on the question text
+      const shapePrompt = `Create a clear geometric diagram for this math question: "${questionText}". 
+        Include appropriate labels, measurements, and annotations that match the question.`;
+      
+      const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+        body: {
+          questions: [{
+            questionNumber: 1,
+            imagePrompt: shapePrompt,
+          }],
+          useNanoBanana: useAIImages,
+        },
+      });
+
+      if (error) {
+        console.error('Geometry shape generation error:', error);
+        return null;
+      }
+
+      const imageUrl = data?.results?.[0]?.imageUrl;
+      if (imageUrl) {
+        setGeometryShapes(prev => ({
+          ...prev,
+          [questionKey]: imageUrl,
+        }));
+        return imageUrl;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error generating geometry shape:', error);
+      return null;
+    } finally {
+      setRegeneratingShapeKey(null);
+    }
+  };
+
+  // Regenerate geometry shape for a specific question
+  const regenerateGeometryShape = async (questionText: string, questionKey: string) => {
+    toast({
+      title: 'Generating shape...',
+      description: 'Creating a geometry diagram for this question.',
+    });
+    
+    const imageUrl = await generateGeometryShapeForQuestion(questionText, questionKey);
+    
+    if (imageUrl) {
+      toast({
+        title: 'Shape generated',
+        description: 'Geometry diagram has been created.',
+      });
+    } else {
+      toast({
+        title: 'Generation failed',
+        description: 'Could not generate geometry shape. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const renderStudentPreview = (student: StudentWithDiagnostic, index: number) => {
     if (!previewData) return null;
@@ -1984,10 +2531,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                         </Tooltip>
                       </TooltipProvider>
                     </div>
-                    {/* Show geometry shapes in preview */}
-                    {(q.imageUrl || q.svg) && includeGeometry && (
-                      <div className="mt-2 flex justify-center">
-                        {q.svg && !q.imageUrl ? (
+                    {/* Show geometry shapes in preview - from question or generated */}
+                    {((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-warmUp-${idx}`] ? (
+                      <div className="mt-2 flex justify-center relative group/shape">
+                        {geometryShapes[`${cacheKey}-warmUp-${idx}`] ? (
+                          <img 
+                            src={geometryShapes[`${cacheKey}-warmUp-${idx}`]} 
+                            alt="Geometry diagram" 
+                            className="max-w-[150px] max-h-[150px] border rounded"
+                          />
+                        ) : q.svg && !q.imageUrl ? (
                           <div 
                             className="max-w-[150px] max-h-[150px] border rounded overflow-hidden"
                             dangerouslySetInnerHTML={{ __html: q.svg }}
@@ -1999,7 +2552,35 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                             className="max-w-[150px] max-h-[150px] border rounded"
                           />
                         )}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="absolute top-1 right-1 h-6 opacity-0 group-hover/shape:opacity-100 transition-opacity"
+                          onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-warmUp-${idx}`)}
+                          disabled={regeneratingShapeKey === `${cacheKey}-warmUp-${idx}`}
+                        >
+                          {regeneratingShapeKey === `${cacheKey}-warmUp-${idx}` ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3 w-3" />
+                          )}
+                        </Button>
                       </div>
+                    ) : includeGeometry && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 w-full"
+                        onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-warmUp-${idx}`)}
+                        disabled={regeneratingShapeKey === `${cacheKey}-warmUp-${idx}`}
+                      >
+                        {regeneratingShapeKey === `${cacheKey}-warmUp-${idx}` ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : (
+                          <Shapes className="h-3 w-3 mr-1" />
+                        )}
+                        Generate Shape
+                      </Button>
                     )}
                     {/* Show storyboard art in preview */}
                     {includeStoryboardArt && (
@@ -2089,10 +2670,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                         </Tooltip>
                       </TooltipProvider>
                     </div>
-                    {/* Show geometry shapes in preview */}
-                    {(q.imageUrl || q.svg) && includeGeometry && (
-                      <div className="mt-2 flex justify-center">
-                        {q.svg && !q.imageUrl ? (
+                    {/* Show geometry shapes in preview - from question or generated */}
+                    {((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-main-${idx}`] ? (
+                      <div className="mt-2 flex justify-center relative group/shape">
+                        {geometryShapes[`${cacheKey}-main-${idx}`] ? (
+                          <img 
+                            src={geometryShapes[`${cacheKey}-main-${idx}`]} 
+                            alt="Geometry diagram" 
+                            className="max-w-[180px] max-h-[180px] border rounded"
+                          />
+                        ) : q.svg && !q.imageUrl ? (
                           <div 
                             className="max-w-[180px] max-h-[180px] border rounded overflow-hidden"
                             dangerouslySetInnerHTML={{ __html: q.svg }}
@@ -2104,8 +2691,21 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                             className="max-w-[180px] max-h-[180px] border rounded"
                           />
                         )}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="absolute top-1 right-1 h-6 opacity-0 group-hover/shape:opacity-100 transition-opacity"
+                          onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-main-${idx}`)}
+                          disabled={regeneratingShapeKey === `${cacheKey}-main-${idx}`}
+                        >
+                          {regeneratingShapeKey === `${cacheKey}-main-${idx}` ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3 w-3" />
+                          )}
+                        </Button>
                       </div>
-                    )}
+                    ) : null}
                     {/* Show storyboard art in preview */}
                     {includeStoryboardArt && (
                       <div className="mt-2">
@@ -2151,9 +2751,27 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                     {q.hint && includeHints && (
                       <p className="text-xs text-muted-foreground mt-1 italic">Hint: {q.hint}</p>
                     )}
-                    {/* Answer space */}
+                    {/* Answer space with Generate Shape button */}
                     <div className="mt-3 border-t pt-2">
-                      <div className="h-16 border border-dashed rounded bg-gray-50"></div>
+                      <div className="h-16 border border-dashed rounded bg-gray-50 relative flex items-center justify-center">
+                        {/* Show Generate Shape button if no shape exists and geometry is enabled */}
+                        {includeGeometry && !q.imageUrl && !q.svg && !geometryShapes[`${cacheKey}-main-${idx}`] && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                            onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-main-${idx}`)}
+                            disabled={regeneratingShapeKey === `${cacheKey}-main-${idx}`}
+                          >
+                            {regeneratingShapeKey === `${cacheKey}-main-${idx}` ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              <Shapes className="h-3 w-3 mr-1" />
+                            )}
+                            Generate Shape
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -2637,6 +3255,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                       <SelectItem value="english">English / Literature</SelectItem>
                       <SelectItem value="history">History / Social Studies</SelectItem>
                       <SelectItem value="biology">Biology / Life Science</SelectItem>
+                      <SelectItem value="chemistry">Chemistry</SelectItem>
+                      <SelectItem value="physics">Physics</SelectItem>
                       <SelectItem value="science">General Science</SelectItem>
                       <SelectItem value="social-studies">Social Studies</SelectItem>
                     </SelectContent>
@@ -3028,6 +3648,33 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 <Badge variant="outline">
                   {Object.keys(previewData.questions).length} unique form/level combinations
                 </Badge>
+                {/* Geometry shapes indicator */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div 
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer transition-colors ${
+                          includeGeometry 
+                            ? 'bg-blue-100 text-blue-700 border border-blue-300' 
+                            : 'bg-gray-100 text-gray-500 border border-gray-200'
+                        }`}
+                        onClick={() => setIncludeGeometry(!includeGeometry)}
+                      >
+                        <Shapes className="h-3.5 w-3.5" />
+                        <span className="text-xs font-medium">
+                          Shapes {includeGeometry ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">
+                        {includeGeometry 
+                          ? 'Geometry shapes will be included in PDF/Word. Click to turn off.' 
+                          : 'Geometry shapes are disabled. Click to enable.'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Batch regenerate controls */}
@@ -3112,6 +3759,19 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 >
                   <X className="h-4 w-4 mr-1" />
                   Close
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={generateWordDocument}
+                  disabled={isGenerating}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isGenerating && generationStatus.includes('Word') ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <FileType className="h-4 w-4 mr-1" />
+                  )}
+                  Word Doc
                 </Button>
                 <Button
                   size="sm"
