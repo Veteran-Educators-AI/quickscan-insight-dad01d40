@@ -57,6 +57,7 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
     cancelScan,
     updateSettings,
     clearImages,
+    clearError,
     checkCompatibility,
     reconnectToDevice,
   } = useWebUSBScanner();
@@ -138,14 +139,22 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="flex items-center justify-between">
               <span>{error}</span>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={requestDevice}
-                className="ml-2"
-              >
-                <RefreshCw className="h-3 w-3 mr-1" /> Retry
-              </Button>
+              <div className="flex gap-2 ml-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={requestDevice}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" /> Retry
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={clearError}
+                >
+                  Dismiss
+                </Button>
+              </div>
             </AlertDescription>
           </Alert>
         )}
@@ -172,11 +181,11 @@ export function WebUSBScannerPanel({ onImagesScanned, className }: WebUSBScanner
                 <span className="text-xs">Works best with scanners that support USB Image Class</span>
               </p>
 
-              {/* Previously paired devices */}
+              {/* Previously remembered devices (browser remembers USB permissions, not actual connection) */}
               {pairedDevices.length > 0 && !isAutoReconnecting && (
-                <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-orange-200">
-                  <p className="text-xs font-medium mb-2 flex items-center justify-center gap-1">
-                    <ShieldCheck className="h-3 w-3 text-orange-500" />
+                <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                  <p className="text-xs font-medium mb-1 flex items-center justify-center gap-1 text-amber-700 dark:text-amber-400">
+                    <Usb className="h-3 w-3" />
                     Remembered Scanners
                   </p>
                   <p className="text-xs text-muted-foreground mb-2 text-center">

@@ -3,11 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { handleApiError } from '@/lib/apiErrorHandler';
 import { useQRScanSettings } from '@/hooks/useQRScanSettings';
+import { useDuplicateWorkDetection } from '@/hooks/useDuplicateWorkDetection';
 import jsQR from 'jsqr';
 import { parseStudentQRCode } from '@/components/print/StudentQRCode';
 import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
+import { toast } from 'sonner';
 
 const BATCH_STORAGE_KEY = 'scan-genius-batch-data';
+const BATCH_SUMMARY_KEY = 'scan-genius-batch-summary';
 
 interface RubricStep {
   step_number: number;
@@ -133,6 +136,7 @@ interface UseBatchAnalysisReturn {
   selectRunAsGrade: (itemId: string, runIndex: number) => void;
   isProcessing: boolean;
   isIdentifying: boolean;
+  isRestoredFromStorage: boolean;
   currentIndex: number;
   summary: BatchSummary | null;
   generateSummary: () => BatchSummary;
@@ -141,7 +145,10 @@ interface UseBatchAnalysisReturn {
 export function useBatchAnalysis(): UseBatchAnalysisReturn {
   const { user } = useAuth();
   const { settings: qrScanSettings } = useQRScanSettings();
-  const isInitialized = useRef(false);
+  const { checkForDuplicate, quickDuplicateCheck, clearDuplicateCache } = useDuplicateWorkDetection();
+  const hasLoadedFromStorage = useRef(false);
+  const lastSavedItems = useRef<string>('');
+  const lastSavedSummary = useRef<string>('');
   
   // Load initial state from localStorage
   const [items, setItems] = useState<BatchItem[]>(() => {
@@ -150,12 +157,14 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          console.log(`Restored ${parsed.length} items from session`);
+          console.log(`[BatchAnalysis] Restored ${parsed.length} items from session`);
+          hasLoadedFromStorage.current = true;
+          lastSavedItems.current = stored;
           return parsed;
         }
       }
     } catch (e) {
-      console.error('Failed to restore batch data:', e);
+      console.error('[BatchAnalysis] Failed to restore batch data:', e);
     }
     return [];
   });
@@ -163,26 +172,120 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(-1);
-  const [summary, setSummary] = useState<BatchSummary | null>(null);
-
-  // Persist items to localStorage when they change
-  useEffect(() => {
-    // Skip initial render to avoid overwriting restored data
-    if (!isInitialized.current) {
-      isInitialized.current = true;
-      return;
-    }
-    
+  
+  // Load summary from localStorage
+  const [summary, setSummary] = useState<BatchSummary | null>(() => {
     try {
-      if (items.length > 0) {
-        localStorage.setItem(BATCH_STORAGE_KEY, JSON.stringify(items));
-      } else {
-        localStorage.removeItem(BATCH_STORAGE_KEY);
+      const storedSummary = localStorage.getItem(BATCH_SUMMARY_KEY);
+      if (storedSummary) {
+        const parsed = JSON.parse(storedSummary);
+        console.log('[BatchAnalysis] Restored summary from session');
+        lastSavedSummary.current = storedSummary;
+        return parsed;
       }
     } catch (e) {
-      console.error('Failed to persist batch data:', e);
+      console.error('[BatchAnalysis] Failed to restore summary:', e);
+    }
+    return null;
+  });
+
+  // Persist items to localStorage when they change - use JSON comparison to avoid unnecessary writes
+  useEffect(() => {
+    try {
+      const serialized = items.length > 0 ? JSON.stringify(items) : '';
+      
+      // Only write if the data actually changed
+      if (serialized !== lastSavedItems.current) {
+        if (items.length > 0) {
+          console.log(`[BatchAnalysis] Persisting ${items.length} items to localStorage`);
+          localStorage.setItem(BATCH_STORAGE_KEY, serialized);
+          lastSavedItems.current = serialized;
+        } else if (lastSavedItems.current !== '') {
+          // Only clear if we previously had data (prevents clearing on initial empty load)
+          console.log('[BatchAnalysis] Clearing items from localStorage');
+          localStorage.removeItem(BATCH_STORAGE_KEY);
+          localStorage.removeItem(BATCH_SUMMARY_KEY);
+          lastSavedItems.current = '';
+          lastSavedSummary.current = '';
+        }
+      }
+    } catch (e) {
+      console.error('[BatchAnalysis] Failed to persist batch data:', e);
     }
   }, [items]);
+
+  // Persist summary to localStorage when it changes
+  useEffect(() => {
+    try {
+      const serialized = summary ? JSON.stringify(summary) : '';
+      
+      if (serialized !== lastSavedSummary.current) {
+        if (summary) {
+          console.log('[BatchAnalysis] Persisting summary to localStorage');
+          localStorage.setItem(BATCH_SUMMARY_KEY, serialized);
+          lastSavedSummary.current = serialized;
+        } else if (lastSavedSummary.current !== '') {
+          console.log('[BatchAnalysis] Clearing summary from localStorage');
+          localStorage.removeItem(BATCH_SUMMARY_KEY);
+          lastSavedSummary.current = '';
+        }
+      }
+    } catch (e) {
+      console.error('[BatchAnalysis] Failed to persist summary:', e);
+    }
+  }, [summary]);
+
+  // Auto-regenerate summary on mount if we have completed items but no summary
+  useEffect(() => {
+    const completedItems = items.filter(item => item.status === 'completed' && item.result);
+    if (completedItems.length > 0 && !summary) {
+      console.log('Auto-regenerating summary for restored items');
+      // Delay to ensure state is fully initialized
+      setTimeout(() => {
+        const validScores = completedItems
+          .map(item => item.result?.grade ?? item.result?.totalScore?.percentage)
+          .filter((s): s is number => typeof s === 'number' && !isNaN(s));
+
+        if (validScores.length > 0) {
+          const avgScore = validScores.reduce((a, b) => a + b, 0) / validScores.length;
+          const highScore = Math.max(...validScores);
+          const lowScore = Math.min(...validScores);
+          const passCount = validScores.filter(s => s >= 65).length;
+          
+          const misconceptionCounts: Record<string, number> = {};
+          completedItems.forEach(item => {
+            (item.result?.misconceptions || []).forEach(m => {
+              misconceptionCounts[m] = (misconceptionCounts[m] || 0) + 1;
+            });
+          });
+          
+          const ranges = [
+            { range: '0-59%', min: 0, max: 59 },
+            { range: '60-69%', min: 60, max: 69 },
+            { range: '70-79%', min: 70, max: 79 },
+            { range: '80-89%', min: 80, max: 89 },
+            { range: '90-100%', min: 90, max: 100 },
+          ];
+          
+          setSummary({
+            totalStudents: completedItems.length,
+            averageScore: Math.round(avgScore * 10) / 10,
+            highestScore: highScore,
+            lowestScore: lowScore,
+            passRate: Math.round((passCount / validScores.length) * 100),
+            commonMisconceptions: Object.entries(misconceptionCounts)
+              .map(([misconception, count]) => ({ misconception, count }))
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 5),
+            scoreDistribution: ranges.map(({ range, min, max }) => ({
+              range,
+              count: validScores.filter(s => s >= min && s <= max).length,
+            })),
+          });
+        }
+      }, 100);
+    }
+  }, []); // Only run on mount
 
   // Apply grade curve to a result
   const applyGradeCurve = useCallback((result: AnalysisResult): AnalysisResult => {
@@ -301,16 +404,22 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   }, []);
 
   const clearAll = useCallback(() => {
+    console.log('[BatchAnalysis] Clearing all data');
     setItems([]);
     setSummary(null);
     setCurrentIndex(-1);
-    // Clear persisted data
+    // Clear persisted data explicitly
     try {
       localStorage.removeItem(BATCH_STORAGE_KEY);
+      localStorage.removeItem(BATCH_SUMMARY_KEY);
+      lastSavedItems.current = '';
+      lastSavedSummary.current = '';
     } catch (e) {
-      console.error('Failed to clear batch data:', e);
+      console.error('[BatchAnalysis] Failed to clear batch data:', e);
     }
-  }, []);
+    // Clear duplicate detection cache for fresh batch
+    clearDuplicateCache();
+  }, [clearDuplicateCache]);
 
   // Local QR code scanning function - supports both student-only and student+question QR codes
   const scanQRCodeFromImage = async (imageDataUrl: string): Promise<{ studentId: string; questionId?: string; type: 'student-only' | 'student-question' } | null> => {
@@ -329,18 +438,38 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
         ctx.drawImage(img, 0, 0);
         
-        // Try scanning different regions
+        // Calculate region sizes based on image dimensions
+        // QR codes are 70-80px with borders, so look for appropriately sized regions
+        const cornerSize = Math.max(200, Math.min(500, Math.floor(img.width / 2.5)));
+        const edgeWidth = Math.max(150, Math.min(400, Math.floor(img.width / 3)));
+        
+        // Try scanning different regions - TOP-RIGHT FIRST (where student QR is placed)
+        // Order matters: most common locations first for performance
         const regions = [
-          { x: 0, y: 0, w: Math.min(400, img.width / 2), h: Math.min(400, img.height / 2) },
-          { x: Math.max(0, img.width - 400), y: 0, w: Math.min(400, img.width / 2), h: Math.min(400, img.height / 2) },
-          { x: 0, y: Math.max(0, img.height - 400), w: Math.min(400, img.width / 2), h: Math.min(400, img.height / 2) },
+          // TOP-RIGHT CORNER (PRIMARY - this is where StudentOnlyQRCode is placed on worksheets)
+          { x: Math.max(0, img.width - cornerSize), y: 0, w: cornerSize, h: cornerSize },
+          // Top edge full width (header area - catches QR even if slightly off)
+          { x: 0, y: 0, w: img.width, h: Math.min(400, img.height / 3) },
+          // Top-left corner (for question QRs)
+          { x: 0, y: 0, w: cornerSize, h: cornerSize },
+          // Right edge full height (catches QR if page slightly rotated)
+          { x: Math.max(0, img.width - edgeWidth), y: 0, w: edgeWidth, h: img.height },
+          // Upper half of image (most QRs are in top portion)
+          { x: 0, y: 0, w: img.width, h: Math.floor(img.height / 2) },
+          // Bottom corners (legacy support)
+          { x: Math.max(0, img.width - cornerSize), y: Math.max(0, img.height - cornerSize), w: cornerSize, h: cornerSize },
+          { x: 0, y: Math.max(0, img.height - cornerSize), w: cornerSize, h: cornerSize },
+          // Full image (final fallback)
           { x: 0, y: 0, w: img.width, h: img.height },
         ];
 
         for (const region of regions) {
           try {
             const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
-            const code = jsQR(imageData.data, region.w, region.h);
+            // Use inversionAttempts for better detection in varied lighting conditions
+            const code = jsQR(imageData.data, region.w, region.h, {
+              inversionAttempts: 'attemptBoth',
+            });
             
             if (code) {
               // Try unified parser first (handles both v1 and v2)
@@ -535,6 +664,64 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
   const analyzeItem = async (item: BatchItem, rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string): Promise<BatchItem> => {
     try {
+      // Check for duplicate work before spending AI credits
+      if (item.studentId && item.questionId) {
+        const duplicateCheck = await checkForDuplicate(
+          item.studentId,
+          item.questionId,
+          undefined, // We don't have OCR text yet
+          item.imageDataUrl
+        );
+
+        if (duplicateCheck.isDuplicate) {
+          const gradeInfo = duplicateCheck.existingGrade 
+            ? `${duplicateCheck.existingGrade}%` 
+            : 'recorded';
+          toast.info(
+            `Skipping duplicate: ${item.studentName || 'Student'}'s work already analyzed (${gradeInfo})`,
+            { duration: 3000 }
+          );
+          return {
+            ...item,
+            status: 'completed',
+            result: {
+              ocrText: '',
+              problemIdentified: 'Duplicate work - previously analyzed',
+              approachAnalysis: 'This work was already analyzed in a previous scan.',
+              rubricScores: [],
+              misconceptions: [],
+              totalScore: { 
+                earned: duplicateCheck.existingGrade ? Math.round(duplicateCheck.existingGrade / 10) : 0, 
+                possible: 10, 
+                percentage: duplicateCheck.existingGrade || 0 
+              },
+              feedback: `This work was already analyzed${duplicateCheck.createdAt ? ` on ${new Date(duplicateCheck.createdAt).toLocaleDateString()}` : ''}.`,
+              grade: duplicateCheck.existingGrade,
+              gradeJustification: 'Duplicate submission - using previous grade',
+            },
+          };
+        }
+      }
+
+      // Quick session-level duplicate check (catches rescans in same session)
+      const quickCheck = await quickDuplicateCheck(
+        item.studentId || 'unknown',
+        item.questionId,
+        item.imageDataUrl
+      );
+
+      if (quickCheck.isDuplicate) {
+        toast.info(
+          `Skipping: Same image already processed this session`,
+          { duration: 2000 }
+        );
+        return {
+          ...item,
+          status: 'failed',
+          error: 'Duplicate image in this batch - already processed',
+        };
+      }
+
       const { data, error } = await supabase.functions.invoke('analyze-student-work', {
         body: {
           imageBase64: item.imageDataUrl,
@@ -1514,6 +1701,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     selectRunAsGrade,
     isProcessing,
     isIdentifying,
+    isRestoredFromStorage: hasLoadedFromStorage.current,
     currentIndex,
     summary,
     generateSummary,

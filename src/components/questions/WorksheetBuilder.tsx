@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock, NotebookPen, Scissors } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ import { ImageLibraryPicker } from './ImageLibraryPicker';
 import { useAIImageLibrary } from '@/hooks/useAIImageLibrary';
 import jsPDF from 'jspdf';
 import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
+import { ScrapPaperGenerator } from '@/components/print/ScrapPaperGenerator';
 // Shared assignments are now saved directly to database - no need for usePushToSisterApp
 
 export interface WorksheetQuestion {
@@ -73,7 +75,7 @@ const getBloomInfo = (level?: BloomLevel) => {
 };
 
 // Worksheet mode types
-export type WorksheetMode = 'practice' | 'basic_assessment' | 'diagnostic';
+export type WorksheetMode = 'basic_assessment' | 'diagnostic';
 
 interface SavedWorksheet {
   id: string;
@@ -101,6 +103,90 @@ interface SavedWorksheet {
   is_shared: boolean;
 }
 
+// Page Break Indicator Component - shows where pages will split when printing
+const PageBreakIndicators = ({ contentRef }: { contentRef: React.RefObject<HTMLDivElement> }) => {
+  const [pageBreaks, setPageBreaks] = useState<number[]>([]);
+  
+  useEffect(() => {
+    if (!contentRef.current) return;
+    
+    // Standard US Letter: 11in page height, 0.75in padding top and bottom = 9.5in content area
+    // At 96 DPI: 9.5 * 96 = 912px per page content area
+    const pageContentHeight = 912; // pixels
+    
+    const calculateBreaks = () => {
+      if (!contentRef.current) return;
+      const contentHeight = contentRef.current.scrollHeight;
+      const breaks: number[] = [];
+      
+      // Add a break at each page boundary
+      let currentPosition = pageContentHeight;
+      while (currentPosition < contentHeight) {
+        breaks.push(currentPosition);
+        currentPosition += pageContentHeight;
+      }
+      
+      setPageBreaks(breaks);
+    };
+    
+    // Calculate on mount and when content changes
+    calculateBreaks();
+    
+    // Use ResizeObserver to detect content changes
+    const observer = new ResizeObserver(calculateBreaks);
+    observer.observe(contentRef.current);
+    
+    return () => observer.disconnect();
+  }, [contentRef]);
+  
+  if (pageBreaks.length === 0) return null;
+  
+  return (
+    <>
+      {pageBreaks.map((position, index) => (
+        <div
+          key={index}
+          className="print:hidden"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: `${position}px`,
+            zIndex: 10,
+            pointerEvents: 'none',
+          }}
+        >
+          {/* Dashed line */}
+          <div style={{
+            borderTop: '2px dashed #ef4444',
+            position: 'relative',
+          }}>
+            {/* Page number badge */}
+            <div style={{
+              position: 'absolute',
+              left: '50%',
+              transform: 'translateX(-50%) translateY(-50%)',
+              backgroundColor: '#ef4444',
+              color: 'white',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            }}>
+              <Scissors className="h-3 w-3" />
+              Page {index + 1} ends here
+            </div>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+};
+
 interface WorksheetBuilderProps {
   selectedQuestions: WorksheetQuestion[];
   onRemoveQuestion: (id: string) => void;
@@ -110,18 +196,18 @@ interface WorksheetBuilderProps {
 export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearAll }: WorksheetBuilderProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [worksheetTitle, setWorksheetTitle] = useState('Math Practice Worksheet');
+  const [worksheetTitle, setWorksheetTitle] = useState('Diagnostic Assessment');
   const [hasUserEditedTitle, setHasUserEditedTitle] = useState(false);
-  const [worksheetMode, setWorksheetMode] = useState<WorksheetMode>('practice');
+  const [worksheetMode, setWorksheetMode] = useState<WorksheetMode>('diagnostic');
   const [teacherName, setTeacherName] = useState('');
 
   // Auto-update title to first topic name when questions are added
   useEffect(() => {
     if (selectedQuestions.length > 0 && !hasUserEditedTitle) {
-      const prefix = worksheetMode === 'basic_assessment' ? 'Assessment: ' : worksheetMode === 'diagnostic' ? 'Diagnostic: ' : '';
+      const prefix = worksheetMode === 'basic_assessment' ? 'Assessment: ' : 'Diagnostic: ';
       setWorksheetTitle(prefix + selectedQuestions[0].topicName);
     } else if (selectedQuestions.length === 0 && !hasUserEditedTitle) {
-      setWorksheetTitle(worksheetMode === 'basic_assessment' ? 'Math Assessment' : worksheetMode === 'diagnostic' ? 'Diagnostic Assessment' : 'Math Practice Worksheet');
+      setWorksheetTitle(worksheetMode === 'basic_assessment' ? 'Math Assessment' : 'Diagnostic Assessment');
     }
   }, [selectedQuestions, hasUserEditedTitle, worksheetMode]);
   const [showAnswerLines, setShowAnswerLines] = useState(true);
@@ -136,6 +222,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [useNanoBanana, setUseNanoBanana] = useState(false); // Use Nano Banana for realistic shape images
   const [imageSize, setImageSize] = useState(200); // Image size in pixels (100-400)
   const [includeAnswerKey, setIncludeAnswerKey] = useState(false); // Include answer key for teachers
+  const [marginSize, setMarginSize] = useState<'small' | 'medium' | 'large'>('medium'); // Page margin size
+  const [includeScrapPaper, setIncludeScrapPaper] = useState(false); // Bundle scrap paper with worksheet
+  const [scrapPaperLayout, setScrapPaperLayout] = useState<'single' | 'split-2' | 'split-4'>('split-2'); // Scrap paper layout
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledQuestions, setCompiledQuestions] = useState<GeneratedQuestion[]>([]);
   const [isCompiled, setIsCompiled] = useState(false);
@@ -191,7 +280,21 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [imageSelectionQuestionNumber, setImageSelectionQuestionNumber] = useState<number | null>(null);
   const { pendingCount, saveImageForReview, approvedImages } = useAIImageLibrary();
   
+  // Scrap Paper Generator state
+  const [showScrapPaperGenerator, setShowScrapPaperGenerator] = useState(false);
+  
   const printRef = useRef<HTMLDivElement>(null);
+
+  // ESC key handler for preview modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showPreview) {
+        setShowPreview(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPreview]);
 
   // Determine if selected topics are geometry/trigonometry related (for shape generation vs clipart)
   const isGeometryOrTrigSubject = selectedQuestions.some(q => {
@@ -968,6 +1071,121 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     }
   };
 
+  // Helper function to draw a scrap paper work zone
+  const drawScrapWorkZone = (
+    pdf: jsPDF,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    problemNumber: number
+  ) => {
+    // Main container border (navy blue)
+    pdf.setDrawColor(30, 58, 95);
+    pdf.setLineWidth(0.8);
+    pdf.rect(x, y, width, height);
+
+    // Work area background
+    pdf.setFillColor(248, 250, 252);
+    pdf.rect(x + 0.4, y + 0.4, width - 0.8, height - 0.8, 'F');
+
+    // Problem label header
+    const headerHeight = 8;
+    pdf.setFillColor(224, 242, 254);
+    pdf.rect(x + 0.4, y + 0.4, width - 0.8, headerHeight, 'F');
+    
+    // Problem number badge
+    pdf.setFillColor(30, 58, 95);
+    pdf.roundedRect(x + 3, y + 2, 28, 5, 1, 1, 'F');
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(`PROBLEM #${problemNumber}`, x + 5, y + 5.5);
+
+    // Instructions
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'italic');
+    pdf.setTextColor(100, 116, 139);
+    pdf.text('Show all work within this zone', x + width - 38, y + 5.5);
+    pdf.setTextColor(0);
+
+    // Separator line
+    pdf.setDrawColor(148, 163, 184);
+    pdf.setLineWidth(0.3);
+    pdf.line(x, y + headerHeight, x + width, y + headerHeight);
+
+    const contentStartY = y + 10;
+    const contentEndY = y + height - 15;
+
+    // Draw lined paper
+    pdf.setDrawColor(203, 213, 225);
+    pdf.setLineWidth(0.15);
+    const lineSpacing = 6;
+    for (let lineY = contentStartY + lineSpacing; lineY < contentEndY; lineY += lineSpacing) {
+      pdf.line(x + 3, lineY, x + width - 3, lineY);
+    }
+
+    // Corner markers for AI zone detection
+    pdf.setDrawColor(30, 58, 95);
+    pdf.setLineWidth(0.5);
+    const markerSize = 5;
+    const markerOffset = 10;
+
+    // Top-left
+    pdf.line(x + 2, y + markerOffset, x + 2, y + markerOffset + markerSize);
+    pdf.line(x + 2, y + markerOffset, x + 2 + markerSize, y + markerOffset);
+
+    // Top-right
+    pdf.line(x + width - 2, y + markerOffset, x + width - 2, y + markerOffset + markerSize);
+    pdf.line(x + width - 2, y + markerOffset, x + width - 2 - markerSize, y + markerOffset);
+
+    // Bottom-left
+    pdf.line(x + 2, contentEndY - 2, x + 2, contentEndY - 2 - markerSize);
+    pdf.line(x + 2, contentEndY - 2, x + 2 + markerSize, contentEndY - 2);
+
+    // Bottom-right
+    pdf.line(x + width - 2, contentEndY - 2, x + width - 2, contentEndY - 2 - markerSize);
+    pdf.line(x + width - 2, contentEndY - 2, x + width - 2 - markerSize, contentEndY - 2);
+
+    // Final Answer Section
+    const answerSectionHeight = 12;
+    const answerY = y + height - answerSectionHeight - 2;
+
+    // Answer section separator
+    pdf.setDrawColor(148, 163, 184);
+    pdf.setLineDashPattern([2, 2], 0);
+    pdf.setLineWidth(0.3);
+    pdf.line(x + 2, answerY, x + width - 2, answerY);
+    pdf.setLineDashPattern([], 0);
+
+    // Answer section background (amber)
+    pdf.setFillColor(254, 243, 199);
+    pdf.rect(x + 0.4, answerY + 0.5, width - 0.8, answerSectionHeight, 'F');
+
+    // Answer section top border
+    pdf.setDrawColor(245, 158, 11);
+    pdf.setLineWidth(0.5);
+    pdf.line(x, answerY + 0.5, x + width, answerY + 0.5);
+
+    // Final Answer badge
+    pdf.setFillColor(253, 230, 138);
+    pdf.roundedRect(x + 3, answerY + 2.5, 25, 5, 1, 1, 'F');
+    pdf.setDrawColor(245, 158, 11);
+    pdf.setLineWidth(0.3);
+    pdf.roundedRect(x + 3, answerY + 2.5, 25, 5, 1, 1, 'S');
+    pdf.setFontSize(6);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(146, 64, 14);
+    pdf.text(`ANSWER #${problemNumber}`, x + 4.5, answerY + 6);
+
+    // Answer line
+    pdf.setDrawColor(217, 119, 6);
+    pdf.setLineWidth(0.4);
+    pdf.line(x + 30, answerY + 8, x + width - 5, answerY + 8);
+
+    pdf.setTextColor(0);
+  };
+
   const generatePDF = async () => {
     if (compiledQuestions.length === 0) {
       toast({
@@ -984,7 +1202,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       const pdf = new jsPDF('p', 'mm', 'letter');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 15; // Reduced from 20mm for better use of page space
+      const margin = marginSize === 'small' ? 12 : marginSize === 'large' ? 25 : 20; // Based on user preference
       const contentWidth = pageWidth - margin * 2;
       let yPosition = margin;
 
@@ -1047,9 +1265,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         yPosition += 8;
 
         // Question text - wrap long text, sanitize for PDF to fix encoding issues
-        pdf.setFontSize(11);
-        const sanitizedQuestion = sanitizeForPDF(question.question);
-        const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
+        pdf.setFontSize(10); // Slightly smaller for better fit
+        const sanitizedQuestion = sanitizeForPDF(renderMathText(fixEncodingCorruption(question.question)));
+        // Use 85% of content width to prevent text overflow
+        const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth * 0.85);
         
         lines.forEach((line: string) => {
           if (yPosition > pageHeight - 40) {
@@ -1057,8 +1276,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             yPosition = margin;
           }
           pdf.text(line, margin + 5, yPosition);
-          yPosition += 6;
+          yPosition += 5;
         });
+        pdf.setFontSize(11); // Reset
 
         yPosition += 4;
 
@@ -1180,18 +1400,94 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           }
         }
 
-        // Work area
+        // AI-Optimized Work Area with bounded zones
         if (showAnswerLines) {
-          pdf.setDrawColor(200);
-          pdf.setLineWidth(0.2);
-          for (let i = 0; i < 5; i++) {
-            if (yPosition > pageHeight - 30) {
-              pdf.addPage();
-              yPosition = margin;
-            }
-            pdf.line(margin + 5, yPosition + (i * 8), pageWidth - margin, yPosition + (i * 8));
+          // Check if we have enough space for the work area box (needs ~70mm)
+          if (yPosition > pageHeight - 75) {
+            pdf.addPage();
+            yPosition = margin;
           }
-          yPosition += 45;
+          
+          const boxMarginLeft = margin + 5;
+          const boxWidth = contentWidth - 5;
+          const workAreaHeight = 35; // mm for work area
+          const answerAreaHeight = 12; // mm for answer box
+          const totalBoxHeight = workAreaHeight + answerAreaHeight + 10;
+          
+          // Main container border (navy blue)
+          pdf.setDrawColor(30, 58, 95); // #1e3a5f
+          pdf.setLineWidth(0.8);
+          pdf.rect(boxMarginLeft, yPosition, boxWidth, totalBoxHeight);
+          
+          // Work Area Section background
+          pdf.setFillColor(248, 250, 252); // #f8fafc light gray
+          pdf.rect(boxMarginLeft, yPosition, boxWidth, workAreaHeight + 8, 'F');
+          
+          // Work Area label
+          pdf.setFillColor(224, 242, 254); // #e0f2fe light blue
+          pdf.roundedRect(boxMarginLeft + 3, yPosition + 2, 32, 5, 1, 1, 'F');
+          pdf.setFontSize(7);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(30, 58, 95);
+          pdf.text(`WORK AREA Q${question.questionNumber}`, boxMarginLeft + 5, yPosition + 5.5);
+          
+          // Instructions text
+          pdf.setFontSize(6);
+          pdf.setFont('helvetica', 'italic');
+          pdf.setTextColor(100, 116, 139); // #64748b
+          pdf.text('Show all calculations & reasoning here', boxMarginLeft + boxWidth - 45, yPosition + 5.5);
+          
+          // Dashed separator line between work and answer areas
+          pdf.setDrawColor(148, 163, 184); // #94a3b8
+          pdf.setLineWidth(0.3);
+          pdf.setLineDashPattern([2, 2], 0);
+          pdf.line(boxMarginLeft, yPosition + workAreaHeight + 7, boxMarginLeft + boxWidth, yPosition + workAreaHeight + 7);
+          pdf.setLineDashPattern([], 0); // Reset dash pattern
+          
+          // Work area lines
+          pdf.setDrawColor(203, 213, 225); // #cbd5e1
+          pdf.setLineWidth(0.15);
+          for (let i = 0; i < 4; i++) {
+            pdf.line(boxMarginLeft + 3, yPosition + 10 + (i * 7), boxMarginLeft + boxWidth - 3, yPosition + 10 + (i * 7));
+          }
+          
+          // Corner markers for AI zone detection
+          pdf.setDrawColor(30, 58, 95);
+          pdf.setLineWidth(0.5);
+          // Top-left corner
+          pdf.line(boxMarginLeft + 2, yPosition + 8, boxMarginLeft + 2, yPosition + 12);
+          pdf.line(boxMarginLeft + 2, yPosition + 8, boxMarginLeft + 6, yPosition + 8);
+          // Top-right corner  
+          pdf.line(boxMarginLeft + boxWidth - 2, yPosition + 8, boxMarginLeft + boxWidth - 2, yPosition + 12);
+          pdf.line(boxMarginLeft + boxWidth - 2, yPosition + 8, boxMarginLeft + boxWidth - 6, yPosition + 8);
+          
+          // Final Answer Section background (yellow/amber)
+          pdf.setFillColor(254, 243, 199); // #fef3c7
+          pdf.rect(boxMarginLeft, yPosition + workAreaHeight + 8, boxWidth, answerAreaHeight, 'F');
+          
+          // Answer section top border (amber)
+          pdf.setDrawColor(245, 158, 11); // #f59e0b
+          pdf.setLineWidth(0.5);
+          pdf.line(boxMarginLeft, yPosition + workAreaHeight + 8, boxMarginLeft + boxWidth, yPosition + workAreaHeight + 8);
+          
+          // Final Answer label
+          pdf.setFillColor(253, 230, 138); // #fde68a
+          pdf.roundedRect(boxMarginLeft + 3, yPosition + workAreaHeight + 10, 22, 5, 1, 1, 'F');
+          pdf.setDrawColor(245, 158, 11);
+          pdf.setLineWidth(0.3);
+          pdf.roundedRect(boxMarginLeft + 3, yPosition + workAreaHeight + 10, 22, 5, 1, 1, 'S');
+          pdf.setFontSize(7);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(146, 64, 14); // #92400e
+          pdf.text('FINAL ANSWER', boxMarginLeft + 5, yPosition + workAreaHeight + 13.5);
+          
+          // Answer line
+          pdf.setDrawColor(217, 119, 6); // #d97706
+          pdf.setLineWidth(0.4);
+          pdf.line(boxMarginLeft + 28, yPosition + workAreaHeight + 15, boxMarginLeft + boxWidth - 5, yPosition + workAreaHeight + 15);
+          
+          pdf.setTextColor(0); // Reset text color
+          yPosition += totalBoxHeight + 8;
         } else {
           yPosition += 15;
         }
@@ -1351,7 +1647,83 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         }
       }
 
-      // Footer
+      // Add Scrap Paper Pages if enabled
+      if (includeScrapPaper) {
+        const problemNumbers = compiledQuestions.map(q => q.questionNumber);
+        const zonesPerPage = scrapPaperLayout === 'single' ? 1 : scrapPaperLayout === 'split-2' ? 2 : 4;
+        const pagesNeeded = Math.ceil(problemNumbers.length / zonesPerPage);
+        
+        let problemIndex = 0;
+        
+        for (let page = 0; page < pagesNeeded; page++) {
+          pdf.addPage();
+          let yPos = margin;
+          
+          // Scrap Paper Header
+          pdf.setFontSize(14);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(30, 58, 95);
+          pdf.text(sanitizeForPDF(`${worksheetTitle} - Scrap Paper`), pageWidth / 2, yPos, { align: 'center' });
+          yPos += 6;
+          
+          // Subheader
+          pdf.setFontSize(9);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setTextColor(100, 116, 139);
+          pdf.text(`Page ${page + 1} of ${pagesNeeded} | AI-Optimized Work Zones`, pageWidth / 2, yPos, { align: 'center' });
+          yPos += 4;
+          
+          // Name/Date line
+          pdf.setFontSize(10);
+          pdf.setTextColor(0);
+          pdf.text('Name: _______________________', margin, yPos);
+          pdf.text('Date: ___________', pageWidth - margin - 40, yPos);
+          yPos += 8;
+          
+          // Instructions banner
+          pdf.setFillColor(236, 253, 245);
+          pdf.setDrawColor(110, 231, 183);
+          pdf.roundedRect(margin, yPos, contentWidth, 8, 2, 2, 'FD');
+          pdf.setFontSize(7);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(4, 120, 87);
+          pdf.text('[!] INSTRUCTIONS:', margin + 3, yPos + 5);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text('Keep all work within the designated zones for AI scanning. Write clearly and stay inside the boxes.', margin + 30, yPos + 5);
+          yPos += 12;
+          
+          const availableHeight = pageHeight - yPos - margin;
+          
+          // Draw work zones based on layout
+          if (scrapPaperLayout === 'single') {
+            const zoneHeight = availableHeight;
+            const problemNum = problemNumbers[problemIndex] || (problemIndex + 1);
+            drawScrapWorkZone(pdf, margin, yPos, contentWidth, zoneHeight, problemNum);
+            problemIndex++;
+          } else if (scrapPaperLayout === 'split-2') {
+            const zoneHeight = (availableHeight - 5) / 2;
+            for (let i = 0; i < 2 && problemIndex < problemNumbers.length; i++) {
+              const problemNum = problemNumbers[problemIndex] || (problemIndex + 1);
+              drawScrapWorkZone(pdf, margin, yPos + (i * (zoneHeight + 5)), contentWidth, zoneHeight, problemNum);
+              problemIndex++;
+            }
+          } else if (scrapPaperLayout === 'split-4') {
+            const zoneWidth = (contentWidth - 5) / 2;
+            const zoneHeight = (availableHeight - 5) / 2;
+            for (let row = 0; row < 2; row++) {
+              for (let col = 0; col < 2 && problemIndex < problemNumbers.length; col++) {
+                const problemNum = problemNumbers[problemIndex] || (problemIndex + 1);
+                const x = margin + (col * (zoneWidth + 5));
+                const y = yPos + (row * (zoneHeight + 5));
+                drawScrapWorkZone(pdf, x, y, zoneWidth, zoneHeight, problemNum);
+                problemIndex++;
+              }
+            }
+          }
+        }
+      }
+
+      // Footer on last page
       pdf.setFontSize(8);
       pdf.setTextColor(150);
       pdf.text('Generated with NYCLogic Ai - NYS Regents Aligned', pageWidth / 2, pageHeight - 10, { align: 'center' });
@@ -1361,7 +1733,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
       toast({
         title: 'Worksheet downloaded!',
-        description: `Your worksheet with ${compiledQuestions.length} question(s) has been saved.`,
+        description: `Your worksheet with ${compiledQuestions.length} question(s)${includeScrapPaper ? ' and scrap paper' : ''} has been saved.`,
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -1574,33 +1946,14 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               {/* Worksheet Type Selection */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">What are you building?</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    type="button"
-                    variant={worksheetMode === 'practice' ? 'default' : 'outline'}
-                    className={`h-auto py-3 flex flex-col items-center gap-1.5 ${
-                      worksheetMode === 'practice' 
-                        ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2' 
-                        : 'hover:bg-muted'
-                    }`}
-                    onClick={() => {
-                      setWorksheetMode('practice');
-                      if (!hasUserEditedTitle) {
-                        setWorksheetTitle(selectedQuestions.length > 0 ? selectedQuestions[0].topicName : 'Math Practice Worksheet');
-                      }
-                    }}
-                  >
-                    <BookOpen className="h-5 w-5" />
-                    <span className="font-semibold text-xs">Practice</span>
-                    <span className="text-[10px] opacity-80 text-center leading-tight">Homework & classwork</span>
-                  </Button>
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
                     variant={worksheetMode === 'basic_assessment' ? 'default' : 'outline'}
                     className={`h-auto py-3 flex flex-col items-center gap-1.5 ${
                       worksheetMode === 'basic_assessment' 
-                        ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2' 
-                        : 'hover:bg-muted'
+                        ? 'bg-blue-600 text-white ring-2 ring-blue-600 ring-offset-2' 
+                        : 'hover:bg-muted border-blue-200'
                     }`}
                     onClick={() => {
                       setWorksheetMode('basic_assessment');
@@ -1611,7 +1964,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   >
                     <FileText className="h-5 w-5" />
                     <span className="font-semibold text-xs">Assessment</span>
-                    <span className="text-[10px] opacity-80 text-center leading-tight">Quizzes & tests</span>
+                    <span className="text-[10px] opacity-80 text-center leading-tight">Equal level for all</span>
                   </Button>
                   <Button
                     type="button"
@@ -1630,20 +1983,36 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   >
                     <Sparkles className="h-5 w-5" />
                     <span className="font-semibold text-xs">Diagnostic</span>
-                    <span className="text-[10px] opacity-80 text-center leading-tight">Levels A-F</span>
+                    <span className="text-[10px] opacity-80 text-center leading-tight">Individualized A-F</span>
                   </Button>
                 </div>
                 
+                {/* Assessment Mode Description */}
+                {worksheetMode === 'basic_assessment' && (
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <FileText className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-blue-900">Adaptive Assessment</p>
+                        <p className="text-xs text-blue-700">
+                          All students receive the same adaptive questions at a consistent difficulty level. 
+                          Fair for quizzes and tests where everyone is assessed equally.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Diagnostic Mode Description */}
                 {worksheetMode === 'diagnostic' && (
                   <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
                     <div className="flex items-start gap-2">
                       <Sparkles className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-purple-900">Diagnostic Worksheet</p>
+                        <p className="text-sm font-medium text-purple-900">Individualized Diagnostic</p>
                         <p className="text-xs text-purple-700">
-                          Questions are labeled with advancement levels A-F. Use student responses to generate 
-                          differentiated follow-up worksheets tailored to each student's level.
+                          Questions span levels A-F to identify each student's understanding. 
+                          Use responses to generate personalized follow-up worksheets.
                         </p>
                         <div className="flex flex-wrap gap-1 mt-2">
                           {['A', 'B', 'C', 'D', 'E', 'F'].map((level) => (
@@ -1933,6 +2302,62 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       <span className="text-xs text-muted-foreground ml-5">Generates a separate answer key page with solutions</span>
                     </span>
                   </Label>
+                </div>
+                
+                {/* Page Margin Size */}
+                <div className="space-y-2 pt-2 border-t border-dashed">
+                  <Label className="text-sm flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5" />
+                    Page Margins
+                  </Label>
+                  <Select value={marginSize} onValueChange={(v) => setMarginSize(v as 'small' | 'medium' | 'large')}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="small">Small (12mm) - More content space</SelectItem>
+                      <SelectItem value="medium">Medium (20mm) - Balanced</SelectItem>
+                      <SelectItem value="large">Large (25mm) - More white space</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Include Scrap Paper Option */}
+                <div className="space-y-3 pt-2 border-t border-dashed">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="includeScrapPaper"
+                      checked={includeScrapPaper}
+                      onChange={(e) => setIncludeScrapPaper(e.target.checked)}
+                      className="rounded border-input"
+                    />
+                    <Label htmlFor="includeScrapPaper" className="text-sm cursor-pointer">
+                      <span className="flex flex-col">
+                        <span className="flex items-center gap-1">
+                          <NotebookPen className="h-3.5 w-3.5 text-amber-600" />
+                          Bundle scrap paper with worksheet
+                        </span>
+                        <span className="text-xs text-muted-foreground ml-5">Adds AI-optimized work zones after questions</span>
+                      </span>
+                    </Label>
+                  </div>
+                  
+                  {includeScrapPaper && (
+                    <div className="ml-5 space-y-2">
+                      <Label className="text-xs text-muted-foreground">Problems per scrap page</Label>
+                      <Select value={scrapPaperLayout} onValueChange={(v) => setScrapPaperLayout(v as 'single' | 'split-2' | 'split-4')}>
+                        <SelectTrigger className="w-full h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="single">1 per page (full space)</SelectItem>
+                          <SelectItem value="split-2">2 per page (balanced)</SelectItem>
+                          <SelectItem value="split-4">4 per page (compact)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2351,28 +2776,40 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               )}
 
               {/* Download/Print/Save Actions */}
-              <div className="flex gap-2">
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    onClick={generatePDF}
+                    disabled={isGenerating}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {isGenerating ? 'Generating...' : 'Download PDF'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handlePreview}
+                    title="Preview before printing"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handlePrint}
+                    title="Print worksheet"
+                  >
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Scrap Paper - grouped with download actions */}
                 <Button
-                  className="flex-1"
-                  onClick={generatePDF}
-                  disabled={isGenerating}
+                  variant="secondary"
+                  className="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 dark:border-amber-800 dark:text-amber-200"
+                  onClick={() => setShowScrapPaperGenerator(true)}
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  {isGenerating ? 'Generating...' : 'Download PDF'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handlePreview}
-                  title="Preview before printing"
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handlePrint}
-                  title="Print worksheet"
-                >
-                  <Printer className="h-4 w-4" />
+                  <NotebookPen className="h-4 w-4 mr-2" />
+                  Print Scrap Paper (AI-Optimized Work Zones)
                 </Button>
               </div>
 
@@ -2439,11 +2876,76 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         </CardContent>
       </Card>
 
-      {/* Print Preview Modal */}
-      {showPreview && (
-        <div className="fixed inset-0 bg-muted/90 z-50 flex flex-col print:static print:overflow-visible print:bg-white">
+      {/* Print Preview Modal - Uses Portal to render at document root */}
+      {showPreview && createPortal(
+        <div 
+          className="print:static print:overflow-visible print:bg-white"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 99999,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Large Fixed X Close Button - TOP RIGHT CORNER - Very Prominent */}
+          <button
+            type="button"
+            onClick={() => setShowPreview(false)}
+            className="print:hidden"
+            style={{
+              position: 'fixed',
+              top: '0.75rem',
+              right: '0.75rem',
+              zIndex: 100001,
+              width: '56px',
+              height: '56px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              backgroundColor: '#dc2626',
+              color: 'white',
+              border: '4px solid white',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.6), 0 0 0 2px #dc2626',
+              cursor: 'pointer',
+              transition: 'transform 0.2s, background-color 0.2s, box-shadow 0.2s',
+              fontWeight: 'bold',
+              fontSize: '1.5rem',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#b91c1c';
+              e.currentTarget.style.transform = 'scale(1.15)';
+              e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.7), 0 0 0 3px #b91c1c';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#dc2626';
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.6), 0 0 0 2px #dc2626';
+            }}
+            aria-label="Close preview"
+            title="Close Preview (ESC)"
+          >
+            <X className="h-8 w-8" strokeWidth={3.5} />
+          </button>
+
           {/* Preview Header Toolbar */}
-          <div className="print:hidden flex items-center justify-between p-3 bg-background border-b shadow-sm">
+          <div 
+            className="print:hidden"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.75rem 1rem',
+              backgroundColor: 'white',
+              borderBottom: '1px solid #e5e7eb',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            }}
+          >
             <div className="flex items-center gap-4">
               <h2 className="font-semibold text-lg">Print Preview</h2>
               <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
@@ -2466,87 +2968,507 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 </Button>
               </div>
               <span className="text-sm text-muted-foreground">
-                {compiledQuestions.length} question{compiledQuestions.length !== 1 ? 's' : ''}
+                {compiledQuestions.length} question{compiledQuestions.length !== 1 ? 's' : ''} • Press ESC to close
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" style={{ marginRight: '4rem' }}>
               <Button variant="outline" onClick={() => setShowPreview(false)}>
                 <X className="h-4 w-4 mr-2" />
                 Close
               </Button>
-              <Button onClick={() => { window.print(); }}>
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  // Generate professional PDF from worksheet content
+                  const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'pt',
+                    format: 'letter',
+                  });
+                  
+                  const pageWidth = 612; // 8.5in in points
+                  const pageHeight = 792; // 11in in points
+                  const marginLeft = 54; // 0.75in
+                  const marginRight = 54;
+                  const marginTop = 54;
+                  const marginBottom = 54;
+                  const contentWidth = pageWidth - marginLeft - marginRight;
+                  let yPosition = marginTop;
+                  
+                  // Helper function to clean text for PDF (fix encoding issues)
+                  const cleanTextForPDF = (text: string): string => {
+                    let cleaned = fixEncodingCorruption(text);
+                    // Additional cleanup for PDF rendering
+                    cleaned = cleaned
+                      .replace(/\u03B8/g, 'θ') // theta
+                      .replace(/\u03C0/g, 'π') // pi
+                      .replace(/\u221A/g, '√') // sqrt
+                      .replace(/\u00B2/g, '²') // superscript 2
+                      .replace(/\u00B3/g, '³') // superscript 3
+                      .replace(/\u2264/g, '≤') // less than or equal
+                      .replace(/\u2265/g, '≥') // greater than or equal
+                      .replace(/\u00B0/g, '°') // degree
+                      .replace(/\u2220/g, '∠') // angle
+                      .replace(/\u00B1/g, '±'); // plus minus
+                    return cleaned;
+                  };
+                  
+                  // Helper to check page break
+                  const checkPageBreak = (neededHeight: number) => {
+                    if (yPosition + neededHeight > pageHeight - marginBottom) {
+                      pdf.addPage();
+                      yPosition = marginTop;
+                      return true;
+                    }
+                    return false;
+                  };
+                  
+                  // Title
+                  pdf.setFontSize(20);
+                  pdf.setFont('helvetica', 'bold');
+                  pdf.text(cleanTextForPDF(worksheetTitle), pageWidth / 2, yPosition, { align: 'center' });
+                  yPosition += 28;
+                  
+                  // Teacher name
+                  if (teacherName) {
+                    pdf.setFontSize(11);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.text(`Teacher: ${teacherName}`, pageWidth / 2, yPosition, { align: 'center' });
+                    yPosition += 20;
+                  }
+                  
+                  // Name/Date/Period fields
+                  yPosition += 10;
+                  pdf.setFontSize(11);
+                  pdf.setFont('helvetica', 'normal');
+                  pdf.text('Name: ________________________________', marginLeft, yPosition);
+                  pdf.text('Date: ____________', marginLeft + 280, yPosition);
+                  pdf.text('Period: _____', marginLeft + 420, yPosition);
+                  yPosition += 8;
+                  
+                  // Divider line
+                  pdf.setDrawColor(180, 180, 180);
+                  pdf.setLineWidth(0.5);
+                  pdf.line(marginLeft, yPosition, pageWidth - marginRight, yPosition);
+                  yPosition += 25;
+                  
+                  // Questions
+                  compiledQuestions.forEach((q) => {
+                    // Estimate question height
+                    const questionText = cleanTextForPDF(q.question);
+                    const questionLines = pdf.splitTextToSize(questionText, contentWidth - 20);
+                    const estimatedHeight = showAnswerLines ? 180 : 60 + (questionLines.length * 14);
+                    
+                    checkPageBreak(estimatedHeight);
+                    
+                    // Question number and topic header
+                    pdf.setFontSize(11);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(`${q.questionNumber}.`, marginLeft, yPosition);
+                    
+                    pdf.setFontSize(9);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.setTextColor(100, 100, 100);
+                    pdf.text(`[${q.difficulty}] ${cleanTextForPDF(q.topic)}`, marginLeft + 20, yPosition);
+                    pdf.setTextColor(0, 0, 0);
+                    yPosition += 18;
+                    
+                    // Question text
+                    pdf.setFontSize(11);
+                    pdf.setFont('helvetica', 'normal');
+                    questionLines.forEach((line: string) => {
+                      checkPageBreak(16);
+                      pdf.text(line, marginLeft + 15, yPosition);
+                      yPosition += 14;
+                    });
+                    
+                    // Work area box if enabled
+                    if (showAnswerLines) {
+                      yPosition += 8;
+                      const boxHeight = 100;
+                      checkPageBreak(boxHeight + 30);
+                      
+                      // Draw work area box
+                      pdf.setDrawColor(30, 58, 95);
+                      pdf.setLineWidth(1.5);
+                      pdf.rect(marginLeft, yPosition, contentWidth, boxHeight);
+                      
+                      // Work Area label
+                      pdf.setFontSize(8);
+                      pdf.setTextColor(100, 100, 100);
+                      pdf.text('Work Area', marginLeft + 5, yPosition + 12);
+                      pdf.setTextColor(0, 0, 0);
+                      
+                      yPosition += boxHeight + 10;
+                      
+                      // Final Answer line
+                      pdf.setFontSize(10);
+                      pdf.text('Final Answer: ___________________________________________', marginLeft + 15, yPosition);
+                      yPosition += 25;
+                    } else {
+                      yPosition += 15;
+                    }
+                  });
+                  
+                  // Answer Key on new page if answers exist
+                  const questionsWithAnswers = compiledQuestions.filter(q => q.answer);
+                  if (questionsWithAnswers.length > 0) {
+                    pdf.addPage();
+                    yPosition = marginTop;
+                    
+                    pdf.setFontSize(18);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('Answer Key', pageWidth / 2, yPosition, { align: 'center' });
+                    yPosition += 35;
+                    
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'normal');
+                    questionsWithAnswers.forEach((q) => {
+                      checkPageBreak(30);
+                      const answerText = `${q.questionNumber}. ${cleanTextForPDF(q.answer || '')}`;
+                      const answerLines = pdf.splitTextToSize(answerText, contentWidth);
+                      answerLines.forEach((line: string) => {
+                        pdf.text(line, marginLeft, yPosition);
+                        yPosition += 14;
+                      });
+                      yPosition += 8;
+                    });
+                  }
+                  
+                  // Download
+                  const fileName = `${worksheetTitle.replace(/[^a-z0-9]/gi, '_')}_worksheet.pdf`;
+                  pdf.save(fileName);
+                  toast({ title: "PDF Downloaded", description: `Saved as ${fileName}` });
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+              <Button onClick={() => {
+                // Print the worksheet content properly
+                const printContent = printRef.current;
+                if (!printContent) {
+                  toast({ title: "Error", description: "Could not find content to print", variant: "destructive" });
+                  return;
+                }
+                
+                // Create a new window for printing
+                const printWindow = window.open('', '_blank');
+                if (!printWindow) {
+                  toast({ title: "Error", description: "Popup blocked. Please allow popups.", variant: "destructive" });
+                  return;
+                }
+                
+                // Get the worksheet HTML
+                const worksheetHTML = printContent.innerHTML;
+                
+                printWindow.document.write(`
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                    <title>${worksheetTitle}</title>
+                    <style>
+                      @page { size: letter; margin: 0.75in; }
+                      * { box-sizing: border-box; }
+                      body { 
+                        font-family: Georgia, serif; 
+                        margin: 0; 
+                        padding: 0;
+                        color: #000;
+                        background: #fff;
+                      }
+                      .worksheet-page {
+                        width: 100%;
+                        max-width: 8.5in;
+                        margin: 0 auto;
+                      }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="worksheet-page">${worksheetHTML}</div>
+                    <script>
+                      window.onload = function() {
+                        window.print();
+                        window.onafterprint = function() { window.close(); };
+                      };
+                    </script>
+                  </body>
+                  </html>
+                `);
+                printWindow.document.close();
+              }}>
                 <Printer className="h-4 w-4 mr-2" />
-                Print
+                Print from Preview
               </Button>
             </div>
           </div>
 
-          {/* Preview Content Area */}
-          <div className="flex-1 overflow-y-auto overflow-x-auto p-6 print:p-0 print:overflow-visible" style={{ maxHeight: 'calc(100vh - 64px)' }}>
+          {/* Preview Content Area - render as 8.5x11 pages with page break indicators */}
+          <div 
+            className="print:p-0 print:overflow-visible"
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              overflowX: 'auto',
+              padding: '2rem',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0',
+            }}
+          >
+            {/* Page container with visual page breaks */}
             <div 
               ref={printRef} 
-              className="bg-white mx-auto shadow-xl print:shadow-none"
+              className="print:shadow-none print:border-none"
               style={{ 
-                width: `${8.5 * (previewZoom / 100)}in`,
-                minHeight: `${11 * (previewZoom / 100)}in`,
-                padding: `${0.75 * (previewZoom / 100)}in`,
-                transform: 'origin-top',
-                boxSizing: 'border-box',
+                width: '8.5in',
+                transform: `scale(${previewZoom / 100})`,
+                transformOrigin: 'top center',
               }}
             >
-              <div style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: 'top left', width: `${100 / (previewZoom / 100)}%` }}>
-                <div className="text-center mb-6">
-                  <h1 className="text-2xl font-bold text-black">{worksheetTitle}</h1>
-                  {teacherName && <p className="text-gray-600 mt-1">Teacher: {teacherName}</p>}
-                </div>
-                <div className="flex justify-between text-sm mb-6 border-b border-gray-300 pb-4 text-black">
-                  <span>Name: _______________________</span>
-                  <span>Date: ___________</span>
-                  <span>Period: _____</span>
-                </div>
-                <div className="space-y-8">
-                  {compiledQuestions.map((question) => (
-                    <div key={question.questionNumber} className="space-y-2" style={{ pageBreakInside: 'avoid' }}>
-                      <div className="flex items-baseline gap-2 flex-wrap">
-                        <span className="font-bold text-black">{question.questionNumber}.</span>
-                        {worksheetMode === 'diagnostic' && question.advancementLevel && (
-                          <span className={`text-xs px-2 py-0.5 rounded border font-semibold ${
-                            question.advancementLevel === 'A' ? 'bg-green-100 text-green-800 border-green-300' :
-                            question.advancementLevel === 'B' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
-                            question.advancementLevel === 'C' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
-                            question.advancementLevel === 'D' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                            question.advancementLevel === 'E' ? 'bg-red-100 text-red-800 border-red-300' :
-                            'bg-gray-100 text-gray-800 border-gray-300'
-                          }`}>
-                            Level {question.advancementLevel}
-                          </span>
-                        )}
-                        <span className="text-xs px-2 py-0.5 rounded border bg-gray-100 text-gray-700 border-gray-200">
-                          {question.difficulty}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-500 ml-5">
-                        {question.topic} ({question.standard})
-                      </p>
-                      <p className="ml-5 font-serif leading-relaxed text-base text-black" style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
-                        {renderMathText(fixEncodingCorruption(question.question))}
-                      </p>
-                      {question.svg && (
-                        <div 
-                          className="ml-5 mt-2 flex justify-center"
-                          dangerouslySetInnerHTML={{ __html: question.svg }}
-                        />
-                      )}
-                      {showAnswerLines && (
-                        <div className="ml-5 mt-4 space-y-3">
-                          {[1, 2, 3, 4, 5].map((line) => (
-                            <div key={line} className="border-b border-gray-300" style={{ height: '24px' }} />
-                          ))}
-                        </div>
-                      )}
+              {/* Wrapper that shows page boundaries */}
+              <div style={{ position: 'relative' }}>
+                {/* Page break indicators - shown every 11 inches minus padding (9.5in content height) */}
+                <PageBreakIndicators contentRef={printRef} />
+                
+                {/* Actual page content */}
+                <div 
+                  className="print-worksheet print:shadow-none print:border-none"
+                  style={{ 
+                    backgroundColor: 'white',
+                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                    border: '1px solid #d1d5db',
+                    padding: '0.6in 0.65in',
+                    boxSizing: 'border-box',
+                    width: '100%',
+                    maxWidth: '8.5in',
+                    overflow: 'visible',
+                    fontFamily: "'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif",
+                  }}
+                >
+                  {/* Instructions Banner - Print friendly */}
+                  {showAnswerLines && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      padding: '0.4rem 0.75rem',
+                      marginBottom: '0.75rem',
+                      backgroundColor: '#f0fdf4',
+                      border: '1px solid #86efac',
+                      borderRadius: '0.25rem',
+                      fontSize: '0.65rem',
+                      color: '#166534',
+                    }}>
+                      <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                        Instructions:
+                      </span>
+                      <span style={{ flex: 1 }}>
+                        Write all work in the <strong>Work Area</strong> boxes. Put your final answer in the <strong>Final Answer</strong> section.
+                      </span>
                     </div>
-                  ))}
-                </div>
+                  )}
+                  
+                  <div className="text-center mb-6">
+                    <h1 className="text-2xl font-bold text-black">{worksheetTitle}</h1>
+                    {teacherName && <p className="text-gray-600 mt-1">Teacher: {teacherName}</p>}
+                  </div>
+                  <div className="flex justify-between text-sm mb-6 border-b border-gray-300 pb-4 text-black">
+                    <span>Name: _______________________</span>
+                    <span>Date: ___________</span>
+                    <span>Period: _____</span>
+                  </div>
+                  <div style={{ width: '100%' }}>
+                    {compiledQuestions.map((question) => (
+                      <div 
+                        key={question.questionNumber} 
+                        style={{ 
+                          pageBreakInside: 'avoid',
+                          marginBottom: '1.5rem',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        {/* Question header - single line with number, bloom level, difficulty */}
+                        <div style={{ 
+                          display: 'flex', 
+                          flexWrap: 'wrap', 
+                          alignItems: 'baseline', 
+                          gap: '0.5rem', 
+                          marginBottom: '0.125rem',
+                          borderBottom: '1px solid #1e3a5f',
+                          paddingBottom: '0.25rem',
+                        }}>
+                          <span style={{ fontWeight: 700, color: 'black', fontSize: '0.9rem' }}>
+                            {question.questionNumber}. [{question.bloomLevel || 'Remember'}: {question.bloomVerb || 'state'}]
+                          </span>
+                          {worksheetMode === 'diagnostic' && question.advancementLevel && (
+                            <span style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              color: question.advancementLevel === 'A' ? '#166534' :
+                                     question.advancementLevel === 'B' ? '#047857' :
+                                     question.advancementLevel === 'C' ? '#a16207' :
+                                     question.advancementLevel === 'D' ? '#c2410c' :
+                                     question.advancementLevel === 'E' ? '#b91c1c' : '#374151',
+                            }}>
+                              [Level {question.advancementLevel}]
+                            </span>
+                          )}
+                          <span style={{ fontSize: '0.75rem', color: '#374151' }}>
+                            [{question.difficulty}]
+                          </span>
+                        </div>
+                        
+                        {/* Topic/Standard - compact italic */}
+                        <p style={{ 
+                          fontSize: '0.75rem', 
+                          color: '#6b7280', 
+                          marginLeft: '1rem', 
+                          marginBottom: '0.375rem',
+                          fontStyle: 'italic',
+                        }}>
+                          {question.topic} ({question.standard})
+                        </p>
+                        
+                        {/* Question text - single spaced, proper margins */}
+                        <div 
+                          style={{ 
+                            marginLeft: '1rem',
+                            marginRight: '0.5rem',
+                            fontFamily: 'serif',
+                            lineHeight: '1.3',
+                            fontSize: '0.95rem',
+                            color: 'black',
+                            wordWrap: 'break-word', 
+                            overflowWrap: 'break-word',
+                            wordBreak: 'normal',
+                            hyphens: 'auto',
+                            letterSpacing: '0.02em',
+                          }}
+                        >
+                          {renderMathText(fixEncodingCorruption(question.question))}
+                        </div>
+                        
+                        {/* SVG if present */}
+                        {question.svg && (
+                          <div 
+                            style={{ marginLeft: '1rem', marginTop: '0.5rem', display: 'flex', justifyContent: 'center' }}
+                            dangerouslySetInnerHTML={{ __html: question.svg }}
+                          />
+                        )}
+                        
+                        {/* Work Area Box - Clean design matching reference */}
+                        {showAnswerLines && (
+                          <div style={{
+                            border: '2px solid #1e3a5f',
+                            marginTop: '0.5rem',
+                            marginLeft: '1rem',
+                            marginRight: '0.5rem',
+                            backgroundColor: '#ffffff',
+                            overflow: 'hidden',
+                            boxSizing: 'border-box',
+                          }}>
+                            {/* Work Area Section */}
+                            <div style={{
+                              borderBottom: '2px dashed #94a3b8',
+                              padding: '0.5rem 0.75rem',
+                              backgroundColor: '#ffffff',
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '0.375rem',
+                              }}>
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: 700,
+                                  color: '#1e3a5f',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                }}>
+                                  Work Area Q{question.questionNumber}
+                                </span>
+                                <span style={{
+                                  fontSize: '0.6rem',
+                                  color: '#64748b',
+                                  fontStyle: 'italic',
+                                }}>
+                                  Show all calculations & reasoning here
+                                </span>
+                              </div>
+                              {/* Work lines with corner markers */}
+                              <div style={{ 
+                                minHeight: '90px',
+                                position: 'relative',
+                              }}>
+                                {[...Array(5)].map((_, i) => (
+                                  <div key={i} style={{
+                                    borderBottom: '1px solid #d1d5db',
+                                    height: '1.1rem',
+                                  }} />
+                                ))}
+                                {/* Corner markers */}
+                                <div style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  width: '10px',
+                                  height: '10px',
+                                  borderLeft: '2px solid #1e3a5f',
+                                  borderTop: '2px solid #1e3a5f',
+                                }} />
+                                <div style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  right: 0,
+                                  width: '10px',
+                                  height: '10px',
+                                  borderRight: '2px solid #1e3a5f',
+                                  borderTop: '2px solid #1e3a5f',
+                                }} />
+                              </div>
+                            </div>
+                            
+                            {/* Final Answer Section - Yellow background */}
+                            <div style={{
+                              padding: '0.5rem 0.75rem',
+                              backgroundColor: '#fef3c7',
+                              borderTop: '2px solid #f59e0b',
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                              }}>
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: 700,
+                                  color: '#92400e',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.03em',
+                                  backgroundColor: '#fde68a',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '0.2rem',
+                                  border: '1.5px solid #f59e0b',
+                                  whiteSpace: 'nowrap',
+                                }}>
+                                  Final Answer
+                                </span>
+                                <div style={{
+                                  flex: 1,
+                                  borderBottom: '1.5px solid #d97706',
+                                  minHeight: '1.25rem',
+                                }} />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
 
                 {/* Formula Reference Sheet in Print Preview */}
                 {includeFormulaSheet && (() => {
@@ -2608,27 +3530,90 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     </div>
                   </div>
                 )}
-
-                <div className="mt-12 text-center text-xs text-gray-400">
+                <div className="mt-12 text-center text-xs text-gray-400 print:hidden">
                   Generated with NYCLogic Ai - NYS Regents Aligned
+                </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Print Styles */}
       <style>{`
         @media print {
-          body * {
-            visibility: hidden;
+          /* Reset everything for clean print */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          .print-worksheet, .print-worksheet * {
-            visibility: visible;
+          
+          /* Hide everything by default */
+          body > * {
+            display: none !important;
+            visibility: hidden !important;
           }
+          
+          /* Show only the worksheet container */
+          body > div:last-child,
+          body > div:last-child * {
+            visibility: visible !important;
+          }
+          
+          /* Show only the worksheet */
+          .print-worksheet {
+            display: block !important;
+            visibility: visible !important;
+            position: static !important;
+            left: auto !important;
+            top: auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0.5in 0.6in !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+            transform: none !important;
+            background: white !important;
+            box-sizing: border-box !important;
+            overflow: visible !important;
+            /* Ensure proper font for math symbols */
+            font-family: 'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif !important;
+          }
+          
+          .print-worksheet * {
+            visibility: visible !important;
+            /* Inherit font for math symbols */
+            font-family: inherit !important;
+          }
+          
+          /* Ensure math text uses serif font for proper symbol rendering */
+          .print-worksheet [style*="font-family: serif"],
+          .print-worksheet .font-serif {
+            font-family: 'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif !important;
+          }
+          
+          /* Hide print-only hidden elements */
+          .print\\:hidden {
+            display: none !important;
+            visibility: hidden !important;
+          }
+          
+          /* Ensure borders print correctly */
+          .print-worksheet div[style*="border"] {
+            border-color: #1e3a5f !important;
+          }
+          
+          /* Keep page breaks working */
+          .print-worksheet > div {
+            page-break-inside: avoid;
+          }
+          
           @page {
-            margin: 0.75in;
+            margin: 0.5in;
+            size: letter;
           }
         }
       `}</style>
@@ -2664,7 +3649,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     </div>
                     {question && (
                       <p className="text-sm text-muted-foreground line-clamp-2">
-                        {question.question}
+                        {renderMathText(fixEncodingCorruption(question.question))}
                       </p>
                     )}
                     <div className="space-y-1">
@@ -2969,6 +3954,14 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           ? compiledQuestions.find(q => q.questionNumber === imageSelectionQuestionNumber)?.topic
           : undefined
         }
+      />
+
+      {/* Scrap Paper Generator Dialog */}
+      <ScrapPaperGenerator
+        open={showScrapPaperGenerator}
+        onOpenChange={setShowScrapPaperGenerator}
+        problemNumbers={compiledQuestions.map(q => q.questionNumber)}
+        worksheetTitle={worksheetTitle}
       />
     </>
   );

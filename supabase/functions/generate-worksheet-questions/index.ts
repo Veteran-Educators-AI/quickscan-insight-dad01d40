@@ -51,23 +51,38 @@ async function callLovableAI(prompt: string): Promise<string> {
       messages: [
         { role: 'system', content: `You are an expert math educator creating textbook-quality problems. 
 
-CRITICAL FORMATTING REQUIREMENTS:
-- Use proper mathematical Unicode symbols in ALL questions:
-  • Use π (not "pi" or "3.14")
-  • Use √ for square roots (e.g., √2, √3)
-  • Use ² ³ ⁴ for exponents (e.g., x², y³, r⁴)
+CRITICAL FORMATTING REQUIREMENTS - MUST FOLLOW EXACTLY:
+
+NEVER use LaTeX notation. Do NOT use:
+- Dollar signs for math: $x$ or $$equation$$
+- Backslash commands: \\frac, \\neq, \\geq, \\leq, \\sqrt, \\cdot, \\times, etc.
+- Any LaTeX syntax whatsoever
+
+INSTEAD, use proper mathematical Unicode symbols DIRECTLY in ALL questions:
+  • Use π (not "pi", not "\\pi", not "$\\pi$")
+  • Use √ for square roots (e.g., √2, √3, √(x+1))
+  • Use ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹ for exponents (e.g., x², y³, r⁴)
   • Use ° for degrees (e.g., 45°, 90°)
   • Use ∠ for angles (e.g., ∠ABC)
-  • Use ≤ ≥ ≠ for inequalities
+  • Use ≤ ≥ ≠ for inequalities (NOT \\leq \\geq \\neq)
   • Use × for multiplication in expressions
   • Use ÷ for division where appropriate
   • Use θ for angle theta
   • Use ½ ⅓ ¼ ⅔ ¾ for common fractions
+  • For complex fractions, write as: (numerator)/(denominator) e.g., (x² + 1)/(x - 2)
   • Use ⊥ for perpendicular
   • Use ∥ for parallel
   • Use △ for triangle notation (e.g., △ABC)
   • Use ≅ for congruent
   • Use ~ for similar
+
+CURRENCY FORMATTING (CRITICAL):
+  • ALL money values MUST include the dollar sign: $4.00, $12.50, $100.00
+  • Always use two decimal places for cents: $5.00 (not $5)
+  • For word problems involving money, profit, cost, price, revenue, savings, etc. - ALWAYS format as currency
+  • Examples: "The item costs $4.00" NOT "The item costs 4.00"
+  • Examples: "He earned a profit of $25.50" NOT "He earned a profit of 25.50"
+  • This helps students understand real-world financial context
   
 Write questions in a fluid, professional textbook style - complete sentences, clear mathematical language, and elegant formatting.
 
@@ -618,8 +633,68 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       
       let result = text;
       
-      // First pass: Remove any emoji characters that might cause PDF rendering issues
-      // Emojis don't render well in jsPDF and cause garbled output like "Ø=Ü¡"
+      // FIRST: Convert plain-text math notation to Unicode symbols
+      // This handles cases where the AI outputs "pi", "tan^2", etc. instead of proper Unicode
+      
+      // Convert plain-text "pi" to π symbol (but not in words like "spinning", "pieces")
+      result = result
+        .replace(/\bpi\b(?!\s*[a-zA-Z])/gi, 'π')     // standalone "pi"
+        .replace(/(\d)\s*pi\b/gi, '$1π')              // "2pi" -> "2π"
+        .replace(/pi\/(\d)/gi, 'π/$1')                // "pi/3" -> "π/3"
+        .replace(/(\d)pi\/(\d)/gi, '$1π/$2')          // "2pi/3" -> "2π/3"
+        .replace(/npi\b/gi, 'nπ')                     // "npi" -> "nπ"
+        .replace(/\+\s*nπ/g, ' + nπ')                 // clean up spacing
+        .replace(/kpi\b/gi, 'kπ');                    // "kpi" -> "kπ"
+      
+      // Convert caret notation for exponents to superscripts
+      result = result
+        .replace(/\^2\b/g, '²')
+        .replace(/\^3\b/g, '³')
+        .replace(/\^4\b/g, '⁴')
+        .replace(/\^5\b/g, '⁵')
+        .replace(/\^6\b/g, '⁶')
+        .replace(/\^7\b/g, '⁷')
+        .replace(/\^8\b/g, '⁸')
+        .replace(/\^9\b/g, '⁹')
+        .replace(/\^0\b/g, '⁰')
+        .replace(/\^n\b/gi, 'ⁿ')
+        .replace(/\^(-?\d+)/g, (match, num) => {
+          const superscripts: { [key: string]: string } = {
+            '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+            '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻'
+          };
+          return num.split('').map((c: string) => superscripts[c] || c).join('');
+        });
+      
+      // Convert common math words to symbols
+      result = result
+        .replace(/\bsqrt\s*\(/gi, '√(')              // "sqrt(" -> "√("
+        .replace(/\bsqrt\s*(\d)/gi, '√$1')           // "sqrt2" -> "√2"
+        .replace(/\btheta\b/gi, 'θ')                  // "theta" -> "θ"
+        .replace(/\balpha\b/gi, 'α')                  // "alpha" -> "α"
+        .replace(/\bbeta\b/gi, 'β')                   // "beta" -> "β"
+        .replace(/\bgamma\b/gi, 'γ')                  // "gamma" -> "γ"
+        .replace(/\bdelta\b/gi, 'δ')                  // "delta" -> "δ"
+        .replace(/\binfinity\b/gi, '∞')               // "infinity" -> "∞"
+        .replace(/>=\b/g, '≥')                        // ">=" -> "≥"
+        .replace(/<=\b/g, '≤')                        // "<=" -> "≤"
+        .replace(/!=/g, '≠')                          // "!=" -> "≠"
+        .replace(/<>/g, '≠')                          // "<>" -> "≠"
+        .replace(/\+-/g, '±')                         // "+-" -> "±"
+        .replace(/\b(\d+)\s*degrees?\b/gi, '$1°')     // "90 degrees" -> "90°"
+        .replace(/\bperpendicular\b/gi, '⊥')          // for formulas only
+        .replace(/\bcongruent\b/gi, '≅');             // for formulas only
+      
+      // Convert trig function notation (tan^2 x -> tan²x)
+      result = result
+        .replace(/sin²/g, 'sin²')
+        .replace(/cos²/g, 'cos²')
+        .replace(/tan²/g, 'tan²')
+        .replace(/sec²/g, 'sec²')
+        .replace(/csc²/g, 'csc²')
+        .replace(/cot²/g, 'cot²');
+      
+      // Remove any emoji characters that might cause PDF rendering issues
       result = result
         .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')  // Miscellaneous Symbols, Emoticons
         .replace(/[\u{2600}-\u{26FF}]/gu, '')    // Miscellaneous Symbols
@@ -632,82 +707,161 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         .replace(/📝/g, '')                       // Memo
         .replace(/🎉/g, '');                      // Party popper
       
-      // Second pass: Fix ampersand-interleaved text corruption
-      // This catastrophic encoding pattern inserts & between each character
-      // Example: "&p&a&i&n&t&e&d&" -> "painted"
-      // We need to detect and fix this pattern before other fixes
+      // Fix ampersand-interleaved text corruption
       const ampersandPattern = /(&[a-zA-Z]){3,}/g;
       if (ampersandPattern.test(result)) {
-        // Remove all & characters that are between single letters
         result = result.replace(/&([a-zA-Z])(?=&|$|\s|\.)/g, '$1');
         result = result.replace(/^&([a-zA-Z])/g, '$1');
       }
-      
-      // Fix standalone & before letters (partial corruption)
       result = result.replace(/&([a-zA-Z])&/g, '$1');
       
-      // Second pass: Fix mojibake patterns (UTF-8 decoded as Latin-1/Windows-1252)
+      // Fix mojibake patterns (UTF-8 decoded as Latin-1/Windows-1252)
       const mojibakePatterns: [RegExp, string][] = [
-        // Greek letters mojibake
-        [/Ï€/g, 'π'],      // π (pi)
-        [/Î¸/g, 'θ'],      // θ (theta)
-        [/Î±/g, 'α'],      // α (alpha)
-        [/Î²/g, 'β'],      // β (beta)
-        [/Î³/g, 'γ'],      // γ (gamma)
-        [/Î"/g, 'Δ'],      // Δ (Delta)
-        [/Î´/g, 'δ'],      // δ (delta)
-        [/Ïˆ/g, 'ψ'],      // ψ (psi)
-        [/Ï†/g, 'φ'],      // φ (phi)
-        [/Î£/g, 'Σ'],      // Σ (Sigma)
-        [/Ïƒ/g, 'σ'],      // σ (sigma)
-        [/Î©/g, 'Ω'],      // Ω (Omega)
-        [/Ï‰/g, 'ω'],      // ω (omega)
-        [/Î»/g, 'λ'],      // λ (lambda)
-        [/Î¼/g, 'μ'],      // μ (mu)
-        [/Ï/g, 'ρ'],       // ρ (rho) - careful, this is generic
+        // ============================================================
+        // CRITICAL: Common diagnostic worksheet corruption patterns
+        // These appear as "d", "A", Å, À where θ or π should be
+        // ============================================================
         
-        // Math operators mojibake
-        [/â‰¤/g, '≤'],      // ≤
-        [/â‰¥/g, '≥'],      // ≥
-        [/â‰ /g, '≠'],      // ≠
-        [/â†'/g, '→'],      // →
-        [/â†/g, '←'],       // ←
-        [/âˆš/g, '√'],      // √
-        [/âˆž/g, '∞'],      // ∞
-        [/Ã—/g, '×'],      // ×
-        [/Ã·/g, '÷'],      // ÷
-        [/â€"/g, '—'],      // em dash
-        [/â€™/g, "'"],     // right single quote
-        [/â€œ/g, '"'],     // left double quote
-        [/â€/g, '"'],      // right double quote (partial)
-        [/â€˜/g, "'"],     // left single quote
-        [/â€¦/g, '...'],   // ellipsis
-        [/â€"/g, '-'],      // en dash
-        [/âˆ /g, '∠'],      // angle symbol
-        [/âŠ¥/g, '⊥'],      // perpendicular
-        [/â‰…/g, '≅'],      // congruent
-        [/âˆ†/g, '△'],      // triangle
+        // Theta (θ) corruption patterns
+        [/"d"/g, 'θ'],                // "d" -> θ
+        [/"d/g, 'θ'],                 // "d -> θ
+        [/d"/g, 'θ'],                 // d" -> θ
+        [/Ã¸/g, 'θ'],                 // Ã¸ -> θ
+        [/θ̈/g, 'θ'],                  // θ with diaeresis
+        [/Î¸/g, 'θ'],                 // Î¸ -> θ
+        [/\u00f8/g, 'θ'],             // ø -> θ (common substitution)
         
-        // Fix common Â prefix corruption (UTF-8 BOM or encoding mismatch)
-        [/Â\s*π/g, 'π'],
-        [/Âπ/g, 'π'],
-        [/πÂ/g, 'π'],
-        [/Â°/g, '°'],
-        [/°Â/g, '°'],
+        // Pi (π) corruption patterns  
+        [/"A\)/g, 'π)'],              // "A) -> π)
+        [/\("A/g, '(π'],              // ("A -> (π
+        [/2"A/g, '2π'],               // 2"A -> 2π
+        [/"A/g, 'π'],                 // "A -> π
+        [/Å/g, 'π'],                  // Å -> π
+        [/2Å/g, '2π'],                // 2Å -> 2π
+        [/À/g, 'π'],                  // À -> π
+        [/2À/g, '2π'],                // 2À -> 2π
+        [/Ã€/g, 'π'],                 // Ã€ -> π
+        [/Ï€/g, 'π'],                 // Ï€ -> π
+        [/\u03c0/g, 'π'],             // Ensure proper π
+        [/\u00c0/g, 'π'],             // À character code
+        [/\u00c5/g, 'π'],             // Å character code
+        [/ãƒ¼/g, 'π'],                // Japanese character corruption
+        [/ð/g, 'π'],                  // ð -> π
+        
+        // Full interval patterns (0 ≤ θ < 2π)
+        [/\(0\s*"d"\s*,?\s*<?=?\s*2"A"\)/gi, '(0 ≤ θ < 2π)'],
+        [/\(0\s*"d\s*,?\s*<?=?\s*2Å\)/gi, '(0 ≤ θ < 2π)'],
+        [/\(0\s*"d\s*,?\s*<?=?\s*2À\)/gi, '(0 ≤ θ < 2π)'],
+        [/0\s*≤\s*"d"\s*<\s*2"A"/gi, '0 ≤ θ < 2π'],
+        [/0\s*≤\s*"d\s*<\s*2À/gi, '0 ≤ θ < 2π'],
+        [/0\s*≤\s*"d\s*<\s*2Å/gi, '0 ≤ θ < 2π'],
+        [/0\s*"d\s*,?\s*<\s*2Å/gi, '0 ≤ θ < 2π'],
+        [/0\s*"d"\s*<\s*2Å/gi, '0 ≤ θ < 2π'],
+        [/0"d"</g, '0 ≤ θ <'],
+        [/"d\s*,/g, 'θ ≤'],
+        [/"d,/g, 'θ ≤'],
+        
+        // Square root (√) corruption
+        [/âˆš/g, '√'],
+        [/\u221a/g, '√'],
+        [/V(?=\d)/g, '√'],            // V before number -> √
+        [/\\sqrt/g, '√'],             // LaTeX escape
+        
+        // Superscript corruption
         [/Â²/g, '²'],
         [/Â³/g, '³'],
+        [/\^2(?!\d)/g, '²'],
+        [/\^3(?!\d)/g, '³'],
+        [/\^4(?!\d)/g, '⁴'],
+        [/\^5(?!\d)/g, '⁵'],
+        [/\^n\b/gi, 'ⁿ'],
+        
+        // Comparison operators
+        [/â‰¤/g, '≤'],
+        [/â‰¥/g, '≥'],
+        [/â‰ /g, '≠'],
+        [/&lt;=/g, '≤'],
+        [/&gt;=/g, '≥'],
+        [/<=/g, '≤'],
+        [/>=/g, '≥'],
+        [/!=/g, '≠'],
+        [/<>/g, '≠'],
+        
+        // Greek letters mojibake
+        [/Î±/g, 'α'],
+        [/Î²/g, 'β'],
+        [/Î³/g, 'γ'],
+        [/Î"/g, 'Δ'],
+        [/Î´/g, 'δ'],
+        [/Ïˆ/g, 'ψ'],
+        [/Ï†/g, 'φ'],
+        [/Î£/g, 'Σ'],
+        [/Ïƒ/g, 'σ'],
+        [/Î©/g, 'Ω'],
+        [/Ï‰/g, 'ω'],
+        [/Î»/g, 'λ'],
+        [/Î¼/g, 'μ'],
+        [/Ï/g, 'ρ'],
+        [/Îµ/g, 'ε'],
+        [/Î¶/g, 'ζ'],
+        [/Î·/g, 'η'],
+        [/Î¹/g, 'ι'],
+        [/Îº/g, 'κ'],
+        [/Î½/g, 'ν'],
+        [/Î¾/g, 'ξ'],
+        [/Ï€/g, 'π'],
+        [/Ï„/g, 'τ'],
+        [/Ï…/g, 'υ'],
+        [/Ï‡/g, 'χ'],
+        
+        // Arrows and math operators
+        [/â†'/g, '→'],
+        [/â†/g, '←'],
+        [/âˆž/g, '∞'],
+        [/Ã—/g, '×'],
+        [/Ã·/g, '÷'],
+        [/Â±/g, '±'],
+        [/âˆ /g, '∠'],
+        [/âŠ¥/g, '⊥'],
+        [/â‰…/g, '≅'],
+        [/âˆ†/g, '△'],
+        [/∥/g, '∥'],
+        [/Ã¢Ë†Â¥/g, '∥'],
+        
+        // Degree symbol
+        [/Â°/g, '°'],
+        [/°Â/g, '°'],
+        [/\bdegrees?\b/gi, '°'],
+        
+        // Fractions
         [/Â½/g, '½'],
         [/Â¼/g, '¼'],
         [/Â¾/g, '¾'],
-        [/Â±/g, '±'],
+        [/1\/2(?!\d)/g, '½'],
+        [/1\/3(?!\d)/g, '⅓'],
+        [/1\/4(?!\d)/g, '¼'],
+        [/2\/3(?!\d)/g, '⅔'],
+        [/3\/4(?!\d)/g, '¾'],
+        
+        // Quote/apostrophe corruption
+        [/â€"/g, '—'],
+        [/â€™/g, "'"],
+        [/â€œ/g, '"'],
+        [/â€/g, '"'],
+        [/â€˜/g, "'"],
+        [/â€¦/g, '...'],
+        [/â€"/g, '-'],
+        
+        // Common Â prefix corruption cleanup
+        [/Â\s*π/g, 'π'],
+        [/Âπ/g, 'π'],
+        [/πÂ/g, 'π'],
+        [/Âθ/g, 'θ'],
+        [/θÂ/g, 'θ'],
         [/Â·/g, '·'],
-        [/Âµ/g, 'μ'],      // mu from Latin-1
+        [/Âµ/g, 'μ'],
         
-        // Fix À (Latin capital A with grave) which often corrupts π
-        [/À(?=\s|$|\.|\,)/g, 'π'],  // À at word boundary -> π
-        [/(\d)\s*À/g, '$1π'],        // number followed by À -> π
-        
-        // Fix numbers followed by Â (common in "terms of π" expressions)
+        // Number + corrupted π patterns
         [/(\d)Â(?=\s|$|\.)/g, '$1π'],
         [/(\d)Â\s*cm/gi, '$1π cm'],
         [/(\d)Â\s*cubic/gi, '$1π cubic'],
@@ -715,21 +869,76 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         [/(\d)Â\s*meter/gi, '$1π meter'],
         [/(\d)Â\s*inch/gi, '$1π inch'],
         [/(\d)Â\s*unit/gi, '$1π unit'],
+        [/(\d)\s*À/g, '$1π'],
+        [/(\d)\s*Å/g, '$1π'],
+        
+        // Trig function cleanup
+        [/sin\s*²/g, 'sin²'],
+        [/cos\s*²/g, 'cos²'],
+        [/tan\s*²/g, 'tan²'],
+        [/sec\s*²/g, 'sec²'],
+        [/csc\s*²/g, 'csc²'],
+        [/cot\s*²/g, 'cot²'],
+        
+        // cos² patterns with corrupted symbols
+        [/4\s*cos\s*²\s*,/g, '4cos²θ'],
+        [/cos²\s*,/g, 'cos²θ'],
+        [/sin²\s*,/g, 'sin²θ'],
+        [/tan²\s*,/g, 'tan²θ'],
+        
+        // ============================================================
+        // SUBSCRIPT CORRUPTION PATTERNS
+        // w• should be w₁, w, should be w₂, wƒ should be w₃, etc.
+        // ============================================================
+        
+        // Subscript 1 corruption (• bullet often replaces ₁)
+        [/([a-zA-Z])•/g, '$1₁'],           // w• -> w₁
+        [/([a-zA-Z])â€¢/g, '$1₁'],          // mojibake bullet
+        [/([a-zA-Z])\u2022/g, '$1₁'],       // unicode bullet
+        [/([a-zA-Z])·/g, '$1₁'],            // middle dot
+        [/([a-zA-Z])¹/g, '$1₁'],            // superscript 1 -> subscript 1
+        
+        // Subscript 2 corruption (, comma often replaces ₂)
+        [/([a-zA-Z]),\s*(?=and|or|\+|-|=|is|the|that|when|if)/gi, '$1₂ '],  // w, and -> w₂ and
+        [/([a-zA-Z]),(?=\s+[a-zA-Z])/g, '$1₂'],   // w, w -> w₂ w
+        [/([a-zA-Z])²(?=\s+and|\s+or)/gi, '$1₂'], // w² and -> w₂ and (context-aware)
+        
+        // Subscript 3 corruption (ƒ often replaces ₃ or f)
+        [/([a-zA-Z])ƒ/g, '$1₃'],            // wƒ -> w₃ (or could be wf)
+        [/([a-zA-Z])Æ'/g, '$1₃'],           // mojibake for ƒ
+        
+        // Direct subscript number patterns
+        [/_1\b/g, '₁'],
+        [/_2\b/g, '₂'],
+        [/_3\b/g, '₃'],
+        [/_4\b/g, '₄'],
+        [/_5\b/g, '₅'],
+        [/_n\b/gi, 'ₙ'],
+        [/_0\b/g, '₀'],
+        
+        // Common variable subscript patterns
+        [/x_1/gi, 'x₁'],
+        [/x_2/gi, 'x₂'],
+        [/y_1/gi, 'y₁'],
+        [/y_2/gi, 'y₂'],
+        [/a_1/gi, 'a₁'],
+        [/a_2/gi, 'a₂'],
+        [/a_n/gi, 'aₙ'],
+        [/w_1/gi, 'w₁'],
+        [/w_2/gi, 'w₂'],
+        [/w_3/gi, 'w₃'],
       ];
       
       for (const [pattern, replacement] of mojibakePatterns) {
         result = result.replace(pattern, replacement);
       }
       
-      // Third pass: Clean up remaining artifacts
+      // Clean up remaining artifacts
       result = result
-        // Clean up stray Â characters
         .replace(/Â(?![a-zA-Z0-9°²³])/g, '')
         .replace(/Â\s+/g, ' ')
         .replace(/\s+Â/g, ' ')
-        // Clean up double spaces
         .replace(/\s{2,}/g, ' ')
-        // Trim
         .trim();
       
       return result;

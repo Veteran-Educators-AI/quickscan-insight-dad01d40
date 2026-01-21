@@ -15,8 +15,13 @@ import {
   MessageSquare,
   Clock,
   FileText,
-  Trash2
+  Trash2,
+  Lightbulb,
+  CheckCircle2,
+  Circle,
+  Sparkles
 } from 'lucide-react';
+import { RemediationCompletionsBadge } from '@/components/dashboard/RemediationCompletionsBadge';
 import { VerificationStatsWidget } from '@/components/reports/VerificationStatsWidget';
 import { StudentsNeedingHelpWidget } from '@/components/reports/StudentsNeedingHelpWidget';
 import { Button } from '@/components/ui/button';
@@ -56,6 +61,26 @@ interface RecentLessonPlan {
   created_at: string;
 }
 
+const teacherTips = [
+  "Start each class by reviewing common misconceptions from the last assessment.",
+  "Use student work samples to spark discussion about different problem-solving approaches.",
+  "Celebrate progress, not just perfection—growth mindset matters!",
+  "Quick exit tickets can reveal gaps before they become bigger issues.",
+  "Pair struggling students with peer tutors for collaborative learning.",
+  "Visual representations help students connect abstract concepts to real understanding.",
+  "Give students time to struggle productively before offering hints.",
+  "Regular low-stakes assessments reduce test anxiety and improve retention.",
+  "Ask 'How do you know?' to deepen mathematical reasoning.",
+  "Mistakes are learning opportunities—normalize productive failure."
+];
+
+const gettingStartedSteps = [
+  { id: 1, label: "Create your first class", description: "Add a class with your students' names", href: "/classes/new" },
+  { id: 2, label: "Build a worksheet", description: "Generate AI-powered practice problems", href: "/questions" },
+  { id: 3, label: "Scan student work", description: "Use the camera to grade papers instantly", href: "/scan" },
+  { id: 4, label: "Review reports", description: "See insights on student performance", href: "/reports" },
+];
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -74,12 +99,24 @@ export default function Dashboard() {
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [lessonToDelete, setLessonToDelete] = useState<RecentLessonPlan | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [userName, setUserName] = useState<string>('');
 
   useEffect(() => {
     async function fetchStats() {
       if (!user) return;
 
       try {
+        // Fetch user's full name
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile?.full_name) {
+          setUserName(profile.full_name.split(' ')[0]); // Use first name only
+        }
+
         // Fetch class count
         const { count: classCount } = await supabase
           .from('classes')
@@ -219,41 +256,104 @@ export default function Dashboard() {
       <div className="space-y-8">
         {/* Header */}
         <div className="animate-fade-in flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="font-display text-3xl font-bold text-foreground">
-                Welcome back!
-              </h1>
-              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded border border-amber-500/30">
-                Beta
-              </span>
-            </div>
-            <p className="text-muted-foreground mt-1">
-              Here's an overview of your geometry assessments.
-            </p>
+          <div className="flex items-center gap-3">
+            <h1 className="font-display text-3xl font-bold text-foreground">
+              Welcome back{userName ? `, ${userName}` : ''}!
+            </h1>
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded border border-amber-500/30">
+              Beta
+            </span>
           </div>
           
-          {/* Unread Comments Badge */}
-          {stats.unreadComments > 0 && (
-            <Link to="/reports">
-              <Card className="border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
-                <CardContent className="p-3 flex items-center gap-3">
-                  <div className="relative">
-                    <MessageSquare className="h-5 w-5 text-primary" />
-                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
-                      {stats.unreadComments > 9 ? '9+' : stats.unreadComments}
-                    </span>
-                  </div>
-                  <div className="text-sm">
-                    <p className="font-medium text-foreground">
-                      {stats.unreadComments} unread {stats.unreadComments === 1 ? 'comment' : 'comments'}
-                    </p>
-                    <p className="text-muted-foreground text-xs">from students</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            </Link>
+          {/* Notification Badges */}
+          <div className="flex items-center gap-3">
+            {/* Remediation Completions Badge */}
+            <RemediationCompletionsBadge />
+            
+            {/* Unread Comments Badge */}
+            {stats.unreadComments > 0 && (
+              <Link to="/reports">
+                <Card className="border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <div className="relative">
+                      <MessageSquare className="h-5 w-5 text-primary" />
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                        {stats.unreadComments > 9 ? '9+' : stats.unreadComments}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <p className="font-medium text-foreground">
+                        {stats.unreadComments} unread {stats.unreadComments === 1 ? 'comment' : 'comments'}
+                      </p>
+                      <p className="text-muted-foreground text-xs">from students</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* Daily Teaching Tip & Getting Started */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-in">
+          {/* Daily Teaching Tip */}
+          <Card className="border-amber-200 dark:border-amber-800 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                  <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">
+                    Daily Teaching Tip
+                  </p>
+                  <p className="text-sm text-foreground leading-relaxed">
+                    {teacherTips[new Date().getDate() % teacherTips.length]}
+                  </p>
+                </div>
+                <Sparkles className="h-4 w-4 text-amber-400 dark:text-amber-500 flex-shrink-0" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Getting Started Steps */}
+          {stats.classCount === 0 && (
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5">
+              <CardContent className="p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-3">
+                  Getting Started
+                </p>
+                <div className="space-y-2">
+                  {gettingStartedSteps.map((step) => {
+                    const isComplete = 
+                      (step.id === 1 && stats.classCount > 0) ||
+                      (step.id === 2 && stats.questionCount > 0);
+                    
+                    return (
+                      <Link 
+                        key={step.id} 
+                        to={step.href}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-background/50 transition-colors group"
+                      >
+                        {isComplete ? (
+                          <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                        ) : (
+                          <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${isComplete ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                            {step.label}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">{step.description}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
 

@@ -163,6 +163,7 @@ interface UseWebUSBScannerReturn {
   cancelScan: () => void;
   updateSettings: (settings: Partial<ScanSettings>) => void;
   clearImages: () => void;
+  clearError: () => void;
   checkCompatibility: () => Promise<CompatibilityCheck | null>;
   reconnectToDevice: (device: USBDevice) => Promise<boolean>;
 }
@@ -317,10 +318,13 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
     return connectToDevice(device, false);
   }, [connectToDevice]);
 
-  // Check for previously paired devices on mount (no auto-reconnect)
+  // Check for previously paired devices on mount (NO auto-reconnect - user must click)
   useEffect(() => {
     if (!isSupported) return;
 
+    // Clear any stale error state from previous sessions
+    setError(null);
+    
     const checkPairedDevices = async () => {
       try {
         const devices = await navigator.usb!.getDevices();
@@ -330,8 +334,13 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
         );
         
         setPairedDevices(scanners);
-        // Note: We don't auto-reconnect - user must explicitly click "Connect"
-        // This prevents "interface is busy" errors from premature connection attempts
+        
+        // NOTE: We intentionally do NOT auto-reconnect here.
+        // The browser remembers paired devices, but the scanner is not actually connected
+        // until the user explicitly clicks "Reconnect" or "Connect Scanner".
+        if (scanners.length > 0) {
+          console.log('Found remembered scanners (not yet connected):', scanners.map(s => s.productName));
+        }
       } catch (err) {
         console.error('Error checking paired devices:', err);
       }
@@ -340,25 +349,25 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
     checkPairedDevices();
 
     // Listen for device connections/disconnections
-    const handleConnect = async (event: USBConnectionEvent) => {
+    const handleConnect = (event: USBConnectionEvent) => {
       const device = event.device;
       const isKnownScanner = KNOWN_SCANNER_VENDORS.includes(device.vendorId) || device.deviceClass === 0x10;
       
       if (isKnownScanner) {
-        // Update paired devices list
+        // Update paired devices list only - NO auto-connect
         setPairedDevices(prev => {
           const exists = prev.some(d => d.serialNumber === device.serialNumber);
           return exists ? prev : [...prev, device];
         });
         
-        // If currently connected device was reconnected
+        // If currently connected device was reconnected (user already had it open)
         if (deviceRef.current?.serialNumber === device.serialNumber) {
           setConnectedDevice(prev => prev ? { ...prev, isConnected: true } : null);
           toast.success('Scanner reconnected');
-        } else if (!connectedDevice) {
-          // Just notify user - don't auto-connect to prevent "interface is busy" errors
+        } else {
+          // Just notify user - don't auto-connect
           toast.info(`Scanner detected: ${device.productName || 'Unknown Scanner'}`, {
-            description: 'Click "Connect Scanner" to use it.',
+            description: 'Click "Connect" to use it.',
             duration: 3000,
           });
         }
@@ -790,6 +799,10 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
     }
   }, []);
 
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
   return {
     isSupported,
     isConnecting,
@@ -809,6 +822,7 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
     cancelScan,
     updateSettings,
     clearImages,
+    clearError,
     checkCompatibility,
     reconnectToDevice,
   };

@@ -30,6 +30,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { fixEncodingCorruption, renderMathText } from '@/lib/mathRenderer';
 
 interface MasteryChallengeGeneratorProps {
   open: boolean;
@@ -973,12 +974,14 @@ export function MasteryChallengeGenerator({ open, onOpenChange }: MasteryChallen
                         </Badge>
                       </div>
                       <p className="text-base mb-4" style={{ fontFamily: 'Georgia, serif' }}>
-                        {q.question}
+                        {renderMathText(fixEncodingCorruption(q.question))}
                       </p>
                       {includeHints && q.hint && (
                         <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mb-4 text-sm">
                           <span className="font-semibold text-yellow-700">💡 Hint:</span>{' '}
-                          <span className="text-yellow-800 italic">{q.hint}</span>
+                          <span className="text-yellow-800 italic">
+                            {renderMathText(fixEncodingCorruption(q.hint))}
+                          </span>
                         </div>
                       )}
                       <div className="border-2 border-dashed border-gray-300 rounded p-4 min-h-[120px]">

@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { fixEncodingCorruption, renderMathText } from '@/lib/mathRenderer';
 
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -72,6 +73,8 @@ const svgToDataUri = (svg: string): string => {
     .replace(/"/g, '%22');
   return `data:image/svg+xml,${encoded}`;
 };
+
+const formatPreviewText = (text?: string) => renderMathText(fixEncodingCorruption(text ?? ''));
 
 export function QuestionPreviewPanel({
   selectedTopics,
@@ -237,9 +240,11 @@ export function QuestionPreviewPanel({
         {/* Question text with optional inline shape preview */}
         <div className="flex gap-2">
           <div className="flex-1">
-            <p className="text-sm">{question.question}</p>
+            <p className="text-sm whitespace-pre-line">{formatPreviewText(question.question)}</p>
             {question.hint && includeHints && (
-              <p className="text-xs text-amber-600 mt-1 italic">💡 {question.hint}</p>
+              <p className="text-xs text-amber-600 mt-1 italic whitespace-pre-line">
+                💡 {formatPreviewText(question.hint)}
+              </p>
             )}
           </div>
           

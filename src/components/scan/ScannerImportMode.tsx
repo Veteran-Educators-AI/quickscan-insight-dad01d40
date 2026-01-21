@@ -3,7 +3,7 @@ import {
   Upload, Loader2, RotateCcw, RotateCw, ArrowUp, ArrowDown, 
   Trash2, Check, Layers, FileImage, Wand2, GripVertical,
   ZoomIn, ZoomOut, Eye, FolderOpen, RefreshCw, Settings2, Cloud,
-  Zap, Pause, Play, Usb, Monitor, ChevronLeft, ChevronRight, Search, X
+  Zap, Pause, Play, Usb, ChevronLeft, ChevronRight, Search, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +23,7 @@ import { GoogleDriveImport } from './GoogleDriveImport';
 import { GoogleDriveAutoSyncConfig } from './GoogleDriveAutoSyncConfig';
 import { HotFolderAlert } from './HotFolderAlert';
 import { WebUSBScannerPanel } from './WebUSBScannerPanel';
-import { TWAINBridgePanel } from './TWAINBridgePanel';
+
 import { useGoogleDriveAutoSync, SyncedFile } from '@/hooks/useGoogleDriveAutoSync';
 import { playNotificationSound, isSoundEnabled } from '@/lib/notificationSound';
 
@@ -195,7 +195,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const [driveImportOpen, setDriveImportOpen] = useState(false);
   const [autoSyncConfigOpen, setAutoSyncConfigOpen] = useState(false);
   const [showUSBScanner, setShowUSBScanner] = useState(false);
-  const [showTWAINBridge, setShowTWAINBridge] = useState(false);
+  
   const [settings, setSettings] = useState({
     autoRotate: true,
     applyPhotocopyFilter: true,
@@ -807,27 +807,11 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
             {/* WebUSB Scanner Button */}
             <Button
               variant={showUSBScanner ? "default" : "outline"}
-              onClick={() => {
-                setShowUSBScanner(!showUSBScanner);
-                if (!showUSBScanner) setShowTWAINBridge(false);
-              }}
+              onClick={() => setShowUSBScanner(!showUSBScanner)}
               disabled={isProcessing}
             >
               <Usb className="h-4 w-4 mr-2" />
               USB Scanner
-            </Button>
-
-            {/* TWAIN/SANE Bridge Button */}
-            <Button
-              variant={showTWAINBridge ? "default" : "outline"}
-              onClick={() => {
-                setShowTWAINBridge(!showTWAINBridge);
-                if (!showTWAINBridge) setShowUSBScanner(false);
-              }}
-              disabled={isProcessing}
-            >
-              <Monitor className="h-4 w-4 mr-2" />
-              Scanner Bridge
             </Button>
 
             <Button
@@ -908,13 +892,6 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
             />
           )}
 
-          {/* TWAIN/SANE Bridge Panel */}
-          {showTWAINBridge && (
-            <TWAINBridgePanel
-              onImagesScanned={handleUSBScannedImages}
-              className="mt-2"
-            />
-          )}
 
           {/* Auto-Sync Status */}
           {autoSyncConfig?.folderId && (

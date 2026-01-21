@@ -27,6 +27,7 @@ import {
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 import { MisconceptionComparison, extractErrorRegions } from './MisconceptionComparison';
 import { ImageErrorOverlay } from './ImageErrorOverlay';
+import { AIAnalysisCritiqueDialog } from './AIAnalysisCritiqueDialog';
 interface RubricScore {
   criterion: string;
   score: number;
@@ -422,6 +423,17 @@ export function StudentWorkDetailDialog({
                     </AccordionContent>
                   </AccordionItem>
                 </Accordion>
+
+                {/* Train AI Button */}
+                <div className="mt-4 pt-4 border-t">
+                  <AIAnalysisCritiqueDialog
+                    aiGrade={grade}
+                    aiJustification={result.gradeJustification}
+                    aiMisconceptions={result.misconceptions}
+                    aiFeedback={result.feedback}
+                    topicName={result.problemIdentified || 'Unknown Topic'}
+                  />
+                </div>
               </div>
             </ScrollArea>
           </div>

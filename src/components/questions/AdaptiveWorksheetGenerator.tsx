@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useStudentWeaknesses, type StudentPerformanceProfile, type AdvancementLevel } from '@/hooks/useStudentWeaknesses';
-import { sanitizeForPDF } from '@/lib/mathRenderer';
+import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
 
 interface AdaptiveWorksheetGeneratorProps {
@@ -59,6 +59,8 @@ const getLevelColor = (level: AdvancementLevel) => {
   };
   return colors[level];
 };
+
+const formatPdfText = (text: string) => sanitizeForPDF(renderMathText(fixEncodingCorruption(text)));
 
 const getLevelDescription = (level: AdvancementLevel) => {
   const descriptions: Record<AdvancementLevel, string> = {
@@ -441,10 +443,16 @@ export function AdaptiveWorksheetGenerator({ open, onOpenChange }: AdaptiveWorks
           pdf.text(`${q.questionNumber}.`, margin, yPosition);
 
           pdf.setFont('helvetica', 'normal');
-          const questionText = sanitizeForPDF(q.question);
-          const lines = pdf.splitTextToSize(questionText, contentWidth - 10);
-          pdf.text(lines, margin + 8, yPosition);
-          yPosition += lines.length * 5 + 3;
+          pdf.setFontSize(10); // Slightly smaller for better fit
+          const questionText = formatPdfText(q.question);
+          // Use 85% of content width to prevent text overflow
+          const lines = pdf.splitTextToSize(questionText, contentWidth * 0.85);
+          lines.forEach((line: string) => {
+            pdf.text(line, margin + 5, yPosition);
+            yPosition += 4.5;
+          });
+          yPosition += 3;
+          pdf.setFontSize(10); // Reset
 
           // Topic/Standard tag
           pdf.setFontSize(7);
@@ -458,11 +466,15 @@ export function AdaptiveWorksheetGenerator({ open, onOpenChange }: AdaptiveWorks
           if (includeHints && q.hint) {
             pdf.setFontSize(8);
             pdf.setTextColor(59, 130, 246);
-            const hintLines = pdf.splitTextToSize(`Hint: ${q.hint}`, contentWidth - 15);
-            pdf.text(hintLines, margin + 8, yPosition);
+            // Use 85% of content width for hints
+            const hintLines = pdf.splitTextToSize(formatPdfText(`Hint: ${q.hint}`), contentWidth * 0.85);
+            hintLines.forEach((line: string) => {
+              pdf.text(line, margin + 5, yPosition);
+              yPosition += 3.5;
+            });
             pdf.setTextColor(0);
             pdf.setFontSize(10);
-            yPosition += hintLines.length * 4 + 2;
+            yPosition += 2;
           }
 
           // Answer space

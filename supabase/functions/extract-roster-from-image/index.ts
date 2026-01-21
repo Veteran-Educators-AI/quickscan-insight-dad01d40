@@ -154,29 +154,46 @@ serve(async (req) => {
       }
     }
 
-    const prompt = `Analyze this image of a class roster and extract all student information.
+    const prompt = `Analyze this image of a class roster or gradebook and extract ALL student information and data columns visible.
 
-For each student found, extract:
-- First name
-- Last name
-- Student ID (if visible)
-- Email (if visible)
+REQUIRED fields for each student:
+- firstName: Student's first name
+- lastName: Student's last name
 
-Return the data as a JSON array with this exact structure:
+COMMON fields to look for (use these exact field names if present):
+- studentId: Student ID number
+- email: Email address
+- grade: Overall grade or score (letter grade, percentage, or points)
+
+ADDITIONAL fields - extract ANY other columns you see, such as:
+- period, section, homeroom, advisor, birthDate, phone, parentName, parentEmail, parentPhone
+- Individual assignment scores (use the assignment name as the field name in camelCase, e.g., "homework1", "quiz2", "midtermExam")
+- Attendance data, participation scores, or any other visible columns
+
+Return the data as a JSON object with this structure:
 {
   "students": [
     {
       "firstName": "John",
       "lastName": "Doe",
       "studentId": "12345",
-      "email": "john.doe@school.edu"
+      "email": "john.doe@school.edu",
+      "grade": "85",
+      "period": "3",
+      "homework1": "90",
+      "quiz1": "88"
     }
   ]
 }
 
-If a field is not visible or cannot be determined, omit it from that student's object.
-Only include firstName and lastName as required fields.
-Parse carefully - this may be a handwritten list, printed roster, or screenshot.
+IMPORTANT RULES:
+- Use camelCase for all field names (e.g., "studentId" not "student_id", "parentEmail" not "parent_email")
+- Include the raw value as seen for scores/grades (e.g., "85", "A+", "92%", "45/50")
+- If a field is not visible or cannot be determined for a student, omit it
+- Only firstName and lastName are required
+- Extract EVERY column/field visible in the image - don't skip any data columns
+- Parse carefully - this may be a handwritten list, printed roster, gradebook screenshot, or scan
+
 Return ONLY the JSON, no additional text.`;
 
     // Clean base64 if it has data URL prefix

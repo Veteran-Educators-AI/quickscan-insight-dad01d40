@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
+import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
 
 interface GeneratedQuestion {
@@ -82,6 +83,9 @@ export default function SharedWorksheet() {
     }
   };
 
+  const formatWorksheetText = (text: string) => renderMathText(fixEncodingCorruption(text));
+  const formatWorksheetTextForPdf = (text: string) => sanitizeForPDF(formatWorksheetText(text));
+
   const generatePDF = async () => {
     if (!worksheet) return;
 
@@ -133,8 +137,10 @@ export default function SharedWorksheet() {
         pdf.setTextColor(0);
         yPosition += 8;
 
-        pdf.setFontSize(11);
-        const lines = pdf.splitTextToSize(question.question, contentWidth - 10);
+        pdf.setFontSize(10); // Slightly smaller for better fit
+        const sanitizedQuestion = formatWorksheetTextForPdf(question.question);
+        // Use 85% of content width to prevent text overflow
+        const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth * 0.85);
 
         lines.forEach((line: string) => {
           if (yPosition > pageHeight - 40) {
@@ -142,8 +148,9 @@ export default function SharedWorksheet() {
             yPosition = margin;
           }
           pdf.text(line, margin + 5, yPosition);
-          yPosition += 6;
+          yPosition += 5;
         });
+        pdf.setFontSize(11); // Reset
 
         yPosition += 4;
 
@@ -289,7 +296,7 @@ export default function SharedWorksheet() {
                   <p className="text-sm text-muted-foreground mb-1">
                     {question.topic} ({question.standard})
                   </p>
-                  <p className="text-sm">{question.question}</p>
+                  <p className="text-sm whitespace-pre-line">{formatWorksheetText(question.question)}</p>
                   {question.svg && (
                     <div 
                       className="mt-2 flex justify-center"

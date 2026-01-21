@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Printer, Check, Loader2, QrCode, Eye, BookOpen } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Printer, Check, Loader2, QrCode, Eye, BookOpen, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -62,6 +63,17 @@ export function PrintWorksheetDialog({ classId, students, trigger, topicName }: 
   const [includeLevels, setIncludeLevels] = useState(true);
   const [aiOptimizedLayout, setAIOptimizedLayout] = useState(true);
   const [studentLevels, setStudentLevels] = useState<Map<string, StudentLevel>>(new Map());
+
+  // Handle ESC key to close preview
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showPreview) {
+        setShowPreview(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPreview]);
 
   useEffect(() => {
     if (open) {
@@ -399,14 +411,59 @@ export function PrintWorksheetDialog({ classId, students, trigger, topicName }: 
         </DialogContent>
       </Dialog>
 
-      {/* Hidden Print Content */}
-      {showPreview && (
-        <div className="fixed inset-0 bg-white z-50 overflow-auto print:static print:overflow-visible">
-          <div className="print:hidden p-4 bg-muted border-b flex items-center justify-between">
-            <p>Print preview - press Ctrl+P or Cmd+P to print</p>
-            <Button variant="outline" onClick={() => setShowPreview(false)}>
+      {/* Hidden Print Content - Using Portal to ensure it renders at document body level */}
+      {showPreview && createPortal(
+        <div 
+          className="fixed inset-0 bg-white overflow-auto print:static print:overflow-visible"
+          style={{ zIndex: 99999 }}
+        >
+          {/* Fixed close button in top-right corner - always visible */}
+          <button 
+            type="button"
+            onClick={() => setShowPreview(false)}
+            style={{
+              position: 'fixed',
+              top: '16px',
+              right: '16px',
+              zIndex: 100000,
+              width: '44px',
+              height: '44px',
+              borderRadius: '8px',
+              backgroundColor: '#dc2626',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              fontSize: '24px',
+              fontWeight: 'bold',
+            }}
+            className="print:hidden"
+          >
+            ✕
+          </button>
+          
+          <div className="print:hidden p-4 bg-gray-100 border-b flex items-center justify-between sticky top-0" style={{ zIndex: 99998 }}>
+            <p className="text-sm text-gray-700">Print preview - press Ctrl+P or Cmd+P to print, or press <kbd className="px-1.5 py-0.5 bg-white rounded border text-xs">ESC</kbd> to close</p>
+            <button 
+              type="button"
+              onClick={() => setShowPreview(false)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                backgroundColor: 'white',
+                border: '1px solid #d1d5db',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <X className="h-4 w-4" />
               Close Preview
-            </Button>
+            </button>
           </div>
           <div ref={printRef}>
             {getSelectedStudents().map((student) => {
@@ -425,7 +482,8 @@ export function PrintWorksheetDialog({ classId, students, trigger, topicName }: 
               );
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* AI Scan Preview Dialog */}

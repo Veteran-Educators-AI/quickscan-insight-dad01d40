@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw, QrCode } from 'lucide-react';
+import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw, QrCode, Palette, BookOpen, ImageIcon } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QuestionPreviewPanel } from './QuestionPreviewPanel';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
-import { sanitizeForPDF } from '@/lib/mathRenderer';
+import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
 
 interface WorksheetPreset {
@@ -37,6 +37,8 @@ const FORM_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'] as const
 type FormLetter = typeof FORM_LETTERS[number];
 
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+
+const formatPdfText = (text: string) => sanitizeForPDF(renderMathText(fixEncodingCorruption(text)));
 
 interface Student {
   id: string;
@@ -310,10 +312,18 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [includeGeometry, setIncludeGeometry] = useState(false);
   const [useAIImages, setUseAIImages] = useState(false);
   const [includeStudentQR, setIncludeStudentQR] = useState(true);
+  const [onlyWithoutDiagnostic, setOnlyWithoutDiagnostic] = useState(false);
+  const [marginSize, setMarginSize] = useState<'small' | 'medium' | 'large'>('medium');
+  
+  // Storyboard art settings for non-math subjects
+  const [includeStoryboardArt, setIncludeStoryboardArt] = useState(false);
+  const [storyboardSubject, setStoryboardSubject] = useState<'english' | 'history' | 'biology' | 'science' | 'social-studies'>('english');
+  const [storyboardStyle, setStoryboardStyle] = useState<'storyboard' | 'illustration' | 'diagram'>('storyboard');
+  const [storyboardImages, setStoryboardImages] = useState<Record<string, string>>({});
+  const [regeneratingImageKey, setRegeneratingImageKey] = useState<string | null>(null);
   
   // Topics from standards menu selection
   const [customTopics, setCustomTopics] = useState<{ topicName: string; standard: string }[]>([]);
-
   // Adaptive levels based on student performance data
   const { 
     students: adaptiveStudents, 
@@ -561,11 +571,21 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   };
 
   const selectAll = () => {
-    setStudents(prev => prev.map(s => ({ ...s, selected: !!s.diagnosticResult || !!s.hasAdaptiveData })));
+    // In diagnostic mode with "only without diagnostic" filter, select students without data
+    if (diagnosticMode && onlyWithoutDiagnostic) {
+      setStudents(prev => prev.map(s => ({ ...s, selected: !s.diagnosticResult && !s.hasAdaptiveData })));
+    } else {
+      setStudents(prev => prev.map(s => ({ ...s, selected: !!s.diagnosticResult || !!s.hasAdaptiveData })));
+    }
   };
 
   const deselectAll = () => {
     setStudents(prev => prev.map(s => ({ ...s, selected: false })));
+  };
+
+  // Select only students without any diagnostic data (for first-time diagnostics)
+  const selectOnlyWithoutDiagnostic = () => {
+    setStudents(prev => prev.map(s => ({ ...s, selected: !s.diagnosticResult && !s.hasAdaptiveData })));
   };
 
   const generateDifferentiatedWorksheets = async () => {
@@ -595,7 +615,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       const pdf = new jsPDF('p', 'mm', 'letter');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 15; // Reduced from 20mm for better use of page space
+      const margin = marginSize === 'small' ? 12 : marginSize === 'large' ? 25 : 20; // Based on user preference
       const contentWidth = pageWidth - margin * 2;
       let isFirstPage = true;
 
@@ -762,7 +782,32 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
           pdf.setLineWidth(0.5);
           pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-          yPosition += 10;
+          yPosition += 8;
+          
+          // AI Grading Instructions Box
+          pdf.setFillColor(239, 246, 255); // Light blue background
+          pdf.setDrawColor(59, 130, 246); // Blue border
+          pdf.setLineWidth(0.4);
+          pdf.roundedRect(margin, yPosition, contentWidth, 18, 2, 2, 'FD');
+          
+          // Warning icon (use asterisk/star instead of emoji to avoid encoding issues)
+          pdf.setFontSize(9);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(30, 64, 175);
+          pdf.text('[!] IMPORTANT: AI Grading Instructions', margin + 3, yPosition + 5);
+          
+          // Instructions text
+          pdf.setFontSize(8);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setTextColor(55, 65, 81);
+          pdf.text('- Write ALL work inside the bordered "WORK AREA" boxes only.', margin + 5, yPosition + 10);
+          pdf.text('- Write your FINAL ANSWER in the highlighted yellow section.', margin + 5, yPosition + 14);
+          pdf.text('- Work outside boxes may NOT be graded by AI.', pageWidth / 2 + 5, yPosition + 10);
+          pdf.text('- Keep handwriting clear and legible for scanning.', pageWidth / 2 + 5, yPosition + 14);
+          
+          pdf.setTextColor(0);
+          pdf.setDrawColor(0);
+          yPosition += 22;
 
           // Helper function to add continuation page header with QR
           const addContinuationPageHeader = async (currentPage: number) => {
@@ -822,12 +867,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               yPosition += 6;
 
               pdf.setFont('helvetica', 'normal');
-              const sanitizedQuestion = sanitizeForPDF(question.question);
-              const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
+              pdf.setFontSize(10); // Slightly smaller font for better fit
+              const sanitizedQuestion = formatPdfText(question.question);
+              // Very aggressive text width: use 60% of content width to guarantee no overflow
+              const textAreaWidth = contentWidth * 0.85;
+              const lines = pdf.splitTextToSize(sanitizedQuestion, textAreaWidth);
               lines.forEach((line: string) => {
                 pdf.text(line, margin + 5, yPosition);
-                yPosition += 5;
+                yPosition += 4.5;
               });
+              pdf.setFontSize(11); // Reset font size
 
               // Add geometry diagram if available for warm-up
               if ((question.imageUrl || question.svg) && includeGeometry) {
@@ -863,28 +912,107 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               // Add hint if available
               if (question.hint && includeHints) {
                 yPosition += 2;
-                pdf.setFontSize(9);
-                pdf.setFont('helvetica', 'italic');
-                pdf.setTextColor(120, 100, 50);
-                const sanitizedHint = sanitizeForPDF(question.hint);
-                const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, contentWidth - 10);
-                hintLines.forEach((line: string) => {
-                  pdf.text(line, margin + 5, yPosition);
-                  yPosition += 4;
-                });
+              pdf.setFontSize(8);
+              pdf.setFont('helvetica', 'italic');
+              pdf.setTextColor(120, 100, 50);
+              const sanitizedHint = formatPdfText(question.hint);
+              // Very aggressive text width for hints
+              const hintAreaWidth = contentWidth * 0.85;
+              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, hintAreaWidth);
+              hintLines.forEach((line: string) => {
+                pdf.text(line, margin + 5, yPosition);
+                yPosition += 3.5;
+              });
                 pdf.setTextColor(0);
                 pdf.setFontSize(11);
               }
 
-              // Smaller answer space for warm-up
+              // AI-Optimized Work/Answer Zone for warm-up
               yPosition += 3;
-              pdf.setDrawColor(200);
-              pdf.setLineWidth(0.2);
-              for (let i = 0; i < 2; i++) {
-                pdf.line(margin + 5, yPosition, pageWidth - margin, yPosition);
-                yPosition += 7;
+              
+              // Check if we need a new page for the zone box
+              const warmUpZoneHeight = 35; // Total height for work area + answer
+              if (yPosition > pageHeight - warmUpZoneHeight - 15) {
+                pdf.addPage();
+                pageCount++;
+                await addContinuationPageHeader(pageCount);
+                yPosition = 25;
               }
-              yPosition += 5;
+              
+              const boxMarginLeft = margin + 3;
+              const boxWidth = contentWidth - 6;
+              const warmUpWorkAreaHeight = 20;
+              const warmUpAnswerHeight = 12;
+              
+              // Main container border (dark blue)
+              pdf.setDrawColor(30, 58, 95);
+              pdf.setLineWidth(0.5);
+              pdf.rect(boxMarginLeft, yPosition, boxWidth, warmUpZoneHeight);
+              
+              // Work Area background (light gray)
+              pdf.setFillColor(248, 250, 252);
+              pdf.rect(boxMarginLeft, yPosition, boxWidth, warmUpWorkAreaHeight, 'F');
+              
+              // Work Area label
+              pdf.setFontSize(7);
+              pdf.setFont('helvetica', 'bold');
+              pdf.setTextColor(30, 58, 95);
+              pdf.text(`WORK AREA W${question.questionNumber}`, boxMarginLeft + 2, yPosition + 4);
+              
+              // Corner markers for AI zone detection
+              pdf.setDrawColor(30, 58, 95);
+              pdf.setLineWidth(0.3);
+              // Top-left
+              pdf.line(boxMarginLeft + 2, yPosition + 6, boxMarginLeft + 2, yPosition + 10);
+              pdf.line(boxMarginLeft + 2, yPosition + 6, boxMarginLeft + 6, yPosition + 6);
+              // Top-right
+              pdf.line(boxMarginLeft + boxWidth - 2, yPosition + 6, boxMarginLeft + boxWidth - 2, yPosition + 10);
+              pdf.line(boxMarginLeft + boxWidth - 6, yPosition + 6, boxMarginLeft + boxWidth - 2, yPosition + 6);
+              // Bottom-left
+              pdf.line(boxMarginLeft + 2, yPosition + warmUpWorkAreaHeight - 4, boxMarginLeft + 2, yPosition + warmUpWorkAreaHeight);
+              pdf.line(boxMarginLeft + 2, yPosition + warmUpWorkAreaHeight, boxMarginLeft + 6, yPosition + warmUpWorkAreaHeight);
+              // Bottom-right
+              pdf.line(boxMarginLeft + boxWidth - 2, yPosition + warmUpWorkAreaHeight - 4, boxMarginLeft + boxWidth - 2, yPosition + warmUpWorkAreaHeight);
+              pdf.line(boxMarginLeft + boxWidth - 6, yPosition + warmUpWorkAreaHeight, boxMarginLeft + boxWidth - 2, yPosition + warmUpWorkAreaHeight);
+              
+              // Reminder text at bottom of work area
+              pdf.setFontSize(5.5);
+              pdf.setFont('helvetica', 'italic');
+              pdf.setTextColor(120, 130, 140);
+              pdf.text('Stay inside the lines for AI grading', boxMarginLeft + boxWidth / 2, yPosition + warmUpWorkAreaHeight - 2, { align: 'center' });
+              
+              // Dashed line separator
+              pdf.setDrawColor(148, 163, 184);
+              pdf.setLineDashPattern([1, 1], 0);
+              pdf.line(boxMarginLeft, yPosition + warmUpWorkAreaHeight, boxMarginLeft + boxWidth, yPosition + warmUpWorkAreaHeight);
+              pdf.setLineDashPattern([], 0);
+              
+              // Final Answer section (amber background)
+              pdf.setFillColor(254, 243, 199);
+              pdf.rect(boxMarginLeft, yPosition + warmUpWorkAreaHeight, boxWidth, warmUpAnswerHeight, 'F');
+              
+              // Answer border top (amber accent)
+              pdf.setDrawColor(245, 158, 11);
+              pdf.setLineWidth(0.4);
+              pdf.line(boxMarginLeft, yPosition + warmUpWorkAreaHeight, boxMarginLeft + boxWidth, yPosition + warmUpWorkAreaHeight);
+              
+              // Final Answer label
+              pdf.setFontSize(7);
+              pdf.setFont('helvetica', 'bold');
+              pdf.setTextColor(146, 64, 14);
+              pdf.text('FINAL ANSWER', boxMarginLeft + 2, yPosition + warmUpWorkAreaHeight + 4);
+              
+              // Answer line
+              pdf.setDrawColor(180, 140, 80);
+              pdf.setLineWidth(0.2);
+              pdf.line(boxMarginLeft + 25, yPosition + warmUpWorkAreaHeight + 8, boxMarginLeft + boxWidth - 5, yPosition + warmUpWorkAreaHeight + 8);
+              
+              // Reset colors
+              pdf.setDrawColor(0);
+              pdf.setTextColor(0);
+              pdf.setLineWidth(0.2);
+              
+              yPosition += warmUpZoneHeight + 5;
             }
 
             // Separator before main questions
@@ -903,7 +1031,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           }
 
           // Main Questions
-          for (const question of questions) {
+          for (let questionIdx = 0; questionIdx < questions.length; questionIdx++) {
+            const question = questions[questionIdx];
             if (yPosition > pageHeight - 60) {
               pdf.addPage();
               pageCount++;
@@ -917,8 +1046,11 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             yPosition += 6;
 
             pdf.setFont('helvetica', 'normal');
-            const sanitizedQuestion = sanitizeForPDF(question.question);
-            const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth - 10);
+            pdf.setFontSize(10); // Slightly smaller font for better fit
+            const sanitizedQuestion = formatPdfText(question.question);
+            // Very aggressive text width: use 85% of content width to guarantee no overflow
+            const textAreaWidth = contentWidth * 0.85;
+            const lines = pdf.splitTextToSize(sanitizedQuestion, textAreaWidth);
             for (const line of lines) {
               if (yPosition > pageHeight - 30) {
                 pdf.addPage();
@@ -927,8 +1059,9 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 yPosition = 25; // Start below the continuation header
               }
               pdf.text(line, margin + 5, yPosition);
-              yPosition += 5;
+              yPosition += 4.5;
             }
+            pdf.setFontSize(11); // Reset font size
 
             // Add geometry diagram if available
             if ((question.imageUrl || question.svg) && includeGeometry) {
@@ -968,14 +1101,40 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               }
             }
 
-            // Add hint if available
+            // Add storyboard art if available
+            if (includeStoryboardArt) {
+              const storyboardKey = `${cacheKey}-main-${questionIdx}`;
+              const storyboardImageUrl = storyboardImages[storyboardKey];
+              if (storyboardImageUrl) {
+                try {
+                  if (yPosition > pageHeight - 65) {
+                    pdf.addPage();
+                    pageCount++;
+                    await addContinuationPageHeader(pageCount);
+                    yPosition = 25;
+                  }
+                  
+                  const imgWidth = 55;
+                  const imgHeight = 45;
+                  const imgX = (pageWidth - imgWidth) / 2; // Center the image
+                  
+                  yPosition += 3;
+                  pdf.addImage(storyboardImageUrl, 'PNG', imgX, yPosition, imgWidth, imgHeight);
+                  yPosition += imgHeight + 5;
+                } catch (storyboardError) {
+                  console.error('Error adding storyboard image to PDF:', storyboardError);
+                }
+              }
+            }
             if (question.hint && includeHints) {
               yPosition += 2;
-              pdf.setFontSize(9);
+              pdf.setFontSize(8);
               pdf.setFont('helvetica', 'italic');
               pdf.setTextColor(120, 100, 50);
-              const sanitizedHint = sanitizeForPDF(question.hint);
-              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, contentWidth - 10);
+              const sanitizedHint = formatPdfText(question.hint);
+              // Very aggressive text width for hints
+              const hintAreaWidth = contentWidth * 0.85;
+              const hintLines = pdf.splitTextToSize(`Hint: ${sanitizedHint}`, hintAreaWidth);
               for (const line of hintLines) {
                 if (yPosition > pageHeight - 25) {
                   pdf.addPage();
@@ -984,27 +1143,110 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   yPosition = 25; // Start below the continuation header
                 }
                 pdf.text(line, margin + 5, yPosition);
-                yPosition += 4;
+                yPosition += 3.5;
               }
               pdf.setTextColor(0);
               pdf.setFontSize(11);
             }
 
-            // Answer lines
+            // AI-Optimized Work/Answer Zone for main questions
             yPosition += 5;
-            pdf.setDrawColor(200);
-            pdf.setLineWidth(0.2);
-            for (let i = 0; i < 4; i++) {
-              if (yPosition > pageHeight - 20) {
-                pdf.addPage();
-                pageCount++;
-                await addContinuationPageHeader(pageCount);
-                yPosition = 25; // Start below the continuation header
-              }
-              pdf.line(margin + 5, yPosition, pageWidth - margin, yPosition);
-              yPosition += 8;
+            
+            // Zone dimensions
+            const mainZoneHeight = 55; // Total height for work area + answer
+            const mainWorkAreaHeight = 40;
+            const mainAnswerHeight = 12;
+            const boxMarginLeft = margin + 3;
+            const boxWidth = contentWidth - 6;
+            
+            // Check if we need a new page for the zone box
+            if (yPosition > pageHeight - mainZoneHeight - 15) {
+              pdf.addPage();
+              pageCount++;
+              await addContinuationPageHeader(pageCount);
+              yPosition = 25;
             }
-            yPosition += 5;
+            
+            // Main container border (dark blue)
+            pdf.setDrawColor(30, 58, 95);
+            pdf.setLineWidth(0.5);
+            pdf.rect(boxMarginLeft, yPosition, boxWidth, mainZoneHeight);
+            
+            // Work Area background (light gray)
+            pdf.setFillColor(248, 250, 252);
+            pdf.rect(boxMarginLeft, yPosition, boxWidth, mainWorkAreaHeight, 'F');
+            
+            // Work Area label
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(30, 58, 95);
+            pdf.text(`WORK AREA Q${question.questionNumber}`, boxMarginLeft + 2, yPosition + 5);
+            
+            // Corner markers for AI zone detection
+            pdf.setDrawColor(30, 58, 95);
+            pdf.setLineWidth(0.3);
+            // Top-left corner marker
+            pdf.line(boxMarginLeft + 2, yPosition + 7, boxMarginLeft + 2, yPosition + 12);
+            pdf.line(boxMarginLeft + 2, yPosition + 7, boxMarginLeft + 7, yPosition + 7);
+            // Top-right corner marker
+            pdf.line(boxMarginLeft + boxWidth - 2, yPosition + 7, boxMarginLeft + boxWidth - 2, yPosition + 12);
+            pdf.line(boxMarginLeft + boxWidth - 7, yPosition + 7, boxMarginLeft + boxWidth - 2, yPosition + 7);
+            // Bottom-left corner marker
+            pdf.line(boxMarginLeft + 2, yPosition + mainWorkAreaHeight - 5, boxMarginLeft + 2, yPosition + mainWorkAreaHeight);
+            pdf.line(boxMarginLeft + 2, yPosition + mainWorkAreaHeight, boxMarginLeft + 7, yPosition + mainWorkAreaHeight);
+            // Bottom-right corner marker
+            pdf.line(boxMarginLeft + boxWidth - 2, yPosition + mainWorkAreaHeight - 5, boxMarginLeft + boxWidth - 2, yPosition + mainWorkAreaHeight);
+            pdf.line(boxMarginLeft + boxWidth - 7, yPosition + mainWorkAreaHeight, boxMarginLeft + boxWidth - 2, yPosition + mainWorkAreaHeight);
+            
+            // Work area lines (light guidelines)
+            pdf.setDrawColor(220, 220, 220);
+            pdf.setLineWidth(0.1);
+            for (let i = 1; i <= 3; i++) {
+              const lineY = yPosition + 10 + (i * 8);
+              if (lineY < yPosition + mainWorkAreaHeight - 2) {
+                pdf.line(boxMarginLeft + 5, lineY, boxMarginLeft + boxWidth - 5, lineY);
+              }
+            }
+            
+            // Reminder text at bottom of work area
+            pdf.setFontSize(6);
+            pdf.setFont('helvetica', 'italic');
+            pdf.setTextColor(120, 130, 140);
+            pdf.text('Stay inside the lines for AI grading', boxMarginLeft + boxWidth / 2, yPosition + mainWorkAreaHeight - 3, { align: 'center' });
+            
+            // Dashed line separator between work and answer
+            pdf.setDrawColor(148, 163, 184);
+            pdf.setLineDashPattern([1.5, 1.5], 0);
+            pdf.line(boxMarginLeft, yPosition + mainWorkAreaHeight, boxMarginLeft + boxWidth, yPosition + mainWorkAreaHeight);
+            pdf.setLineDashPattern([], 0);
+            
+            // Final Answer section (amber background)
+            pdf.setFillColor(254, 243, 199);
+            pdf.rect(boxMarginLeft, yPosition + mainWorkAreaHeight, boxWidth, mainAnswerHeight, 'F');
+            
+            // Answer border top (amber accent line)
+            pdf.setDrawColor(245, 158, 11);
+            pdf.setLineWidth(0.4);
+            pdf.line(boxMarginLeft, yPosition + mainWorkAreaHeight, boxMarginLeft + boxWidth, yPosition + mainWorkAreaHeight);
+            
+            // Final Answer label
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(146, 64, 14);
+            pdf.text('FINAL ANSWER', boxMarginLeft + 2, yPosition + mainWorkAreaHeight + 5);
+            
+            // Answer line
+            pdf.setDrawColor(180, 140, 80);
+            pdf.setLineWidth(0.2);
+            pdf.line(boxMarginLeft + 30, yPosition + mainWorkAreaHeight + 8, boxMarginLeft + boxWidth - 5, yPosition + mainWorkAreaHeight + 8);
+            
+            // Reset colors and line settings
+            pdf.setDrawColor(0);
+            pdf.setTextColor(0);
+            pdf.setLineWidth(0.2);
+            pdf.setFont('helvetica', 'normal');
+            
+            yPosition += mainZoneHeight + 8;
           }
 
           // Footer with optional QR code
@@ -1102,7 +1344,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 pdf.addPage();
                 akY = margin;
               }
-              const questionText = sanitizeForPDF(q.question).substring(0, 80) + (q.question.length > 80 ? '...' : '');
+              const formattedQuestion = formatPdfText(q.question);
+              const questionText = formattedQuestion.substring(0, 80) + (formattedQuestion.length > 80 ? '...' : '');
               pdf.setFontSize(8);
               pdf.text(`W${idx + 1}. ${questionText}`, margin + 2, akY);
               akY += 4;
@@ -1123,7 +1366,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 pdf.addPage();
                 akY = margin;
               }
-              const questionText = sanitizeForPDF(q.question).substring(0, 80) + (q.question.length > 80 ? '...' : '');
+              const formattedQuestion = formatPdfText(q.question);
+              const questionText = formattedQuestion.substring(0, 80) + (formattedQuestion.length > 80 ? '...' : '');
               pdf.setFontSize(8);
               pdf.text(`${idx + 1}. ${questionText}`, margin + 2, akY);
               akY += 4;
@@ -1473,7 +1717,108 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     }
   };
 
-  // Render preview worksheet for a student
+  // Generate storyboard art for a question
+  const generateStoryboardArtForQuestion = async (
+    questionText: string,
+    questionKey: string
+  ): Promise<string | null> => {
+    try {
+      console.log(`Generating storyboard art for: ${questionKey}`);
+      setRegeneratingImageKey(questionKey);
+      
+      const { data, error } = await supabase.functions.invoke('generate-storyboard-art', {
+        body: {
+          questionText,
+          subject: storyboardSubject,
+          style: storyboardStyle,
+        },
+      });
+
+      if (error) {
+        console.error('Storyboard art generation error:', error);
+        return null;
+      }
+
+      if (data?.imageUrl) {
+        setStoryboardImages(prev => ({
+          ...prev,
+          [questionKey]: data.imageUrl,
+        }));
+        return data.imageUrl;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error generating storyboard art:', error);
+      return null;
+    } finally {
+      setRegeneratingImageKey(null);
+    }
+  };
+
+  // Regenerate storyboard art for a specific question
+  const regenerateStoryboardArt = async (questionText: string, questionKey: string) => {
+    toast({
+      title: 'Generating new image...',
+      description: 'Creating a fresh storyboard illustration.',
+    });
+    
+    const imageUrl = await generateStoryboardArtForQuestion(questionText, questionKey);
+    
+    if (imageUrl) {
+      toast({
+        title: 'Image regenerated',
+        description: 'New storyboard art has been generated.',
+      });
+    } else {
+      toast({
+        title: 'Generation failed',
+        description: 'Could not generate storyboard art. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Generate storyboard art for all questions in preview
+  const generateAllStoryboardArt = async () => {
+    if (!previewData) return;
+    
+    setIsGenerating(true);
+    setGenerationStatus('Generating storyboard illustrations...');
+    
+    const allQuestions: { key: string; text: string }[] = [];
+    
+    // Collect all questions that need storyboard art
+    Object.entries(previewData.questions).forEach(([cacheKey, questions]) => {
+      questions.warmUp?.forEach((q, idx) => {
+        allQuestions.push({ key: `${cacheKey}-warmUp-${idx}`, text: q.question });
+      });
+      questions.main?.forEach((q, idx) => {
+        allQuestions.push({ key: `${cacheKey}-main-${idx}`, text: q.question });
+      });
+    });
+    
+    let completed = 0;
+    for (const { key, text } of allQuestions) {
+      if (!storyboardImages[key]) {
+        setGenerationProgress((completed / allQuestions.length) * 100);
+        setGenerationStatus(`Generating illustration ${completed + 1} of ${allQuestions.length}...`);
+        await generateStoryboardArtForQuestion(text, key);
+      }
+      completed++;
+    }
+    
+    setIsGenerating(false);
+    setGenerationProgress(0);
+    setGenerationStatus('');
+    
+    toast({
+      title: 'Storyboard art complete',
+      description: `Generated ${completed} illustrations.`,
+    });
+  };
+
+
   const renderStudentPreview = (student: StudentWithDiagnostic, index: number) => {
     if (!previewData) return null;
 
@@ -1656,6 +2001,48 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                         )}
                       </div>
                     )}
+                    {/* Show storyboard art in preview */}
+                    {includeStoryboardArt && (
+                      <div className="mt-2">
+                        {storyboardImages[`${cacheKey}-warmUp-${idx}`] ? (
+                          <div className="relative group/img">
+                            <img 
+                              src={storyboardImages[`${cacheKey}-warmUp-${idx}`]} 
+                              alt="Storyboard illustration" 
+                              className="max-w-[200px] max-h-[150px] border rounded mx-auto"
+                            />
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="absolute top-1 right-1 h-6 opacity-0 group-hover/img:opacity-100 transition-opacity"
+                              onClick={() => regenerateStoryboardArt(q.question, `${cacheKey}-warmUp-${idx}`)}
+                              disabled={regeneratingImageKey === `${cacheKey}-warmUp-${idx}`}
+                            >
+                              {regeneratingImageKey === `${cacheKey}-warmUp-${idx}` ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-xs"
+                            onClick={() => generateStoryboardArtForQuestion(q.question, `${cacheKey}-warmUp-${idx}`)}
+                            disabled={regeneratingImageKey === `${cacheKey}-warmUp-${idx}`}
+                          >
+                            {regeneratingImageKey === `${cacheKey}-warmUp-${idx}` ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              <Palette className="h-3 w-3 mr-1" />
+                            )}
+                            Generate Illustration
+                          </Button>
+                        )}
+                      </div>
+                    )}
                     {q.hint && includeHints && (
                       <p className="text-xs text-muted-foreground mt-1 italic">Hint: {q.hint}</p>
                     )}
@@ -1716,6 +2103,48 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                             alt="Geometry diagram" 
                             className="max-w-[180px] max-h-[180px] border rounded"
                           />
+                        )}
+                      </div>
+                    )}
+                    {/* Show storyboard art in preview */}
+                    {includeStoryboardArt && (
+                      <div className="mt-2">
+                        {storyboardImages[`${cacheKey}-main-${idx}`] ? (
+                          <div className="relative group/img flex justify-center">
+                            <img 
+                              src={storyboardImages[`${cacheKey}-main-${idx}`]} 
+                              alt="Storyboard illustration" 
+                              className="max-w-[220px] max-h-[180px] border rounded"
+                            />
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="absolute top-1 right-1 h-6 opacity-0 group-hover/img:opacity-100 transition-opacity"
+                              onClick={() => regenerateStoryboardArt(q.question, `${cacheKey}-main-${idx}`)}
+                              disabled={regeneratingImageKey === `${cacheKey}-main-${idx}`}
+                            >
+                              {regeneratingImageKey === `${cacheKey}-main-${idx}` ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-xs"
+                            onClick={() => generateStoryboardArtForQuestion(q.question, `${cacheKey}-main-${idx}`)}
+                            disabled={regeneratingImageKey === `${cacheKey}-main-${idx}`}
+                          >
+                            {regeneratingImageKey === `${cacheKey}-main-${idx}` ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              <Palette className="h-3 w-3 mr-1" />
+                            )}
+                            Generate Illustration
+                          </Button>
                         )}
                       </div>
                     )}
@@ -2157,7 +2586,86 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             </div>
           )}
 
-          {/* Adaptive Difficulty Option */}
+          {/* Storyboard Art for Non-Math Subjects */}
+          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-pink-100 rounded-lg">
+                <Palette className="h-5 w-5 text-pink-600" />
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="includeStoryboardArt" className="text-sm font-medium text-pink-900 cursor-pointer flex items-center gap-2">
+                  Storyboard Art Generator
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <ImageIcon className="h-3.5 w-3.5 text-pink-500" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-sm">
+                          Generate high-quality storyboard-style illustrations for subjects like English, History, Biology, and more.
+                          Perfect for making worksheets more engaging and visual.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </Label>
+                <p className="text-xs text-pink-700 mt-0.5">
+                  AI-generated illustrations for English, History, Biology & more
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="includeStoryboardArt"
+              checked={includeStoryboardArt}
+              onCheckedChange={setIncludeStoryboardArt}
+            />
+          </div>
+
+          {includeStoryboardArt && (
+            <div className="ml-6 space-y-3 p-3 bg-rose-50 border border-rose-200 rounded-lg">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-rose-800 flex items-center gap-1">
+                    <BookOpen className="h-3 w-3" />
+                    Subject
+                  </Label>
+                  <Select value={storyboardSubject} onValueChange={(v) => setStoryboardSubject(v as typeof storyboardSubject)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="english">English / Literature</SelectItem>
+                      <SelectItem value="history">History / Social Studies</SelectItem>
+                      <SelectItem value="biology">Biology / Life Science</SelectItem>
+                      <SelectItem value="science">General Science</SelectItem>
+                      <SelectItem value="social-studies">Social Studies</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-rose-800 flex items-center gap-1">
+                    <Palette className="h-3 w-3" />
+                    Art Style
+                  </Label>
+                  <Select value={storyboardStyle} onValueChange={(v) => setStoryboardStyle(v as typeof storyboardStyle)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="storyboard">Storyboard Panel</SelectItem>
+                      <SelectItem value="illustration">Classic Illustration</SelectItem>
+                      <SelectItem value="diagram">Educational Diagram</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <p className="text-xs text-rose-600">
+                💡 Tip: You can regenerate individual images after preview if needed
+              </p>
+            </div>
+          )}
+
+
           <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-100 rounded-lg">
@@ -2239,6 +2747,25 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               onCheckedChange={setIncludeStudentQR}
             />
           </div>
+          
+          {/* Page Margin Size */}
+          <div className="space-y-2">
+            <Label className="text-sm flex items-center gap-1">
+              <FileText className="h-3.5 w-3.5" />
+              Page Margins
+            </Label>
+            <Select value={marginSize} onValueChange={(v) => setMarginSize(v as 'small' | 'medium' | 'large')}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="small">Small (12mm) - More content space</SelectItem>
+                <SelectItem value="medium">Medium (20mm) - Balanced</SelectItem>
+                <SelectItem value="large">Large (25mm) - More white space</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <QuestionPreviewPanel
             selectedTopics={selectedTopics}
             customTopics={customTopics}
@@ -2253,7 +2780,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
           <Separator />
 
-          {/* Students with Diagnostic Results */}
+          {/* Students Selection */}
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -2261,14 +2788,59 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           ) : selectedClassId ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Students with Diagnostic Data</Label>
+                <Label>
+                  {diagnosticMode ? 'Select Students for Diagnostic' : 'Students with Diagnostic Data'}
+                </Label>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={selectAll}>Select All</Button>
                   <Button variant="ghost" size="sm" onClick={deselectAll}>Deselect All</Button>
                 </div>
               </div>
 
-              {studentsWithDiagnostics.length === 0 ? (
+              {/* Filter option for diagnostic mode */}
+              {diagnosticMode && students.length > 0 && (
+                <div className="flex items-center justify-between p-3 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-100 rounded-lg">
+                      <Users className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <div className="flex-1">
+                      <Label htmlFor="onlyWithoutDiagnostic" className="text-sm font-medium text-amber-900 cursor-pointer">
+                        Only Students Without Diagnostic Record
+                      </Label>
+                      <p className="text-xs text-amber-700 mt-0.5">
+                        Print worksheets only for students who haven't been diagnosed on selected topics
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="onlyWithoutDiagnostic"
+                    checked={onlyWithoutDiagnostic}
+                    onCheckedChange={(checked) => {
+                      setOnlyWithoutDiagnostic(checked);
+                      if (checked) {
+                        selectOnlyWithoutDiagnostic();
+                      } else {
+                        // When turning off filter in diagnostic mode, select all students
+                        setStudents(prev => prev.map(s => ({ ...s, selected: true })));
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Show count of students without diagnostic data */}
+              {diagnosticMode && onlyWithoutDiagnostic && (
+                <div className="p-2 bg-amber-50 border border-amber-200 rounded-md">
+                  <p className="text-sm text-amber-800">
+                    <span className="font-medium">
+                      {students.filter(s => !s.diagnosticResult && !s.hasAdaptiveData).length}
+                    </span> student(s) without diagnostic data on selected topic(s)
+                  </p>
+                </div>
+              )}
+
+              {studentsWithDiagnostics.length === 0 && !diagnosticMode ? (
                 <Card className="border-dashed">
                   <CardContent className="flex flex-col items-center justify-center py-8 text-center">
                     <AlertCircle className="h-10 w-10 text-muted-foreground/50 mb-3" />
@@ -2289,18 +2861,23 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                       const adaptiveInfo = adaptiveStudents.find(s => s.studentId === student.id);
                       const isAdaptiveAdjusted = useAdaptiveDifficulty && student.hasAdaptiveData && adaptiveInfo;
                       
+                      // In diagnostic mode, allow selecting students without data (they get Level C default)
+                      const canSelect = diagnosticMode || hasData;
+                      // When filter is on, dim students who have data
+                      const isDimmed = diagnosticMode && onlyWithoutDiagnostic && hasData;
+                      
                       return (
                         <div
                           key={student.id}
                           className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
                             student.selected ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted/50'
-                          } ${!hasData ? 'opacity-50' : ''}`}
+                          } ${!canSelect || isDimmed ? 'opacity-50' : ''}`}
                         >
                           <div className="flex items-center gap-3">
                             <Checkbox
                               checked={student.selected}
                               onCheckedChange={() => toggleStudent(student.id)}
-                              disabled={!hasData}
+                              disabled={!canSelect || isDimmed}
                             />
                             <div>
                               <p className="font-medium text-sm flex items-center gap-1.5">
@@ -2335,12 +2912,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                             </div>
                           </div>
                           
-                          {hasData && (
+                          {hasData ? (
                             <Badge 
                               variant="outline" 
                               className={`${getLevelColor(student.recommendedLevel)} ${isAdaptiveAdjusted ? 'ring-1 ring-purple-400' : ''}`}
                             >
                               Level {student.recommendedLevel}
+                            </Badge>
+                          ) : diagnosticMode && (
+                            <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-300">
+                              New (Level C)
                             </Badge>
                           )}
                         </div>
@@ -2499,6 +3080,28 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                   <ZoomIn className="h-4 w-4" />
                 </Button>
                 <Separator orientation="vertical" className="h-6" />
+                
+                {/* Generate All Storyboard Art button */}
+                {includeStoryboardArt && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={generateAllStoryboardArt}
+                      disabled={isGenerating}
+                      className="bg-pink-50 border-pink-200 text-pink-700 hover:bg-pink-100"
+                    >
+                      {isGenerating && regeneratingImageKey ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Palette className="h-4 w-4 mr-1" />
+                      )}
+                      Generate All Art
+                    </Button>
+                    <Separator orientation="vertical" className="h-6" />
+                  </>
+                )}
+                
                 <Button
                   variant="outline"
                   size="sm"

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy, Brain } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy, Brain, AlertTriangle, GraduationCap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { NYS_SUBJECTS, searchTopics, type JMAPTopic, type TopicCategory } from '@/data/nysTopics';
 import { WorksheetBuilder, type WorksheetQuestion } from '@/components/questions/WorksheetBuilder';
 import { DifferentiatedWorksheetGenerator } from '@/components/questions/DifferentiatedWorksheetGenerator';
@@ -18,6 +19,10 @@ import { LessonPlanGenerator } from '@/components/questions/LessonPlanGenerator'
 import { LessonPlanLibrary } from '@/components/questions/LessonPlanLibrary';
 import { LessonTopicSelector, type PresentationTheme } from '@/components/questions/LessonTopicSelector';
 import { MasteryChallengeGenerator } from '@/components/questions/MasteryChallengeGenerator';
+import { TrainingFormGenerator } from '@/components/scan/TrainingFormGenerator';
+import { TeacherAnswerSampleUploader } from '@/components/scan/TeacherAnswerSampleUploader';
+import { TeacherAnswerSampleList } from '@/components/scan/TeacherAnswerSampleList';
+import { DiagnosticGapsDialog } from '@/components/reports/DiagnosticGapsSummary';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Questions() {
@@ -37,6 +42,8 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
   const [selectedTheme, setSelectedTheme] = useState<PresentationTheme | null>(null);
   const [showMasteryChallenge, setShowMasteryChallenge] = useState(false);
   const [showAdaptiveGenerator, setShowAdaptiveGenerator] = useState(false);
+  const [showTrainAI, setShowTrainAI] = useState(false);
+  const [sampleRefresh, setSampleRefresh] = useState(0);
 
   // Get selected topics as array for passing to generator
   const getSelectedTopicsArray = () => {
@@ -455,6 +462,15 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                 <Trophy className="h-4 w-4 mr-2" />
                 Mastery Challenge
               </Button>
+              <Button 
+                onClick={() => setShowTrainAI(true)}
+                variant="outline"
+                className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              >
+                <GraduationCap className="h-4 w-4 mr-2" />
+                AI Training
+              </Button>
+              <DiagnosticGapsDialog />
             </TooltipProvider>
           </div>
         </div>
@@ -744,6 +760,37 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
         open={showAdaptiveGenerator}
         onOpenChange={setShowAdaptiveGenerator}
       />
+
+      {/* AI Training Dialog */}
+      <Dialog open={showTrainAI} onOpenChange={setShowTrainAI}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GraduationCap className="h-5 w-5" />
+              AI Training
+            </DialogTitle>
+            <DialogDescription>
+              Train the AI to grade like you by uploading your solutions or generating practice forms
+            </DialogDescription>
+          </DialogHeader>
+          <Tabs defaultValue="upload" className="mt-4">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="upload">Upload Solutions</TabsTrigger>
+              <TabsTrigger value="generate">Generate Forms</TabsTrigger>
+              <TabsTrigger value="samples">My Samples</TabsTrigger>
+            </TabsList>
+            <TabsContent value="upload" className="mt-4">
+              <TeacherAnswerSampleUploader onSampleSaved={() => setSampleRefresh(prev => prev + 1)} />
+            </TabsContent>
+            <TabsContent value="generate" className="mt-4">
+              <TrainingFormGenerator onFormGenerated={() => {}} />
+            </TabsContent>
+            <TabsContent value="samples" className="mt-4">
+              <TeacherAnswerSampleList refreshTrigger={sampleRefresh} />
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
