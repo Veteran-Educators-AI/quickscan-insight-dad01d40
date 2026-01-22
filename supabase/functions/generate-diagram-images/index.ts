@@ -20,49 +20,72 @@ async function generateImageWithNanoBanana(prompt: string): Promise<string | nul
   }
 
   try {
-    const enhancedPrompt = `You are creating a textbook-quality educational mathematical diagram for a printable worksheet.
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // MASTER GEOMETRY TEMPLATE - Ultra-explicit analytical prompting for AI diagrams
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const enhancedPrompt = `You are creating a textbook-quality educational mathematical diagram.
 
-DIAGRAM DESCRIPTION:
+═══════════════════════════════════════════════════════════════════════════════
+[DIAGRAM REQUEST]
+═══════════════════════════════════════════════════════════════════════════════
 ${prompt}
 
-MANDATORY REQUIREMENTS FOR ALL DIAGRAMS:
+═══════════════════════════════════════════════════════════════════════════════
+MASTER GEOMETRY TEMPLATE - FOLLOW THIS STRUCTURE EXACTLY
+═══════════════════════════════════════════════════════════════════════════════
 
-1. COORDINATE PLANES (if applicable):
-   - Draw a clear Cartesian coordinate plane with a visible grid
-   - Label the x-axis and y-axis with arrows at the ends
-   - Number the axes at regular intervals (e.g., -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5)
-   - Use thin gray lines for the grid, bold black lines for the axes
-   - Plot ALL points with solid black dots (radius 4-5 pixels)
-   - Label each point clearly with its coordinates, e.g., "Point A (2, 5)" or "Endpoint 1 (2, 5)"
-   - Draw any lines, segments, or curves connecting points with clear solid black lines
-   - If multiple points exist, label them distinctly (e.g., "Endpoint 1", "Endpoint 2" or "A", "B")
+[STYLE HEADER]
+"A clean, black-and-white educational diagram on a plain white background, styled like a figure in a geometry textbook. All lines are thin black lines. All text is clear, dark, sans-serif academic font. No shading, no colors, no gradients."
 
-2. GEOMETRIC SHAPES:
-   - Draw shapes with bold, clean black outlines (2-3px stroke width)
-   - Label ALL vertices with capital letters (A, B, C, D, etc.)
-   - Show ALL measurements (side lengths, angles, radii) with clear labels
-   - Use tick marks to indicate equal sides
-   - Use arc symbols to indicate angles with degree measurements
-   - For right angles, use the small square symbol
-   - Show dashed lines for hidden edges, altitudes, or construction lines
+[ORIENTATION DEFINITION] (CRITICAL: Define the shape's physical orientation first)
+"The shape is oriented such that [describe EXACT physical orientation]:
+- For triangles: 'The base is horizontal along the bottom. The apex is at the top. The left vertex is at the bottom-left corner.'
+- For rectangles/squares: 'The long side is horizontal. The shape sits flat on its bottom edge.'
+- For circles: 'The center is at the middle of the image. The radius extends to the right.'
+- For coordinate planes: 'The origin is at the center. The positive x-axis extends right. The positive y-axis extends up.'"
 
-3. LABELS AND ANNOTATIONS:
-   - Use clear, readable sans-serif font (12-14pt equivalent)
-   - Position labels outside shapes where possible, with leader lines if needed
-   - Include units of measurement (cm, m, degrees, etc.)
-   - For equations on graphs, write the equation near the line/curve
+[KEY FEATURES & SYMBOLS]
+"Include these EXACT markings:
+- Right-angle symbols: Small square (⊿) placed IN the corner where the right angle is located
+- Tick marks: Single tick marks (|) on sides that are equal in length
+- Parallel arrows: Small arrows (>>) on lines that are parallel
+- Arc symbols: Curved arcs drawn INSIDE the angle to indicate angle measurements
+- Dashed lines: Use dashed lines (- - -) for altitudes, hidden edges, or construction lines"
 
-4. STYLE REQUIREMENTS:
-   - Black and white only (suitable for printing)
-   - High contrast for readability
-   - Professional textbook illustration quality
-   - Clean, uncluttered composition with appropriate whitespace
-   - Center the main diagram in the frame
+[VERTEX & POINT LABELING]
+"Label ALL vertices and points as follows:
+- Each vertex gets a CAPITAL LETTER (A, B, C, D, etc.)
+- Position: Place the label OUTSIDE the shape, near the vertex
+- Font: Dark, clear, sans-serif, slightly larger than measurements
+- For coordinate points: Label as 'A (x, y)' with the coordinates in parentheses"
 
-5. SPECIFIC ELEMENT EXAMPLES:
-   - For a line segment from (2, 5) to (8, 3): "A straight line segment connects these two points. Point labels are clearly visible."
-   - For a triangle: "Triangle ABC with vertex labels, side length labels (e.g., AB = 5cm), and angle measurements (e.g., ∠A = 60°)"
-   - For a circle: "Circle with center point O marked, radius line drawn and labeled (r = 4), diameter shown if relevant"`;
+[ANGLE LABELING]
+"Label angles as follows:
+- Location: Specify the EXACT vertex (e.g., 'the angle at the top-right corner')
+- Symbol: Draw a small arc INSIDE the angle
+- Label: Write the degree measurement (e.g., '60°') or variable (e.g., 'θ') near the arc
+- Greek letters: Use θ (theta), α (alpha), β (beta) when variables are needed"
+
+[SIDE/SEGMENT LABELING] (Use PHYSICAL LOCATIONS, not mathematical terms)
+"Label the sides/lengths as follows:
+- The [vertical side on the left] is labeled '[value] cm' or '[variable]'
+- The [horizontal side on the bottom] is labeled '[value] cm' or '[variable]'  
+- The [diagonal side connecting top-left to bottom-right] is labeled '[value] cm' or '[variable]'
+- Position: Place labels OUTSIDE the shape, parallel to the side
+- Include UNITS: Always write 'cm', 'm', or 'units' after numbers"
+
+[COORDINATE PLANE REQUIREMENTS] (If applicable)
+"For coordinate planes:
+- Draw x-axis and y-axis with ARROWS at both ends
+- Label 'x' at the right end of x-axis, 'y' at the top of y-axis
+- Mark tick marks at EVERY integer from -10 to 10 (or appropriate range)
+- Write numbers below x-axis ticks and left of y-axis ticks
+- Draw a light gray GRID behind the axes
+- Plot points as SOLID BLACK DOTS (radius 4-5 pixels)
+- Label each point with 'P(x, y)' format directly next to the dot"
+
+[FINAL POLISH]
+"All lines are thin black lines (1-2px stroke). All text is clear, dark, sans-serif academic font. No shading, no colors, no gradients. The diagram is centered with appropriate whitespace. Professional textbook illustration quality."`;
 
     console.log('Generating image with Nano Banana...');
     
