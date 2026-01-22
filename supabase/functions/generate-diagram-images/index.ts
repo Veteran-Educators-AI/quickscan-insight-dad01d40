@@ -113,57 +113,107 @@ async function generateImageWithNanoBanana(prompt: string, attemptNumber = 1): P
 
   try {
     // ═══════════════════════════════════════════════════════════════════════════════
-    // MASTER GEOMETRY TEMPLATE v3 - LAYERED RENDERING APPROACH
+    // MASTER GEOMETRY TEMPLATE v4 - ULTRA-PRESCRIPTIVE COORDINATE PLANE APPROACH
     // ═══════════════════════════════════════════════════════════════════════════════
-    const enhancedPrompt = `Create a simple, clean mathematical diagram using LAYERED RENDERING.
+    
+    // Parse coordinates from the prompt to provide explicit placement instructions
+    const coordinateMatches = prompt.match(/\((\d+),\s*(\d+)\)/g) || [];
+    const coordinates = coordinateMatches.map(match => {
+      const nums = match.match(/(\d+)/g);
+      return nums ? { x: parseInt(nums[0]), y: parseInt(nums[1]) } : null;
+    }).filter(Boolean);
+    
+    // Determine the coordinate range needed
+    const maxX = Math.max(10, ...coordinates.map(c => c!.x + 1));
+    const maxY = Math.max(10, ...coordinates.map(c => c!.y + 1));
+    
+    const enhancedPrompt = `You are creating a PRECISE mathematical coordinate plane diagram. Follow these instructions EXACTLY.
 
-═══════════════════════════════════════════════════════════════════════════════
-STEP 1: DRAW THE COORDINATE PLANE FIRST (BASE LAYER)
-═══════════════════════════════════════════════════════════════════════════════
-Before drawing ANY shape, create a complete coordinate plane:
-1. White background
-2. Draw X-AXIS: horizontal black line with arrow pointing RIGHT, label "x" at arrow
-3. Draw Y-AXIS: vertical black line with arrow pointing UP, label "y" at arrow  
-4. Add tick marks at integers: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
-5. X-axis numbers go BELOW the axis, evenly spaced LEFT to RIGHT
-6. Y-axis numbers go to the LEFT of the axis, evenly spaced BOTTOM to TOP
-7. Origin is labeled "0" only ONCE (at the corner where axes meet)
-8. Optional: light gray grid lines
+════════════════════════════════════════════════════════════════════════════════
+PHASE 1: DRAW THE COORDINATE PLANE (this MUST be done FIRST and CORRECTLY)
+════════════════════════════════════════════════════════════════════════════════
 
-THE COORDINATE PLANE MUST BE COMPLETE AND CORRECT BEFORE STEP 2.
+Create a standard Cartesian coordinate plane with these EXACT specifications:
 
-═══════════════════════════════════════════════════════════════════════════════
-STEP 2: DRAW THE SHAPE ON TOP (OVERLAY LAYER)
-═══════════════════════════════════════════════════════════════════════════════
-After the coordinate plane is complete:
-1. Plot each vertex as a SMALL SOLID BLACK DOT at the correct coordinates
-2. Connect vertices with THIN BLACK LINES to form the shape
-3. Label each vertex ONCE with letter and coordinates: A(1, 4)
-4. Place labels OUTSIDE the shape, near the dot
+BACKGROUND: Pure white, clean
 
-═══════════════════════════════════════════════════════════════════════════════
-WHAT TO DRAW ON THIS COORDINATE PLANE:
-═══════════════════════════════════════════════════════════════════════════════
+X-AXIS (HORIZONTAL):
+- Draw a horizontal black line from left edge to right edge
+- Place an arrowhead at the RIGHT end pointing right
+- Write lowercase "x" next to the arrowhead
+- Add ${maxX} evenly-spaced tick marks along this axis
+- BELOW each tick mark, write the numbers in this EXACT sequence from left to right:
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9${maxX > 10 ? `, 10, ...${maxX}` : ', 10'}
+- The "0" is at the LEFT where the axes meet (the origin)
+- Numbers INCREASE as you go RIGHT
+
+Y-AXIS (VERTICAL):
+- Draw a vertical black line from bottom edge to top edge
+- Place an arrowhead at the TOP end pointing up
+- Write lowercase "y" next to the arrowhead
+- Add ${maxY} evenly-spaced tick marks along this axis
+- To the LEFT of each tick mark, write the numbers in this EXACT sequence from bottom to top:
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9${maxY > 10 ? `, 10, ...${maxY}` : ', 10'}
+- The "0" is at the BOTTOM where the axes meet (shared with x-axis origin)
+- Numbers INCREASE as you go UP
+
+CRITICAL AXIS RULE:
+- The ORIGIN (0,0) is at the BOTTOM-LEFT corner where both axes meet
+- Numbers get LARGER going RIGHT on X-axis
+- Numbers get LARGER going UP on Y-axis
+- This is the STANDARD mathematical convention
+
+OPTIONAL: Light gray grid lines connecting tick marks (like graph paper)
+
+════════════════════════════════════════════════════════════════════════════════
+PHASE 2: PLOT THE SHAPE (only AFTER the coordinate plane is complete)
+════════════════════════════════════════════════════════════════════════════════
+
 ${prompt}
 
-═══════════════════════════════════════════════════════════════════════════════
-ABSOLUTE RULES - DO NOT BREAK THESE
-═══════════════════════════════════════════════════════════════════════════════
-- Y-axis numbers: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 going UP (not scattered)
-- X-axis numbers: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 going RIGHT (not scattered)
-- All text is HORIZONTAL (no rotated or diagonal text)
-- NO "units" labels on the shape sides unless explicitly requested
-- NO duplicate labels
-- NO colors or shading (black and white only)
-- Labels are positioned OUTSIDE shapes, not inside
+FOR EACH VERTEX COORDINATE (x, y):
+- Find x on the horizontal axis (count from 0 at left)
+- Find y on the vertical axis (count from 0 at bottom)
+- Place a SMALL SOLID BLACK DOT where the vertical line from x meets the horizontal line from y
+- Write the label (like "A(1, 4)") NEAR the dot but OUTSIDE the shape
 
-═══════════════════════════════════════════════════════════════════════════════
-FINAL VERIFICATION
-═══════════════════════════════════════════════════════════════════════════════
-✓ Coordinate plane is drawn FIRST with correct axis numbering
-✓ Shape is drawn ON TOP of the coordinate plane
-✓ Each vertex has exactly ONE label
-✓ All text is horizontal and readable`;
+CONNECTING VERTICES:
+- Draw straight black lines between adjacent vertices to form the shape
+- Lines should be thin and clean
+
+════════════════════════════════════════════════════════════════════════════════
+EXPLICIT COORDINATE POSITIONS FROM THIS PROBLEM:
+════════════════════════════════════════════════════════════════════════════════
+${coordinates.length > 0 ? coordinates.map((c, i) => {
+  const labels = prompt.match(/[A-Z]\s*\(\d+,\s*\d+\)/g) || [];
+  const label = labels[i] || `Point ${i + 1}`;
+  return `• ${label}: Go ${c!.x} units RIGHT from origin on x-axis, then ${c!.y} units UP on y-axis`;
+}).join('\n') : 'Plot points at the exact coordinates specified in the problem.'}
+
+════════════════════════════════════════════════════════════════════════════════
+ABSOLUTE REQUIREMENTS - VIOLATION = FAILURE
+════════════════════════════════════════════════════════════════════════════════
+✗ DO NOT put random/scattered numbers on axes - they MUST be sequential (0,1,2,3...)
+✗ DO NOT repeat axis numbers (no two "10"s, no two "4"s, etc.)
+✗ DO NOT put numbers in wrong order (like 10,3,7,4 - WRONG!)
+✗ DO NOT rotate text - ALL text must be horizontal and readable
+✗ DO NOT label the same vertex twice
+✗ DO NOT use colors - black lines on white background ONLY
+✗ DO NOT write "units" on shape edges unless specifically asked
+
+✓ Y-axis: 0 at BOTTOM, numbers INCREASE going UP (0,1,2,3,4,5,6,7,8,9,10)
+✓ X-axis: 0 at LEFT, numbers INCREASE going RIGHT (0,1,2,3,4,5,6,7,8,9,10)
+✓ Origin (0,0) is at BOTTOM-LEFT corner
+✓ Each vertex has exactly ONE label positioned outside the shape
+✓ All text is horizontal
+
+════════════════════════════════════════════════════════════════════════════════
+QUALITY CHECK BEFORE FINISHING
+════════════════════════════════════════════════════════════════════════════════
+□ X-axis numbers read "0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10" left to right? 
+□ Y-axis numbers read "0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10" bottom to top?
+□ Each point is plotted at the correct grid intersection?
+□ All labels are horizontal and near (but outside) the shape?`;
 
     console.log('Generating image with Nano Banana...');
     
