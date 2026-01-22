@@ -2587,29 +2587,31 @@ QUALITY CHECK BEFORE FINISHING
                     </div>
                     {/* Show geometry shapes in preview - from question or generated */}
                     {((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-warmUp-${idx}`] ? (
-                      <div className="mt-2 flex justify-center relative group/shape">
-                        {geometryShapes[`${cacheKey}-warmUp-${idx}`] ? (
-                          <img 
-                            src={geometryShapes[`${cacheKey}-warmUp-${idx}`]} 
-                            alt="Geometry diagram" 
-                            className="max-w-[150px] max-h-[150px] border rounded"
-                          />
-                        ) : q.svg && !q.imageUrl ? (
-                          <div 
-                            className="max-w-[150px] max-h-[150px] border rounded overflow-hidden"
-                            dangerouslySetInnerHTML={{ __html: q.svg }}
-                          />
-                        ) : (
-                          <img 
-                            src={q.imageUrl || svgToDataUri(q.svg || '')} 
-                            alt="Geometry diagram" 
-                            className="max-w-[150px] max-h-[150px] border rounded"
-                          />
-                        )}
+                      <div className="mt-2 flex flex-col items-center gap-2">
+                        <div className="relative">
+                          {geometryShapes[`${cacheKey}-warmUp-${idx}`] ? (
+                            <img 
+                              src={geometryShapes[`${cacheKey}-warmUp-${idx}`]} 
+                              alt="Geometry diagram" 
+                              className="max-w-[150px] max-h-[150px] border rounded"
+                            />
+                          ) : q.svg && !q.imageUrl ? (
+                            <div 
+                              className="max-w-[150px] max-h-[150px] border rounded overflow-hidden"
+                              dangerouslySetInnerHTML={{ __html: q.svg }}
+                            />
+                          ) : (
+                            <img 
+                              src={q.imageUrl || svgToDataUri(q.svg || '')} 
+                              alt="Geometry diagram" 
+                              className="max-w-[150px] max-h-[150px] border rounded"
+                            />
+                          )}
+                        </div>
                         <Button
-                          variant="secondary"
+                          variant="outline"
                           size="sm"
-                          className="absolute top-1 right-1 h-6 opacity-0 group-hover/shape:opacity-100 transition-opacity"
+                          className="text-xs gap-1 bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
                           onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-warmUp-${idx}`)}
                           disabled={regeneratingShapeKey === `${cacheKey}-warmUp-${idx}`}
                         >
@@ -2618,6 +2620,7 @@ QUALITY CHECK BEFORE FINISHING
                           ) : (
                             <RefreshCw className="h-3 w-3" />
                           )}
+                          Regenerate Diagram
                         </Button>
                       </div>
                     ) : includeGeometry && (
@@ -2726,29 +2729,31 @@ QUALITY CHECK BEFORE FINISHING
                     </div>
                     {/* Show geometry shapes in preview - from question or generated */}
                     {((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-main-${idx}`] ? (
-                      <div className="mt-2 flex justify-center relative group/shape">
-                        {geometryShapes[`${cacheKey}-main-${idx}`] ? (
-                          <img 
-                            src={geometryShapes[`${cacheKey}-main-${idx}`]} 
-                            alt="Geometry diagram" 
-                            className="max-w-[180px] max-h-[180px] border rounded"
-                          />
-                        ) : q.svg && !q.imageUrl ? (
-                          <div 
-                            className="max-w-[180px] max-h-[180px] border rounded overflow-hidden"
-                            dangerouslySetInnerHTML={{ __html: q.svg }}
-                          />
-                        ) : (
-                          <img 
-                            src={q.imageUrl || svgToDataUri(q.svg || '')} 
-                            alt="Geometry diagram" 
-                            className="max-w-[180px] max-h-[180px] border rounded"
-                          />
-                        )}
+                      <div className="mt-2 flex flex-col items-center gap-2">
+                        <div className="relative">
+                          {geometryShapes[`${cacheKey}-main-${idx}`] ? (
+                            <img 
+                              src={geometryShapes[`${cacheKey}-main-${idx}`]} 
+                              alt="Geometry diagram" 
+                              className="max-w-[180px] max-h-[180px] border rounded"
+                            />
+                          ) : q.svg && !q.imageUrl ? (
+                            <div 
+                              className="max-w-[180px] max-h-[180px] border rounded overflow-hidden"
+                              dangerouslySetInnerHTML={{ __html: q.svg }}
+                            />
+                          ) : (
+                            <img 
+                              src={q.imageUrl || svgToDataUri(q.svg || '')} 
+                              alt="Geometry diagram" 
+                              className="max-w-[180px] max-h-[180px] border rounded"
+                            />
+                          )}
+                        </div>
                         <Button
-                          variant="secondary"
+                          variant="outline"
                           size="sm"
-                          className="absolute top-1 right-1 h-6 opacity-0 group-hover/shape:opacity-100 transition-opacity"
+                          className="text-xs gap-1 bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
                           onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-main-${idx}`)}
                           disabled={regeneratingShapeKey === `${cacheKey}-main-${idx}`}
                         >
@@ -2757,6 +2762,7 @@ QUALITY CHECK BEFORE FINISHING
                           ) : (
                             <RefreshCw className="h-3 w-3" />
                           )}
+                          Regenerate Diagram
                         </Button>
                       </div>
                     ) : null}
