@@ -422,27 +422,42 @@ function parseCircleInfo(prompt: string): { center: { x: number; y: number } | n
 
 // Generate deterministic SVG for all shape types on coordinate plane (guaranteed correct axis labels)
 function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null {
+  // CRITICAL: Skip deterministic generation if prompt contains algebraic/variable coordinates
+  // Variables like a, b, c, x, y, etc. indicate this is a proof problem, not a graphing problem
+  const hasAlgebraicCoords = /\([a-z][\s,]|,\s*[a-z]\)|[a-z]\s*\+|[a-z]\s*-|[+-]\s*[a-z]|₂|²/i.test(prompt);
+  if (hasAlgebraicCoords) {
+    console.log('Detected algebraic/variable coordinates - skipping deterministic SVG generation');
+    return null;
+  }
+  
   // IMPROVED: Parse ONLY explicitly labeled vertex coordinates (A(x,y), B(x,y), etc.)
   // This prevents picking up stray numbers from the prompt text
   const labeledVertexMatches = prompt.match(/([A-Z])\s*\((\d+),\s*(\d+)\)/g) || [];
   
-  const labeledVertices: { label: string; x: number; y: number }[] = [];
+  // Use a Map to deduplicate labels - only keep the first occurrence of each label
+  const labeledVerticesMap = new Map<string, { label: string; x: number; y: number }>();
   for (const match of labeledVertexMatches) {
     const parsed = match.match(/([A-Z])\s*\((\d+),\s*(\d+)\)/);
     if (parsed) {
-      labeledVertices.push({
-        label: parsed[1],
-        x: parseInt(parsed[2]),
-        y: parseInt(parsed[3])
-      });
+      const label = parsed[1];
+      // Only add if we haven't seen this label before
+      if (!labeledVerticesMap.has(label)) {
+        labeledVerticesMap.set(label, {
+          label: label,
+          x: parseInt(parsed[2]),
+          y: parseInt(parsed[3])
+        });
+      }
     }
   }
+  
+  const labeledVertices = Array.from(labeledVerticesMap.values());
   
   // Extract coordinates and labels arrays from labeled vertices
   const coordinates = labeledVertices.map(v => ({ x: v.x, y: v.y }));
   const labels = labeledVertices.map(v => v.label);
   
-  console.log(`Parsed ${labeledVertices.length} labeled vertices:`, labeledVertices.map(v => `${v.label}(${v.x}, ${v.y})`).join(', '));
+  console.log(`Parsed ${labeledVertices.length} unique labeled vertices:`, labeledVertices.map(v => `${v.label}(${v.x}, ${v.y})`).join(', '));
 
   // Detect shape type
   const shapeInfo = detectShapeType(prompt);
