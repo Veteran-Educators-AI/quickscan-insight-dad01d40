@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil, QrCode, BookOpen, ExternalLink, FileText, Database } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil, QrCode, BookOpen, ExternalLink, FileText, Database, MinusCircle } from 'lucide-react';
 import { useStudentDataCoverage } from '@/hooks/useStudentDataCoverage';
 import { StudentOnlyQRCode } from '@/components/print/StudentOnlyQRCode';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import { useStudentNames } from '@/lib/StudentNameContext';
 import { getStudentPseudonym, getAvailablePseudonyms, setCustomPseudonym } from '@/lib/studentPseudonyms';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Gradebook } from '@/components/reports/Gradebook';
+import { BehaviorPointDeductionDialog } from '@/components/behavior/BehaviorPointDeductionDialog';
 
 interface Student {
   id: string;
@@ -53,6 +54,7 @@ export default function ClassDetail() {
   const [isAdding, setIsAdding] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [behaviorDeductionOpen, setBehaviorDeductionOpen] = useState(false);
   
   const availablePseudonyms = getAvailablePseudonyms();
   const { coverage, totalAssignments, totalDataPoints, isLoading: coverageLoading } = useStudentDataCoverage(id);
@@ -571,6 +573,14 @@ export default function ClassDetail() {
                     </Button>
                   }
                 />
+                <Button 
+                  variant="outline" 
+                  className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={() => setBehaviorDeductionOpen(true)}
+                >
+                  <MinusCircle className="h-4 w-4 mr-2" />
+                  Deduct Points
+                </Button>
                 <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
                   <Upload className="h-4 w-4 mr-2" />
                   Import CSV
@@ -819,6 +829,13 @@ export default function ClassDetail() {
         <Gradebook classId={id} />
       </TabsContent>
     </Tabs>
+
+        {/* Behavior Point Deduction Dialog */}
+        <BehaviorPointDeductionDialog
+          open={behaviorDeductionOpen}
+          onOpenChange={setBehaviorDeductionOpen}
+          preselectedClassId={id}
+        />
       </div>
     </AppLayout>
   );

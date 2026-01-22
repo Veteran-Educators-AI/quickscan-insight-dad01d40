@@ -75,7 +75,7 @@ export function InboundScholarDataPanel({ classId }: InboundScholarDataPanelProp
         .from('sister_app_sync_log')
         .select('*')
         .eq('teacher_id', user!.id)
-        .in('action', ['grade_completed', 'activity_completed', 'reward_earned', 'level_up', 'achievement_unlocked'])
+        .in('action', ['grade_completed', 'activity_completed', 'reward_earned', 'level_up', 'achievement_unlocked', 'behavior_deduction'])
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -222,6 +222,8 @@ export function InboundScholarDataPanel({ classId }: InboundScholarDataPanelProp
         return <TrendingUp className="h-4 w-4 text-emerald-500" />;
       case 'achievement_unlocked':
         return <Award className="h-4 w-4 text-pink-500" />;
+      case 'behavior_deduction':
+        return <AlertCircle className="h-4 w-4 text-destructive" />;
       default:
         return <Star className="h-4 w-4 text-muted-foreground" />;
     }
@@ -234,6 +236,7 @@ export function InboundScholarDataPanel({ classId }: InboundScholarDataPanelProp
       case 'reward_earned': return 'Reward Earned';
       case 'level_up': return 'Level Up';
       case 'achievement_unlocked': return 'Achievement Unlocked';
+      case 'behavior_deduction': return 'Behavior Deduction';
       default: return action;
     }
   };
