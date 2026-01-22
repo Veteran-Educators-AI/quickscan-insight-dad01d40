@@ -2306,79 +2306,63 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       console.log(`Generating geometry shape for: ${questionKey}`);
       setRegeneratingShapeKey(questionKey);
       
-      // Create a highly detailed prompt based on the question text
       // ═══════════════════════════════════════════════════════════════════════════════
-      // MASTER GEOMETRY TEMPLATE - Ultra-explicit analytical prompting
+      // MASTER GEOMETRY TEMPLATE v2 - Simple, Strict, Explicit
       // ═══════════════════════════════════════════════════════════════════════════════
-      const shapePrompt = `Create a textbook-quality mathematical diagram for this question:
+      const shapePrompt = `Create a simple, clean mathematical diagram for this question:
 
-═══════════════════════════════════════════════════════════════════════════════
-[QUESTION TO ILLUSTRATE]
-═══════════════════════════════════════════════════════════════════════════════
 "${questionText}"
 
 ═══════════════════════════════════════════════════════════════════════════════
-MASTER GEOMETRY TEMPLATE - FOLLOW THIS STRUCTURE EXACTLY
+STRICT RULES - FOLLOW EXACTLY
 ═══════════════════════════════════════════════════════════════════════════════
 
-[STYLE HEADER]
-"A clean, black-and-white educational diagram on a plain white background, styled like a figure in a geometry textbook."
+RULE 1: STYLE
+- Plain white background
+- Black lines only (no colors, no shading, no gradients)
+- Clean sans-serif font for all text
+- Simple and minimal - like a textbook diagram
 
-[ORIENTATION DEFINITION] (Crucial Step: Define how the shape sits so you can reference top/bottom/left/right later. Pick one standard orientation and stick to it.)
-"The shape is oriented such that [describe orientation]:
-- For RIGHT TRIANGLES: 'it has a flat horizontal base and a vertical height on the left side, meeting at the bottom-left corner where the right angle is'
-- For REGULAR TRIANGLES: 'the base is horizontal at the bottom, with the apex pointing upward'
-- For RECTANGLES: 'the longer sides are horizontal, shorter sides are vertical'
-- For CIRCLES: 'the center is at the middle, with the primary radius extending horizontally to the right'
-- For COORDINATE PLANES: 'origin at center, positive x to the right, positive y upward'"
+RULE 2: COORDINATE PLANE (if the question has coordinates)
+- Draw x-axis as a horizontal line with arrow pointing RIGHT, label "x"
+- Draw y-axis as a vertical line with arrow pointing UP, label "y"
+- Put small tick marks at each integer with numbers
+- Numbers go BELOW x-axis and to the LEFT of y-axis
 
-[KEY FEATURES & SYMBOLS]
-"Include the following SPECIFIC markings:
-- RIGHT-ANGLE SQUARES: A small square symbol (⊿) placed exactly in the corner where the 90° angle is located
-- CONGRUENT TICK MARKS: Single tick marks (|) on sides that are equal; double ticks (||) for a second pair of equal sides
-- PARALLEL LINE ARROWS: Small arrows (>>) on lines that are parallel to each other
-- ANGLE ARCS: Curved arcs drawn INSIDE angles to indicate angle measurements, with degree labels nearby"
+RULE 3: PLOTTING POINTS
+- Draw each point as a SOLID BLACK DOT
+- Write the label NEXT TO the dot (not on top)
+- Format: "A(1, 1)" or "B(7, 1)"
+- Each point gets ONE label only - never repeat
 
-[VERTEX LABELING]
-"Label ALL vertices with CAPITAL LETTERS:
-- Position each label OUTSIDE the shape, near its vertex
-- Use A, B, C, D, E, F in clockwise order starting from the top or top-left
-- For triangles: A at top/apex, B at bottom-left, C at bottom-right
-- Font: Clear, dark, sans-serif academic style"
+RULE 4: SHAPES
+- Connect vertices with straight black lines
+- Label each vertex ONCE, positioned OUTSIDE the shape
+- Clockwise order: A, B, C, D starting from bottom-left or top
 
-[ANGLE LABELING]
-"Label the angles as follows:
-- [Specify the EXACT vertex location, e.g., 'top-right corner', 'bottom-left', 'center'] is labeled with [Greek letter or variable name]
-- Draw a small arc INSIDE the angle to indicate it
-- Write the degree measurement (e.g., '45°') or variable (e.g., 'θ') adjacent to the arc
-- For right angles: Use the square symbol instead of an arc"
+RULE 5: MEASUREMENTS
+- Write measurements OUTSIDE the shape
+- Include units: "6 units" or "3 cm"
+- Only show measurements that are needed
 
-[SIDE/SEGMENT LABELING] (Do not use math terms like 'opposite' or 'adjacent'. Use PHYSICAL LOCATIONS.)
-"Label the sides/lengths as follows:
-• The [physical location, e.g., 'vertical side on the left'] is labeled '[Value/Variable]'
-• The [physical location, e.g., 'bottom horizontal base'] is labeled '[Value/Variable]'
-• The [physical location, e.g., 'slanted/diagonal side'] is labeled '[Value/Variable]'
-- Position labels OUTSIDE the shape, parallel to the side they describe
-- ALWAYS include units: '5 cm', '8 m', '3.5 units'"
+═══════════════════════════════════════════════════════════════════════════════
+DO NOT DO THESE THINGS
+═══════════════════════════════════════════════════════════════════════════════
+- DO NOT use colors or shading
+- DO NOT repeat the same vertex label twice
+- DO NOT put labels inside the shape
+- DO NOT add extra arrows or decorations not asked for
+- DO NOT add elements that were not in the question
+- DO NOT make it cluttered or confusing
 
-[COORDINATE PLANE REQUIREMENTS] (If the question involves coordinates)
-"For coordinate planes:
-- X-AXIS: Horizontal line with arrow at right end, labeled 'x'
-- Y-AXIS: Vertical line with arrow at top end, labeled 'y'
-- ORIGIN: Labeled 'O' or '(0,0)' at the intersection
-- TICK MARKS: At every integer value, numbered clearly
-- GRID: Light gray lines forming a complete grid behind the axes
-- POINTS: Solid black dots (radius 4-5px), labeled as 'P(x, y)' or 'A(2, 5)'"
-
-[CIRCLE REQUIREMENTS] (If the question involves circles)
-"For circles:
-- CENTER: Marked with a dot and labeled 'O' or 'Center'
-- RADIUS: A line segment from center to edge, labeled 'r = [value]'
-- DIAMETER: If relevant, shown as a line through center, labeled 'd = [value]'
-- POINTS ON CIRCLE: Labeled with capital letters and coordinates if on a coordinate plane"
-
-[FINAL POLISH]
-"All lines are thin black lines (1-2px stroke). All text is clear, dark, sans-serif academic font. No shading, no colors, no gradients. The diagram is centered with appropriate whitespace. Professional textbook illustration quality suitable for printing."`;
+═══════════════════════════════════════════════════════════════════════════════
+QUALITY CHECK BEFORE FINISHING
+═══════════════════════════════════════════════════════════════════════════════
+✓ Each vertex has exactly ONE label
+✓ All coordinates match the question exactly
+✓ The shape is clearly visible
+✓ Labels are readable and outside the shape
+✓ The diagram is clean and simple`;
       
       const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
         body: {
