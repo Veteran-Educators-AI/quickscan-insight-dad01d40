@@ -68,34 +68,68 @@ EXECUTE FUNCTION public.handle_new_parent();
 -- STUDENT FUNCTIONS
 -- ============================================================================
 
--- Join class with code
-CREATE OR REPLACE FUNCTION public.join_class_with_code(p_class_code TEXT, p_first_name TEXT, p_last_name TEXT)
-RETURNS UUID AS $$
+-- Join class with code (for student app)
+CREATE OR REPLACE FUNCTION public.join_class_with_code(p_join_code TEXT, p_user_email TEXT)
+RETURNS JSONB AS $$
 DECLARE
   v_class_id UUID;
-  v_student_id UUID;
+  v_class_name TEXT;
+  v_student RECORD;
+  v_user_id UUID;
 BEGIN
-  -- Find the class
-  SELECT id INTO v_class_id FROM public.classes WHERE class_code = p_class_code AND is_active = true;
+  -- Get the current user's ID
+  v_user_id := auth.uid();
+
+  IF v_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Not authenticated');
+  END IF;
+
+  -- Find the class by code
+  SELECT id, name INTO v_class_id, v_class_name
+  FROM public.classes
+  WHERE class_code = p_join_code AND is_active = true;
 
   IF v_class_id IS NULL THEN
-    RAISE EXCEPTION 'Invalid class code or class is not active';
+    RETURN jsonb_build_object('success', false, 'error', 'Invalid class code or class is not active');
   END IF;
 
   -- Check if student already exists in this class
-  SELECT id INTO v_student_id FROM public.students
-  WHERE class_id = v_class_id AND user_id = auth.uid();
+  SELECT * INTO v_student FROM public.students
+  WHERE class_id = v_class_id AND user_id = v_user_id;
 
-  IF v_student_id IS NOT NULL THEN
-    RETURN v_student_id;
+  IF v_student IS NOT NULL THEN
+    RETURN jsonb_build_object(
+      'success', true,
+      'student_name', v_student.first_name || ' ' || v_student.last_name,
+      'class_name', v_class_name
+    );
   END IF;
 
-  -- Create new student record
-  INSERT INTO public.students (user_id, class_id, first_name, last_name)
-  VALUES (auth.uid(), v_class_id, p_first_name, p_last_name)
-  RETURNING id INTO v_student_id;
+  -- Try to find existing student record for this user that can be linked
+  -- (student might have been pre-created by teacher)
+  SELECT * INTO v_student FROM public.students
+  WHERE class_id = v_class_id AND user_id IS NULL
+  ORDER BY created_at DESC
+  LIMIT 1;
 
-  RETURN v_student_id;
+  IF v_student IS NOT NULL THEN
+    -- Link existing student record to user
+    UPDATE public.students
+    SET user_id = v_user_id
+    WHERE id = v_student.id;
+
+    RETURN jsonb_build_object(
+      'success', true,
+      'student_name', v_student.first_name || ' ' || v_student.last_name,
+      'class_name', v_class_name
+    );
+  END IF;
+
+  -- No student record found - return error (teacher needs to add student first)
+  RETURN jsonb_build_object(
+    'success', false,
+    'error', 'You are not enrolled in this class. Please ask your teacher to add you to the class roster.'
+  );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 

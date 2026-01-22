@@ -575,33 +575,39 @@ export type Database = {
       }
       classes: {
         Row: {
-          class_period: string | null
-          created_at: string
           id: string
-          join_code: string
-          name: string
-          school_year: string | null
           teacher_id: string
+          name: string
+          subject: string | null
+          period: string | null
+          class_code: string | null
+          school_year: string | null
+          is_active: boolean
+          created_at: string
           updated_at: string
         }
         Insert: {
-          class_period?: string | null
-          created_at?: string
           id?: string
-          join_code: string
-          name: string
-          school_year?: string | null
           teacher_id: string
+          name: string
+          subject?: string | null
+          period?: string | null
+          class_code?: string | null
+          school_year?: string | null
+          is_active?: boolean
+          created_at?: string
           updated_at?: string
         }
         Update: {
-          class_period?: string | null
-          created_at?: string
           id?: string
-          join_code?: string
-          name?: string
-          school_year?: string | null
           teacher_id?: string
+          name?: string
+          subject?: string | null
+          period?: string | null
+          class_code?: string | null
+          school_year?: string | null
+          is_active?: boolean
+          created_at?: string
           updated_at?: string
         }
         Relationships: [

@@ -12,9 +12,9 @@ import { useToast } from '@/hooks/use-toast';
 interface ClassWithStudentCount {
   id: string;
   name: string;
-  join_code: string;
+  class_code: string | null;
   school_year: string | null;
-  class_period: string | null;
+  period: string | null;
   created_at: string;
   student_count: number;
 }
@@ -133,7 +133,7 @@ export default function Classes() {
                       <EditClassDialog
                         classId={cls.id}
                         currentName={cls.name}
-                        currentPeriod={cls.class_period}
+                        currentPeriod={cls.period}
                         currentYear={cls.school_year}
                         onUpdate={fetchClasses}
                       />
@@ -144,9 +144,9 @@ export default function Classes() {
                   </CardTitle>
                   <CardDescription className="flex items-center gap-2">
                     {cls.school_year || 'No year set'}
-                    {cls.class_period && (
+                    {cls.period && (
                       <Badge variant="secondary" className="text-xs">
-                        {cls.class_period}
+                        {cls.period}
                       </Badge>
                     )}
                   </CardDescription>
@@ -162,15 +162,15 @@ export default function Classes() {
                       size="sm"
                       onClick={(e) => {
                         e.preventDefault();
-                        copyJoinCode(cls.join_code);
+                        if (cls.class_code) copyJoinCode(cls.class_code);
                       }}
                     >
-                      {copiedCode === cls.join_code ? (
+                      {copiedCode === cls.class_code ? (
                         <Check className="h-3 w-3" />
                       ) : (
                         <Copy className="h-3 w-3" />
                       )}
-                      {cls.join_code}
+                      {cls.class_code || 'No code'}
                     </Button>
                   </div>
                 </CardContent>
