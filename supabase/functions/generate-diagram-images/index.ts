@@ -11,12 +11,104 @@ interface QuestionWithPrompt {
   imagePrompt: string;
 }
 
+interface ValidationResult {
+  isValid: boolean;
+  issues: string[];
+  shouldRetry: boolean;
+}
+
+// Validate generated image using AI vision
+async function validateDiagramImage(imageUrl: string, originalPrompt: string): Promise<ValidationResult> {
+  const apiKey = Deno.env.get('LOVABLE_API_KEY');
+  if (!apiKey) {
+    return { isValid: true, issues: [], shouldRetry: false }; // Skip validation if no key
+  }
+
+  try {
+    console.log('Validating generated diagram...');
+    
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Analyze this mathematical diagram for quality issues. Check for these SPECIFIC problems:
+
+COORDINATE PLANE ISSUES:
+- Are the Y-axis numbers in correct order (0,1,2,3... going UP)?
+- Are the X-axis numbers in correct order (0,1,2,3... going RIGHT)?
+- Are axis numbers scattered randomly instead of evenly spaced?
+
+LABEL ISSUES:
+- Are any vertex labels duplicated (same letter appears twice)?
+- Are labels placed inside shapes instead of outside?
+- Is text rotated/diagonal when it should be horizontal?
+- Are there unwanted "units" labels cluttering the diagram?
+
+SHAPE ISSUES:
+- Is the shape clearly visible on the coordinate plane?
+- Are vertices plotted at approximately correct positions?
+
+Respond with ONLY a JSON object in this exact format:
+{
+  "isValid": true/false,
+  "issues": ["list of specific issues found"],
+  "shouldRetry": true/false
+}
+
+Set shouldRetry=true if the diagram has major issues that would confuse students.
+Set isValid=false if there are ANY of the issues listed above.`
+              },
+              {
+                type: 'image_url',
+                image_url: { url: imageUrl }
+              }
+            ]
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 500,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Validation API error:', response.status);
+      return { isValid: true, issues: [], shouldRetry: false };
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    
+    // Extract JSON from response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]) as ValidationResult;
+      console.log('Validation result:', result);
+      return result;
+    }
+    
+    return { isValid: true, issues: [], shouldRetry: false };
+  } catch (error) {
+    console.error('Validation error:', error);
+    return { isValid: true, issues: [], shouldRetry: false };
+  }
+}
+
 // Generate image using Nano Banana (google/gemini-2.5-flash-image-preview)
-async function generateImageWithNanoBanana(prompt: string): Promise<string | null> {
+async function generateImageWithNanoBanana(prompt: string, attemptNumber = 1): Promise<{ imageUrl: string | null; validation: ValidationResult | null }> {
   const apiKey = Deno.env.get('LOVABLE_API_KEY');
   if (!apiKey) {
     console.error('LOVABLE_API_KEY not configured');
-    return null;
+    return { imageUrl: null, validation: null };
   }
 
   try {
@@ -96,7 +188,7 @@ FINAL VERIFICATION
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Nano Banana API error:', response.status, errorText);
-      return null;
+      return { imageUrl: null, validation: null };
     }
 
     const data = await response.json();
@@ -108,15 +200,33 @@ FINAL VERIFICATION
       const imageUrl = images[0]?.image_url?.url;
       if (imageUrl) {
         console.log('Successfully generated image with Nano Banana');
-        return imageUrl;
+        
+        // Validate the generated image (only for geometry diagrams, max 2 retries)
+        const isGeometryPrompt = prompt.toLowerCase().includes('coordinate') || 
+                                  prompt.toLowerCase().includes('vertex') ||
+                                  prompt.toLowerCase().includes('triangle') ||
+                                  prompt.toLowerCase().includes('quadrilateral');
+        
+        if (isGeometryPrompt && attemptNumber <= 2) {
+          const validation = await validateDiagramImage(imageUrl, prompt);
+          
+          if (validation.shouldRetry && attemptNumber < 2) {
+            console.log(`Validation failed (attempt ${attemptNumber}), retrying...`, validation.issues);
+            return generateImageWithNanoBanana(prompt, attemptNumber + 1);
+          }
+          
+          return { imageUrl, validation };
+        }
+        
+        return { imageUrl, validation: null };
       }
     }
 
     console.log('No image in Nano Banana response');
-    return null;
+    return { imageUrl: null, validation: null };
   } catch (error) {
     console.error('Error generating with Nano Banana:', error);
-    return null;
+    return { imageUrl: null, validation: null };
   }
 }
 
@@ -257,7 +367,8 @@ Requirements:
 - Professional and friendly style
 - NO TEXT or labels`;
 
-      let imageUrl = await generateImageWithNanoBanana(clipartPrompt);
+      const result = await generateImageWithNanoBanana(clipartPrompt);
+      let imageUrl = result.imageUrl;
       
       // If Nano Banana fails, try SVG fallback (only for clipart style)
       if (!imageUrl && !isPresentation) {
@@ -267,7 +378,7 @@ Requirements:
       
       // Return imageUrl (null is acceptable - frontend should handle gracefully)
       return new Response(
-        JSON.stringify({ imageUrl: imageUrl || null, fallback: !imageUrl }),
+        JSON.stringify({ imageUrl: imageUrl || null, fallback: !imageUrl, validation: result.validation }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -287,16 +398,19 @@ Requirements:
 
     console.log(`Starting image generation for ${questions.length} questions (Nano Banana: ${useNanoBanana})...`);
 
-    const results: { questionNumber: number; imageUrl: string | null }[] = [];
+    const results: { questionNumber: number; imageUrl: string | null; validation?: ValidationResult | null }[] = [];
 
     for (const q of questions) {
       console.log(`Generating image for question ${q.questionNumber}...`);
       
       let imageUrl: string | null = null;
+      let validation: ValidationResult | null = null;
       
       if (useNanoBanana) {
-        // Use Nano Banana for realistic image generation
-        imageUrl = await generateImageWithNanoBanana(q.imagePrompt);
+        // Use Nano Banana for realistic image generation with validation
+        const result = await generateImageWithNanoBanana(q.imagePrompt);
+        imageUrl = result.imageUrl;
+        validation = result.validation;
       } else {
         // Use standard SVG generation
         imageUrl = await generateSVGWithAI(q.imagePrompt);
@@ -304,13 +418,17 @@ Requirements:
       
       results.push({
         questionNumber: q.questionNumber,
-        imageUrl
+        imageUrl,
+        validation
       });
-      console.log(`Question ${q.questionNumber}: ${imageUrl ? 'Success' : 'Failed'}`);
+      
+      const validationStatus = validation ? (validation.isValid ? '✓ Valid' : `⚠ Issues: ${validation.issues.join(', ')}`) : '';
+      console.log(`Question ${q.questionNumber}: ${imageUrl ? 'Success' : 'Failed'} ${validationStatus}`);
     }
 
     const successCount = results.filter(r => r.imageUrl).length;
-    console.log(`Completed: ${successCount}/${questions.length} images generated successfully`);
+    const validCount = results.filter(r => r.validation?.isValid !== false).length;
+    console.log(`Completed: ${successCount}/${questions.length} images generated, ${validCount} passed validation`);
 
     return new Response(
       JSON.stringify({ results }),
