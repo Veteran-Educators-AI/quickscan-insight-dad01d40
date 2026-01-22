@@ -598,9 +598,10 @@ Requirements:
     }
 
     // Existing batch question image generation
-    const { questions, useNanoBanana } = body as {
+    const { questions, useNanoBanana, preferDeterministicSVG } = body as {
       questions: QuestionWithPrompt[];
       useNanoBanana?: boolean;
+      preferDeterministicSVG?: boolean;
     };
 
     if (!questions || questions.length === 0) {
@@ -610,7 +611,7 @@ Requirements:
       );
     }
 
-    console.log(`Starting image generation for ${questions.length} questions (Nano Banana: ${useNanoBanana})...`);
+    console.log(`Starting image generation for ${questions.length} questions (Nano Banana: ${useNanoBanana}, Deterministic: ${preferDeterministicSVG})...`);
 
     const results: { questionNumber: number; imageUrl: string | null; validation?: ValidationResult | null }[] = [];
 
@@ -620,7 +621,19 @@ Requirements:
       let imageUrl: string | null = null;
       let validation: ValidationResult | null = null;
       
-      if (useNanoBanana) {
+      // If preferDeterministicSVG is enabled, always try deterministic first
+      if (preferDeterministicSVG) {
+        console.log('Using deterministic SVG generator (user preference)...');
+        imageUrl = generateDeterministicCoordinatePlaneSVG(q.imagePrompt);
+        if (imageUrl) {
+          console.log('Deterministic SVG generated successfully');
+          validation = { isValid: true, issues: [], shouldRetry: false };
+        } else {
+          // Fall back to standard SVG generation if deterministic fails (no coordinates found)
+          console.log('Deterministic failed (no coordinates), falling back to SVG AI...');
+          imageUrl = await generateSVGWithAI(q.imagePrompt);
+        }
+      } else if (useNanoBanana) {
         // Use Nano Banana for realistic image generation with validation
         const result = await generateImageWithNanoBanana(q.imagePrompt);
         imageUrl = result.imageUrl;
