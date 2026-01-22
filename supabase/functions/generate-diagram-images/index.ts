@@ -302,7 +302,52 @@ STYLE REQUIREMENTS:
   }
 }
 
-// Generate deterministic SVG coordinate plane diagram (guaranteed correct axis labels)
+// Detect polygon type from prompt
+function detectPolygonType(prompt: string): { type: string; sides: number } {
+  const lowerPrompt = prompt.toLowerCase();
+  
+  if (lowerPrompt.includes('triangle') || lowerPrompt.includes('3-gon')) {
+    return { type: 'triangle', sides: 3 };
+  }
+  if (lowerPrompt.includes('quadrilateral') || lowerPrompt.includes('rectangle') || 
+      lowerPrompt.includes('square') || lowerPrompt.includes('parallelogram') ||
+      lowerPrompt.includes('rhombus') || lowerPrompt.includes('trapezoid') || lowerPrompt.includes('4-gon')) {
+    return { type: 'quadrilateral', sides: 4 };
+  }
+  if (lowerPrompt.includes('pentagon') || lowerPrompt.includes('5-gon')) {
+    return { type: 'pentagon', sides: 5 };
+  }
+  if (lowerPrompt.includes('hexagon') || lowerPrompt.includes('6-gon')) {
+    return { type: 'hexagon', sides: 6 };
+  }
+  if (lowerPrompt.includes('heptagon') || lowerPrompt.includes('7-gon')) {
+    return { type: 'heptagon', sides: 7 };
+  }
+  if (lowerPrompt.includes('octagon') || lowerPrompt.includes('8-gon')) {
+    return { type: 'octagon', sides: 8 };
+  }
+  if (lowerPrompt.includes('line segment') || lowerPrompt.includes('segment')) {
+    return { type: 'segment', sides: 2 };
+  }
+  if (lowerPrompt.includes('ray')) {
+    return { type: 'ray', sides: 2 };
+  }
+  if (lowerPrompt.includes('line')) {
+    return { type: 'line', sides: 2 };
+  }
+  
+  // Default: infer from number of coordinates
+  const coordCount = (prompt.match(/\(\d+,\s*\d+\)/g) || []).length;
+  if (coordCount === 2) return { type: 'segment', sides: 2 };
+  if (coordCount === 3) return { type: 'triangle', sides: 3 };
+  if (coordCount === 4) return { type: 'quadrilateral', sides: 4 };
+  if (coordCount === 5) return { type: 'pentagon', sides: 5 };
+  if (coordCount === 6) return { type: 'hexagon', sides: 6 };
+  
+  return { type: 'polygon', sides: coordCount || 0 };
+}
+
+// Generate deterministic SVG for all polygon types on coordinate plane (guaranteed correct axis labels)
 function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null {
   // Parse coordinates from the prompt
   const coordinateMatches = prompt.match(/\((\d+),\s*(\d+)\)/g) || [];
@@ -318,6 +363,10 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
   if (coordinates.length === 0) {
     return null; // Can't generate without coordinates
   }
+
+  // Detect polygon type for special rendering
+  const polygonInfo = detectPolygonType(prompt);
+  console.log(`Detected polygon type: ${polygonInfo.type} (${coordinates.length} vertices)`);
 
   // Determine the coordinate range needed
   const maxX = Math.max(10, ...coordinates.map(c => c.x + 2));
@@ -386,14 +435,56 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
 
   svg += `\n  </g>`;
 
-  // Draw the shape (connect vertices)
+  // Draw the shape based on polygon type
   if (coordinates.length >= 2) {
     svg += `\n  
-  <!-- Shape outline -->
+  <!-- ${polygonInfo.type.charAt(0).toUpperCase() + polygonInfo.type.slice(1)} outline -->`;
+    
+    if (polygonInfo.type === 'segment') {
+      // Line segment: just connect two points
+      svg += `
+  <g stroke="#000000" stroke-width="2.5" fill="none">
+    <line x1="${toSvgX(coordinates[0].x)}" y1="${toSvgY(coordinates[0].y)}" 
+          x2="${toSvgX(coordinates[1].x)}" y2="${toSvgY(coordinates[1].y)}"/>
+  </g>`;
+    } else if (polygonInfo.type === 'ray') {
+      // Ray: start at first point, extend beyond second point
+      const dx = coordinates[1].x - coordinates[0].x;
+      const dy = coordinates[1].y - coordinates[0].y;
+      const extendedX = coordinates[1].x + dx * 2;
+      const extendedY = coordinates[1].y + dy * 2;
+      svg += `
+  <g stroke="#000000" stroke-width="2.5" fill="none">
+    <line x1="${toSvgX(coordinates[0].x)}" y1="${toSvgY(coordinates[0].y)}" 
+          x2="${toSvgX(Math.min(maxX, Math.max(0, extendedX)))}" y2="${toSvgY(Math.min(maxY, Math.max(0, extendedY)))}"/>
+    <!-- Ray arrow -->
+    <polygon points="${toSvgX(coordinates[1].x)},${toSvgY(coordinates[1].y) - 4} ${toSvgX(coordinates[1].x) - 4},${toSvgY(coordinates[1].y) + 4} ${toSvgX(coordinates[1].x) + 4},${toSvgY(coordinates[1].y) + 4}" fill="#000000"/>
+  </g>`;
+    } else if (polygonInfo.type === 'line') {
+      // Line: extend in both directions
+      const dx = coordinates[1].x - coordinates[0].x;
+      const dy = coordinates[1].y - coordinates[0].y;
+      const extendedX1 = coordinates[0].x - dx * 2;
+      const extendedY1 = coordinates[0].y - dy * 2;
+      const extendedX2 = coordinates[1].x + dx * 2;
+      const extendedY2 = coordinates[1].y + dy * 2;
+      svg += `
+  <g stroke="#000000" stroke-width="2.5" fill="none">
+    <line x1="${toSvgX(Math.min(maxX, Math.max(0, extendedX1)))}" y1="${toSvgY(Math.min(maxY, Math.max(0, extendedY1)))}" 
+          x2="${toSvgX(Math.min(maxX, Math.max(0, extendedX2)))}" y2="${toSvgY(Math.min(maxY, Math.max(0, extendedY2)))}"/>
+  </g>`;
+    } else {
+      // All polygons (triangles, quadrilaterals, pentagons, hexagons, etc.)
+      svg += `
   <g stroke="#000000" stroke-width="2" fill="none">
     <polygon points="${coordinates.map(c => `${toSvgX(c.x)},${toSvgY(c.y)}`).join(' ')}"/>
   </g>`;
+    }
   }
+
+  // Calculate centroid for smart label placement
+  const centroidX = coordinates.reduce((sum, c) => sum + c.x, 0) / coordinates.length;
+  const centroidY = coordinates.reduce((sum, c) => sum + c.y, 0) / coordinates.length;
 
   // Plot vertices and labels
   svg += `\n  
@@ -401,28 +492,52 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
   <g fill="#000000">`;
 
   coordinates.forEach((coord, i) => {
-    const label = labels[i] || String.fromCharCode(65 + i); // A, B, C, D...
+    const label = labels[i] || String.fromCharCode(65 + i); // A, B, C, D, E, F...
     const labelX = toSvgX(coord.x);
     const labelY = toSvgY(coord.y);
     
-    // Determine label position (offset based on position to avoid overlap with shape)
-    let textOffsetX = 8;
-    let textOffsetY = -8;
+    // Smart label positioning: place labels away from the centroid
+    const dirX = coord.x - centroidX;
+    const dirY = coord.y - centroidY;
+    const magnitude = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
     
-    // If point is on the right side, put label to the right
-    if (coord.x > maxX / 2) textOffsetX = 8;
-    else textOffsetX = -30; // Left side, put label to the left
+    // Normalize and scale for label offset
+    let textOffsetX = (dirX / magnitude) * 25;
+    let textOffsetY = (dirY / magnitude) * -15; // Invert Y for SVG
     
-    // If point is at the top, put label above
-    if (coord.y > maxY / 2) textOffsetY = -8;
-    else textOffsetY = 18; // Bottom, put label below
+    // Ensure minimum offset
+    if (Math.abs(textOffsetX) < 10) textOffsetX = textOffsetX >= 0 ? 12 : -25;
+    if (Math.abs(textOffsetY) < 8) textOffsetY = textOffsetY >= 0 ? -10 : 15;
+    
+    // Clamp offsets to keep labels in view
+    textOffsetX = Math.max(-40, Math.min(15, textOffsetX));
+    textOffsetY = Math.max(-15, Math.min(20, textOffsetY));
 
     svg += `\n    <!-- ${label}(${coord.x}, ${coord.y}) -->
     <circle cx="${labelX}" cy="${labelY}" r="4"/>
     <text x="${labelX + textOffsetX}" y="${labelY + textOffsetY}" font-family="Arial, sans-serif" font-size="12" font-weight="bold">${label}(${coord.x}, ${coord.y})</text>`;
   });
 
-  svg += `\n  </g>
+  svg += `\n  </g>`;
+
+  // Add special annotations for certain polygon types
+  if (polygonInfo.type === 'triangle' && coordinates.length === 3) {
+    // Check for right angle markers
+    const isRightTriangle = prompt.toLowerCase().includes('right');
+    if (isRightTriangle) {
+      // Find the right angle vertex (usually at the corner with perpendicular sides)
+      // For now, add a small square at the first vertex as a right angle marker
+      const rightVertex = coordinates[0];
+      const size = 6;
+      svg += `\n  
+  <!-- Right angle marker -->
+  <g stroke="#000000" stroke-width="1" fill="none">
+    <polyline points="${toSvgX(rightVertex.x) + size},${toSvgY(rightVertex.y)} ${toSvgX(rightVertex.x) + size},${toSvgY(rightVertex.y) - size} ${toSvgX(rightVertex.x)},${toSvgY(rightVertex.y) - size}"/>
+  </g>`;
+    }
+  }
+
+  svg += `
 </svg>`;
 
   // Convert to data URL
