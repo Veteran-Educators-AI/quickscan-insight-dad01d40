@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { RosterImageConverter } from '@/components/classes/RosterImageConverter';
 import { CSVStudentUploader, ParsedStudent } from '@/components/classes/CSVStudentUploader';
+import { useFeatureTracking } from '@/hooks/useFeatureTracking';
 
 function generateJoinCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -32,6 +33,7 @@ export default function ClassNew() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { trackFeature } = useFeatureTracking();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,6 +91,18 @@ export default function ClassNew() {
           description: `Join code: ${joinCode}`,
         });
       }
+
+      // Track class creation
+      trackFeature({
+        featureName: 'Create Class',
+        category: 'classes',
+        action: 'created',
+        metadata: {
+          studentCount: pendingStudents.length,
+          hasSchoolYear: !!schoolYear,
+          hasPeriod: !!classPeriod,
+        },
+      });
 
       navigate(`/classes/${data.id}`);
     } catch (error: any) {

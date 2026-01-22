@@ -19,6 +19,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { useFeatureTracking } from '@/hooks/useFeatureTracking';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
 import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
@@ -298,6 +299,7 @@ interface ClassOption {
 export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosticMode = false, initialTopics = [] }: DifferentiatedWorksheetGeneratorProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { trackFeature } = useFeatureTracking();
   
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
@@ -1867,6 +1869,21 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       const topicsForFilename = selectedTopics.length > 0 ? selectedTopics[0].replace(/\s+/g, '_').substring(0, 20) : 'Math';
       const fileName = `Class_Set_${topicsForFilename}_Forms_${formsToGenerate.join('')}_${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(fileName);
+
+      // Track differentiated worksheet generation
+      trackFeature({
+        featureName: 'Generate Differentiated Worksheets',
+        category: 'worksheets',
+        action: 'generated',
+        metadata: {
+          studentCount: selectedStudents.length,
+          formCount: numForms,
+          topicCount: selectedTopics.length,
+          includeGeometry,
+          includeStoryboardArt,
+          diagnosticMode,
+        },
+      });
 
       toast({
         title: '🎉 Class set is ready!',
