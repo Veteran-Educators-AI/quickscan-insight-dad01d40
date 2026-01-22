@@ -6,6 +6,231 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Subject detection keywords and their corresponding NYS standards
+interface SubjectPattern {
+  id: string;
+  name: string;
+  keywords: string[];
+  standardPrefixes: string[];
+  sampleStandards: string[];
+}
+
+const SUBJECT_PATTERNS: SubjectPattern[] = [
+  {
+    id: 'geometry',
+    name: 'Geometry',
+    keywords: [
+      'triangle', 'angle', 'parallel', 'perpendicular', 'congruent', 'similar',
+      'proof', 'theorem', 'postulate', 'polygon', 'quadrilateral', 'circle',
+      'radius', 'diameter', 'circumference', 'area', 'perimeter', 'volume',
+      'surface area', 'pythagorean', 'hypotenuse', 'sine', 'cosine', 'tangent',
+      'rotation', 'reflection', 'translation', 'dilation', 'transformation',
+      'coordinate', 'slope', 'midpoint', 'distance formula', 'bisector',
+      'inscribed', 'circumscribed', 'arc', 'sector', 'chord', 'secant',
+      'SAS', 'ASA', 'SSS', 'AAS', 'HL', 'CPCTC', 'altitude', 'median',
+      'centroid', 'orthocenter', 'incenter', 'circumcenter'
+    ],
+    standardPrefixes: ['G.CO', 'G.SRT', 'G.C', 'G.GPE', 'G.GMD', 'G.MG'],
+    sampleStandards: ['G.CO.A.1', 'G.SRT.B.5', 'G.C.A.2', 'G.GPE.B.4']
+  },
+  {
+    id: 'algebra1',
+    name: 'Algebra I',
+    keywords: [
+      'linear', 'equation', 'variable', 'coefficient', 'constant', 'slope',
+      'y-intercept', 'graph', 'function', 'domain', 'range', 'inequality',
+      'system', 'substitution', 'elimination', 'quadratic', 'parabola',
+      'vertex', 'factoring', 'FOIL', 'polynomial', 'exponent', 'radical',
+      'square root', 'absolute value', 'expression', 'simplify', 'solve',
+      'rate of change', 'arithmetic sequence', 'scatter plot', 'correlation',
+      'literal equation', 'proportion', 'ratio', 'percent'
+    ],
+    standardPrefixes: ['A.SSE', 'A.APR', 'A.CED', 'A.REI', 'F.IF', 'F.BF', 'F.LE', 'N.RN', 'S.ID'],
+    sampleStandards: ['A.SSE.A.1', 'A.REI.B.3', 'F.IF.B.4', 'A.CED.A.1']
+  },
+  {
+    id: 'algebra2',
+    name: 'Algebra II',
+    keywords: [
+      'polynomial', 'rational', 'logarithm', 'exponential', 'complex number',
+      'imaginary', 'conjugate', 'asymptote', 'end behavior', 'inverse function',
+      'composition', 'transformation', 'trigonometric', 'radian', 'unit circle',
+      'amplitude', 'period', 'phase shift', 'sequence', 'series', 'summation',
+      'binomial', 'pascal', 'permutation', 'combination', 'probability',
+      'normal distribution', 'standard deviation', 'z-score', 'regression',
+      'remainder theorem', 'factor theorem', 'synthetic division'
+    ],
+    standardPrefixes: ['A.SSE', 'A.APR', 'A.CED', 'A.REI', 'F.IF', 'F.BF', 'F.LE', 'F.TF', 'N.CN', 'S.IC', 'S.CP', 'S.MD'],
+    sampleStandards: ['A.APR.B.2', 'F.TF.A.1', 'N.CN.A.1', 'S.IC.B.4']
+  },
+  {
+    id: 'biology',
+    name: 'Biology',
+    keywords: [
+      'cell', 'DNA', 'RNA', 'protein', 'gene', 'chromosome', 'mitosis', 'meiosis',
+      'photosynthesis', 'respiration', 'ATP', 'enzyme', 'organism', 'ecosystem',
+      'evolution', 'natural selection', 'mutation', 'adaptation', 'species',
+      'population', 'biodiversity', 'food chain', 'food web', 'producer',
+      'consumer', 'decomposer', 'homeostasis', 'hormone', 'nervous system',
+      'immune', 'virus', 'bacteria', 'organelle', 'membrane', 'nucleus',
+      'ribosome', 'mitochondria', 'chloroplast', 'genetics', 'heredity',
+      'Punnett square', 'dominant', 'recessive', 'allele', 'genotype', 'phenotype'
+    ],
+    standardPrefixes: ['LS', 'BIO'],
+    sampleStandards: ['LS1.A', 'LS2.B', 'LS3.A', 'LS4.C']
+  },
+  {
+    id: 'chemistry',
+    name: 'Chemistry',
+    keywords: [
+      'atom', 'element', 'compound', 'molecule', 'ion', 'electron', 'proton',
+      'neutron', 'periodic table', 'atomic number', 'atomic mass', 'isotope',
+      'chemical reaction', 'reactant', 'product', 'balance', 'mole', 'molarity',
+      'solution', 'solute', 'solvent', 'acid', 'base', 'pH', 'oxidation',
+      'reduction', 'redox', 'electronegativity', 'bond', 'covalent', 'ionic',
+      'metallic', 'Lewis structure', 'VSEPR', 'enthalpy', 'entropy', 'Gibbs',
+      'equilibrium', 'Le Chatelier', 'stoichiometry', 'limiting reagent',
+      'concentration', 'dilution', 'titration', 'catalyst', 'activation energy'
+    ],
+    standardPrefixes: ['PS', 'CHEM'],
+    sampleStandards: ['PS1.A', 'PS1.B', 'PS2.B', 'PS3.D']
+  },
+  {
+    id: 'physics',
+    name: 'Physics',
+    keywords: [
+      'force', 'motion', 'velocity', 'acceleration', 'momentum', 'Newton',
+      'gravity', 'friction', 'mass', 'weight', 'energy', 'kinetic', 'potential',
+      'work', 'power', 'wave', 'frequency', 'wavelength', 'amplitude',
+      'electromagnetic', 'electric', 'magnetic', 'circuit', 'current', 'voltage',
+      'resistance', 'Ohm', 'capacitor', 'inductor', 'thermodynamics', 'heat',
+      'temperature', 'pressure', 'fluid', 'buoyancy', 'optics', 'lens', 'mirror',
+      'reflection', 'refraction', 'diffraction', 'interference', 'nuclear',
+      'radioactive', 'half-life', 'relativity', 'quantum'
+    ],
+    standardPrefixes: ['PS', 'PHYS'],
+    sampleStandards: ['PS2.A', 'PS3.A', 'PS4.A', 'PS4.B']
+  },
+  {
+    id: 'english',
+    name: 'English Language Arts',
+    keywords: [
+      'thesis', 'argument', 'evidence', 'claim', 'counterclaim', 'rhetoric',
+      'ethos', 'pathos', 'logos', 'metaphor', 'simile', 'imagery', 'symbolism',
+      'theme', 'motif', 'character', 'plot', 'setting', 'conflict', 'resolution',
+      'narrator', 'point of view', 'tone', 'mood', 'irony', 'foreshadowing',
+      'allusion', 'personification', 'hyperbole', 'diction', 'syntax', 'grammar',
+      'paragraph', 'essay', 'introduction', 'conclusion', 'transition', 'citation',
+      'source', 'analysis', 'inference', 'main idea', 'supporting detail'
+    ],
+    standardPrefixes: ['RL', 'RI', 'W', 'SL', 'L'],
+    sampleStandards: ['RL.9-10.1', 'RI.9-10.2', 'W.9-10.1', 'L.9-10.1']
+  },
+  {
+    id: 'history',
+    name: 'History/Social Studies',
+    keywords: [
+      'revolution', 'constitution', 'democracy', 'republic', 'government',
+      'war', 'treaty', 'amendment', 'civil rights', 'movement', 'colonization',
+      'independence', 'industrial', 'reform', 'immigration', 'migration',
+      'economy', 'trade', 'imperialism', 'nationalism', 'globalization',
+      'primary source', 'secondary source', 'perspective', 'bias', 'cause',
+      'effect', 'continuity', 'change', 'turning point', 'era', 'decade',
+      'century', 'civilization', 'culture', 'society', 'political', 'social'
+    ],
+    standardPrefixes: ['RH', 'WHST', 'SS'],
+    sampleStandards: ['RH.9-10.1', 'WHST.9-10.1', 'SS.1.1']
+  },
+  {
+    id: 'financialmath',
+    name: 'Financial Math',
+    keywords: [
+      'budget', 'income', 'expense', 'savings', 'investment', 'interest',
+      'compound interest', 'simple interest', 'principal', 'loan', 'mortgage',
+      'credit', 'debit', 'tax', 'gross pay', 'net pay', 'paycheck', 'W-4',
+      'insurance', 'premium', 'deductible', 'stock', 'bond', 'mutual fund',
+      'retirement', '401k', 'IRA', 'inflation', 'depreciation', 'APR', 'APY',
+      'credit score', 'credit card', 'minimum payment', 'balance', 'statement'
+    ],
+    standardPrefixes: ['NGPF', 'FIN'],
+    sampleStandards: ['NGPF.1.1', 'NGPF.2.1', 'NGPF.3.1']
+  }
+];
+
+// Detect subject area from OCR text
+function detectSubjectFromText(ocrText: string): { subject: SubjectPattern | null; confidence: 'high' | 'medium' | 'low'; matchedKeywords: string[] } {
+  if (!ocrText || ocrText.trim().length < 10) {
+    return { subject: null, confidence: 'low', matchedKeywords: [] };
+  }
+
+  const textLower = ocrText.toLowerCase();
+  const subjectScores: { pattern: SubjectPattern; score: number; matches: string[] }[] = [];
+
+  for (const pattern of SUBJECT_PATTERNS) {
+    const matches: string[] = [];
+    let score = 0;
+
+    for (const keyword of pattern.keywords) {
+      // Use word boundary matching for more accurate detection
+      const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+      const occurrences = (textLower.match(regex) || []).length;
+      if (occurrences > 0) {
+        matches.push(keyword);
+        score += occurrences * (keyword.length > 5 ? 2 : 1); // Longer keywords get higher weight
+      }
+    }
+
+    if (score > 0) {
+      subjectScores.push({ pattern, score, matches });
+    }
+  }
+
+  // Sort by score descending
+  subjectScores.sort((a, b) => b.score - a.score);
+
+  if (subjectScores.length === 0) {
+    return { subject: null, confidence: 'low', matchedKeywords: [] };
+  }
+
+  const topMatch = subjectScores[0];
+  const secondMatch = subjectScores[1];
+
+  // Determine confidence based on score and differentiation from second place
+  let confidence: 'high' | 'medium' | 'low' = 'low';
+  if (topMatch.score >= 10 && (!secondMatch || topMatch.score > secondMatch.score * 1.5)) {
+    confidence = 'high';
+  } else if (topMatch.score >= 5) {
+    confidence = 'medium';
+  }
+
+  return {
+    subject: topMatch.pattern,
+    confidence,
+    matchedKeywords: topMatch.matches.slice(0, 10) // Limit to top 10 for logging
+  };
+}
+
+// Generate subject-specific NYS standards context
+function generateSubjectStandardsContext(subject: SubjectPattern | null, detectedKeywords: string[]): string {
+  if (!subject) {
+    return '';
+  }
+
+  return `
+AUTO-DETECTED SUBJECT AREA: ${subject.name}
+Based on content analysis, this appears to be ${subject.name} work.
+Detected keywords: ${detectedKeywords.join(', ')}
+
+RELEVANT NYS STANDARD PREFIXES for ${subject.name}:
+${subject.standardPrefixes.map(p => `- ${p}.*`).join('\n')}
+
+When identifying the NYS Standard, prioritize standards from these prefix families.
+Sample standards for this subject: ${subject.sampleStandards.join(', ')}
+
+IMPORTANT: Use the detected subject to accurately identify which specific standard applies to this problem.
+`;
+}
+
 // Check rate limit for a user
 async function checkRateLimit(supabase: any, userId: string): Promise<{ allowed: boolean; message?: string }> {
   const { data, error } = await supabase.rpc('check_ai_rate_limit', { p_user_id: userId });
@@ -521,6 +746,9 @@ Evaluate the student's work against this standard. When reporting the NYS Standa
 - Example: "6.G.A.1 - Finding area of composite shapes"
 - Do NOT include full standard text, long explanations, or curriculum descriptions
 ` : '';
+
+    // Auto-detect subject context placeholder - will be populated after initial OCR
+    let autoDetectedSubjectContext = '';
     
     let systemPrompt: string;
     let userPromptText: string;
@@ -660,21 +888,27 @@ When extracting OCR text:
 `;
 
     if (isAIMode) {
-      systemPrompt = `You are a precise and factual NYS Regents mathematics grader. Your goal is to provide assessment based STRICTLY on verified observations from student work.
+      systemPrompt = `You are a precise and factual NYS Regents grader for ALL academic subjects. Your goal is to provide assessment based STRICTLY on verified observations from student work.
+
+CRITICAL - SUBJECT DETECTION:
+You MUST first identify the SUBJECT AREA of this work based on the content you observe (Math, Science, English, History, etc.).
+Then apply the appropriate NYS standards for that subject.
 
 ${hallucinationShieldContext}
 ${verificationContext}
 ${gradingStyleContext}
+${autoDetectedSubjectContext}
 
 Your task is to:
-1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions - cite exactly what you see
-2. Identify the mathematical problem the student is solving and which NYS standard it aligns with
-3. SOLVE THE PROBLEM YOURSELF to determine the correct answer and approach
-4. Compare the student's work against the correct solution using NYS Regents scoring guidelines
-5. Determine if the student's answer is mathematically correct - with specific evidence
-6. Identify any misconceptions or errors in the student's reasoning - cite the exact work showing this
-7. Score using the NYS Regents 0-4 rubric and convert to 55-100 scale
-8. Provide constructive, standards-aligned feedback based only on observed work
+1. Perform OCR on the student's work to extract all text, equations, diagrams, and expressions - cite exactly what you see
+2. IDENTIFY THE SUBJECT AREA based on content keywords and context
+3. Identify the specific problem/task the student is addressing and which NYS standard it aligns with
+4. SOLVE THE PROBLEM YOURSELF (if applicable) to determine the correct answer and approach
+5. Compare the student's work against the correct solution using NYS Regents scoring guidelines
+6. Determine if the student's answer is correct - with specific evidence
+7. Identify any misconceptions or errors in the student's reasoning - cite the exact work showing this
+8. Score using the NYS Regents 0-4 rubric and convert to 55-100 scale
+9. Provide constructive, standards-aligned feedback based only on observed work
 
 ${regentsContext}
 ${customRubricContext}
@@ -682,11 +916,25 @@ ${standardContext}
 
 ${teacherGuideContext}
 
-CRITICAL: If you cannot clearly read something, make your best interpretation but flag it with "[INTERPRETATION - VERIFY: ...]" for teacher review. Never completely fabricate understanding with no basis in the work.`;
+SUBJECT-SPECIFIC NYS STANDARDS GUIDE:
+- MATH (Geometry): G.CO.*, G.SRT.*, G.C.*, G.GPE.*, G.GMD.*, G.MG.*
+- MATH (Algebra I): A.SSE.*, A.APR.*, A.CED.*, A.REI.*, F.IF.*, F.BF.*, F.LE.*
+- MATH (Algebra II): A.SSE.*, A.APR.*, F.IF.*, F.BF.*, F.TF.*, N.CN.*, S.IC.*, S.CP.*
+- SCIENCE (Biology): LS1.*, LS2.*, LS3.*, LS4.*
+- SCIENCE (Chemistry): PS1.*, PS2.*, PS3.*
+- SCIENCE (Physics): PS2.*, PS3.*, PS4.*
+- ENGLISH: RL.*, RI.*, W.*, SL.*, L.*
+- HISTORY/SS: RH.*, WHST.*, SS.*
+- FINANCIAL MATH: NGPF.*, FIN.*
 
-      userPromptText = `Please analyze this student's handwritten math work${isTeacherGuidedMode ? ' using the teacher\'s answer guide as reference' : ' using NYS Regents scoring standards'}.
+CRITICAL: Detect the subject from the content and use the appropriate standard prefixes.
+If you cannot clearly read something, make your best interpretation but flag it with "[INTERPRETATION - VERIFY: ...]" for teacher review.`;
 
-IMPORTANT: ${isTeacherGuidedMode ? 'Use the teacher\'s answer guide to determine correct answers and grading criteria.' : 'You must solve this problem yourself first to determine the correct answer, then evaluate the student\'s work against NYS standards.'}`;
+      userPromptText = `Please analyze this student's work${isTeacherGuidedMode ? ' using the teacher\'s answer guide as reference' : ' using NYS Regents scoring standards'}.
+
+IMPORTANT: 
+1. First, IDENTIFY THE SUBJECT AREA from the content (Math, Science, English, History, etc.)
+2. ${isTeacherGuidedMode ? 'Use the teacher\'s answer guide to determine correct answers and grading criteria.' : 'Apply the appropriate NYS standards for the detected subject.'}`;
 
       if (promptText) {
         userPromptText += `\n\nThe problem statement is: ${promptText}`;
@@ -695,37 +943,60 @@ IMPORTANT: ${isTeacherGuidedMode ? 'Use the teacher\'s answer guide to determine
       userPromptText += `
 
 Steps to follow:
-1. Extract all text and mathematical content from the image (OCR)
-2. Identify the problem being solved and its related NYS standard
-3. Solve the problem yourself to get the correct answer
-4. Compare the student's solution to your solution
-5. Apply NYS Regents scoring rubric (0-4 scale)
-6. Convert to 55-100 grade scale`;
+1. Extract all text and content from the image (OCR)
+2. DETECT THE SUBJECT AREA based on vocabulary, formulas, and context
+3. Identify the problem being solved and its related NYS standard (use subject-appropriate prefix)
+4. Solve the problem yourself (if applicable) to get the correct answer
+5. Compare the student's solution to your solution
+6. Apply NYS Regents scoring rubric (0-4 scale)
+7. Convert to 55-100 grade scale
+8. Report the detected subject in your response`;
 
     } else {
-      systemPrompt = `You are a precise and factual NYS Regents mathematics grader. Your goal is to provide assessment based STRICTLY on verified observations from student work.
+      systemPrompt = `You are a precise and factual NYS Regents grader for ALL academic subjects. Your goal is to provide assessment based STRICTLY on verified observations from student work.
+
+CRITICAL - SUBJECT DETECTION:
+You MUST first identify the SUBJECT AREA of this work based on the content you observe (Math, Science, English, History, etc.).
+Then apply the appropriate NYS standards for that subject.
 
 ${hallucinationShieldContext}
 ${verificationContext}
 ${gradingStyleContext}
 ${teacherAnswerSampleContext}
+${autoDetectedSubjectContext}
+
 Your task is to:
-1. Perform OCR on the student's handwritten work to extract all text, equations, and mathematical expressions - cite exactly what you see
-2. Analyze the student's problem-solving approach using NYS Regents scoring guidelines
-3. Score using the NYS Regents 0-4 rubric and convert to 55-100 scale
-4. Identify any misconceptions or errors in the student's reasoning - cite the exact work showing this
-5. Provide constructive, standards-aligned feedback based only on observed work
+1. Perform OCR on the student's work to extract all text, equations, diagrams, and expressions - cite exactly what you see
+2. IDENTIFY THE SUBJECT AREA based on content keywords and context
+3. Analyze the student's problem-solving approach using NYS Regents scoring guidelines for that subject
+4. Score using the NYS Regents 0-4 rubric and convert to 55-100 scale
+5. Identify any misconceptions or errors in the student's reasoning - cite the exact work showing this
+6. Provide constructive, standards-aligned feedback based only on observed work
 
 ${regentsContext}
 ${customRubricContext}
 ${standardContext}
 
-CRITICAL: If you cannot clearly read something, make your best interpretation but flag it with "[INTERPRETATION - VERIFY: ...]" for teacher review. Never completely fabricate understanding with no basis in the work.`;
+SUBJECT-SPECIFIC NYS STANDARDS GUIDE:
+- MATH (Geometry): G.CO.*, G.SRT.*, G.C.*, G.GPE.*, G.GMD.*, G.MG.*
+- MATH (Algebra I): A.SSE.*, A.APR.*, A.CED.*, A.REI.*, F.IF.*, F.BF.*, F.LE.*
+- MATH (Algebra II): A.SSE.*, A.APR.*, F.IF.*, F.BF.*, F.TF.*, N.CN.*, S.IC.*, S.CP.*
+- SCIENCE (Biology): LS1.*, LS2.*, LS3.*, LS4.*
+- SCIENCE (Chemistry): PS1.*, PS2.*, PS3.*
+- SCIENCE (Physics): PS2.*, PS3.*, PS4.*
+- ENGLISH: RL.*, RI.*, W.*, SL.*, L.*
+- HISTORY/SS: RH.*, WHST.*, SS.*
+- FINANCIAL MATH: NGPF.*, FIN.*
 
-      userPromptText = `Please analyze this student's handwritten math work using NYS Regents scoring standards.
+CRITICAL: Detect the subject from the content and use the appropriate standard prefixes.
+If you cannot clearly read something, make your best interpretation but flag it with "[INTERPRETATION - VERIFY: ...]" for teacher review.`;
 
-Extract all text and mathematical content you can see (OCR).
-Identify the problem being solved, its related NYS standard, and evaluate the student's approach.`;
+      userPromptText = `Please analyze this student's work using NYS Regents scoring standards.
+
+IMPORTANT: First IDENTIFY THE SUBJECT AREA from the content, then apply appropriate NYS standards.
+
+Extract all text and content you can see (OCR).
+Detect the subject area, identify the problem being solved, its related NYS standard, and evaluate the student's approach.`;
     }
 
     if (rubricSteps && rubricSteps.length > 0) {
@@ -769,15 +1040,16 @@ STEP 3 - FLAG FOR TEACHER VERIFICATION:
 3. Teacher will review and confirm flagged items
 
 Provide your analysis in the following structure:
+- Detected Subject: (the subject area you identified from the content: Geometry, Algebra I, Algebra II, Biology, Chemistry, Physics, English, History, Financial Math, or Other)
 - OCR Text: (extracted content - include interpretations marked as "[INTERPRETATION - VERIFY: probable reading is X]")
 - Interpretations Made: (LIST any interpretations that need teacher verification)
 - Problem Identified: (what problem the student is solving - BRIEF description only, under 20 words)
-- NYS Standard: (CONCISE format ONLY: "[CODE] - [Brief 5-10 word description]". Example: "6.G.A.1 - Finding area of composite shapes". Do NOT include full standard text or long explanations.)` + (isAIMode ? `
+- NYS Standard: (CONCISE format ONLY: "[CODE] - [Brief 5-10 word description]". Example: "6.G.A.1 - Finding area of composite shapes". Use subject-appropriate standard prefix. Do NOT include full standard text or long explanations.)` + (isAIMode ? `
 - Correct Solution: (your step-by-step solution to the problem)` : '') + `
 - Concepts Demonstrated: (LIST each concept with citation from their work)
 - Coherent Work Shown: (YES or NO - does the student show logical thinking/work, even if simple?)
 - Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND)
-- Is Correct: (YES or NO - is the final answer mathematically correct?)
+- Is Correct: (YES or NO - is the final answer correct?)
 - Regents Score: (0, 1, 2, 3, or 4 - remember: ANY understanding = Score 1 minimum)
 - Regents Score Justification: (why this score - cite evidence)
 - Rubric Scores: (if teacher rubric provided, score each criterion with points)
@@ -1568,6 +1840,7 @@ function levenshteinDistance(str1: string, str2: string): number {
 }
 
 interface ParsedResult {
+  detectedSubject: string;
   ocrText: string;
   problemIdentified: string;
   nysStandard: string;
@@ -1586,6 +1859,7 @@ interface ParsedResult {
 
 function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: number = 55, gradeFloorWithEffort: number = 65): ParsedResult {
   const result: ParsedResult = {
+    detectedSubject: '',
     ocrText: '',
     problemIdentified: '',
     nysStandard: '',
@@ -1602,7 +1876,11 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     feedback: '',
   };
 
-  const ocrMatch = text.match(/OCR Text[:\s]*([^]*?)(?=Problem Identified|NYS Standard|Concepts Demonstrated|Approach Analysis|$)/i);
+  // Parse Detected Subject
+  const subjectMatch = text.match(/Detected Subject[:\s]*([^\n]+)/i);
+  if (subjectMatch) result.detectedSubject = subjectMatch[1].trim();
+
+  const ocrMatch = text.match(/OCR Text[:\s]*([^]*?)(?=Interpretations Made|Problem Identified|NYS Standard|Concepts Demonstrated|Approach Analysis|$)/i);
   if (ocrMatch) result.ocrText = ocrMatch[1].trim();
 
   const problemMatch = text.match(/Problem Identified[:\s]*([^]*?)(?=NYS Standard|Concepts Demonstrated|Approach Analysis|Rubric Scores|$)/i);
