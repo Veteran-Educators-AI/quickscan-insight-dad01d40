@@ -21,70 +21,57 @@ async function generateImageWithNanoBanana(prompt: string): Promise<string | nul
 
   try {
     // ═══════════════════════════════════════════════════════════════════════════════
-    // MASTER GEOMETRY TEMPLATE v2 - Strict, Simple, Explicit
+    // MASTER GEOMETRY TEMPLATE v3 - LAYERED RENDERING APPROACH
     // ═══════════════════════════════════════════════════════════════════════════════
-    const enhancedPrompt = `Create a simple, clean mathematical diagram.
+    const enhancedPrompt = `Create a simple, clean mathematical diagram using LAYERED RENDERING.
 
-WHAT TO DRAW:
+═══════════════════════════════════════════════════════════════════════════════
+STEP 1: DRAW THE COORDINATE PLANE FIRST (BASE LAYER)
+═══════════════════════════════════════════════════════════════════════════════
+Before drawing ANY shape, create a complete coordinate plane:
+1. White background
+2. Draw X-AXIS: horizontal black line with arrow pointing RIGHT, label "x" at arrow
+3. Draw Y-AXIS: vertical black line with arrow pointing UP, label "y" at arrow  
+4. Add tick marks at integers: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+5. X-axis numbers go BELOW the axis, evenly spaced LEFT to RIGHT
+6. Y-axis numbers go to the LEFT of the axis, evenly spaced BOTTOM to TOP
+7. Origin is labeled "0" only ONCE (at the corner where axes meet)
+8. Optional: light gray grid lines
+
+THE COORDINATE PLANE MUST BE COMPLETE AND CORRECT BEFORE STEP 2.
+
+═══════════════════════════════════════════════════════════════════════════════
+STEP 2: DRAW THE SHAPE ON TOP (OVERLAY LAYER)
+═══════════════════════════════════════════════════════════════════════════════
+After the coordinate plane is complete:
+1. Plot each vertex as a SMALL SOLID BLACK DOT at the correct coordinates
+2. Connect vertices with THIN BLACK LINES to form the shape
+3. Label each vertex ONCE with letter and coordinates: A(1, 4)
+4. Place labels OUTSIDE the shape, near the dot
+
+═══════════════════════════════════════════════════════════════════════════════
+WHAT TO DRAW ON THIS COORDINATE PLANE:
+═══════════════════════════════════════════════════════════════════════════════
 ${prompt}
 
 ═══════════════════════════════════════════════════════════════════════════════
-STRICT RULES - FOLLOW EXACTLY
+ABSOLUTE RULES - DO NOT BREAK THESE
 ═══════════════════════════════════════════════════════════════════════════════
-
-RULE 1: STYLE
-- Plain white background
-- Black lines only (no colors, no shading, no gradients)
-- Clean sans-serif font for all text
-- Simple and minimal - like a textbook diagram
-
-RULE 2: COORDINATE PLANE (if needed)
-- Draw x-axis as a horizontal line with arrow pointing RIGHT
-- Draw y-axis as a vertical line with arrow pointing UP
-- Label "x" at the right end of x-axis
-- Label "y" at the top of y-axis
-- Put small tick marks at each integer
-- Write the numbers BELOW the x-axis ticks
-- Write the numbers to the LEFT of y-axis ticks
-- The origin (0,0) is where the axes cross
-
-RULE 3: PLOTTING POINTS
-- Draw each point as a SOLID BLACK DOT
-- Write the point label NEXT TO the dot (not on top of it)
-- Format: Letter followed by coordinates, like "A(1, 1)" or "B(7, 1)"
-- Each point gets ONE label only - do not repeat labels
-
-RULE 4: SHAPES ON COORDINATE PLANE
-- Connect the vertices with straight black lines
-- The shape should be clearly visible
-- Label each vertex ONCE with its letter and coordinates
-- Place vertex labels OUTSIDE the shape, near each corner
-
-RULE 5: MEASUREMENTS (if showing lengths)
-- Write measurements OUTSIDE the shape, parallel to the side
-- Include units: "6 units" or "3 units"
-- Do NOT clutter - only show measurements that are asked for
+- Y-axis numbers: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 going UP (not scattered)
+- X-axis numbers: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 going RIGHT (not scattered)
+- All text is HORIZONTAL (no rotated or diagonal text)
+- NO "units" labels on the shape sides unless explicitly requested
+- NO duplicate labels
+- NO colors or shading (black and white only)
+- Labels are positioned OUTSIDE shapes, not inside
 
 ═══════════════════════════════════════════════════════════════════════════════
-DO NOT DO THESE THINGS
+FINAL VERIFICATION
 ═══════════════════════════════════════════════════════════════════════════════
-- DO NOT use colors or shading
-- DO NOT repeat the same vertex label twice
-- DO NOT put labels inside the shape
-- DO NOT add extra arrows or decorations
-- DO NOT add elements that were not requested
-- DO NOT make it cluttered or confusing
-- DO NOT use fancy fonts or styling
-
-═══════════════════════════════════════════════════════════════════════════════
-QUALITY CHECK
-═══════════════════════════════════════════════════════════════════════════════
-Before finishing, verify:
+✓ Coordinate plane is drawn FIRST with correct axis numbering
+✓ Shape is drawn ON TOP of the coordinate plane
 ✓ Each vertex has exactly ONE label
-✓ All coordinates match what was requested
-✓ The shape is clearly visible
-✓ Labels are readable and positioned outside the shape
-✓ The diagram is clean and simple`;
+✓ All text is horizontal and readable`;
 
     console.log('Generating image with Nano Banana...');
     
