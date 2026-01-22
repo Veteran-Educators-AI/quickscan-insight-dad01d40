@@ -431,13 +431,13 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
   }
   
   // IMPROVED: Parse ONLY explicitly labeled vertex coordinates (A(x,y), B(x,y), etc.)
-  // This prevents picking up stray numbers from the prompt text
-  const labeledVertexMatches = prompt.match(/([A-Z])\s*\((\d+),\s*(\d+)\)/g) || [];
+  // Now supports NEGATIVE coordinates like P(-1, 5) or R(5, -3)
+  const labeledVertexMatches = prompt.match(/([A-Z])\s*\((-?\d+),\s*(-?\d+)\)/g) || [];
   
   // Use a Map to deduplicate labels - only keep the first occurrence of each label
   const labeledVerticesMap = new Map<string, { label: string; x: number; y: number }>();
   for (const match of labeledVertexMatches) {
-    const parsed = match.match(/([A-Z])\s*\((\d+),\s*(\d+)\)/);
+    const parsed = match.match(/([A-Z])\s*\((-?\d+),\s*(-?\d+)\)/);
     if (parsed) {
       const label = parsed[1];
       // Only add if we haven't seen this label before
@@ -489,33 +489,43 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
     return null; // Can't generate without coordinates
   }
 
-  // Determine the coordinate range needed (include circle bounds if applicable)
+  // Determine the coordinate range needed - SUPPORT NEGATIVE COORDINATES
+  let minX = 0;
+  let minY = 0;
   let maxX = 10;
   let maxY = 10;
   
   if (shapeInfo.isCircular && circleInfo?.center && circleInfo?.radius) {
-    maxX = Math.max(10, circleInfo.center.x + circleInfo.radius + 2);
-    maxY = Math.max(10, circleInfo.center.y + circleInfo.radius + 2);
+    minX = Math.min(minX, circleInfo.center.x - circleInfo.radius - 2);
+    minY = Math.min(minY, circleInfo.center.y - circleInfo.radius - 2);
+    maxX = Math.max(maxX, circleInfo.center.x + circleInfo.radius + 2);
+    maxY = Math.max(maxY, circleInfo.center.y + circleInfo.radius + 2);
   }
   if (coordinates.length > 0) {
+    minX = Math.min(minX, ...coordinates.map(c => c.x - 2));
+    minY = Math.min(minY, ...coordinates.map(c => c.y - 2));
     maxX = Math.max(maxX, ...coordinates.map(c => c.x + 2));
     maxY = Math.max(maxY, ...coordinates.map(c => c.y + 2));
   }
+  
+  // Calculate total range
+  const rangeX = maxX - minX;
+  const rangeY = maxY - minY;
 
-  // SVG dimensions and scaling
+  // SVG dimensions and scaling - now supports negative coordinates
   const svgWidth = 320;
   const svgHeight = 320;
   const margin = 40;
   const plotWidth = svgWidth - 2 * margin;
   const plotHeight = svgHeight - 2 * margin;
-  const scaleX = plotWidth / maxX;
-  const scaleY = plotHeight / maxY;
+  const scaleX = plotWidth / rangeX;
+  const scaleY = plotHeight / rangeY;
   // Use uniform scaling for circles to prevent distortion
   const uniformScale = Math.min(scaleX, scaleY);
 
-  // Helper to convert coordinates to SVG positions
-  const toSvgX = (x: number) => margin + x * scaleX;
-  const toSvgY = (y: number) => svgHeight - margin - y * scaleY; // Y is inverted in SVG
+  // Helper to convert coordinates to SVG positions (now accounts for minX/minY offset)
+  const toSvgX = (x: number) => margin + (x - minX) * scaleX;
+  const toSvgY = (y: number) => svgHeight - margin - (y - minY) * scaleY; // Y is inverted in SVG
 
   // Build SVG parts
   let svg = `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
@@ -524,25 +534,25 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
   <!-- Grid lines -->
   <g stroke="#e0e0e0" stroke-width="1">`;
 
-  // Vertical grid lines
-  for (let x = 0; x <= maxX; x++) {
-    svg += `\n    <line x1="${toSvgX(x)}" y1="${toSvgY(0)}" x2="${toSvgX(x)}" y2="${toSvgY(maxY)}"/>`;
+  // Vertical grid lines (from minX to maxX)
+  for (let x = minX; x <= maxX; x++) {
+    svg += `\n    <line x1="${toSvgX(x)}" y1="${toSvgY(minY)}" x2="${toSvgX(x)}" y2="${toSvgY(maxY)}"/>`;
   }
-  // Horizontal grid lines
-  for (let y = 0; y <= maxY; y++) {
-    svg += `\n    <line x1="${toSvgX(0)}" y1="${toSvgY(y)}" x2="${toSvgX(maxX)}" y2="${toSvgY(y)}"/>`;
+  // Horizontal grid lines (from minY to maxY)
+  for (let y = minY; y <= maxY; y++) {
+    svg += `\n    <line x1="${toSvgX(minX)}" y1="${toSvgY(y)}" x2="${toSvgX(maxX)}" y2="${toSvgY(y)}"/>`;
   }
 
   svg += `\n  </g>
   
   <!-- Axes -->
   <g stroke="#000000" stroke-width="2">
-    <!-- X-axis -->
-    <line x1="${margin - 5}" y1="${toSvgY(0)}" x2="${toSvgX(maxX) + 10}" y2="${toSvgY(0)}"/>
+    <!-- X-axis (at y=0, or at minY if 0 is not in range) -->
+    <line x1="${toSvgX(minX) - 5}" y1="${toSvgY(0)}" x2="${toSvgX(maxX) + 10}" y2="${toSvgY(0)}"/>
     <!-- X-axis arrow -->
     <polygon points="${toSvgX(maxX) + 10},${toSvgY(0)} ${toSvgX(maxX) + 2},${toSvgY(0) - 4} ${toSvgX(maxX) + 2},${toSvgY(0) + 4}" fill="#000000"/>
-    <!-- Y-axis -->
-    <line x1="${toSvgX(0)}" y1="${toSvgY(0) + 5}" x2="${toSvgX(0)}" y2="${toSvgY(maxY) - 10}"/>
+    <!-- Y-axis (at x=0, or at minX if 0 is not in range) -->
+    <line x1="${toSvgX(0)}" y1="${toSvgY(minY) + 5}" x2="${toSvgX(0)}" y2="${toSvgY(maxY) - 10}"/>
     <!-- Y-axis arrow -->
     <polygon points="${toSvgX(0)},${toSvgY(maxY) - 10} ${toSvgX(0) - 4},${toSvgY(maxY) - 2} ${toSvgX(0) + 4},${toSvgY(maxY) - 2}" fill="#000000"/>
   </g>
@@ -554,14 +564,16 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
     <!-- Y-axis label -->
     <text x="${toSvgX(0) - 5}" y="${toSvgY(maxY) - 15}" font-style="italic">y</text>`;
 
-  // X-axis numbers (SEQUENTIAL: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-  for (let x = 0; x <= maxX; x++) {
+  // X-axis numbers (from minX to maxX, including negative numbers)
+  for (let x = minX; x <= maxX; x++) {
+    // Skip 0 label if it overlaps with origin
+    if (x === 0 && minY < 0 && maxY > 0) continue;
     svg += `\n    <text x="${toSvgX(x)}" y="${toSvgY(0) + 15}" text-anchor="middle">${x}</text>`;
   }
 
-  // Y-axis numbers (SEQUENTIAL: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 going UP)
-  for (let y = 0; y <= maxY; y++) {
-    if (y === 0) continue; // Skip 0 on Y-axis since it's shared with X
+  // Y-axis numbers (from minY to maxY, including negative numbers)
+  for (let y = minY; y <= maxY; y++) {
+    if (y === 0) continue; // Skip 0 on Y-axis since it's on X-axis
     svg += `\n    <text x="${toSvgX(0) - 8}" y="${toSvgY(y) + 4}" text-anchor="end">${y}</text>`;
   }
 
