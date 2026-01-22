@@ -302,8 +302,150 @@ STYLE REQUIREMENTS:
   }
 }
 
-// Generate SVG diagram using standard AI model
+// Generate deterministic SVG coordinate plane diagram (guaranteed correct axis labels)
+function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null {
+  // Parse coordinates from the prompt
+  const coordinateMatches = prompt.match(/\((\d+),\s*(\d+)\)/g) || [];
+  const coordinates = coordinateMatches.map(match => {
+    const nums = match.match(/(\d+)/g);
+    return nums ? { x: parseInt(nums[0]), y: parseInt(nums[1]) } : null;
+  }).filter(Boolean) as { x: number; y: number }[];
+
+  // Parse vertex labels (A, B, C, D, etc.)
+  const labelMatches = prompt.match(/([A-Z])\s*\(\d+,\s*\d+\)/g) || [];
+  const labels = labelMatches.map(match => match.charAt(0));
+
+  if (coordinates.length === 0) {
+    return null; // Can't generate without coordinates
+  }
+
+  // Determine the coordinate range needed
+  const maxX = Math.max(10, ...coordinates.map(c => c.x + 2));
+  const maxY = Math.max(10, ...coordinates.map(c => c.y + 2));
+
+  // SVG dimensions and scaling
+  const svgWidth = 320;
+  const svgHeight = 320;
+  const margin = 40;
+  const plotWidth = svgWidth - 2 * margin;
+  const plotHeight = svgHeight - 2 * margin;
+  const scaleX = plotWidth / maxX;
+  const scaleY = plotHeight / maxY;
+
+  // Helper to convert coordinates to SVG positions
+  const toSvgX = (x: number) => margin + x * scaleX;
+  const toSvgY = (y: number) => svgHeight - margin - y * scaleY; // Y is inverted in SVG
+
+  // Build SVG parts
+  let svg = `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="${svgWidth}" height="${svgHeight}" fill="#ffffff"/>
+  
+  <!-- Grid lines -->
+  <g stroke="#e0e0e0" stroke-width="1">`;
+
+  // Vertical grid lines
+  for (let x = 0; x <= maxX; x++) {
+    svg += `\n    <line x1="${toSvgX(x)}" y1="${toSvgY(0)}" x2="${toSvgX(x)}" y2="${toSvgY(maxY)}"/>`;
+  }
+  // Horizontal grid lines
+  for (let y = 0; y <= maxY; y++) {
+    svg += `\n    <line x1="${toSvgX(0)}" y1="${toSvgY(y)}" x2="${toSvgX(maxX)}" y2="${toSvgY(y)}"/>`;
+  }
+
+  svg += `\n  </g>
+  
+  <!-- Axes -->
+  <g stroke="#000000" stroke-width="2">
+    <!-- X-axis -->
+    <line x1="${margin - 5}" y1="${toSvgY(0)}" x2="${toSvgX(maxX) + 10}" y2="${toSvgY(0)}"/>
+    <!-- X-axis arrow -->
+    <polygon points="${toSvgX(maxX) + 10},${toSvgY(0)} ${toSvgX(maxX) + 2},${toSvgY(0) - 4} ${toSvgX(maxX) + 2},${toSvgY(0) + 4}" fill="#000000"/>
+    <!-- Y-axis -->
+    <line x1="${toSvgX(0)}" y1="${toSvgY(0) + 5}" x2="${toSvgX(0)}" y2="${toSvgY(maxY) - 10}"/>
+    <!-- Y-axis arrow -->
+    <polygon points="${toSvgX(0)},${toSvgY(maxY) - 10} ${toSvgX(0) - 4},${toSvgY(maxY) - 2} ${toSvgX(0) + 4},${toSvgY(maxY) - 2}" fill="#000000"/>
+  </g>
+  
+  <!-- Axis labels -->
+  <g font-family="Arial, sans-serif" font-size="11" fill="#000000">
+    <!-- X-axis label -->
+    <text x="${toSvgX(maxX) + 15}" y="${toSvgY(0) + 4}" font-style="italic">x</text>
+    <!-- Y-axis label -->
+    <text x="${toSvgX(0) - 5}" y="${toSvgY(maxY) - 15}" font-style="italic">y</text>`;
+
+  // X-axis numbers (SEQUENTIAL: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  for (let x = 0; x <= maxX; x++) {
+    svg += `\n    <text x="${toSvgX(x)}" y="${toSvgY(0) + 15}" text-anchor="middle">${x}</text>`;
+  }
+
+  // Y-axis numbers (SEQUENTIAL: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 going UP)
+  for (let y = 0; y <= maxY; y++) {
+    if (y === 0) continue; // Skip 0 on Y-axis since it's shared with X
+    svg += `\n    <text x="${toSvgX(0) - 8}" y="${toSvgY(y) + 4}" text-anchor="end">${y}</text>`;
+  }
+
+  svg += `\n  </g>`;
+
+  // Draw the shape (connect vertices)
+  if (coordinates.length >= 2) {
+    svg += `\n  
+  <!-- Shape outline -->
+  <g stroke="#000000" stroke-width="2" fill="none">
+    <polygon points="${coordinates.map(c => `${toSvgX(c.x)},${toSvgY(c.y)}`).join(' ')}"/>
+  </g>`;
+  }
+
+  // Plot vertices and labels
+  svg += `\n  
+  <!-- Vertices -->
+  <g fill="#000000">`;
+
+  coordinates.forEach((coord, i) => {
+    const label = labels[i] || String.fromCharCode(65 + i); // A, B, C, D...
+    const labelX = toSvgX(coord.x);
+    const labelY = toSvgY(coord.y);
+    
+    // Determine label position (offset based on position to avoid overlap with shape)
+    let textOffsetX = 8;
+    let textOffsetY = -8;
+    
+    // If point is on the right side, put label to the right
+    if (coord.x > maxX / 2) textOffsetX = 8;
+    else textOffsetX = -30; // Left side, put label to the left
+    
+    // If point is at the top, put label above
+    if (coord.y > maxY / 2) textOffsetY = -8;
+    else textOffsetY = 18; // Bottom, put label below
+
+    svg += `\n    <!-- ${label}(${coord.x}, ${coord.y}) -->
+    <circle cx="${labelX}" cy="${labelY}" r="4"/>
+    <text x="${labelX + textOffsetX}" y="${labelY + textOffsetY}" font-family="Arial, sans-serif" font-size="12" font-weight="bold">${label}(${coord.x}, ${coord.y})</text>`;
+  });
+
+  svg += `\n  </g>
+</svg>`;
+
+  // Convert to data URL
+  const base64Svg = btoa(unescape(encodeURIComponent(svg)));
+  return `data:image/svg+xml;base64,${base64Svg}`;
+}
+
+// Generate SVG diagram using standard AI model (fallback if deterministic fails)
 async function generateSVGWithAI(prompt: string): Promise<string | null> {
+  // First, try deterministic generation for coordinate plane problems
+  const isCoordinatePlane = prompt.toLowerCase().includes('coordinate') || 
+                            prompt.match(/[A-Z]\s*\(\d+,\s*\d+\)/);
+  
+  if (isCoordinatePlane) {
+    console.log('Using deterministic SVG generator for coordinate plane...');
+    const deterministicSvg = generateDeterministicCoordinatePlaneSVG(prompt);
+    if (deterministicSvg) {
+      console.log('Deterministic SVG generated successfully');
+      return deterministicSvg;
+    }
+  }
+
+  // Fall back to AI generation for non-coordinate-plane diagrams
   const apiKey = Deno.env.get('LOVABLE_API_KEY');
   if (!apiKey) {
     console.error('LOVABLE_API_KEY not configured');
@@ -320,7 +462,7 @@ MANDATORY SVG REQUIREMENTS:
 1. FOR COORDINATE PLANES:
    - Include a complete grid with light gray lines (#cccccc)
    - Bold black axes with arrows at the ends
-   - Number labels on both axes at regular intervals
+   - Number labels on both axes at regular intervals (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
    - Plot points as solid black circles (r="4")
    - Label each point with its name and coordinates using <text> elements
    - Example: <text x="45" y="85" font-size="12">A (2, 5)</text>
