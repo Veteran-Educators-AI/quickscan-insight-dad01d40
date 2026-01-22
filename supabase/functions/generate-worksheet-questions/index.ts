@@ -299,36 +299,93 @@ VARIATION REQUIREMENT (CRITICAL - ANTI-COPYING MEASURE):
     if (includeGeometry) {
       if (useAIImages) {
         geometryInstruction = `
-8. For geometry-related questions, you MUST include an "imagePrompt" field with an EXTREMELY DETAILED description of the diagram.
-   
-   YOUR imagePrompt MUST follow this exact format - be as explicit as possible:
+8. For geometry-related questions, you MUST include an "imagePrompt" field following the MASTER GEOMETRY TEMPLATE format:
 
-   COORDINATE GEOMETRY EXAMPLE:
-   "A Cartesian coordinate plane with a clear grid. The axes are numbered from -5 to 10. 
-    - A point is plotted exactly at (2, 5) and labeled 'Endpoint 1 (2, 5)'. 
-    - A second point is plotted exactly at (8, 3) and labeled 'Endpoint 2 (8, 3)'. 
-    - A straight line segment connects these two points.
-    - The midpoint at (5, 4) is marked with a small dot and labeled 'Midpoint M (5, 4)'."
+═══════════════════════════════════════════════════════════════════════════════
+MASTER GEOMETRY TEMPLATE - USE THIS EXACT STRUCTURE FOR ALL imagePrompt FIELDS
+═══════════════════════════════════════════════════════════════════════════════
 
-   TRIANGLE EXAMPLE:
-   "A right triangle ABC displayed in textbook style:
-    - Vertex A is at the top, vertex B at bottom-left, vertex C at bottom-right.
-    - The right angle is at vertex C, shown with a small square symbol.
-    - Side AB (hypotenuse) is labeled '10 cm'.
-    - Side BC is labeled '6 cm'.
-    - Side AC is labeled '8 cm'.
-    - Angle A is labeled '37°' with an arc symbol.
-    - Angle B is labeled '53°' with an arc symbol."
+[STYLE HEADER]
+"A clean, black-and-white educational diagram of a [Shape Name, e.g., right triangle, circle, rectangle] on a plain white background, styled like a figure in a geometry textbook."
 
-   CIRCLE EXAMPLE:
-   "A circle with center point O clearly marked at the center:
-    - The radius is drawn from O to point A on the circle, labeled 'r = 5 cm'.
-    - A chord BC is drawn with endpoints B and C on the circle.
-    - The midpoint M of chord BC is marked.
-    - A perpendicular line from O to M is shown as a dashed line.
-    - The distance OM is labeled '3 cm'."
+[ORIENTATION DEFINITION] (Crucial Step: Pick one standard orientation and stick to it.)
+"The shape is oriented such that [Describe orientation, e.g., 'it has a flat horizontal base and a vertical height on the left side, meeting at the bottom-left corner']."
 
-   ALWAYS include: exact coordinates, point labels, measurement values, angle degrees, and visual indicators.`;
+[KEY FEATURES & SYMBOLS]
+"Include the following specific markings: [List symbols like right-angle squares, parallel line arrows, or congruent tick marks, specifying EXACTLY which corner or line they belong to]."
+
+[ANGLE LABELING]
+"Label the angles as follows: [Specify the exact vertex location, e.g., 'top-right corner', 'bottom-left', 'center'] is labeled with [Greek letter or variable name]. Draw an arc to indicate this angle."
+
+[SIDE/SEGMENT LABELING] (Use physical locations, NOT math terms like 'opposite' or 'adjacent')
+"Label the sides/lengths as follows:
+• The [physical location, e.g., vertical side on the left] is labeled '[Value/Variable]'.
+• The [physical location, e.g., bottom horizontal base] is labeled '[Value/Variable]'.
+• The [physical location, e.g., long diagonal side] is labeled '[Value/Variable]'."
+
+[FINAL POLISH]
+"All lines are thin black lines, and all text is clear, dark, sans-serif academic font. No shading or colors."
+
+═══════════════════════════════════════════════════════════════════════════════
+EXAMPLE imagePrompt FOR A RIGHT TRIANGLE:
+═══════════════════════════════════════════════════════════════════════════════
+
+"A clean, black-and-white educational diagram of a right triangle on a plain white background, styled like a figure in a geometry textbook.
+
+The shape is oriented such that it has a flat horizontal base and a vertical height on the left side, meeting at the bottom-left corner.
+
+Include the following specific markings: A right-angle square symbol is placed in the bottom-left corner where the vertical and horizontal sides meet. Single tick marks are on both the vertical side and horizontal base to indicate they are known values.
+
+Label the angles as follows: The top vertex is labeled with 'A'. The bottom-left corner (the right angle) has a small square instead of a letter. The bottom-right vertex is labeled 'C'.
+
+Label the sides/lengths as follows:
+• The vertical side on the left is labeled '6 cm'.
+• The bottom horizontal base is labeled '8 cm'.
+• The slanted side connecting top to bottom-right is labeled '10 cm (hypotenuse)'.
+
+All lines are thin black lines, and all text is clear, dark, sans-serif academic font. No shading or colors."
+
+═══════════════════════════════════════════════════════════════════════════════
+EXAMPLE imagePrompt FOR A COORDINATE PLANE:
+═══════════════════════════════════════════════════════════════════════════════
+
+"A clean, black-and-white Cartesian coordinate plane on a plain white background, styled like a figure in a geometry textbook.
+
+The plane is oriented with the origin at the center. The positive x-axis extends to the right and is labeled 'x' with an arrow. The positive y-axis extends upward and is labeled 'y' with an arrow.
+
+Include the following specific markings: 
+• Light gray grid lines at every integer interval from -5 to 10 on both axes.
+• Tick marks with numbers at every integer on both axes.
+• Bold black axis lines with arrows at the ends.
+
+Plot the following points as solid black dots:
+• Point A is plotted exactly at coordinates (2, 5) and labeled 'A (2, 5)' to the upper-right of the dot.
+• Point B is plotted exactly at coordinates (8, 3) and labeled 'B (8, 3)' to the upper-right of the dot.
+
+A straight line segment connects Point A to Point B with a solid black line.
+
+All text is clear, dark, sans-serif academic font. No shading or colors."
+
+═══════════════════════════════════════════════════════════════════════════════
+EXAMPLE imagePrompt FOR A CIRCLE:
+═══════════════════════════════════════════════════════════════════════════════
+
+"A clean, black-and-white educational diagram of a circle on a plain white background, styled like a figure in a geometry textbook.
+
+The circle is centered in the image with its center point clearly marked.
+
+Include the following specific markings:
+• The center point is marked with a small dot and labeled 'O'.
+• A radius line extends from center O to a point P on the circle's edge (to the right).
+• The radius line is labeled 'r = 5 cm' positioned above the line.
+• A chord connects two points Q and R on the circle.
+
+Label the points as follows:
+• Center is labeled 'O'.
+• Point on circle where radius touches is labeled 'P'.
+• Chord endpoints are labeled 'Q' and 'R'.
+
+All lines are thin black lines, and all text is clear, dark, sans-serif academic font. No shading or colors."`;
       } else {
         geometryInstruction = `
 8. For geometry-related questions, you MUST include an "svg" field with a complete, valid SVG string that visually represents the geometric figure described in the question.

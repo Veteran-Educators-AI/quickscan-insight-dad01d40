@@ -2307,41 +2307,78 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       setRegeneratingShapeKey(questionKey);
       
       // Create a highly detailed prompt based on the question text
-      const shapePrompt = `Create a detailed, textbook-quality mathematical diagram for this question:
+      // ═══════════════════════════════════════════════════════════════════════════════
+      // MASTER GEOMETRY TEMPLATE - Ultra-explicit analytical prompting
+      // ═══════════════════════════════════════════════════════════════════════════════
+      const shapePrompt = `Create a textbook-quality mathematical diagram for this question:
 
+═══════════════════════════════════════════════════════════════════════════════
+[QUESTION TO ILLUSTRATE]
+═══════════════════════════════════════════════════════════════════════════════
 "${questionText}"
 
-REQUIRED ELEMENTS FOR THIS DIAGRAM:
+═══════════════════════════════════════════════════════════════════════════════
+MASTER GEOMETRY TEMPLATE - FOLLOW THIS STRUCTURE EXACTLY
+═══════════════════════════════════════════════════════════════════════════════
 
-1. If this involves a COORDINATE PLANE:
-   - Draw a Cartesian coordinate plane with a clear grid
-   - Label the x-axis and y-axis with arrows and numbered intervals (e.g., -5 to 5)
-   - Plot ALL mentioned points as solid black dots
-   - Label each point with its name AND coordinates (e.g., "Point A (2, 5)" or "Endpoint 1 (2, 5)")
-   - If there are two or more points, connect them with a clear line segment or curve as appropriate
-   - Write any relevant equations near their corresponding lines
+[STYLE HEADER]
+"A clean, black-and-white educational diagram on a plain white background, styled like a figure in a geometry textbook."
 
-2. If this involves GEOMETRIC SHAPES:
-   - Draw the shape with bold, clean black outlines
-   - Label ALL vertices with capital letters (A, B, C, D, etc.)
-   - Show ALL given measurements (side lengths in cm/m, angles in degrees)
-   - Use tick marks to indicate equal sides
-   - Use small square symbols for right angles
-   - Use arc symbols with degree measurements for other angles
-   - Show dashed lines for hidden edges, heights, or diagonals
+[ORIENTATION DEFINITION] (Crucial Step: Define how the shape sits so you can reference top/bottom/left/right later. Pick one standard orientation and stick to it.)
+"The shape is oriented such that [describe orientation]:
+- For RIGHT TRIANGLES: 'it has a flat horizontal base and a vertical height on the left side, meeting at the bottom-left corner where the right angle is'
+- For REGULAR TRIANGLES: 'the base is horizontal at the bottom, with the apex pointing upward'
+- For RECTANGLES: 'the longer sides are horizontal, shorter sides are vertical'
+- For CIRCLES: 'the center is at the middle, with the primary radius extending horizontally to the right'
+- For COORDINATE PLANES: 'origin at center, positive x to the right, positive y upward'"
 
-3. If this involves CIRCLES:
-   - Mark and label the center point (usually O)
-   - Draw and label the radius (r = value)
-   - Show diameter, chords, or tangent lines if mentioned
-   - Label any points on the circle
+[KEY FEATURES & SYMBOLS]
+"Include the following SPECIFIC markings:
+- RIGHT-ANGLE SQUARES: A small square symbol (⊿) placed exactly in the corner where the 90° angle is located
+- CONGRUENT TICK MARKS: Single tick marks (|) on sides that are equal; double ticks (||) for a second pair of equal sides
+- PARALLEL LINE ARROWS: Small arrows (>>) on lines that are parallel to each other
+- ANGLE ARCS: Curved arcs drawn INSIDE angles to indicate angle measurements, with degree labels nearby"
 
-4. LABELING REQUIREMENTS:
-   - Every measurement mentioned in the question must appear in the diagram
-   - Use clear, readable text positioned outside shapes when possible
-   - Include units (cm, m, degrees, etc.)
+[VERTEX LABELING]
+"Label ALL vertices with CAPITAL LETTERS:
+- Position each label OUTSIDE the shape, near its vertex
+- Use A, B, C, D, E, F in clockwise order starting from the top or top-left
+- For triangles: A at top/apex, B at bottom-left, C at bottom-right
+- Font: Clear, dark, sans-serif academic style"
 
-Make the diagram professional, clean, black and white, suitable for printing on a worksheet.`;
+[ANGLE LABELING]
+"Label the angles as follows:
+- [Specify the EXACT vertex location, e.g., 'top-right corner', 'bottom-left', 'center'] is labeled with [Greek letter or variable name]
+- Draw a small arc INSIDE the angle to indicate it
+- Write the degree measurement (e.g., '45°') or variable (e.g., 'θ') adjacent to the arc
+- For right angles: Use the square symbol instead of an arc"
+
+[SIDE/SEGMENT LABELING] (Do not use math terms like 'opposite' or 'adjacent'. Use PHYSICAL LOCATIONS.)
+"Label the sides/lengths as follows:
+• The [physical location, e.g., 'vertical side on the left'] is labeled '[Value/Variable]'
+• The [physical location, e.g., 'bottom horizontal base'] is labeled '[Value/Variable]'
+• The [physical location, e.g., 'slanted/diagonal side'] is labeled '[Value/Variable]'
+- Position labels OUTSIDE the shape, parallel to the side they describe
+- ALWAYS include units: '5 cm', '8 m', '3.5 units'"
+
+[COORDINATE PLANE REQUIREMENTS] (If the question involves coordinates)
+"For coordinate planes:
+- X-AXIS: Horizontal line with arrow at right end, labeled 'x'
+- Y-AXIS: Vertical line with arrow at top end, labeled 'y'
+- ORIGIN: Labeled 'O' or '(0,0)' at the intersection
+- TICK MARKS: At every integer value, numbered clearly
+- GRID: Light gray lines forming a complete grid behind the axes
+- POINTS: Solid black dots (radius 4-5px), labeled as 'P(x, y)' or 'A(2, 5)'"
+
+[CIRCLE REQUIREMENTS] (If the question involves circles)
+"For circles:
+- CENTER: Marked with a dot and labeled 'O' or 'Center'
+- RADIUS: A line segment from center to edge, labeled 'r = [value]'
+- DIAMETER: If relevant, shown as a line through center, labeled 'd = [value]'
+- POINTS ON CIRCLE: Labeled with capital letters and coordinates if on a coordinate plane"
+
+[FINAL POLISH]
+"All lines are thin black lines (1-2px stroke). All text is clear, dark, sans-serif academic font. No shading, no colors, no gradients. The diagram is centered with appropriate whitespace. Professional textbook illustration quality suitable for printing."`;
       
       const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
         body: {
