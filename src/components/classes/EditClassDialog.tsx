@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useFeatureTracking } from '@/hooks/useFeatureTracking';
 
 interface EditClassDialogProps {
   classId: string;
@@ -36,6 +37,7 @@ export function EditClassDialog({
   const [year, setYear] = useState(currentYear || '');
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const { trackFeature } = useFeatureTracking();
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -59,6 +61,14 @@ export function EditClassDialog({
         .eq('id', classId);
 
       if (error) throw error;
+
+      // Track class editing
+      trackFeature({
+        featureName: 'Edit Class',
+        category: 'classes',
+        action: 'updated',
+        metadata: { classId },
+      });
 
       toast({
         title: 'Class updated',

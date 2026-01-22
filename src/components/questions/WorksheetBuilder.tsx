@@ -17,6 +17,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { useFeatureTracking } from '@/hooks/useFeatureTracking';
 import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
 import { renderMathText, sanitizeForPDF, fixEncodingCorruption } from '@/lib/mathRenderer';
 import { MathSymbolPreview } from './MathSymbolPreview';
@@ -203,6 +204,7 @@ interface WorksheetBuilderProps {
 export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearAll }: WorksheetBuilderProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { trackFeature } = useFeatureTracking();
   const [worksheetTitle, setWorksheetTitle] = useState('Diagnostic Assessment');
   const [hasUserEditedTitle, setHasUserEditedTitle] = useState(false);
   const [worksheetMode, setWorksheetMode] = useState<WorksheetMode>('diagnostic');
@@ -574,6 +576,20 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       if (data.questions && data.questions.length > 0) {
         setCompiledQuestions(data.questions);
         setIsCompiled(true);
+        
+        // Track worksheet compilation
+        trackFeature({
+          featureName: 'Compile Worksheet',
+          category: 'worksheets',
+          action: 'compiled',
+          metadata: {
+            questionCount: data.questions.length,
+            topicCount: selectedQuestions.length,
+            mode: worksheetMode,
+            includeAIImages: useAIImages,
+          },
+        });
+
         // Show clipart dialog after successful compilation ONLY for non-geometry/trig subjects
         if (!isGeometryOrTrigSubject) {
           setShowClipartDialog(true);

@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { useAuth } from '@/lib/auth';
+import { useFeatureTracking } from '@/hooks/useFeatureTracking';
 import jsPDF from 'jspdf';
 import pptxgen from 'pptxgenjs';
 import { StudentHandoutDialog, type HandoutOptions } from './StudentHandoutDialog';
@@ -92,6 +93,7 @@ export function LessonPlanGenerator({
   const { toast } = useToast();
   const { user } = useAuth();
   const { pushToSisterApp } = usePushToSisterApp();
+  const { trackFeature } = useFeatureTracking();
   const [isGenerating, setIsGenerating] = useState(false);
   const [lessonPlan, setLessonPlan] = useState<LessonPlan | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -344,6 +346,18 @@ export function LessonPlanGenerator({
 
       if (error) throw error;
 
+      // Track lesson plan save
+      trackFeature({
+        featureName: 'Save Lesson Plan',
+        category: 'lessons',
+        action: 'saved',
+        metadata: {
+          topicName: lessonPlan.topicName,
+          standard: lessonPlan.standard,
+          slideCount: lessonPlan.slides?.length || 0,
+        },
+      });
+
       toast({
         title: 'Lesson plan saved!',
         description: 'You can find it in your Lesson Plan Library.',
@@ -382,6 +396,20 @@ export function LessonPlanGenerator({
 
       if (data.lessonPlan) {
         setLessonPlan(data.lessonPlan);
+        
+        // Track lesson plan generation
+        trackFeature({
+          featureName: 'Generate Lesson Plan',
+          category: 'lessons',
+          action: 'generated',
+          metadata: {
+            topicName: topic.topicName,
+            standard: topic.standard,
+            slideCount: data.lessonPlan.slides?.length || 0,
+            duration: lessonDuration,
+          },
+        });
+
         toast({
           title: 'Lesson plan generated!',
           description: `Created ${data.lessonPlan.slides?.length || 0} slides for "${topic.topicName}"`,
