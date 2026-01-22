@@ -6,6 +6,7 @@ import { usePushStudentData } from './usePushStudentData';
 import { usePushToSisterApp } from './usePushToSisterApp';
 import { usePerformanceDropAlert } from './usePerformanceDropAlert';
 import { useDuplicateWorkDetection } from './useDuplicateWorkDetection';
+import { useFeatureTracking } from './useFeatureTracking';
 import type { SyncStatus } from '@/components/scan/SyncStatusIndicator';
 
 interface RubricScore {
@@ -83,6 +84,7 @@ export function useSaveAnalysisResults() {
     sisterAppSync: 'idle',
     webhookSync: 'idle',
   });
+  const { trackFeature } = useFeatureTracking();
 
   const resetSyncStatus = useCallback(() => {
     setSyncStatus({
@@ -100,6 +102,16 @@ export function useSaveAnalysisResults() {
     setIsSaving(true);
 
     try {
+      // Track feature usage
+      trackFeature({
+        featureName: 'Save Scan Results',
+        category: 'scanning',
+        action: 'save',
+        metadata: { 
+          hasTopicName: !!params.topicName,
+          hasClassId: !!params.classId 
+        }
+      });
       // Validate required fields
       if (!params.studentId) {
         toast.error('Student ID is required to save results');

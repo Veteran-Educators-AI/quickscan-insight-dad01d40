@@ -25,6 +25,7 @@ import { ClassMisconceptionSummary } from '@/components/reports/ClassMisconcepti
 import { StandardsByClass } from '@/components/reports/StandardsByClass';
 import { AILearningHistory } from '@/components/reports/AILearningHistory';
 import { AttendancePatternsReport } from '@/components/reports/AttendancePatternsReport';
+import { FeatureUsageReport } from '@/components/reports/FeatureUsageReport';
 import { TrainingConfidenceIndicator } from '@/components/scan/TrainingConfidenceIndicator';
 import { useMasteryData } from '@/hooks/useMasteryData';
 import { useGradeHistoryStats } from '@/hooks/useGradeHistoryStats';
@@ -312,6 +313,9 @@ export default function Reports() {
 
             {/* Differentiation & Grouping */}
             <DifferentiationGrouping students={students} topics={topics} />
+
+            {/* Feature Usage Tracking */}
+            <FeatureUsageReport />
           </>
         )}
       </div>

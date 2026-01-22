@@ -711,6 +711,36 @@ export type Database = {
           },
         ]
       }
+      feature_usage_log: {
+        Row: {
+          action: string
+          created_at: string
+          feature_category: string
+          feature_name: string
+          id: string
+          metadata: Json | null
+          teacher_id: string
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          feature_category?: string
+          feature_name: string
+          id?: string
+          metadata?: Json | null
+          teacher_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          feature_category?: string
+          feature_name?: string
+          id?: string
+          metadata?: Json | null
+          teacher_id?: string
+        }
+        Relationships: []
+      }
       ferpa_audit_log: {
         Row: {
           action: string
