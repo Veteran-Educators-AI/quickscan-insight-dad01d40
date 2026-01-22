@@ -299,15 +299,36 @@ VARIATION REQUIREMENT (CRITICAL - ANTI-COPYING MEASURE):
     if (includeGeometry) {
       if (useAIImages) {
         geometryInstruction = `
-8. For geometry-related questions, you MUST include an "imagePrompt" field with a detailed description of the diagram/image needed.
-   - The imagePrompt should describe what visual diagram would help students understand the question
-   - Be specific about shapes, labels, measurements, angles, and any text that should appear
-   - Examples of prompts:
-     * "A right triangle ABC with right angle at C, hypotenuse AB labeled 10cm, and angle A labeled 30 degrees"
-     * "A circle with center O, radius 5, and a chord AB with midpoint M, showing the perpendicular from O to AB"
-     * "A coordinate plane with x and y axes, showing points A(2,3) and B(-1,4) connected by a line segment"
-     * "A rectangular prism with dimensions 4x3x2, showing dashed hidden edges"
-   - Make the prompts clear and educational, suitable for a math worksheet`;
+8. For geometry-related questions, you MUST include an "imagePrompt" field with an EXTREMELY DETAILED description of the diagram.
+   
+   YOUR imagePrompt MUST follow this exact format - be as explicit as possible:
+
+   COORDINATE GEOMETRY EXAMPLE:
+   "A Cartesian coordinate plane with a clear grid. The axes are numbered from -5 to 10. 
+    - A point is plotted exactly at (2, 5) and labeled 'Endpoint 1 (2, 5)'. 
+    - A second point is plotted exactly at (8, 3) and labeled 'Endpoint 2 (8, 3)'. 
+    - A straight line segment connects these two points.
+    - The midpoint at (5, 4) is marked with a small dot and labeled 'Midpoint M (5, 4)'."
+
+   TRIANGLE EXAMPLE:
+   "A right triangle ABC displayed in textbook style:
+    - Vertex A is at the top, vertex B at bottom-left, vertex C at bottom-right.
+    - The right angle is at vertex C, shown with a small square symbol.
+    - Side AB (hypotenuse) is labeled '10 cm'.
+    - Side BC is labeled '6 cm'.
+    - Side AC is labeled '8 cm'.
+    - Angle A is labeled '37°' with an arc symbol.
+    - Angle B is labeled '53°' with an arc symbol."
+
+   CIRCLE EXAMPLE:
+   "A circle with center point O clearly marked at the center:
+    - The radius is drawn from O to point A on the circle, labeled 'r = 5 cm'.
+    - A chord BC is drawn with endpoints B and C on the circle.
+    - The midpoint M of chord BC is marked.
+    - A perpendicular line from O to M is shown as a dashed line.
+    - The distance OM is labeled '3 cm'."
+
+   ALWAYS include: exact coordinates, point labels, measurement values, angle degrees, and visual indicators.`;
       } else {
         geometryInstruction = `
 8. For geometry-related questions, you MUST include an "svg" field with a complete, valid SVG string that visually represents the geometric figure described in the question.
@@ -345,7 +366,15 @@ ${nextNum}. Include questions that require graph paper solutions:
    - Problems involving plotting points, lines, and curves on a coordinate plane
    - Graphing linear equations, quadratics, or other functions
    - Questions that ask students to "graph and show your work"
-   - Include an "imagePrompt" field describing a coordinate plane with grid, axes labels, and any plotted elements`;
+   
+   For these questions, include an "imagePrompt" field with EXPLICIT details like:
+   "A Cartesian coordinate plane with a complete grid pattern:
+    - X-axis labeled from -10 to 10 with tick marks at each integer.
+    - Y-axis labeled from -10 to 10 with tick marks at each integer.
+    - Grid lines are thin and gray, axes are bold black with arrows.
+    - The linear equation y = 2x + 1 is graphed as a straight line.
+    - Two points on the line are marked: (0, 1) labeled 'y-intercept' and (2, 5) labeled with coordinates.
+    - The slope is illustrated with a right triangle showing 'rise = 4' and 'run = 2'."`;
       } else {
         graphPaperInstruction = `
 ${nextNum}. Include questions that require graph paper solutions:
@@ -362,13 +391,20 @@ ${nextNum}. Include questions that require graph paper solutions:
       const nextNum = (includeGeometry ? 9 : 8) + (includeFormulas ? 1 : 0) + (includeGraphPaper ? 1 : 0);
       if (useAIImages) {
         coordinateGeometryInstruction = `
-${nextNum}. Include coordinate geometry problems:
+${nextNum}. Include coordinate geometry problems with HIGHLY DETAILED imagePrompt fields:
    - Finding distance between points, midpoints, and slopes
    - Equations of lines (point-slope, slope-intercept forms)
    - Parallel and perpendicular lines in coordinate plane
-   - Proving geometric properties using coordinates (e.g., proving a quadrilateral is a parallelogram)
-   - Transformations on the coordinate plane
-   - Include an "imagePrompt" field describing coordinate planes with plotted points and shapes`;
+   
+   EXAMPLE imagePrompt for a distance/midpoint problem:
+   "A Cartesian coordinate plane with a clear numbered grid from -5 to 10 on both axes.
+    - Point P is plotted at exactly (2, 5) with a solid black dot, labeled 'P (2, 5)'.
+    - Point Q is plotted at exactly (8, 3) with a solid black dot, labeled 'Q (8, 3)'.
+    - A straight line segment PQ connects the two points.
+    - The midpoint M at (5, 4) is marked with a smaller dot, labeled 'M (5, 4)'.
+    - A dashed horizontal line from P shows the horizontal distance '6 units'.
+    - A dashed vertical line from Q shows the vertical distance '2 units'.
+    - The distance formula d = √[(x₂-x₁)² + (y₂-y₁)²] is written below."`;
       } else {
         coordinateGeometryInstruction = `
 ${nextNum}. Include coordinate geometry problems:

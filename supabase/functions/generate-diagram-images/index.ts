@@ -20,16 +20,49 @@ async function generateImageWithNanoBanana(prompt: string): Promise<string | nul
   }
 
   try {
-    const enhancedPrompt = `Create a clean, educational diagram for a math worksheet. The image should be suitable for printing on paper.
+    const enhancedPrompt = `You are creating a textbook-quality educational mathematical diagram for a printable worksheet.
 
+DIAGRAM DESCRIPTION:
 ${prompt}
 
-Requirements:
-- Clear geometric shapes with clean lines
-- Labels and measurements should be clearly visible
-- Black and white or minimal color scheme for printing
-- Educational and professional style
-- High contrast for readability`;
+MANDATORY REQUIREMENTS FOR ALL DIAGRAMS:
+
+1. COORDINATE PLANES (if applicable):
+   - Draw a clear Cartesian coordinate plane with a visible grid
+   - Label the x-axis and y-axis with arrows at the ends
+   - Number the axes at regular intervals (e.g., -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5)
+   - Use thin gray lines for the grid, bold black lines for the axes
+   - Plot ALL points with solid black dots (radius 4-5 pixels)
+   - Label each point clearly with its coordinates, e.g., "Point A (2, 5)" or "Endpoint 1 (2, 5)"
+   - Draw any lines, segments, or curves connecting points with clear solid black lines
+   - If multiple points exist, label them distinctly (e.g., "Endpoint 1", "Endpoint 2" or "A", "B")
+
+2. GEOMETRIC SHAPES:
+   - Draw shapes with bold, clean black outlines (2-3px stroke width)
+   - Label ALL vertices with capital letters (A, B, C, D, etc.)
+   - Show ALL measurements (side lengths, angles, radii) with clear labels
+   - Use tick marks to indicate equal sides
+   - Use arc symbols to indicate angles with degree measurements
+   - For right angles, use the small square symbol
+   - Show dashed lines for hidden edges, altitudes, or construction lines
+
+3. LABELS AND ANNOTATIONS:
+   - Use clear, readable sans-serif font (12-14pt equivalent)
+   - Position labels outside shapes where possible, with leader lines if needed
+   - Include units of measurement (cm, m, degrees, etc.)
+   - For equations on graphs, write the equation near the line/curve
+
+4. STYLE REQUIREMENTS:
+   - Black and white only (suitable for printing)
+   - High contrast for readability
+   - Professional textbook illustration quality
+   - Clean, uncluttered composition with appropriate whitespace
+   - Center the main diagram in the frame
+
+5. SPECIFIC ELEMENT EXAMPLES:
+   - For a line segment from (2, 5) to (8, 3): "A straight line segment connects these two points. Point labels are clearly visible."
+   - For a triangle: "Triangle ABC with vertex labels, side length labels (e.g., AB = 5cm), and angle measurements (e.g., ∠A = 60°)"
+   - For a circle: "Circle with center point O marked, radius line drawn and labeled (r = 4), diameter shown if relevant"`;
 
     console.log('Generating image with Nano Banana...');
     
@@ -87,7 +120,32 @@ async function generateSVGWithAI(prompt: string): Promise<string | null> {
   }
 
   try {
-    const enhancedPrompt = `Create a clean, educational black and white diagram for a math worksheet. The diagram should be clear, precise, and suitable for printing. ${prompt}. Style: minimalist, educational, with clear labels and measurements. No background color, just clean black lines on white background. Make sure all text labels are legible and properly positioned.`;
+    const enhancedPrompt = `Create a precise, textbook-quality mathematical diagram in SVG format.
+
+DIAGRAM TO CREATE: ${prompt}
+
+MANDATORY SVG REQUIREMENTS:
+
+1. FOR COORDINATE PLANES:
+   - Include a complete grid with light gray lines (#cccccc)
+   - Bold black axes with arrows at the ends
+   - Number labels on both axes at regular intervals
+   - Plot points as solid black circles (r="4")
+   - Label each point with its name and coordinates using <text> elements
+   - Example: <text x="45" y="85" font-size="12">A (2, 5)</text>
+
+2. FOR GEOMETRIC SHAPES:
+   - Use stroke="#000000" stroke-width="2" for main outlines
+   - Label all vertices with capital letters
+   - Show measurements with positioned <text> elements
+   - Use stroke-dasharray="5,5" for hidden/construction lines
+   - Include angle arcs with degree measurements
+
+3. FOR ALL DIAGRAMS:
+   - Black lines on white background only
+   - Clear, readable labels (font-size 12-14)
+   - Centered composition within the viewBox
+   - Professional textbook illustration quality`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

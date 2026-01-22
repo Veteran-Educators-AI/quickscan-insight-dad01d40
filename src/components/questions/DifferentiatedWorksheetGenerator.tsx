@@ -2306,9 +2306,42 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       console.log(`Generating geometry shape for: ${questionKey}`);
       setRegeneratingShapeKey(questionKey);
       
-      // Create a prompt based on the question text
-      const shapePrompt = `Create a clear geometric diagram for this math question: "${questionText}". 
-        Include appropriate labels, measurements, and annotations that match the question.`;
+      // Create a highly detailed prompt based on the question text
+      const shapePrompt = `Create a detailed, textbook-quality mathematical diagram for this question:
+
+"${questionText}"
+
+REQUIRED ELEMENTS FOR THIS DIAGRAM:
+
+1. If this involves a COORDINATE PLANE:
+   - Draw a Cartesian coordinate plane with a clear grid
+   - Label the x-axis and y-axis with arrows and numbered intervals (e.g., -5 to 5)
+   - Plot ALL mentioned points as solid black dots
+   - Label each point with its name AND coordinates (e.g., "Point A (2, 5)" or "Endpoint 1 (2, 5)")
+   - If there are two or more points, connect them with a clear line segment or curve as appropriate
+   - Write any relevant equations near their corresponding lines
+
+2. If this involves GEOMETRIC SHAPES:
+   - Draw the shape with bold, clean black outlines
+   - Label ALL vertices with capital letters (A, B, C, D, etc.)
+   - Show ALL given measurements (side lengths in cm/m, angles in degrees)
+   - Use tick marks to indicate equal sides
+   - Use small square symbols for right angles
+   - Use arc symbols with degree measurements for other angles
+   - Show dashed lines for hidden edges, heights, or diagonals
+
+3. If this involves CIRCLES:
+   - Mark and label the center point (usually O)
+   - Draw and label the radius (r = value)
+   - Show diameter, chords, or tangent lines if mentioned
+   - Label any points on the circle
+
+4. LABELING REQUIREMENTS:
+   - Every measurement mentioned in the question must appear in the diagram
+   - Use clear, readable text positioned outside shapes when possible
+   - Include units (cm, m, degrees, etc.)
+
+Make the diagram professional, clean, black and white, suitable for printing on a worksheet.`;
       
       const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
         body: {
