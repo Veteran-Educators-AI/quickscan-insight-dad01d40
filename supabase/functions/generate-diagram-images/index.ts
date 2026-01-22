@@ -21,71 +21,70 @@ async function generateImageWithNanoBanana(prompt: string): Promise<string | nul
 
   try {
     // ═══════════════════════════════════════════════════════════════════════════════
-    // MASTER GEOMETRY TEMPLATE - Ultra-explicit analytical prompting for AI diagrams
+    // MASTER GEOMETRY TEMPLATE v2 - Strict, Simple, Explicit
     // ═══════════════════════════════════════════════════════════════════════════════
-    const enhancedPrompt = `You are creating a textbook-quality educational mathematical diagram.
+    const enhancedPrompt = `Create a simple, clean mathematical diagram.
 
-═══════════════════════════════════════════════════════════════════════════════
-[DIAGRAM REQUEST]
-═══════════════════════════════════════════════════════════════════════════════
+WHAT TO DRAW:
 ${prompt}
 
 ═══════════════════════════════════════════════════════════════════════════════
-MASTER GEOMETRY TEMPLATE - FOLLOW THIS STRUCTURE EXACTLY
+STRICT RULES - FOLLOW EXACTLY
 ═══════════════════════════════════════════════════════════════════════════════
 
-[STYLE HEADER]
-"A clean, black-and-white educational diagram on a plain white background, styled like a figure in a geometry textbook. All lines are thin black lines. All text is clear, dark, sans-serif academic font. No shading, no colors, no gradients."
+RULE 1: STYLE
+- Plain white background
+- Black lines only (no colors, no shading, no gradients)
+- Clean sans-serif font for all text
+- Simple and minimal - like a textbook diagram
 
-[ORIENTATION DEFINITION] (CRITICAL: Define the shape's physical orientation first)
-"The shape is oriented such that [describe EXACT physical orientation]:
-- For triangles: 'The base is horizontal along the bottom. The apex is at the top. The left vertex is at the bottom-left corner.'
-- For rectangles/squares: 'The long side is horizontal. The shape sits flat on its bottom edge.'
-- For circles: 'The center is at the middle of the image. The radius extends to the right.'
-- For coordinate planes: 'The origin is at the center. The positive x-axis extends right. The positive y-axis extends up.'"
+RULE 2: COORDINATE PLANE (if needed)
+- Draw x-axis as a horizontal line with arrow pointing RIGHT
+- Draw y-axis as a vertical line with arrow pointing UP
+- Label "x" at the right end of x-axis
+- Label "y" at the top of y-axis
+- Put small tick marks at each integer
+- Write the numbers BELOW the x-axis ticks
+- Write the numbers to the LEFT of y-axis ticks
+- The origin (0,0) is where the axes cross
 
-[KEY FEATURES & SYMBOLS]
-"Include these EXACT markings:
-- Right-angle symbols: Small square (⊿) placed IN the corner where the right angle is located
-- Tick marks: Single tick marks (|) on sides that are equal in length
-- Parallel arrows: Small arrows (>>) on lines that are parallel
-- Arc symbols: Curved arcs drawn INSIDE the angle to indicate angle measurements
-- Dashed lines: Use dashed lines (- - -) for altitudes, hidden edges, or construction lines"
+RULE 3: PLOTTING POINTS
+- Draw each point as a SOLID BLACK DOT
+- Write the point label NEXT TO the dot (not on top of it)
+- Format: Letter followed by coordinates, like "A(1, 1)" or "B(7, 1)"
+- Each point gets ONE label only - do not repeat labels
 
-[VERTEX & POINT LABELING]
-"Label ALL vertices and points as follows:
-- Each vertex gets a CAPITAL LETTER (A, B, C, D, etc.)
-- Position: Place the label OUTSIDE the shape, near the vertex
-- Font: Dark, clear, sans-serif, slightly larger than measurements
-- For coordinate points: Label as 'A (x, y)' with the coordinates in parentheses"
+RULE 4: SHAPES ON COORDINATE PLANE
+- Connect the vertices with straight black lines
+- The shape should be clearly visible
+- Label each vertex ONCE with its letter and coordinates
+- Place vertex labels OUTSIDE the shape, near each corner
 
-[ANGLE LABELING]
-"Label angles as follows:
-- Location: Specify the EXACT vertex (e.g., 'the angle at the top-right corner')
-- Symbol: Draw a small arc INSIDE the angle
-- Label: Write the degree measurement (e.g., '60°') or variable (e.g., 'θ') near the arc
-- Greek letters: Use θ (theta), α (alpha), β (beta) when variables are needed"
+RULE 5: MEASUREMENTS (if showing lengths)
+- Write measurements OUTSIDE the shape, parallel to the side
+- Include units: "6 units" or "3 units"
+- Do NOT clutter - only show measurements that are asked for
 
-[SIDE/SEGMENT LABELING] (Use PHYSICAL LOCATIONS, not mathematical terms)
-"Label the sides/lengths as follows:
-- The [vertical side on the left] is labeled '[value] cm' or '[variable]'
-- The [horizontal side on the bottom] is labeled '[value] cm' or '[variable]'  
-- The [diagonal side connecting top-left to bottom-right] is labeled '[value] cm' or '[variable]'
-- Position: Place labels OUTSIDE the shape, parallel to the side
-- Include UNITS: Always write 'cm', 'm', or 'units' after numbers"
+═══════════════════════════════════════════════════════════════════════════════
+DO NOT DO THESE THINGS
+═══════════════════════════════════════════════════════════════════════════════
+- DO NOT use colors or shading
+- DO NOT repeat the same vertex label twice
+- DO NOT put labels inside the shape
+- DO NOT add extra arrows or decorations
+- DO NOT add elements that were not requested
+- DO NOT make it cluttered or confusing
+- DO NOT use fancy fonts or styling
 
-[COORDINATE PLANE REQUIREMENTS] (If applicable)
-"For coordinate planes:
-- Draw x-axis and y-axis with ARROWS at both ends
-- Label 'x' at the right end of x-axis, 'y' at the top of y-axis
-- Mark tick marks at EVERY integer from -10 to 10 (or appropriate range)
-- Write numbers below x-axis ticks and left of y-axis ticks
-- Draw a light gray GRID behind the axes
-- Plot points as SOLID BLACK DOTS (radius 4-5 pixels)
-- Label each point with 'P(x, y)' format directly next to the dot"
-
-[FINAL POLISH]
-"All lines are thin black lines (1-2px stroke). All text is clear, dark, sans-serif academic font. No shading, no colors, no gradients. The diagram is centered with appropriate whitespace. Professional textbook illustration quality."`;
+═══════════════════════════════════════════════════════════════════════════════
+QUALITY CHECK
+═══════════════════════════════════════════════════════════════════════════════
+Before finishing, verify:
+✓ Each vertex has exactly ONE label
+✓ All coordinates match what was requested
+✓ The shape is clearly visible
+✓ Labels are readable and positioned outside the shape
+✓ The diagram is clean and simple`;
 
     console.log('Generating image with Nano Banana...');
     

@@ -299,93 +299,80 @@ VARIATION REQUIREMENT (CRITICAL - ANTI-COPYING MEASURE):
     if (includeGeometry) {
       if (useAIImages) {
         geometryInstruction = `
-8. For geometry-related questions, you MUST include an "imagePrompt" field following the MASTER GEOMETRY TEMPLATE format:
+8. For geometry-related questions, you MUST include an "imagePrompt" field. Write the prompt using this STRICT format:
 
 ═══════════════════════════════════════════════════════════════════════════════
-MASTER GEOMETRY TEMPLATE - USE THIS EXACT STRUCTURE FOR ALL imagePrompt FIELDS
+IMAGEPR0MPT FORMAT - USE THIS EXACT STRUCTURE
 ═══════════════════════════════════════════════════════════════════════════════
 
-[STYLE HEADER]
-"A clean, black-and-white educational diagram of a [Shape Name, e.g., right triangle, circle, rectangle] on a plain white background, styled like a figure in a geometry textbook."
+Your imagePrompt must be a SIMPLE, CLEAR description that includes:
 
-[ORIENTATION DEFINITION] (Crucial Step: Pick one standard orientation and stick to it.)
-"The shape is oriented such that [Describe orientation, e.g., 'it has a flat horizontal base and a vertical height on the left side, meeting at the bottom-left corner']."
-
-[KEY FEATURES & SYMBOLS]
-"Include the following specific markings: [List symbols like right-angle squares, parallel line arrows, or congruent tick marks, specifying EXACTLY which corner or line they belong to]."
-
-[ANGLE LABELING]
-"Label the angles as follows: [Specify the exact vertex location, e.g., 'top-right corner', 'bottom-left', 'center'] is labeled with [Greek letter or variable name]. Draw an arc to indicate this angle."
-
-[SIDE/SEGMENT LABELING] (Use physical locations, NOT math terms like 'opposite' or 'adjacent')
-"Label the sides/lengths as follows:
-• The [physical location, e.g., vertical side on the left] is labeled '[Value/Variable]'.
-• The [physical location, e.g., bottom horizontal base] is labeled '[Value/Variable]'.
-• The [physical location, e.g., long diagonal side] is labeled '[Value/Variable]'."
-
-[FINAL POLISH]
-"All lines are thin black lines, and all text is clear, dark, sans-serif academic font. No shading or colors."
+1. WHAT TO DRAW: State the shape/diagram type simply
+2. COORDINATES/VERTICES: List each point with its EXACT coordinates
+3. CONNECTIONS: State which points connect to form the shape
+4. LABELS: Specify how to label each vertex (Letter + coordinates)
+5. MEASUREMENTS: Only include if specifically needed
 
 ═══════════════════════════════════════════════════════════════════════════════
-EXAMPLE imagePrompt FOR A RIGHT TRIANGLE:
+STRICT RULES FOR imagePrompt
 ═══════════════════════════════════════════════════════════════════════════════
 
-"A clean, black-and-white educational diagram of a right triangle on a plain white background, styled like a figure in a geometry textbook.
-
-The shape is oriented such that it has a flat horizontal base and a vertical height on the left side, meeting at the bottom-left corner.
-
-Include the following specific markings: A right-angle square symbol is placed in the bottom-left corner where the vertical and horizontal sides meet. Single tick marks are on both the vertical side and horizontal base to indicate they are known values.
-
-Label the angles as follows: The top vertex is labeled with 'A'. The bottom-left corner (the right angle) has a small square instead of a letter. The bottom-right vertex is labeled 'C'.
-
-Label the sides/lengths as follows:
-• The vertical side on the left is labeled '6 cm'.
-• The bottom horizontal base is labeled '8 cm'.
-• The slanted side connecting top to bottom-right is labeled '10 cm (hypotenuse)'.
-
-All lines are thin black lines, and all text is clear, dark, sans-serif academic font. No shading or colors."
+- Keep it SIMPLE and SPECIFIC
+- List vertices in order: A, B, C, D (clockwise from bottom-left usually)
+- Each vertex gets ONE label only - never repeat labels
+- Place labels OUTSIDE the shape
+- Black lines on white background only
+- No colors, no shading, no gradients
+- No extra decorations or arrows unless needed
 
 ═══════════════════════════════════════════════════════════════════════════════
-EXAMPLE imagePrompt FOR A COORDINATE PLANE:
+EXAMPLE: Rectangle on Coordinate Plane
 ═══════════════════════════════════════════════════════════════════════════════
 
-"A clean, black-and-white Cartesian coordinate plane on a plain white background, styled like a figure in a geometry textbook.
+"Draw a coordinate plane with x-axis from 0 to 8 and y-axis from 0 to 5.
 
-The plane is oriented with the origin at the center. The positive x-axis extends to the right and is labeled 'x' with an arrow. The positive y-axis extends upward and is labeled 'y' with an arrow.
+Plot these 4 points as black dots:
+- A at (1, 1) - label it 'A(1,1)' to the lower-left
+- B at (7, 1) - label it 'B(7,1)' to the lower-right  
+- C at (7, 4) - label it 'C(7,4)' to the upper-right
+- D at (1, 4) - label it 'D(1,4)' to the upper-left
 
-Include the following specific markings: 
-• Light gray grid lines at every integer interval from -5 to 10 on both axes.
-• Tick marks with numbers at every integer on both axes.
-• Bold black axis lines with arrows at the ends.
+Connect A→B→C→D→A with straight black lines to form a rectangle.
 
-Plot the following points as solid black dots:
-• Point A is plotted exactly at coordinates (2, 5) and labeled 'A (2, 5)' to the upper-right of the dot.
-• Point B is plotted exactly at coordinates (8, 3) and labeled 'B (8, 3)' to the upper-right of the dot.
+Label the bottom side '6 units' and the right side '3 units'.
 
-A straight line segment connects Point A to Point B with a solid black line.
-
-All text is clear, dark, sans-serif academic font. No shading or colors."
+Black and white only. Simple and clean."
 
 ═══════════════════════════════════════════════════════════════════════════════
-EXAMPLE imagePrompt FOR A CIRCLE:
+EXAMPLE: Right Triangle
 ═══════════════════════════════════════════════════════════════════════════════
 
-"A clean, black-and-white educational diagram of a circle on a plain white background, styled like a figure in a geometry textbook.
+"Draw a right triangle with:
+- Vertex A at the top
+- Vertex B at the bottom-left (right angle here)
+- Vertex C at the bottom-right
 
-The circle is centered in the image with its center point clearly marked.
+The base BC is horizontal. The side AB is vertical. The hypotenuse AC is diagonal.
 
-Include the following specific markings:
-• The center point is marked with a small dot and labeled 'O'.
-• A radius line extends from center O to a point P on the circle's edge (to the right).
-• The radius line is labeled 'r = 5 cm' positioned above the line.
-• A chord connects two points Q and R on the circle.
+Mark the right angle at B with a small square symbol.
 
-Label the points as follows:
-• Center is labeled 'O'.
-• Point on circle where radius touches is labeled 'P'.
-• Chord endpoints are labeled 'Q' and 'R'.
+Label the sides:
+- AB (vertical) = '6 cm'
+- BC (horizontal) = '8 cm'  
+- AC (diagonal) = '10 cm'
 
-All lines are thin black lines, and all text is clear, dark, sans-serif academic font. No shading or colors."`;
+Place vertex labels A, B, C outside the triangle near each corner.
+
+Black and white only. Simple and clean."
+
+═══════════════════════════════════════════════════════════════════════════════
+DO NOT DO THESE THINGS IN YOUR imagePrompt
+═══════════════════════════════════════════════════════════════════════════════
+- DO NOT repeat vertex labels (each letter appears once)
+- DO NOT add colors or shading
+- DO NOT add unnecessary arrows or decorations
+- DO NOT make it overly complex
+- DO NOT forget to specify label positions`;
       } else {
         geometryInstruction = `
 8. For geometry-related questions, you MUST include an "svg" field with a complete, valid SVG string that visually represents the geometric figure described in the question.
