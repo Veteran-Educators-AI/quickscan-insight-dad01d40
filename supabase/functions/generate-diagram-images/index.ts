@@ -302,52 +302,125 @@ STYLE REQUIREMENTS:
   }
 }
 
-// Detect polygon type from prompt
-function detectPolygonType(prompt: string): { type: string; sides: number } {
+// Detect shape type from prompt (polygons, circles, arcs)
+function detectShapeType(prompt: string): { type: string; sides: number; isCircular: boolean } {
   const lowerPrompt = prompt.toLowerCase();
   
+  // Check for circular shapes first
+  if (lowerPrompt.includes('circle')) {
+    return { type: 'circle', sides: 0, isCircular: true };
+  }
+  if (lowerPrompt.includes('semicircle') || lowerPrompt.includes('semi-circle')) {
+    return { type: 'semicircle', sides: 0, isCircular: true };
+  }
+  if (lowerPrompt.includes('arc')) {
+    return { type: 'arc', sides: 0, isCircular: true };
+  }
+  if (lowerPrompt.includes('ellipse') || lowerPrompt.includes('oval')) {
+    return { type: 'ellipse', sides: 0, isCircular: true };
+  }
+  
+  // Polygon types
   if (lowerPrompt.includes('triangle') || lowerPrompt.includes('3-gon')) {
-    return { type: 'triangle', sides: 3 };
+    return { type: 'triangle', sides: 3, isCircular: false };
   }
   if (lowerPrompt.includes('quadrilateral') || lowerPrompt.includes('rectangle') || 
       lowerPrompt.includes('square') || lowerPrompt.includes('parallelogram') ||
       lowerPrompt.includes('rhombus') || lowerPrompt.includes('trapezoid') || lowerPrompt.includes('4-gon')) {
-    return { type: 'quadrilateral', sides: 4 };
+    return { type: 'quadrilateral', sides: 4, isCircular: false };
   }
   if (lowerPrompt.includes('pentagon') || lowerPrompt.includes('5-gon')) {
-    return { type: 'pentagon', sides: 5 };
+    return { type: 'pentagon', sides: 5, isCircular: false };
   }
   if (lowerPrompt.includes('hexagon') || lowerPrompt.includes('6-gon')) {
-    return { type: 'hexagon', sides: 6 };
+    return { type: 'hexagon', sides: 6, isCircular: false };
   }
   if (lowerPrompt.includes('heptagon') || lowerPrompt.includes('7-gon')) {
-    return { type: 'heptagon', sides: 7 };
+    return { type: 'heptagon', sides: 7, isCircular: false };
   }
   if (lowerPrompt.includes('octagon') || lowerPrompt.includes('8-gon')) {
-    return { type: 'octagon', sides: 8 };
+    return { type: 'octagon', sides: 8, isCircular: false };
   }
   if (lowerPrompt.includes('line segment') || lowerPrompt.includes('segment')) {
-    return { type: 'segment', sides: 2 };
+    return { type: 'segment', sides: 2, isCircular: false };
   }
   if (lowerPrompt.includes('ray')) {
-    return { type: 'ray', sides: 2 };
+    return { type: 'ray', sides: 2, isCircular: false };
   }
   if (lowerPrompt.includes('line')) {
-    return { type: 'line', sides: 2 };
+    return { type: 'line', sides: 2, isCircular: false };
   }
   
   // Default: infer from number of coordinates
   const coordCount = (prompt.match(/\(\d+,\s*\d+\)/g) || []).length;
-  if (coordCount === 2) return { type: 'segment', sides: 2 };
-  if (coordCount === 3) return { type: 'triangle', sides: 3 };
-  if (coordCount === 4) return { type: 'quadrilateral', sides: 4 };
-  if (coordCount === 5) return { type: 'pentagon', sides: 5 };
-  if (coordCount === 6) return { type: 'hexagon', sides: 6 };
+  if (coordCount === 2) return { type: 'segment', sides: 2, isCircular: false };
+  if (coordCount === 3) return { type: 'triangle', sides: 3, isCircular: false };
+  if (coordCount === 4) return { type: 'quadrilateral', sides: 4, isCircular: false };
+  if (coordCount === 5) return { type: 'pentagon', sides: 5, isCircular: false };
+  if (coordCount === 6) return { type: 'hexagon', sides: 6, isCircular: false };
   
-  return { type: 'polygon', sides: coordCount || 0 };
+  return { type: 'polygon', sides: coordCount || 0, isCircular: false };
 }
 
-// Generate deterministic SVG for all polygon types on coordinate plane (guaranteed correct axis labels)
+// Parse circle info from prompt (center point and radius)
+function parseCircleInfo(prompt: string): { center: { x: number; y: number } | null; radius: number | null; startAngle?: number; endAngle?: number } {
+  const lowerPrompt = prompt.toLowerCase();
+  
+  // Try to find center point: "center (5, 4)" or "centered at (5, 4)" or "center at C(5, 4)"
+  const centerMatch = prompt.match(/center(?:ed)?(?:\s+at)?\s*(?:[A-Z])?\s*\((\d+),\s*(\d+)\)/i);
+  let center: { x: number; y: number } | null = null;
+  if (centerMatch) {
+    center = { x: parseInt(centerMatch[1]), y: parseInt(centerMatch[2]) };
+  }
+  
+  // Try to find radius: "radius 3" or "radius of 3" or "r = 3" or "r=3"
+  const radiusMatch = prompt.match(/radius(?:\s+of)?\s*=?\s*(\d+(?:\.\d+)?)/i) || 
+                      prompt.match(/r\s*=\s*(\d+(?:\.\d+)?)/i);
+  let radius: number | null = null;
+  if (radiusMatch) {
+    radius = parseFloat(radiusMatch[1]);
+  }
+  
+  // For arcs, try to find angles
+  let startAngle = 0;
+  let endAngle = 360;
+  
+  if (lowerPrompt.includes('semicircle') || lowerPrompt.includes('semi-circle')) {
+    // Check orientation
+    if (lowerPrompt.includes('upper') || lowerPrompt.includes('top')) {
+      startAngle = 0;
+      endAngle = 180;
+    } else if (lowerPrompt.includes('lower') || lowerPrompt.includes('bottom')) {
+      startAngle = 180;
+      endAngle = 360;
+    } else if (lowerPrompt.includes('left')) {
+      startAngle = 90;
+      endAngle = 270;
+    } else if (lowerPrompt.includes('right')) {
+      startAngle = -90;
+      endAngle = 90;
+    } else {
+      // Default: upper semicircle
+      startAngle = 0;
+      endAngle = 180;
+    }
+  } else if (lowerPrompt.includes('arc')) {
+    // Try to parse angle ranges: "arc from 30° to 120°" or "30 to 120 degrees"
+    const angleMatch = prompt.match(/(\d+)\s*(?:°|degrees?)?\s*to\s*(\d+)\s*(?:°|degrees?)?/i);
+    if (angleMatch) {
+      startAngle = parseInt(angleMatch[1]);
+      endAngle = parseInt(angleMatch[2]);
+    } else {
+      // Default: quarter arc
+      startAngle = 0;
+      endAngle = 90;
+    }
+  }
+  
+  return { center, radius, startAngle, endAngle };
+}
+
+// Generate deterministic SVG for all shape types on coordinate plane (guaranteed correct axis labels)
 function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null {
   // Parse coordinates from the prompt
   const coordinateMatches = prompt.match(/\((\d+),\s*(\d+)\)/g) || [];
@@ -360,17 +433,48 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
   const labelMatches = prompt.match(/([A-Z])\s*\(\d+,\s*\d+\)/g) || [];
   const labels = labelMatches.map(match => match.charAt(0));
 
-  if (coordinates.length === 0) {
+  // Detect shape type
+  const shapeInfo = detectShapeType(prompt);
+  
+  // For circular shapes, we need center and radius
+  let circleInfo: ReturnType<typeof parseCircleInfo> | null = null;
+  if (shapeInfo.isCircular) {
+    circleInfo = parseCircleInfo(prompt);
+    
+    // If we have center in coordinates but not parsed, use first coordinate
+    if (!circleInfo.center && coordinates.length > 0) {
+      circleInfo.center = coordinates[0];
+    }
+    
+    // Default radius if not specified
+    if (!circleInfo.radius) {
+      circleInfo.radius = 3; // Default radius
+    }
+    
+    console.log(`Detected circular shape: ${shapeInfo.type}, center: (${circleInfo.center?.x}, ${circleInfo.center?.y}), radius: ${circleInfo.radius}`);
+  } else {
+    console.log(`Detected polygon type: ${shapeInfo.type} (${coordinates.length} vertices)`);
+  }
+
+  // For circular shapes without coordinates, we still need a center point
+  if (shapeInfo.isCircular && circleInfo?.center) {
+    // Continue with circle generation
+  } else if (coordinates.length === 0) {
     return null; // Can't generate without coordinates
   }
 
-  // Detect polygon type for special rendering
-  const polygonInfo = detectPolygonType(prompt);
-  console.log(`Detected polygon type: ${polygonInfo.type} (${coordinates.length} vertices)`);
-
-  // Determine the coordinate range needed
-  const maxX = Math.max(10, ...coordinates.map(c => c.x + 2));
-  const maxY = Math.max(10, ...coordinates.map(c => c.y + 2));
+  // Determine the coordinate range needed (include circle bounds if applicable)
+  let maxX = 10;
+  let maxY = 10;
+  
+  if (shapeInfo.isCircular && circleInfo?.center && circleInfo?.radius) {
+    maxX = Math.max(10, circleInfo.center.x + circleInfo.radius + 2);
+    maxY = Math.max(10, circleInfo.center.y + circleInfo.radius + 2);
+  }
+  if (coordinates.length > 0) {
+    maxX = Math.max(maxX, ...coordinates.map(c => c.x + 2));
+    maxY = Math.max(maxY, ...coordinates.map(c => c.y + 2));
+  }
 
   // SVG dimensions and scaling
   const svgWidth = 320;
@@ -380,6 +484,8 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
   const plotHeight = svgHeight - 2 * margin;
   const scaleX = plotWidth / maxX;
   const scaleY = plotHeight / maxY;
+  // Use uniform scaling for circles to prevent distortion
+  const uniformScale = Math.min(scaleX, scaleY);
 
   // Helper to convert coordinates to SVG positions
   const toSvgX = (x: number) => margin + x * scaleX;
@@ -435,19 +541,85 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
 
   svg += `\n  </g>`;
 
-  // Draw the shape based on polygon type
-  if (coordinates.length >= 2) {
-    svg += `\n  
-  <!-- ${polygonInfo.type.charAt(0).toUpperCase() + polygonInfo.type.slice(1)} outline -->`;
+  // Draw circular shapes (circles, arcs, semicircles)
+  if (shapeInfo.isCircular && circleInfo?.center && circleInfo?.radius) {
+    const cx = toSvgX(circleInfo.center.x);
+    const cy = toSvgY(circleInfo.center.y);
+    const rx = circleInfo.radius * scaleX;
+    const ry = circleInfo.radius * scaleY;
     
-    if (polygonInfo.type === 'segment') {
+    svg += `\n  
+  <!-- ${shapeInfo.type.charAt(0).toUpperCase() + shapeInfo.type.slice(1)} -->`;
+    
+    if (shapeInfo.type === 'circle') {
+      // Full circle
+      svg += `
+  <g stroke="#000000" stroke-width="2" fill="none">
+    <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/>
+  </g>`;
+    } else if (shapeInfo.type === 'ellipse') {
+      // Ellipse (same as circle for now, but could support different rx/ry)
+      svg += `
+  <g stroke="#000000" stroke-width="2" fill="none">
+    <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/>
+  </g>`;
+    } else if (shapeInfo.type === 'semicircle' || shapeInfo.type === 'arc') {
+      // Arc/Semicircle using SVG path
+      const startAngle = circleInfo.startAngle || 0;
+      const endAngle = circleInfo.endAngle || 180;
+      
+      // Convert angles to radians (SVG uses degrees but we calculate in radians)
+      const startRad = (startAngle - 90) * Math.PI / 180; // -90 to start from top
+      const endRad = (endAngle - 90) * Math.PI / 180;
+      
+      // Calculate start and end points
+      const x1 = cx + rx * Math.cos(startRad);
+      const y1 = cy + ry * Math.sin(startRad);
+      const x2 = cx + rx * Math.cos(endRad);
+      const y2 = cy + ry * Math.sin(endRad);
+      
+      // Determine arc flags
+      const angleDiff = endAngle - startAngle;
+      const largeArcFlag = Math.abs(angleDiff) > 180 ? 1 : 0;
+      const sweepFlag = angleDiff > 0 ? 1 : 0;
+      
+      svg += `
+  <g stroke="#000000" stroke-width="2" fill="none">
+    <path d="M ${x1} ${y1} A ${rx} ${ry} 0 ${largeArcFlag} ${sweepFlag} ${x2} ${y2}"/>
+  </g>`;
+    }
+    
+    // Add center point marker and label
+    const centerLabel = labels[0] || 'C';
+    svg += `
+  <!-- Center point -->
+  <g fill="#000000">
+    <circle cx="${cx}" cy="${cy}" r="4"/>
+    <text x="${cx + 10}" y="${cy - 10}" font-family="Arial, sans-serif" font-size="12" font-weight="bold">${centerLabel}(${circleInfo.center.x}, ${circleInfo.center.y})</text>
+  </g>`;
+    
+    // Add radius line and label
+    svg += `
+  <!-- Radius line -->
+  <g stroke="#000000" stroke-width="1.5" stroke-dasharray="4,2">
+    <line x1="${cx}" y1="${cy}" x2="${cx + rx}" y2="${cy}"/>
+  </g>
+  <text x="${cx + rx/2}" y="${cy - 5}" font-family="Arial, sans-serif" font-size="10" text-anchor="middle">r = ${circleInfo.radius}</text>`;
+  }
+
+  // Draw polygon shapes (triangles, quadrilaterals, etc.)
+  if (!shapeInfo.isCircular && coordinates.length >= 2) {
+    svg += `\n  
+  <!-- ${shapeInfo.type.charAt(0).toUpperCase() + shapeInfo.type.slice(1)} outline -->`;
+    
+    if (shapeInfo.type === 'segment') {
       // Line segment: just connect two points
       svg += `
   <g stroke="#000000" stroke-width="2.5" fill="none">
     <line x1="${toSvgX(coordinates[0].x)}" y1="${toSvgY(coordinates[0].y)}" 
           x2="${toSvgX(coordinates[1].x)}" y2="${toSvgY(coordinates[1].y)}"/>
   </g>`;
-    } else if (polygonInfo.type === 'ray') {
+    } else if (shapeInfo.type === 'ray') {
       // Ray: start at first point, extend beyond second point
       const dx = coordinates[1].x - coordinates[0].x;
       const dy = coordinates[1].y - coordinates[0].y;
@@ -460,7 +632,7 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
     <!-- Ray arrow -->
     <polygon points="${toSvgX(coordinates[1].x)},${toSvgY(coordinates[1].y) - 4} ${toSvgX(coordinates[1].x) - 4},${toSvgY(coordinates[1].y) + 4} ${toSvgX(coordinates[1].x) + 4},${toSvgY(coordinates[1].y) + 4}" fill="#000000"/>
   </g>`;
-    } else if (polygonInfo.type === 'line') {
+    } else if (shapeInfo.type === 'line') {
       // Line: extend in both directions
       const dx = coordinates[1].x - coordinates[0].x;
       const dy = coordinates[1].y - coordinates[0].y;
@@ -482,58 +654,60 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
     }
   }
 
-  // Calculate centroid for smart label placement
-  const centroidX = coordinates.reduce((sum, c) => sum + c.x, 0) / coordinates.length;
-  const centroidY = coordinates.reduce((sum, c) => sum + c.y, 0) / coordinates.length;
+  // Plot polygon vertices and labels (skip for circles which have their own labeling)
+  if (!shapeInfo.isCircular && coordinates.length > 0) {
+    // Calculate centroid for smart label placement
+    const centroidX = coordinates.reduce((sum, c) => sum + c.x, 0) / coordinates.length;
+    const centroidY = coordinates.reduce((sum, c) => sum + c.y, 0) / coordinates.length;
 
-  // Plot vertices and labels
-  svg += `\n  
+    svg += `\n  
   <!-- Vertices -->
   <g fill="#000000">`;
 
-  coordinates.forEach((coord, i) => {
-    const label = labels[i] || String.fromCharCode(65 + i); // A, B, C, D, E, F...
-    const labelX = toSvgX(coord.x);
-    const labelY = toSvgY(coord.y);
-    
-    // Smart label positioning: place labels away from the centroid
-    const dirX = coord.x - centroidX;
-    const dirY = coord.y - centroidY;
-    const magnitude = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
-    
-    // Normalize and scale for label offset
-    let textOffsetX = (dirX / magnitude) * 25;
-    let textOffsetY = (dirY / magnitude) * -15; // Invert Y for SVG
-    
-    // Ensure minimum offset
-    if (Math.abs(textOffsetX) < 10) textOffsetX = textOffsetX >= 0 ? 12 : -25;
-    if (Math.abs(textOffsetY) < 8) textOffsetY = textOffsetY >= 0 ? -10 : 15;
-    
-    // Clamp offsets to keep labels in view
-    textOffsetX = Math.max(-40, Math.min(15, textOffsetX));
-    textOffsetY = Math.max(-15, Math.min(20, textOffsetY));
+    coordinates.forEach((coord, i) => {
+      const label = labels[i] || String.fromCharCode(65 + i); // A, B, C, D, E, F...
+      const labelX = toSvgX(coord.x);
+      const labelY = toSvgY(coord.y);
+      
+      // Smart label positioning: place labels away from the centroid
+      const dirX = coord.x - centroidX;
+      const dirY = coord.y - centroidY;
+      const magnitude = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
+      
+      // Normalize and scale for label offset
+      let textOffsetX = (dirX / magnitude) * 25;
+      let textOffsetY = (dirY / magnitude) * -15; // Invert Y for SVG
+      
+      // Ensure minimum offset
+      if (Math.abs(textOffsetX) < 10) textOffsetX = textOffsetX >= 0 ? 12 : -25;
+      if (Math.abs(textOffsetY) < 8) textOffsetY = textOffsetY >= 0 ? -10 : 15;
+      
+      // Clamp offsets to keep labels in view
+      textOffsetX = Math.max(-40, Math.min(15, textOffsetX));
+      textOffsetY = Math.max(-15, Math.min(20, textOffsetY));
 
-    svg += `\n    <!-- ${label}(${coord.x}, ${coord.y}) -->
+      svg += `\n    <!-- ${label}(${coord.x}, ${coord.y}) -->
     <circle cx="${labelX}" cy="${labelY}" r="4"/>
     <text x="${labelX + textOffsetX}" y="${labelY + textOffsetY}" font-family="Arial, sans-serif" font-size="12" font-weight="bold">${label}(${coord.x}, ${coord.y})</text>`;
-  });
+    });
 
-  svg += `\n  </g>`;
+    svg += `\n  </g>`;
 
-  // Add special annotations for certain polygon types
-  if (polygonInfo.type === 'triangle' && coordinates.length === 3) {
-    // Check for right angle markers
-    const isRightTriangle = prompt.toLowerCase().includes('right');
-    if (isRightTriangle) {
-      // Find the right angle vertex (usually at the corner with perpendicular sides)
-      // For now, add a small square at the first vertex as a right angle marker
-      const rightVertex = coordinates[0];
-      const size = 6;
-      svg += `\n  
+    // Add special annotations for certain polygon types
+    if (shapeInfo.type === 'triangle' && coordinates.length === 3) {
+      // Check for right angle markers
+      const isRightTriangle = prompt.toLowerCase().includes('right');
+      if (isRightTriangle) {
+        // Find the right angle vertex (usually at the corner with perpendicular sides)
+        // For now, add a small square at the first vertex as a right angle marker
+        const rightVertex = coordinates[0];
+        const size = 6;
+        svg += `\n  
   <!-- Right angle marker -->
   <g stroke="#000000" stroke-width="1" fill="none">
     <polyline points="${toSvgX(rightVertex.x) + size},${toSvgY(rightVertex.y)} ${toSvgX(rightVertex.x) + size},${toSvgY(rightVertex.y) - size} ${toSvgX(rightVertex.x)},${toSvgY(rightVertex.y) - size}"/>
   </g>`;
+      }
     }
   }
 
