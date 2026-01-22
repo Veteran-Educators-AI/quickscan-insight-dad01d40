@@ -20,6 +20,7 @@ import { LevelProgressionChart } from '@/components/reports/LevelProgressionChar
 import { RegentsScoreReport } from '@/components/reports/RegentsScoreReport';
 import { Gradebook } from '@/components/reports/Gradebook';
 import { ScholarSyncDashboard } from '@/components/reports/ScholarSyncDashboard';
+import { InboundScholarDataPanel } from '@/components/reports/InboundScholarDataPanel';
 import { ClassMisconceptionSummary } from '@/components/reports/ClassMisconceptionSummary';
 import { StandardsByClass } from '@/components/reports/StandardsByClass';
 import { AILearningHistory } from '@/components/reports/AILearningHistory';
@@ -297,8 +298,11 @@ export default function Reports() {
             {/* Regents Score Report */}
             <RegentsScoreReport classId={selectedClassId === 'all' ? undefined : selectedClassId} />
 
-            {/* Scholar AI Sync Dashboard */}
+            {/* Scholar AI Sync Dashboard - Outbound */}
             <ScholarSyncDashboard classId={selectedClassId === 'all' ? undefined : selectedClassId} />
+
+            {/* Inbound Scholar Data - Data returned FROM scholar app */}
+            <InboundScholarDataPanel classId={selectedClassId === 'all' ? undefined : selectedClassId} />
 
             {/* Scan Analysis History */}
             <ScanAnalysisHistory classId={selectedClassId === 'all' ? undefined : selectedClassId} />
