@@ -219,7 +219,7 @@ COMMON MISTAKES TO AVOID:
 ❌ WRONG: Numbers in random order like "10, 3, 7, 4"
 ❌ WRONG: Same number appearing twice
 ❌ WRONG: Rotated or diagonal text
-❌ WRONG: Numbers placed inconsistently (some above, some below axis)
+❌ WRONG: Numbers placed inconsistently (some above, some below the axis)
 
 ✅ CORRECT: Every integer from 0 to 10 appears exactly once
 ✅ CORRECT: Numbers are in sequential order (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
@@ -235,7 +235,7 @@ STYLE REQUIREMENTS:
 - Black lines and text only
 - Clean, professional math textbook style
 - All text must be perfectly horizontal (not rotated)
-- Vertex labels outside the shape, not inside`;
+- Vertex labels outside the shape, not inside.
 
     console.log('Generating image with Nano Banana...');
     
