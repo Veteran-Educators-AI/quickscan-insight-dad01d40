@@ -22,6 +22,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { RemediationCompletionsBadge } from '@/components/dashboard/RemediationCompletionsBadge';
+import { PendingScholarDataBadge } from '@/components/dashboard/PendingScholarDataBadge';
 import { VerificationStatsWidget } from '@/components/reports/VerificationStatsWidget';
 import { StudentsNeedingHelpWidget } from '@/components/reports/StudentsNeedingHelpWidget';
 import { Button } from '@/components/ui/button';
@@ -266,7 +267,10 @@ export default function Dashboard() {
           </div>
           
           {/* Notification Badges */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Pending Inbound Scholar Data Badge */}
+            <PendingScholarDataBadge />
+            
             {/* Remediation Completions Badge */}
             <RemediationCompletionsBadge />
             
