@@ -35,7 +35,7 @@ const corsHeaders = {
  * Contains class info, assignment details, and student grade data
  */
 interface PushRequest {
-  type?: 'ping' | 'grade';   // Request type: 'ping' for connection test, 'grade' for actual data
+  type?: 'ping' | 'grade' | 'behavior';   // Request type: 'ping' for connection test, 'grade' for actual data, 'behavior' for deductions
   class_id?: string;         // The class this data belongs to
   title?: string;            // Assignment or activity title
   description?: string;       // Optional description
@@ -49,10 +49,15 @@ interface PushRequest {
   student_name?: string;     // The student's name
   grade?: number;            // The grade (0-100)
   topic_name?: string;       // The topic/subject of the work
+  // Behavior deduction fields
+  xp_deduction?: number;     // XP to remove for behavior
+  coin_deduction?: number;   // Coins to remove for behavior
+  reason?: string;           // Reason for deduction
+  notes?: string;            // Additional notes
 }
 
 /**
- * Convert internal push request to sister app expected format
+ * Convert internal push request to sister app expected format for grades
  * The receiving endpoint expects 'action' field, not 'type'
  */
 function convertToSisterAppFormat(requestData: PushRequest) {
@@ -72,6 +77,31 @@ function convertToSisterAppFormat(requestData: PushRequest) {
       student_name: requestData.student_name,
       printable_url: requestData.printable_url,
       due_at: requestData.due_at,
+      timestamp: new Date().toISOString(),
+    }
+  };
+}
+
+/**
+ * Convert behavior deduction request to sister app format
+ * Uses negative values for XP/coins to indicate deduction
+ */
+function convertToBehaviorFormat(requestData: PushRequest) {
+  return {
+    action: 'behavior_deduction' as const,
+    student_id: requestData.student_id,
+    data: {
+      activity_type: 'behavior_consequence',
+      activity_name: `Behavior: ${requestData.reason}`,
+      xp_deducted: requestData.xp_deduction || 0,
+      coins_deducted: requestData.coin_deduction || 0,
+      // Also send as negative earned values for backward compatibility
+      xp_earned: -(requestData.xp_deduction || 0),
+      coins_earned: -(requestData.coin_deduction || 0),
+      reason: requestData.reason,
+      notes: requestData.notes,
+      class_id: requestData.class_id,
+      student_name: requestData.student_name,
       timestamp: new Date().toISOString(),
     }
   };
@@ -139,9 +169,18 @@ serve(async (req) => {
     // SEND DATA TO SISTER APP
     // ========================================================================
     // Convert to the format expected by receive-sister-app-data
-    // The receiving endpoint expects 'action' field (e.g., 'grade_completed')
+    // The receiving endpoint expects 'action' field (e.g., 'grade_completed' or 'behavior_deduction')
     // NOT 'type' field which was causing "Unknown payload type" error
-    const sisterAppPayload = convertToSisterAppFormat(requestData);
+    let sisterAppPayload;
+    
+    if (requestData.type === 'behavior') {
+      // Handle behavior deduction - sends negative XP/coins
+      console.log('Processing behavior deduction request');
+      sisterAppPayload = convertToBehaviorFormat(requestData);
+    } else {
+      // Handle grade completion (default)
+      sisterAppPayload = convertToSisterAppFormat(requestData);
+    }
     
     console.log('Sending payload to sister app:', JSON.stringify(sisterAppPayload));
     

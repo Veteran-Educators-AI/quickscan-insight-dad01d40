@@ -43,7 +43,7 @@ const corsHeaders = {
 // data: Flexible object containing event-specific information
 // -----------------------------------------------------------------------------
 interface IncomingData {
-  action: 'grade_completed' | 'activity_completed' | 'reward_earned' | 'level_up' | 'achievement_unlocked' | 'batch_sync';
+  action: 'grade_completed' | 'activity_completed' | 'reward_earned' | 'level_up' | 'achievement_unlocked' | 'batch_sync' | 'behavior_deduction';
   student_id?: string; // Optional for batch_sync
   data?: {
     activity_type?: string;      // e.g., "quiz", "game", "practice"
@@ -376,6 +376,19 @@ serve(async (req) => {
         case 'level_up':
         case 'achievement_unlocked':
           processedResult = { logged: true };
+          break;
+
+        case 'behavior_deduction':
+          // Log behavior deduction - Scholar app will handle the actual point removal
+          console.log('Behavior deduction received:', body.data);
+          const xpVal = body.data?.xp_deducted || (body.data?.xp_earned ? Math.abs(body.data.xp_earned) : 0);
+          const coinVal = body.data?.coins_deducted || (body.data?.coins_earned ? Math.abs(body.data.coins_earned) : 0);
+          processedResult = { 
+            logged: true, 
+            behavior_recorded: true,
+            xp_deducted: xpVal,
+            coins_deducted: coinVal,
+          };
           break;
       }
 
