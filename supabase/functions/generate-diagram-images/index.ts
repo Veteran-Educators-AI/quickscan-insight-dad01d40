@@ -2,8 +2,8 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 interface QuestionWithPrompt {
@@ -19,28 +19,28 @@ interface ValidationResult {
 
 // Validate generated image using AI vision
 async function validateDiagramImage(imageUrl: string, originalPrompt: string): Promise<ValidationResult> {
-  const apiKey = Deno.env.get('LOVABLE_API_KEY');
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
   if (!apiKey) {
     return { isValid: true, issues: [], shouldRetry: false }; // Skip validation if no key
   }
 
   try {
-    console.log('Validating generated diagram...');
-    
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
+    console.log("Validating generated diagram...");
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: "google/gemini-2.5-flash",
         messages: [
           {
-            role: 'user',
+            role: "user",
             content: [
               {
-                type: 'text',
+                type: "text",
                 text: `Analyze this mathematical diagram for quality issues. Check for these SPECIFIC problems:
 
 COORDINATE PLANE ISSUES:
@@ -66,14 +66,14 @@ Respond with ONLY a JSON object in this exact format:
 }
 
 Set shouldRetry=true if the diagram has major issues that would confuse students.
-Set isValid=false if there are ANY of the issues listed above.`
+Set isValid=false if there are ANY of the issues listed above.`,
               },
               {
-                type: 'image_url',
-                image_url: { url: imageUrl }
-              }
-            ]
-          }
+                type: "image_url",
+                image_url: { url: imageUrl },
+              },
+            ],
+          },
         ],
         temperature: 0.1,
         max_tokens: 500,
@@ -81,33 +81,36 @@ Set isValid=false if there are ANY of the issues listed above.`
     });
 
     if (!response.ok) {
-      console.error('Validation API error:', response.status);
+      console.error("Validation API error:", response.status);
       return { isValid: true, issues: [], shouldRetry: false };
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
-    
+    const content = data.choices?.[0]?.message?.content || "";
+
     // Extract JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const result = JSON.parse(jsonMatch[0]) as ValidationResult;
-      console.log('Validation result:', result);
+      console.log("Validation result:", result);
       return result;
     }
-    
+
     return { isValid: true, issues: [], shouldRetry: false };
   } catch (error) {
-    console.error('Validation error:', error);
+    console.error("Validation error:", error);
     return { isValid: true, issues: [], shouldRetry: false };
   }
 }
 
 // Generate image using Nano Banana (google/gemini-2.5-flash-image-preview)
-async function generateImageWithNanoBanana(prompt: string, attemptNumber = 1): Promise<{ imageUrl: string | null; validation: ValidationResult | null }> {
-  const apiKey = Deno.env.get('LOVABLE_API_KEY');
+async function generateImageWithNanoBanana(
+  prompt: string,
+  attemptNumber = 1,
+): Promise<{ imageUrl: string | null; validation: ValidationResult | null }> {
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
   if (!apiKey) {
-    console.error('LOVABLE_API_KEY not configured');
+    console.error("LOVABLE_API_KEY not configured");
     return { imageUrl: null, validation: null };
   }
 
@@ -115,22 +118,24 @@ async function generateImageWithNanoBanana(prompt: string, attemptNumber = 1): P
     // ═══════════════════════════════════════════════════════════════════════════════
     // MASTER GEOMETRY TEMPLATE v5 - PIXEL-PERFECT AXIS LABELING
     // ═══════════════════════════════════════════════════════════════════════════════
-    
+
     // Parse coordinates from the prompt to provide explicit placement instructions
     const coordinateMatches = prompt.match(/\((\d+),\s*(\d+)\)/g) || [];
-    const coordinates = coordinateMatches.map(match => {
-      const nums = match.match(/(\d+)/g);
-      return nums ? { x: parseInt(nums[0]), y: parseInt(nums[1]) } : null;
-    }).filter(Boolean);
-    
+    const coordinates = coordinateMatches
+      .map((match) => {
+        const nums = match.match(/(\d+)/g);
+        return nums ? { x: parseInt(nums[0]), y: parseInt(nums[1]) } : null;
+      })
+      .filter(Boolean);
+
     // Determine the coordinate range needed
-    const maxX = Math.max(10, ...coordinates.map(c => c!.x + 1));
-    const maxY = Math.max(10, ...coordinates.map(c => c!.y + 1));
-    
+    const maxX = Math.max(10, ...coordinates.map((c) => c!.x + 1));
+    const maxY = Math.max(10, ...coordinates.map((c) => c!.y + 1));
+
     // Generate the EXPLICIT list of axis numbers
-    const xAxisNumbers = Array.from({ length: maxX + 1 }, (_, i) => i).join(', ');
-    const yAxisNumbers = Array.from({ length: maxY + 1 }, (_, i) => i).join(', ');
-    
+    const xAxisNumbers = Array.from({ length: maxX + 1 }, (_, i) => i).join(", ");
+    const yAxisNumbers = Array.from({ length: maxY + 1 }, (_, i) => i).join(", ");
+
     const enhancedPrompt = `CREATE A MATHEMATICAL COORDINATE PLANE DIAGRAM.
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -193,19 +198,25 @@ NOW DRAW THE SHAPE ON TOP OF THE COORDINATE PLANE:
 
 ${prompt}
 
-${coordinates.length > 0 ? `
+${
+  coordinates.length > 0
+    ? `
 VERTEX PLOTTING INSTRUCTIONS:
-${coordinates.map((c, i) => {
-  const labels = prompt.match(/[A-Z]\s*\(\d+,\s*\d+\)/g) || [];
-  const label = labels[i] || `Point ${i + 1}`;
-  return `• ${label}: 
+${coordinates
+  .map((c, i) => {
+    const labels = prompt.match(/[A-Z]\s*\(\d+,\s*\d+\)/g) || [];
+    const label = labels[i] || `Point ${i + 1}`;
+    return `• ${label}: 
     - Start at origin (0,0) in bottom-left corner
     - Count ${c!.x} tick marks to the RIGHT on the x-axis (you should be at x=${c!.x})
     - From there, count ${c!.y} tick marks UPWARD (you should now be at y=${c!.y})
     - Place a solid black dot at this grid intersection
     - Write "${label}" next to the dot, outside the shape`;
-}).join('\n')}
-` : ''}
+  })
+  .join("\n")}
+`
+    : ""
+}
 
 Connect the vertices with thin black lines to form the shape.
 
@@ -219,7 +230,7 @@ COMMON MISTAKES TO AVOID:
 ❌ WRONG: Numbers in random order like "10, 3, 7, 4"
 ❌ WRONG: Same number appearing twice
 ❌ WRONG: Rotated or diagonal text
-❌ WRONG: Numbers placed inconsistently (some above, some below the axis)
+❌ WRONG: Numbers placed inconsistently (some above, some below axis)
 
 ✅ CORRECT: Every integer from 0 to 10 appears exactly once
 ✅ CORRECT: Numbers are in sequential order (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
@@ -235,69 +246,70 @@ STYLE REQUIREMENTS:
 - Black lines and text only
 - Clean, professional math textbook style
 - All text must be perfectly horizontal (not rotated)
-- Vertex labels outside the shape, not inside.
+- Vertex labels outside the shape, not inside`;
 
-    console.log('Generating image with Nano Banana...');
-    
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
+    console.log("Generating image with Nano Banana...");
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
+        model: "google/gemini-2.5-flash-image-preview",
         messages: [
           {
-            role: 'user',
-            content: enhancedPrompt
-          }
+            role: "user",
+            content: enhancedPrompt,
+          },
         ],
-        modalities: ['image', 'text']
+        modalities: ["image", "text"],
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Nano Banana API error:', response.status, errorText);
+      console.error("Nano Banana API error:", response.status, errorText);
       return { imageUrl: null, validation: null };
     }
 
     const data = await response.json();
-    console.log('Nano Banana response received');
-    
+    console.log("Nano Banana response received");
+
     // Extract image from the response
     const images = data.choices?.[0]?.message?.images;
     if (images && images.length > 0) {
       const imageUrl = images[0]?.image_url?.url;
       if (imageUrl) {
-        console.log('Successfully generated image with Nano Banana');
-        
+        console.log("Successfully generated image with Nano Banana");
+
         // Validate the generated image (only for geometry diagrams, max 2 retries)
-        const isGeometryPrompt = prompt.toLowerCase().includes('coordinate') || 
-                                  prompt.toLowerCase().includes('vertex') ||
-                                  prompt.toLowerCase().includes('triangle') ||
-                                  prompt.toLowerCase().includes('quadrilateral');
-        
+        const isGeometryPrompt =
+          prompt.toLowerCase().includes("coordinate") ||
+          prompt.toLowerCase().includes("vertex") ||
+          prompt.toLowerCase().includes("triangle") ||
+          prompt.toLowerCase().includes("quadrilateral");
+
         if (isGeometryPrompt && attemptNumber <= 2) {
           const validation = await validateDiagramImage(imageUrl, prompt);
-          
+
           if (validation.shouldRetry && attemptNumber < 2) {
             console.log(`Validation failed (attempt ${attemptNumber}), retrying...`, validation.issues);
             return generateImageWithNanoBanana(prompt, attemptNumber + 1);
           }
-          
+
           return { imageUrl, validation };
         }
-        
+
         return { imageUrl, validation: null };
       }
     }
 
-    console.log('No image in Nano Banana response');
+    console.log("No image in Nano Banana response");
     return { imageUrl: null, validation: null };
   } catch (error) {
-    console.error('Error generating with Nano Banana:', error);
+    console.error("Error generating with Nano Banana:", error);
     return { imageUrl: null, validation: null };
   }
 }
@@ -305,98 +317,109 @@ STYLE REQUIREMENTS:
 // Detect shape type from prompt (polygons, circles, arcs)
 function detectShapeType(prompt: string): { type: string; sides: number; isCircular: boolean } {
   const lowerPrompt = prompt.toLowerCase();
-  
+
   // Check for circular shapes first
-  if (lowerPrompt.includes('circle')) {
-    return { type: 'circle', sides: 0, isCircular: true };
+  if (lowerPrompt.includes("circle")) {
+    return { type: "circle", sides: 0, isCircular: true };
   }
-  if (lowerPrompt.includes('semicircle') || lowerPrompt.includes('semi-circle')) {
-    return { type: 'semicircle', sides: 0, isCircular: true };
+  if (lowerPrompt.includes("semicircle") || lowerPrompt.includes("semi-circle")) {
+    return { type: "semicircle", sides: 0, isCircular: true };
   }
-  if (lowerPrompt.includes('arc')) {
-    return { type: 'arc', sides: 0, isCircular: true };
+  if (lowerPrompt.includes("arc")) {
+    return { type: "arc", sides: 0, isCircular: true };
   }
-  if (lowerPrompt.includes('ellipse') || lowerPrompt.includes('oval')) {
-    return { type: 'ellipse', sides: 0, isCircular: true };
+  if (lowerPrompt.includes("ellipse") || lowerPrompt.includes("oval")) {
+    return { type: "ellipse", sides: 0, isCircular: true };
   }
-  
+
   // Polygon types
-  if (lowerPrompt.includes('triangle') || lowerPrompt.includes('3-gon')) {
-    return { type: 'triangle', sides: 3, isCircular: false };
+  if (lowerPrompt.includes("triangle") || lowerPrompt.includes("3-gon")) {
+    return { type: "triangle", sides: 3, isCircular: false };
   }
-  if (lowerPrompt.includes('quadrilateral') || lowerPrompt.includes('rectangle') || 
-      lowerPrompt.includes('square') || lowerPrompt.includes('parallelogram') ||
-      lowerPrompt.includes('rhombus') || lowerPrompt.includes('trapezoid') || lowerPrompt.includes('4-gon')) {
-    return { type: 'quadrilateral', sides: 4, isCircular: false };
+  if (
+    lowerPrompt.includes("quadrilateral") ||
+    lowerPrompt.includes("rectangle") ||
+    lowerPrompt.includes("square") ||
+    lowerPrompt.includes("parallelogram") ||
+    lowerPrompt.includes("rhombus") ||
+    lowerPrompt.includes("trapezoid") ||
+    lowerPrompt.includes("4-gon")
+  ) {
+    return { type: "quadrilateral", sides: 4, isCircular: false };
   }
-  if (lowerPrompt.includes('pentagon') || lowerPrompt.includes('5-gon')) {
-    return { type: 'pentagon', sides: 5, isCircular: false };
+  if (lowerPrompt.includes("pentagon") || lowerPrompt.includes("5-gon")) {
+    return { type: "pentagon", sides: 5, isCircular: false };
   }
-  if (lowerPrompt.includes('hexagon') || lowerPrompt.includes('6-gon')) {
-    return { type: 'hexagon', sides: 6, isCircular: false };
+  if (lowerPrompt.includes("hexagon") || lowerPrompt.includes("6-gon")) {
+    return { type: "hexagon", sides: 6, isCircular: false };
   }
-  if (lowerPrompt.includes('heptagon') || lowerPrompt.includes('7-gon')) {
-    return { type: 'heptagon', sides: 7, isCircular: false };
+  if (lowerPrompt.includes("heptagon") || lowerPrompt.includes("7-gon")) {
+    return { type: "heptagon", sides: 7, isCircular: false };
   }
-  if (lowerPrompt.includes('octagon') || lowerPrompt.includes('8-gon')) {
-    return { type: 'octagon', sides: 8, isCircular: false };
+  if (lowerPrompt.includes("octagon") || lowerPrompt.includes("8-gon")) {
+    return { type: "octagon", sides: 8, isCircular: false };
   }
-  if (lowerPrompt.includes('line segment') || lowerPrompt.includes('segment')) {
-    return { type: 'segment', sides: 2, isCircular: false };
+  if (lowerPrompt.includes("line segment") || lowerPrompt.includes("segment")) {
+    return { type: "segment", sides: 2, isCircular: false };
   }
-  if (lowerPrompt.includes('ray')) {
-    return { type: 'ray', sides: 2, isCircular: false };
+  if (lowerPrompt.includes("ray")) {
+    return { type: "ray", sides: 2, isCircular: false };
   }
-  if (lowerPrompt.includes('line')) {
-    return { type: 'line', sides: 2, isCircular: false };
+  if (lowerPrompt.includes("line")) {
+    return { type: "line", sides: 2, isCircular: false };
   }
-  
+
   // Default: infer from number of coordinates
   const coordCount = (prompt.match(/\(\d+,\s*\d+\)/g) || []).length;
-  if (coordCount === 2) return { type: 'segment', sides: 2, isCircular: false };
-  if (coordCount === 3) return { type: 'triangle', sides: 3, isCircular: false };
-  if (coordCount === 4) return { type: 'quadrilateral', sides: 4, isCircular: false };
-  if (coordCount === 5) return { type: 'pentagon', sides: 5, isCircular: false };
-  if (coordCount === 6) return { type: 'hexagon', sides: 6, isCircular: false };
-  
-  return { type: 'polygon', sides: coordCount || 0, isCircular: false };
+  if (coordCount === 2) return { type: "segment", sides: 2, isCircular: false };
+  if (coordCount === 3) return { type: "triangle", sides: 3, isCircular: false };
+  if (coordCount === 4) return { type: "quadrilateral", sides: 4, isCircular: false };
+  if (coordCount === 5) return { type: "pentagon", sides: 5, isCircular: false };
+  if (coordCount === 6) return { type: "hexagon", sides: 6, isCircular: false };
+
+  return { type: "polygon", sides: coordCount || 0, isCircular: false };
 }
 
 // Parse circle info from prompt (center point and radius)
-function parseCircleInfo(prompt: string): { center: { x: number; y: number } | null; radius: number | null; startAngle?: number; endAngle?: number } {
+function parseCircleInfo(prompt: string): {
+  center: { x: number; y: number } | null;
+  radius: number | null;
+  startAngle?: number;
+  endAngle?: number;
+} {
   const lowerPrompt = prompt.toLowerCase();
-  
+
   // Try to find center point: "center (5, 4)" or "centered at (5, 4)" or "center at C(5, 4)"
   const centerMatch = prompt.match(/center(?:ed)?(?:\s+at)?\s*(?:[A-Z])?\s*\((\d+),\s*(\d+)\)/i);
   let center: { x: number; y: number } | null = null;
   if (centerMatch) {
     center = { x: parseInt(centerMatch[1]), y: parseInt(centerMatch[2]) };
   }
-  
+
   // Try to find radius: "radius 3" or "radius of 3" or "r = 3" or "r=3"
-  const radiusMatch = prompt.match(/radius(?:\s+of)?\s*=?\s*(\d+(?:\.\d+)?)/i) || 
-                      prompt.match(/r\s*=\s*(\d+(?:\.\d+)?)/i);
+  const radiusMatch =
+    prompt.match(/radius(?:\s+of)?\s*=?\s*(\d+(?:\.\d+)?)/i) || prompt.match(/r\s*=\s*(\d+(?:\.\d+)?)/i);
   let radius: number | null = null;
   if (radiusMatch) {
     radius = parseFloat(radiusMatch[1]);
   }
-  
+
   // For arcs, try to find angles
   let startAngle = 0;
   let endAngle = 360;
-  
-  if (lowerPrompt.includes('semicircle') || lowerPrompt.includes('semi-circle')) {
+
+  if (lowerPrompt.includes("semicircle") || lowerPrompt.includes("semi-circle")) {
     // Check orientation
-    if (lowerPrompt.includes('upper') || lowerPrompt.includes('top')) {
+    if (lowerPrompt.includes("upper") || lowerPrompt.includes("top")) {
       startAngle = 0;
       endAngle = 180;
-    } else if (lowerPrompt.includes('lower') || lowerPrompt.includes('bottom')) {
+    } else if (lowerPrompt.includes("lower") || lowerPrompt.includes("bottom")) {
       startAngle = 180;
       endAngle = 360;
-    } else if (lowerPrompt.includes('left')) {
+    } else if (lowerPrompt.includes("left")) {
       startAngle = 90;
       endAngle = 270;
-    } else if (lowerPrompt.includes('right')) {
+    } else if (lowerPrompt.includes("right")) {
       startAngle = -90;
       endAngle = 90;
     } else {
@@ -404,7 +427,7 @@ function parseCircleInfo(prompt: string): { center: { x: number; y: number } | n
       startAngle = 0;
       endAngle = 180;
     }
-  } else if (lowerPrompt.includes('arc')) {
+  } else if (lowerPrompt.includes("arc")) {
     // Try to parse angle ranges: "arc from 30° to 120°" or "30 to 120 degrees"
     const angleMatch = prompt.match(/(\d+)\s*(?:°|degrees?)?\s*to\s*(\d+)\s*(?:°|degrees?)?/i);
     if (angleMatch) {
@@ -416,7 +439,7 @@ function parseCircleInfo(prompt: string): { center: { x: number; y: number } | n
       endAngle = 90;
     }
   }
-  
+
   return { center, radius, startAngle, endAngle };
 }
 
@@ -426,14 +449,14 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
   // Variables like a, b, c, x, y, etc. indicate this is a proof problem, not a graphing problem
   const hasAlgebraicCoords = /\([a-z][\s,]|,\s*[a-z]\)|[a-z]\s*\+|[a-z]\s*-|[+-]\s*[a-z]|₂|²/i.test(prompt);
   if (hasAlgebraicCoords) {
-    console.log('Detected algebraic/variable coordinates - skipping deterministic SVG generation');
+    console.log("Detected algebraic/variable coordinates - skipping deterministic SVG generation");
     return null;
   }
-  
+
   // IMPROVED: Parse ONLY explicitly labeled vertex coordinates (A(x,y), B(x,y), etc.)
   // Now supports NEGATIVE coordinates like P(-1, 5) or R(5, -3)
   const labeledVertexMatches = prompt.match(/([A-Z])\s*\((-?\d+),\s*(-?\d+)\)/g) || [];
-  
+
   // Use a Map to deduplicate labels - only keep the first occurrence of each label
   const labeledVerticesMap = new Map<string, { label: string; x: number; y: number }>();
   for (const match of labeledVertexMatches) {
@@ -445,39 +468,44 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
         labeledVerticesMap.set(label, {
           label: label,
           x: parseInt(parsed[2]),
-          y: parseInt(parsed[3])
+          y: parseInt(parsed[3]),
         });
       }
     }
   }
-  
+
   const labeledVertices = Array.from(labeledVerticesMap.values());
-  
+
   // Extract coordinates and labels arrays from labeled vertices
-  const coordinates = labeledVertices.map(v => ({ x: v.x, y: v.y }));
-  const labels = labeledVertices.map(v => v.label);
-  
-  console.log(`Parsed ${labeledVertices.length} unique labeled vertices:`, labeledVertices.map(v => `${v.label}(${v.x}, ${v.y})`).join(', '));
+  const coordinates = labeledVertices.map((v) => ({ x: v.x, y: v.y }));
+  const labels = labeledVertices.map((v) => v.label);
+
+  console.log(
+    `Parsed ${labeledVertices.length} unique labeled vertices:`,
+    labeledVertices.map((v) => `${v.label}(${v.x}, ${v.y})`).join(", "),
+  );
 
   // Detect shape type
   const shapeInfo = detectShapeType(prompt);
-  
+
   // For circular shapes, we need center and radius
   let circleInfo: ReturnType<typeof parseCircleInfo> | null = null;
   if (shapeInfo.isCircular) {
     circleInfo = parseCircleInfo(prompt);
-    
+
     // If we have center in coordinates but not parsed, use first coordinate
     if (!circleInfo.center && coordinates.length > 0) {
       circleInfo.center = coordinates[0];
     }
-    
+
     // Default radius if not specified
     if (!circleInfo.radius) {
       circleInfo.radius = 3; // Default radius
     }
-    
-    console.log(`Detected circular shape: ${shapeInfo.type}, center: (${circleInfo.center?.x}, ${circleInfo.center?.y}), radius: ${circleInfo.radius}`);
+
+    console.log(
+      `Detected circular shape: ${shapeInfo.type}, center: (${circleInfo.center?.x}, ${circleInfo.center?.y}), radius: ${circleInfo.radius}`,
+    );
   } else {
     console.log(`Detected polygon type: ${shapeInfo.type} (${coordinates.length} vertices)`);
   }
@@ -494,7 +522,7 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
   let minY = 0;
   let maxX = 10;
   let maxY = 10;
-  
+
   if (shapeInfo.isCircular && circleInfo?.center && circleInfo?.radius) {
     minX = Math.min(minX, circleInfo.center.x - circleInfo.radius - 2);
     minY = Math.min(minY, circleInfo.center.y - circleInfo.radius - 2);
@@ -502,12 +530,12 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
     maxY = Math.max(maxY, circleInfo.center.y + circleInfo.radius + 2);
   }
   if (coordinates.length > 0) {
-    minX = Math.min(minX, ...coordinates.map(c => c.x - 2));
-    minY = Math.min(minY, ...coordinates.map(c => c.y - 2));
-    maxX = Math.max(maxX, ...coordinates.map(c => c.x + 2));
-    maxY = Math.max(maxY, ...coordinates.map(c => c.y + 2));
+    minX = Math.min(minX, ...coordinates.map((c) => c.x - 2));
+    minY = Math.min(minY, ...coordinates.map((c) => c.y - 2));
+    maxX = Math.max(maxX, ...coordinates.map((c) => c.x + 2));
+    maxY = Math.max(maxY, ...coordinates.map((c) => c.y + 2));
   }
-  
+
   // Calculate total range
   const rangeX = maxX - minX;
   const rangeY = maxY - minY;
@@ -585,79 +613,79 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
     const cy = toSvgY(circleInfo.center.y);
     const rx = circleInfo.radius * scaleX;
     const ry = circleInfo.radius * scaleY;
-    
+
     svg += `\n  
   <!-- ${shapeInfo.type.charAt(0).toUpperCase() + shapeInfo.type.slice(1)} -->`;
-    
-    if (shapeInfo.type === 'circle') {
+
+    if (shapeInfo.type === "circle") {
       // Full circle
       svg += `
   <g stroke="#000000" stroke-width="2" fill="none">
     <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/>
   </g>`;
-    } else if (shapeInfo.type === 'ellipse') {
+    } else if (shapeInfo.type === "ellipse") {
       // Ellipse (same as circle for now, but could support different rx/ry)
       svg += `
   <g stroke="#000000" stroke-width="2" fill="none">
     <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/>
   </g>`;
-    } else if (shapeInfo.type === 'semicircle' || shapeInfo.type === 'arc') {
+    } else if (shapeInfo.type === "semicircle" || shapeInfo.type === "arc") {
       // Arc/Semicircle using SVG path
       const startAngle = circleInfo.startAngle || 0;
       const endAngle = circleInfo.endAngle || 180;
-      
+
       // Convert angles to radians (SVG uses degrees but we calculate in radians)
-      const startRad = (startAngle - 90) * Math.PI / 180; // -90 to start from top
-      const endRad = (endAngle - 90) * Math.PI / 180;
-      
+      const startRad = ((startAngle - 90) * Math.PI) / 180; // -90 to start from top
+      const endRad = ((endAngle - 90) * Math.PI) / 180;
+
       // Calculate start and end points
       const x1 = cx + rx * Math.cos(startRad);
       const y1 = cy + ry * Math.sin(startRad);
       const x2 = cx + rx * Math.cos(endRad);
       const y2 = cy + ry * Math.sin(endRad);
-      
+
       // Determine arc flags
       const angleDiff = endAngle - startAngle;
       const largeArcFlag = Math.abs(angleDiff) > 180 ? 1 : 0;
       const sweepFlag = angleDiff > 0 ? 1 : 0;
-      
+
       svg += `
   <g stroke="#000000" stroke-width="2" fill="none">
     <path d="M ${x1} ${y1} A ${rx} ${ry} 0 ${largeArcFlag} ${sweepFlag} ${x2} ${y2}"/>
   </g>`;
     }
-    
+
     // Add center point marker and label
-    const centerLabel = labels[0] || 'C';
+    const centerLabel = labels[0] || "C";
     svg += `
   <!-- Center point -->
   <g fill="#000000">
     <circle cx="${cx}" cy="${cy}" r="4"/>
     <text x="${cx + 10}" y="${cy - 10}" font-family="Arial, sans-serif" font-size="12" font-weight="bold">${centerLabel}(${circleInfo.center.x}, ${circleInfo.center.y})</text>
   </g>`;
-    
+
     // Add radius line and label
     svg += `
   <!-- Radius line -->
   <g stroke="#000000" stroke-width="1.5" stroke-dasharray="4,2">
     <line x1="${cx}" y1="${cy}" x2="${cx + rx}" y2="${cy}"/>
   </g>
-  <text x="${cx + rx/2}" y="${cy - 5}" font-family="Arial, sans-serif" font-size="10" text-anchor="middle">r = ${circleInfo.radius}</text>`;
+  <text x="${cx + rx / 2}" y="${cy - 5}" font-family="Arial, sans-serif" font-size="10" text-anchor="middle">r = ${circleInfo.radius}</text>`;
   }
 
   // Draw polygon shapes (triangles, quadrilaterals, etc.)
   if (!shapeInfo.isCircular && coordinates.length >= 2) {
     svg += `\n  
   <!-- ${shapeInfo.type.charAt(0).toUpperCase() + shapeInfo.type.slice(1)} outline -->`;
-    
-    if (shapeInfo.type === 'segment') {
+
+    if (shapeInfo.type === "segment") {
       // Line segment: just connect two points
       svg += `
   <g stroke="#000000" stroke-width="2.5" fill="none">
     <line x1="${toSvgX(coordinates[0].x)}" y1="${toSvgY(coordinates[0].y)}" 
           x2="${toSvgX(coordinates[1].x)}" y2="${toSvgY(coordinates[1].y)}"/>
   </g>`;
-    } else if (shapeInfo.type === 'ray') {
+    } else if (shapeInfo.type === "ray") {
       // Ray: start at first point, extend beyond second point
       const dx = coordinates[1].x - coordinates[0].x;
       const dy = coordinates[1].y - coordinates[0].y;
@@ -670,7 +698,7 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
     <!-- Ray arrow -->
     <polygon points="${toSvgX(coordinates[1].x)},${toSvgY(coordinates[1].y) - 4} ${toSvgX(coordinates[1].x) - 4},${toSvgY(coordinates[1].y) + 4} ${toSvgX(coordinates[1].x) + 4},${toSvgY(coordinates[1].y) + 4}" fill="#000000"/>
   </g>`;
-    } else if (shapeInfo.type === 'line') {
+    } else if (shapeInfo.type === "line") {
       // Line: extend in both directions
       const dx = coordinates[1].x - coordinates[0].x;
       const dy = coordinates[1].y - coordinates[0].y;
@@ -687,7 +715,7 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
       // All polygons (triangles, quadrilaterals, pentagons, hexagons, etc.)
       svg += `
   <g stroke="#000000" stroke-width="2" fill="none">
-    <polygon points="${coordinates.map(c => `${toSvgX(c.x)},${toSvgY(c.y)}`).join(' ')}"/>
+    <polygon points="${coordinates.map((c) => `${toSvgX(c.x)},${toSvgY(c.y)}`).join(" ")}"/>
   </g>`;
     }
   }
@@ -706,20 +734,20 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
       const label = labels[i] || String.fromCharCode(65 + i); // A, B, C, D, E, F...
       const labelX = toSvgX(coord.x);
       const labelY = toSvgY(coord.y);
-      
+
       // Smart label positioning: place labels away from the centroid
       const dirX = coord.x - centroidX;
       const dirY = coord.y - centroidY;
       const magnitude = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
-      
+
       // Normalize and scale for label offset
       let textOffsetX = (dirX / magnitude) * 25;
       let textOffsetY = (dirY / magnitude) * -15; // Invert Y for SVG
-      
+
       // Ensure minimum offset
       if (Math.abs(textOffsetX) < 10) textOffsetX = textOffsetX >= 0 ? 12 : -25;
       if (Math.abs(textOffsetY) < 8) textOffsetY = textOffsetY >= 0 ? -10 : 15;
-      
+
       // Clamp offsets to keep labels in view
       textOffsetX = Math.max(-40, Math.min(15, textOffsetX));
       textOffsetY = Math.max(-15, Math.min(20, textOffsetY));
@@ -732,9 +760,9 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
     svg += `\n  </g>`;
 
     // Add special annotations for certain polygon types
-    if (shapeInfo.type === 'triangle' && coordinates.length === 3) {
+    if (shapeInfo.type === "triangle" && coordinates.length === 3) {
       // Check for right angle markers
-      const isRightTriangle = prompt.toLowerCase().includes('right');
+      const isRightTriangle = prompt.toLowerCase().includes("right");
       if (isRightTriangle) {
         // Find the right angle vertex (usually at the corner with perpendicular sides)
         // For now, add a small square at the first vertex as a right angle marker
@@ -760,22 +788,21 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
 // Generate SVG diagram using standard AI model (fallback if deterministic fails)
 async function generateSVGWithAI(prompt: string): Promise<string | null> {
   // First, try deterministic generation for coordinate plane problems
-  const isCoordinatePlane = prompt.toLowerCase().includes('coordinate') || 
-                            prompt.match(/[A-Z]\s*\(\d+,\s*\d+\)/);
-  
+  const isCoordinatePlane = prompt.toLowerCase().includes("coordinate") || prompt.match(/[A-Z]\s*\(\d+,\s*\d+\)/);
+
   if (isCoordinatePlane) {
-    console.log('Using deterministic SVG generator for coordinate plane...');
+    console.log("Using deterministic SVG generator for coordinate plane...");
     const deterministicSvg = generateDeterministicCoordinatePlaneSVG(prompt);
     if (deterministicSvg) {
-      console.log('Deterministic SVG generated successfully');
+      console.log("Deterministic SVG generated successfully");
       return deterministicSvg;
     }
   }
 
   // Fall back to AI generation for non-coordinate-plane diagrams
-  const apiKey = Deno.env.get('LOVABLE_API_KEY');
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
   if (!apiKey) {
-    console.error('LOVABLE_API_KEY not configured');
+    console.error("LOVABLE_API_KEY not configured");
     return null;
   }
 
@@ -807,21 +834,22 @@ MANDATORY SVG REQUIREMENTS:
    - Centered composition within the viewBox
    - Professional textbook illustration quality`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: "google/gemini-2.5-flash",
         messages: [
-          { 
-            role: 'system', 
-            content: 'You are an expert at creating SVG diagrams for educational math worksheets. Return only valid SVG code, nothing else.' 
+          {
+            role: "system",
+            content:
+              "You are an expert at creating SVG diagrams for educational math worksheets. Return only valid SVG code, nothing else.",
           },
-          { 
-            role: 'user', 
+          {
+            role: "user",
             content: `Generate a complete, valid SVG code for the following diagram. The SVG should be black lines on white background, suitable for a math worksheet. Return ONLY the SVG code, nothing else.
 
 Diagram to create: ${enhancedPrompt}
@@ -831,8 +859,8 @@ Requirements:
 - Use stroke="#000000" for all lines
 - Use fill="none" for shapes, or fill="#ffffff" for white backgrounds
 - Include clear text labels using <text> elements with font-size="14"
-- Make sure the diagram is centered and well-proportioned`
-          }
+- Make sure the diagram is centered and well-proportioned`,
+          },
         ],
         temperature: 0.3,
         max_tokens: 2000,
@@ -841,7 +869,7 @@ Requirements:
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Lovable AI error:', response.status, errorText);
+      console.error("Lovable AI error:", response.status, errorText);
       return null;
     }
 
@@ -863,26 +891,26 @@ Requirements:
 
     return null;
   } catch (error) {
-    console.error('Error generating SVG with AI:', error);
+    console.error("Error generating SVG with AI:", error);
     return null;
   }
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const body = await req.json();
-    
+
     // Support presentation-style image generation
-    if (body.prompt && (body.style === 'clipart' || body.style === 'presentation')) {
+    if (body.prompt && (body.style === "clipart" || body.style === "presentation")) {
       console.log(`Generating ${body.style} image with Nano Banana (google/gemini-2.5-flash-image-preview)...`);
-      
-      const isPresentation = body.style === 'presentation';
-      
-      const clipartPrompt = isPresentation 
+
+      const isPresentation = body.style === "presentation";
+
+      const clipartPrompt = isPresentation
         ? `Generate a high-quality, photorealistic or professionally illustrated image for an educational classroom presentation.
 
 Topic/Subject: ${body.prompt}
@@ -910,17 +938,17 @@ Requirements:
 
       const result = await generateImageWithNanoBanana(clipartPrompt);
       let imageUrl = result.imageUrl;
-      
+
       // If Nano Banana fails, try SVG fallback (only for clipart style)
       if (!imageUrl && !isPresentation) {
-        console.log('Nano Banana failed, trying SVG fallback...');
+        console.log("Nano Banana failed, trying SVG fallback...");
         imageUrl = await generateSVGWithAI(body.prompt);
       }
-      
+
       // Return imageUrl (null is acceptable - frontend should handle gracefully)
       return new Response(
         JSON.stringify({ imageUrl: imageUrl || null, fallback: !imageUrl, validation: result.validation }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -932,32 +960,34 @@ Requirements:
     };
 
     if (!questions || questions.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'No questions provided' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "No questions provided" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    console.log(`Starting image generation for ${questions.length} questions (Nano Banana: ${useNanoBanana}, Deterministic: ${preferDeterministicSVG})...`);
+    console.log(
+      `Starting image generation for ${questions.length} questions (Nano Banana: ${useNanoBanana}, Deterministic: ${preferDeterministicSVG})...`,
+    );
 
     const results: { questionNumber: number; imageUrl: string | null; validation?: ValidationResult | null }[] = [];
 
     for (const q of questions) {
       console.log(`Generating image for question ${q.questionNumber}...`);
-      
+
       let imageUrl: string | null = null;
       let validation: ValidationResult | null = null;
-      
+
       // If preferDeterministicSVG is enabled, always try deterministic first
       if (preferDeterministicSVG) {
-        console.log('Using deterministic SVG generator (user preference)...');
+        console.log("Using deterministic SVG generator (user preference)...");
         imageUrl = generateDeterministicCoordinatePlaneSVG(q.imagePrompt);
         if (imageUrl) {
-          console.log('Deterministic SVG generated successfully');
+          console.log("Deterministic SVG generated successfully");
           validation = { isValid: true, issues: [], shouldRetry: false };
         } else {
           // Fall back to standard SVG generation if deterministic fails (no coordinates found)
-          console.log('Deterministic failed (no coordinates), falling back to SVG AI...');
+          console.log("Deterministic failed (no coordinates), falling back to SVG AI...");
           imageUrl = await generateSVGWithAI(q.imagePrompt);
         }
       } else if (useNanoBanana) {
@@ -969,32 +999,34 @@ Requirements:
         // Use standard SVG generation
         imageUrl = await generateSVGWithAI(q.imagePrompt);
       }
-      
+
       results.push({
         questionNumber: q.questionNumber,
         imageUrl,
-        validation
+        validation,
       });
-      
-      const validationStatus = validation ? (validation.isValid ? '✓ Valid' : `⚠ Issues: ${validation.issues.join(', ')}`) : '';
-      console.log(`Question ${q.questionNumber}: ${imageUrl ? 'Success' : 'Failed'} ${validationStatus}`);
+
+      const validationStatus = validation
+        ? validation.isValid
+          ? "✓ Valid"
+          : `⚠ Issues: ${validation.issues.join(", ")}`
+        : "";
+      console.log(`Question ${q.questionNumber}: ${imageUrl ? "Success" : "Failed"} ${validationStatus}`);
     }
 
-    const successCount = results.filter(r => r.imageUrl).length;
-    const validCount = results.filter(r => r.validation?.isValid !== false).length;
+    const successCount = results.filter((r) => r.imageUrl).length;
+    const validCount = results.filter((r) => r.validation?.isValid !== false).length;
     console.log(`Completed: ${successCount}/${questions.length} images generated, ${validCount} passed validation`);
 
-    return new Response(
-      JSON.stringify({ results }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
+    return new Response(JSON.stringify({ results }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error: unknown) {
-    console.error('Error in generate-diagram-images:', error);
-    const message = error instanceof Error ? error.message : 'Failed to generate images';
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error("Error in generate-diagram-images:", error);
+    const message = error instanceof Error ? error.message : "Failed to generate images";
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
