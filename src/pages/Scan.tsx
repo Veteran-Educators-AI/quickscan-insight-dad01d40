@@ -75,6 +75,10 @@ export default function Scan() {
   const [showBatchGradingModeSelector, setShowBatchGradingModeSelector] = useState(false);
   const [batchAnswerGuideImage, setBatchAnswerGuideImage] = useState<string | null>(null);
   
+  // Drag and drop state
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
+  
   const solutionInputRef = useRef<HTMLInputElement>(null);
 
   // Class & student selection for batch mode
@@ -532,6 +536,121 @@ export default function Scan() {
     toast.success(`Added ${totalPages} page(s) from ${fileCount} file(s)${selectedClassId ? ' with auto-identification' : ''}`);
     e.target.value = '';
   };
+
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounterRef.current = 0;
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    // Filter valid files (images and PDFs)
+    const validFiles = files.filter(file => 
+      file.type.startsWith('image/') || 
+      file.type === 'application/pdf' || 
+      file.name.toLowerCase().endsWith('.pdf')
+    );
+
+    if (validFiles.length === 0) {
+      toast.error('Please drop image or PDF files only');
+      return;
+    }
+
+    // Single file in single mode
+    if (scanMode === 'single' && validFiles.length === 1) {
+      const file = validFiles[0];
+      try {
+        if (isPdfFile(file)) {
+          toast.info('Converting PDF to images...');
+          const images = await pdfToImages(file);
+          if (images.length === 0) {
+            toast.error('Could not extract pages from PDF');
+            return;
+          }
+          setCapturedImage(images[0]);
+          setScanState('preview');
+          if (images.length > 1) {
+            toast.info(`PDF has ${images.length} pages. First page loaded. Use Scanner mode for multi-page PDFs.`);
+          }
+        } else {
+          const resizedBlob = await resizeImage(file);
+          const dataUrl = await blobToBase64(resizedBlob);
+          setCapturedImage(dataUrl);
+          setScanState('preview');
+        }
+        toast.success('Image loaded from drop');
+      } catch (err) {
+        console.error('Error processing dropped file:', err);
+        toast.error('Failed to process dropped file');
+      }
+    } else {
+      // Multiple files or in scanner mode - process as batch
+      toast.info(`Processing ${validFiles.length} dropped file(s)...`);
+      let totalPages = 0;
+
+      for (const file of validFiles) {
+        try {
+          if (isPdfFile(file)) {
+            const images = await pdfToImages(file);
+            for (const dataUrl of images) {
+              if (singleScanClassId && singleScanStudents.length > 0) {
+                await batch.addImageWithAutoIdentify(dataUrl, singleScanStudents);
+              } else if (selectedClassId && students.length > 0) {
+                await batch.addImageWithAutoIdentify(dataUrl, students);
+              } else {
+                batch.addImage(dataUrl);
+              }
+              totalPages++;
+            }
+          } else {
+            const resizedBlob = await resizeImage(file);
+            const dataUrl = await blobToBase64(resizedBlob);
+            if (singleScanClassId && singleScanStudents.length > 0) {
+              await batch.addImageWithAutoIdentify(dataUrl, singleScanStudents);
+            } else if (selectedClassId && students.length > 0) {
+              await batch.addImageWithAutoIdentify(dataUrl, students);
+            } else {
+              batch.addImage(dataUrl);
+            }
+            totalPages++;
+          }
+        } catch (err) {
+          console.error('Error processing dropped file:', err);
+        }
+      }
+
+      if (totalPages > 0) {
+        setScanMode('scanner');
+        toast.success(`Added ${totalPages} page(s) to batch`);
+      }
+    }
+  }, [scanMode, batch, selectedClassId, singleScanClassId, students, singleScanStudents]);
 
   const handleNativeCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1697,9 +1816,34 @@ export default function Scan() {
                     </CardContent>
                   </Card>
 
-                  <Card className="overflow-hidden">
+                  <Card 
+                    className={`overflow-hidden transition-all duration-200 ${
+                      isDragging 
+                        ? 'ring-2 ring-primary ring-offset-2 border-primary bg-primary/5' 
+                        : ''
+                    }`}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                  >
                     <CardContent className="p-0">
-                      <div className="p-8 sm:p-12">
+                      <div className="p-8 sm:p-12 relative">
+                        {/* Drag overlay */}
+                        {isDragging && (
+                          <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+                            <div className="text-center space-y-3">
+                              <div className="w-20 h-20 mx-auto rounded-full bg-primary/20 flex items-center justify-center animate-pulse">
+                                <Upload className="h-10 w-10 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-primary">Drop files here</p>
+                                <p className="text-sm text-muted-foreground">Images or PDF files</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
                         <div className="text-center space-y-6">
                           <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center ${cameraStatus === 'denied' ? 'bg-destructive/10' : 'bg-primary/10'}`}>
                             {cameraStatus === 'denied' ? (
@@ -1716,7 +1860,7 @@ export default function Scan() {
                             <p className="text-sm text-muted-foreground">
                               {cameraStatus === 'denied' 
                                 ? 'Enable camera in browser settings or upload an image' 
-                                : 'Take a photo of student work or upload an existing image'}
+                                : 'Take a photo, upload files, or drag & drop images/PDFs here'}
                             </p>
                           </div>
 
@@ -1829,6 +1973,14 @@ export default function Scan() {
                             <Upload className="h-5 w-5 mr-2" />
                             Upload Image/PDF
                           </Button>
+                        </div>
+
+                        {/* Drag and drop hint */}
+                        <div className="border-2 border-dashed border-muted-foreground/20 rounded-lg p-4 mt-4">
+                          <p className="text-sm text-muted-foreground">
+                            <FileImage className="h-4 w-4 inline mr-1.5" />
+                            Drag & drop images or PDFs here
+                          </p>
                         </div>
 
                         <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
