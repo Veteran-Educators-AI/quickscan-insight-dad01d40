@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw, FileText, Brain, BookOpen } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw, FileText, Brain, BookOpen, Loader2 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 import { resizeImage, blobToBase64, compressImage } from '@/lib/imageUtils';
 import { pdfToImages, isPdfFile } from '@/lib/pdfUtils';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,16 @@ export default function Scan() {
   // Drag and drop state
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
+  
+  // Drop processing progress state
+  const [dropProcessing, setDropProcessing] = useState<{
+    isProcessing: boolean;
+    currentFile: number;
+    totalFiles: number;
+    currentPage: number;
+    totalPages: number;
+    fileName: string;
+  } | null>(null);
   
   const solutionInputRef = useRef<HTMLInputElement>(null);
 
@@ -586,11 +597,20 @@ export default function Scan() {
     if (scanMode === 'single' && validFiles.length === 1) {
       const file = validFiles[0];
       try {
+        setDropProcessing({
+          isProcessing: true,
+          currentFile: 1,
+          totalFiles: 1,
+          currentPage: 0,
+          totalPages: 0,
+          fileName: file.name,
+        });
+        
         if (isPdfFile(file)) {
-          toast.info('Converting PDF to images...');
           const images = await pdfToImages(file);
           if (images.length === 0) {
             toast.error('Could not extract pages from PDF');
+            setDropProcessing(null);
             return;
           }
           setCapturedImage(images[0]);
@@ -608,17 +628,54 @@ export default function Scan() {
       } catch (err) {
         console.error('Error processing dropped file:', err);
         toast.error('Failed to process dropped file');
+      } finally {
+        setDropProcessing(null);
       }
     } else {
-      // Multiple files or in scanner mode - process as batch
-      toast.info(`Processing ${validFiles.length} dropped file(s)...`);
+      // Multiple files or in scanner mode - process as batch with progress
       let totalPages = 0;
+      
+      // Initialize progress
+      setDropProcessing({
+        isProcessing: true,
+        currentFile: 0,
+        totalFiles: validFiles.length,
+        currentPage: 0,
+        totalPages: 0,
+        fileName: '',
+      });
 
-      for (const file of validFiles) {
+      for (let fileIndex = 0; fileIndex < validFiles.length; fileIndex++) {
+        const file = validFiles[fileIndex];
+        
         try {
           if (isPdfFile(file)) {
+            // Update progress for PDF
+            setDropProcessing(prev => prev ? {
+              ...prev,
+              currentFile: fileIndex + 1,
+              fileName: file.name,
+              currentPage: 0,
+              totalPages: 0,
+            } : null);
+            
             const images = await pdfToImages(file);
-            for (const dataUrl of images) {
+            
+            // Update total pages for this PDF
+            setDropProcessing(prev => prev ? {
+              ...prev,
+              totalPages: images.length,
+            } : null);
+            
+            for (let pageIndex = 0; pageIndex < images.length; pageIndex++) {
+              const dataUrl = images[pageIndex];
+              
+              // Update page progress
+              setDropProcessing(prev => prev ? {
+                ...prev,
+                currentPage: pageIndex + 1,
+              } : null);
+              
               if (singleScanClassId && singleScanStudents.length > 0) {
                 await batch.addImageWithAutoIdentify(dataUrl, singleScanStudents);
               } else if (selectedClassId && students.length > 0) {
@@ -629,6 +686,15 @@ export default function Scan() {
               totalPages++;
             }
           } else {
+            // Update progress for image
+            setDropProcessing(prev => prev ? {
+              ...prev,
+              currentFile: fileIndex + 1,
+              fileName: file.name,
+              currentPage: 1,
+              totalPages: 1,
+            } : null);
+            
             const resizedBlob = await resizeImage(file);
             const dataUrl = await blobToBase64(resizedBlob);
             if (singleScanClassId && singleScanStudents.length > 0) {
@@ -645,6 +711,8 @@ export default function Scan() {
         }
       }
 
+      setDropProcessing(null);
+      
       if (totalPages > 0) {
         setScanMode('scanner');
         toast.success(`Added ${totalPages} page(s) to batch`);
@@ -1839,6 +1907,35 @@ export default function Scan() {
                               <div>
                                 <p className="font-semibold text-primary">Drop files here</p>
                                 <p className="text-sm text-muted-foreground">Images or PDF files</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Processing progress overlay */}
+                        {dropProcessing?.isProcessing && (
+                          <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-20 rounded-lg">
+                            <div className="text-center space-y-4 max-w-xs px-4">
+                              <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                              </div>
+                              <div className="space-y-2">
+                                <p className="font-semibold text-foreground">Processing Files</p>
+                                <p className="text-sm text-muted-foreground truncate" title={dropProcessing.fileName}>
+                                  {dropProcessing.fileName}
+                                </p>
+                              </div>
+                              <div className="space-y-2 w-full">
+                                <Progress 
+                                  value={(dropProcessing.currentFile / dropProcessing.totalFiles) * 100} 
+                                  className="h-2"
+                                />
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                  <span>File {dropProcessing.currentFile} of {dropProcessing.totalFiles}</span>
+                                  {dropProcessing.totalPages > 1 && (
+                                    <span>Page {dropProcessing.currentPage}/{dropProcessing.totalPages}</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
