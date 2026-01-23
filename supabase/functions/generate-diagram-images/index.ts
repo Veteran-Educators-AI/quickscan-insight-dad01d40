@@ -785,6 +785,169 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
   return `data:image/svg+xml;base64,${base64Svg}`;
 }
 
+// Detect subject area from prompt for subject-specific diagram styles
+function detectSubjectArea(prompt: string): 'math' | 'physics' | 'chemistry' | 'biology' | 'general' {
+  const lowerPrompt = prompt.toLowerCase();
+  
+  // Physics indicators
+  const physicsKeywords = [
+    'force', 'velocity', 'acceleration', 'momentum', 'circuit', 'wave', 
+    'electric', 'magnetic', 'gravity', 'friction', 'motion', 'energy',
+    'newton', 'vector', 'projectile', 'pendulum', 'spring', 'resistor',
+    'capacitor', 'inductor', 'current', 'voltage', 'ohm', 'watt'
+  ];
+  if (physicsKeywords.some(kw => lowerPrompt.includes(kw))) {
+    return 'physics';
+  }
+  
+  // Chemistry indicators  
+  const chemistryKeywords = [
+    'molecule', 'atom', 'electron', 'orbital', 'bond', 'reaction',
+    'compound', 'element', 'periodic', 'ion', 'chemical', 'ph',
+    'acid', 'base', 'oxidation', 'reduction', 'mole', 'lewis',
+    'structural', 'organic', 'carbon', 'hydrogen', 'oxygen', 'nitrogen'
+  ];
+  if (chemistryKeywords.some(kw => lowerPrompt.includes(kw))) {
+    return 'chemistry';
+  }
+  
+  // Biology indicators
+  const biologyKeywords = [
+    'cell', 'dna', 'rna', 'protein', 'mitosis', 'meiosis', 'gene',
+    'chromosome', 'organism', 'tissue', 'organ', 'membrane', 'nucleus'
+  ];
+  if (biologyKeywords.some(kw => lowerPrompt.includes(kw))) {
+    return 'biology';
+  }
+  
+  // Math (default for geometric terms)
+  const mathKeywords = [
+    'triangle', 'circle', 'square', 'rectangle', 'polygon', 'coordinate',
+    'graph', 'function', 'equation', 'angle', 'line', 'vertex', 'quadrilateral',
+    'pentagon', 'hexagon', 'parabola', 'hyperbola', 'ellipse', 'sine', 'cosine'
+  ];
+  if (mathKeywords.some(kw => lowerPrompt.includes(kw))) {
+    return 'math';
+  }
+  
+  return 'general';
+}
+
+// Get subject-specific SVG generation prompt based on the Universal Diagram Component methodology
+function getSubjectSpecificPrompt(prompt: string, subject: 'math' | 'physics' | 'chemistry' | 'biology' | 'general'): string {
+  const baseRequirements = `
+SVG TECHNICAL REQUIREMENTS (MANDATORY):
+- Use viewBox="0 0 300 300" for consistent scaling
+- Use a consistent stroke-width of 2px for main elements, 1px for details
+- Ensure all paths are simplified, closed, and non-overlapping
+- Use flat design with NO shadows, NO blurs, NO gradients
+- White background (#ffffff), black primary strokes (#000000)
+- Clear ID tags for each group (<g id="axis">, <g id="shape">, etc.)
+- Path optimization for small file size and readable code
+- All text must be horizontal using <text> elements`;
+
+  switch (subject) {
+    case 'physics':
+      return `Generate a clean, professional SVG diagram for physics education.
+
+DIAGRAM TO CREATE: ${prompt}
+
+PHYSICS DIAGRAM STYLE GUIDE (Technical Schematic):
+- Use a professional color palette: slate blues (#4A5568, #2D3748), grays (#718096)
+- Use rounded rectangles for components/nodes with rx="4"
+- Use clear, straight-line connectors with proper arrowheads
+- Vector arrows should use <polygon> for arrowheads, consistent sizing
+- Force vectors: bold arrows with magnitude labels
+- Circuit components: use standardized symbols (zigzag for resistor, parallel lines for capacitor)
+- Include clear axis labels for graphs
+- Use stroke-dasharray="4,2" for reference lines or construction aids
+- All text labels must be legible (font-size="11" minimum)
+- Ensure symmetrical and balanced layout
+
+${baseRequirements}
+
+Return ONLY valid SVG code, no explanation.`;
+
+    case 'chemistry':
+      return `Generate a clean, professional SVG diagram for chemistry education.
+
+DIAGRAM TO CREATE: ${prompt}
+
+CHEMISTRY DIAGRAM STYLE GUIDE (Molecular/Structural):
+- Use a consistent stroke-width of 2px for bonds
+- Single bonds: straight lines
+- Double bonds: two parallel lines with 2px gap
+- Triple bonds: three parallel lines
+- Atoms/elements: circles with element symbol text centered
+- Use professional colors: Carbon (#333), Oxygen (#EF4444), Nitrogen (#3B82F6), Hydrogen (#9CA3AF)
+- Electron dots: small filled circles (r="2")
+- Orbital diagrams: use ellipses with proper labeling
+- Lewis structures: clear dot positioning around atoms
+- Reaction arrows: use proper arrow notation (→, ⇌)
+- Keep molecular structures flat and 2D (no 3D perspective)
+
+${baseRequirements}
+
+Return ONLY valid SVG code, no explanation.`;
+
+    case 'biology':
+      return `Generate a clean, professional SVG diagram for biology education.
+
+DIAGRAM TO CREATE: ${prompt}
+
+BIOLOGY DIAGRAM STYLE GUIDE (Educational Diagram):
+- Use modular design where individual parts can be identified
+- Cell structures: use distinct shapes for each organelle
+- Use professional colors: membrane (#84CC16), nucleus (#8B5CF6), cytoplasm (#FEF3C7)
+- Clear labels with leader lines connecting to structures
+- Cross-sections: use different fill patterns or subtle color differences
+- Include scale references where appropriate
+- Symmetrical layouts for comparative diagrams
+
+${baseRequirements}
+
+Return ONLY valid SVG code, no explanation.`;
+
+    case 'math':
+      return `Generate a precise, textbook-quality mathematical SVG diagram.
+
+DIAGRAM TO CREATE: ${prompt}
+
+MATH DIAGRAM STYLE GUIDE (Geometric/Coordinate):
+- Coordinate planes: complete grid with light gray lines (#e0e0e0)
+- Bold black axes with arrows at ends
+- Number labels at regular intervals, properly positioned
+- Plot points as solid black circles (r="4")
+- Label each point with name and coordinates
+- Shapes: stroke="#000000" stroke-width="2" fill="none"
+- Angle arcs: use <path> with arc notation, include degree labels
+- Right angle markers: small squares at corners
+- Construction lines: stroke-dasharray="5,5"
+- Measurements: positioned <text> elements with appropriate font-size
+
+${baseRequirements}
+
+Return ONLY valid SVG code, no explanation.`;
+
+    default:
+      return `Generate a clean, professional SVG icon/diagram.
+
+DIAGRAM TO CREATE: ${prompt}
+
+GENERAL DIAGRAM STYLE GUIDE (Universal Diagram Component):
+- Minimalist line-art style
+- Consistent stroke-weight of 2px
+- Simplified, closed, non-overlapping paths
+- Professional appearance suitable for educational use
+- Centered composition
+- Clear visual hierarchy
+
+${baseRequirements}
+
+Return ONLY valid SVG code, no explanation.`;
+  }
+}
+
 // Generate SVG diagram using standard AI model (fallback if deterministic fails)
 async function generateSVGWithAI(prompt: string): Promise<string | null> {
   // First, try deterministic generation for coordinate plane problems
@@ -807,32 +970,10 @@ async function generateSVGWithAI(prompt: string): Promise<string | null> {
   }
 
   try {
-    const enhancedPrompt = `Create a precise, textbook-quality mathematical diagram in SVG format.
-
-DIAGRAM TO CREATE: ${prompt}
-
-MANDATORY SVG REQUIREMENTS:
-
-1. FOR COORDINATE PLANES:
-   - Include a complete grid with light gray lines (#cccccc)
-   - Bold black axes with arrows at the ends
-   - Number labels on both axes at regular intervals (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-   - Plot points as solid black circles (r="4")
-   - Label each point with its name and coordinates using <text> elements
-   - Example: <text x="45" y="85" font-size="12">A (2, 5)</text>
-
-2. FOR GEOMETRIC SHAPES:
-   - Use stroke="#000000" stroke-width="2" for main outlines
-   - Label all vertices with capital letters
-   - Show measurements with positioned <text> elements
-   - Use stroke-dasharray="5,5" for hidden/construction lines
-   - Include angle arcs with degree measurements
-
-3. FOR ALL DIAGRAMS:
-   - Black lines on white background only
-   - Clear, readable labels (font-size 12-14)
-   - Centered composition within the viewBox
-   - Professional textbook illustration quality`;
+    // Detect subject area and get subject-specific prompt
+    const subject = detectSubjectArea(prompt);
+    console.log(`Detected subject area: ${subject}`);
+    const enhancedPrompt = getSubjectSpecificPrompt(prompt, subject);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -845,25 +986,25 @@ MANDATORY SVG REQUIREMENTS:
         messages: [
           {
             role: "system",
-            content:
-              "You are an expert at creating SVG diagrams for educational math worksheets. Return only valid SVG code, nothing else.",
+            content: `You are an expert at creating professional SVG diagrams for educational ${subject} worksheets. 
+            
+CORE PRINCIPLES:
+1. FLAT DESIGN ONLY - No shadows, blurs, or complex effects
+2. PATH OPTIMIZATION - Keep code clean and minimal
+3. VIEWBOX SETTINGS - Always use viewBox="0 0 300 300" for easy scaling
+4. CONSISTENT STROKES - Use 2px for main elements, 1px for details
+5. PROPER GROUPING - Use <g> elements with descriptive IDs
+6. HORIZONTAL TEXT - All labels must be horizontal, never rotated
+
+Return only valid SVG code, nothing else.`,
           },
           {
             role: "user",
-            content: `Generate a complete, valid SVG code for the following diagram. The SVG should be black lines on white background, suitable for a math worksheet. Return ONLY the SVG code, nothing else.
-
-Diagram to create: ${enhancedPrompt}
-
-Requirements:
-- SVG should have width="300" height="300" viewBox="0 0 300 300"
-- Use stroke="#000000" for all lines
-- Use fill="none" for shapes, or fill="#ffffff" for white backgrounds
-- Include clear text labels using <text> elements with font-size="14"
-- Make sure the diagram is centered and well-proportioned`,
+            content: enhancedPrompt,
           },
         ],
         temperature: 0.3,
-        max_tokens: 2000,
+        max_tokens: 2500,
       }),
     });
 
@@ -883,8 +1024,20 @@ Requirements:
     // Extract SVG from the response
     const svgMatch = content.match(/<svg[\s\S]*?<\/svg>/i);
     if (svgMatch) {
+      // Validate and clean up the SVG
+      let svgString = svgMatch[0];
+      
+      // Ensure viewBox is present
+      if (!svgString.includes('viewBox')) {
+        svgString = svgString.replace('<svg', '<svg viewBox="0 0 300 300"');
+      }
+      
+      // Ensure width and height are set
+      if (!svgString.includes('width=')) {
+        svgString = svgString.replace('<svg', '<svg width="300" height="300"');
+      }
+      
       // Convert SVG to data URL
-      const svgString = svgMatch[0];
       const base64Svg = btoa(unescape(encodeURIComponent(svgString)));
       return `data:image/svg+xml;base64,${base64Svg}`;
     }
