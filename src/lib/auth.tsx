@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -22,40 +22,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ALLOWED_ROLES: UserRole[] = ['teacher', 'admin'];
 
-function withTimeout<T>(promise: Promise<T>, ms: number, errorMsg: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(errorMsg)), ms)
-    )
-  ]);
-}
-
-function clearSupabaseAuth() {
-  const keysToRemove: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && (key.includes('supabase') || key.includes('sb-'))) {
-      keysToRemove.push(key);
-    }
-  }
-  keysToRemove.forEach(key => localStorage.removeItem(key));
-}
-
-async function fetchUserRole(userId: string): Promise<UserRole | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .single();
-
-  if (error || !data) {
-    return null;
-  }
-
-  return data.role as UserRole;
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -63,126 +29,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const clearAuthError = () => setAuthError(null);
+  const clearAuthError = useCallback(() => setAuthError(null), []);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const safetyTimeout = setTimeout(() => {
-      if (isMounted) {
-        clearSupabaseAuth();
-        setLoading(false);
-        setSession(null);
-        setUser(null);
-        setUserRole(null);
-      }
-    }, 10000);
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        try {
-          if (session?.user) {
-            const role = await fetchUserRole(session.user.id);
-
-            if (!role) {
-              await supabase.auth.signOut();
-              setSession(null);
-              setUser(null);
-              setUserRole(null);
-              setLoading(false);
-              return;
+    // Get initial session - simple and fast
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      if (currentSession?.user) {
+        setSession(currentSession);
+        setUser(currentSession.user);
+        // Fetch role in background, don't block loading
+        supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', currentSession.user.id)
+          .single()
+          .then(({ data }) => {
+            if (data?.role) {
+              setUserRole(data.role as UserRole);
             }
-
-            if (!ALLOWED_ROLES.includes(role)) {
-              await supabase.auth.signOut();
-              setSession(null);
-              setUser(null);
-              setUserRole(null);
-              setAuthError('This portal is for teachers only. Please use the Student Portal to sign in.');
-              setLoading(false);
-              return;
-            }
-
-            setUserRole(role);
-          } else {
-            setUserRole(null);
-          }
-
-          setSession(session);
-          setUser(session?.user ?? null);
-        } catch (error) {
-          await supabase.auth.signOut();
-          setSession(null);
-          setUser(null);
-          setUserRole(null);
-        } finally {
-          setLoading(false);
-        }
+          });
       }
-    );
-
-    const getSessionWithTimeout = withTimeout(
-      supabase.auth.getSession(),
-      5000,
-      'Session fetch timed out'
-    );
-
-    getSessionWithTimeout.then(async ({ data: { session } }) => {
-      try {
-        if (session?.user) {
-          const role = await withTimeout(
-            fetchUserRole(session.user.id),
-            5000,
-            'Role fetch timed out'
-          );
-
-          if (!role) {
-            clearSupabaseAuth();
-            await supabase.auth.signOut();
-            setSession(null);
-            setUser(null);
-            setUserRole(null);
-            setLoading(false);
-            return;
-          }
-
-          if (!ALLOWED_ROLES.includes(role)) {
-            await supabase.auth.signOut();
-            setSession(null);
-            setUser(null);
-            setUserRole(null);
-            setAuthError('This portal is for teachers only. Please use the Student Portal to sign in.');
-            setLoading(false);
-            return;
-          }
-
-          setUserRole(role);
-        }
-
-        setSession(session);
-        setUser(session?.user ?? null);
-      } catch (error) {
-        clearSupabaseAuth();
-        await supabase.auth.signOut();
-        setSession(null);
-        setUser(null);
-        setUserRole(null);
-      } finally {
-        setLoading(false);
-      }
+      setLoading(false);
     }).catch(() => {
-      clearSupabaseAuth();
       setLoading(false);
     });
 
-    return () => {
-      isMounted = false;
-      clearTimeout(safetyTimeout);
-      subscription.unsubscribe();
-    };
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, currentSession) => {
+        if (currentSession?.user) {
+          setSession(currentSession);
+          setUser(currentSession.user);
+          // Fetch role in background
+          supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', currentSession.user.id)
+            .single()
+            .then(({ data }) => {
+              if (data?.role) {
+                setUserRole(data.role as UserRole);
+              }
+            });
+        } else {
+          setSession(null);
+          setUser(null);
+          setUserRole(null);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -192,9 +92,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     });
     return { error: error as Error | null };
-  };
+  }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string): Promise<{ error: Error | null }> => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -204,43 +104,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: error as Error };
     }
 
-    if (data.user) {
-      const role = await fetchUserRole(data.user.id);
-
-      if (!role) {
-        await supabase.auth.signOut();
-        return { error: new Error('Account setup incomplete. Please try again.') };
-      }
-
-      if (!ALLOWED_ROLES.includes(role)) {
-        await supabase.auth.signOut();
-        return {
-          error: new Error('This portal is for teachers only. Please use the Student Portal to sign in.')
-        };
-      }
-
-      setUserRole(role);
+    if (!data.user) {
+      return { error: new Error('Sign in failed. Please try again.') };
     }
 
-    return { error: null };
-  };
+    // Check role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', data.user.id)
+      .single();
 
-  const resetPassword = async (email: string) => {
+    if (!profile?.role) {
+      await supabase.auth.signOut();
+      return { error: new Error('Account setup incomplete. Please try again.') };
+    }
+
+    if (!ALLOWED_ROLES.includes(profile.role as UserRole)) {
+      await supabase.auth.signOut();
+      setAuthError('This portal is for teachers only. Please use the Student Portal to sign in.');
+      return { error: new Error('This portal is for teachers only.') };
+    }
+
+    // Update state
+    setUserRole(profile.role as UserRole);
+    setSession(data.session);
+    setUser(data.user);
+
+    return { error: null };
+  }, []);
+
+  const resetPassword = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     return { error: error as Error | null };
-  };
+  }, []);
 
-  const updatePassword = async (password: string) => {
+  const updatePassword = useCallback(async (password: string) => {
     const { error } = await supabase.auth.updateUser({ password });
     return { error: error as Error | null };
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     setUserRole(null);
+    setUser(null);
+    setSession(null);
     await supabase.auth.signOut();
-  };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, session, loading, userRole, authError, clearAuthError, signUp, signIn, resetPassword, updatePassword, signOut }}>
