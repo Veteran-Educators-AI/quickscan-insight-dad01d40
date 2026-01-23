@@ -34,8 +34,9 @@ interface Student {
 interface ClassData {
   id: string;
   name: string;
-  class_code: string | null;
+  join_code: string;
   school_year: string | null;
+  class_period: string | null;
 }
 
 export default function ClassDetail() {
@@ -104,8 +105,8 @@ export default function ClassDetail() {
   }
 
   const copyJoinCode = async () => {
-    if (!classData || !classData.class_code) return;
-    await navigator.clipboard.writeText(classData.class_code);
+    if (!classData || !classData.join_code) return;
+    await navigator.clipboard.writeText(classData.join_code);
     setCopiedCode(true);
     toast({ title: 'Copied!', description: 'Join code copied to clipboard' });
     setTimeout(() => setCopiedCode(false), 2000);
@@ -452,7 +453,7 @@ export default function ClassDetail() {
               <div className="flex flex-col gap-2 items-end">
                 <Button variant="outline" onClick={copyJoinCode}>
                   {copiedCode ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-                  Join Code: {classData.class_code || 'None'}
+                  Join Code: {classData.join_code || 'None'}
                 </Button>
                 <Button 
                   variant="ghost" 

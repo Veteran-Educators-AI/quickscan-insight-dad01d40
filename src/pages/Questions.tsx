@@ -23,6 +23,7 @@ import { TrainingFormGenerator } from '@/components/scan/TrainingFormGenerator';
 import { TeacherAnswerSampleUploader } from '@/components/scan/TeacherAnswerSampleUploader';
 import { TeacherAnswerSampleList } from '@/components/scan/TeacherAnswerSampleList';
 import { DiagnosticGapsDialog } from '@/components/reports/DiagnosticGapsSummary';
+import { EnglishLiteratureSuggestions } from '@/components/questions/EnglishLiteratureSuggestions';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Questions() {
@@ -488,6 +489,47 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+
+            {/* English Literature Suggestions - Show when English is selected */}
+            {selectedSubject === 'english' && !searchQuery.trim() && (
+              <EnglishLiteratureSuggestions 
+                onSelectLesson={(lesson) => {
+                  // Add lesson topics to worksheet
+                  const lessonTopics: WorksheetQuestion[] = lesson.standards.map((std, idx) => ({
+                    id: `${lesson.id}-${std}-${idx}`,
+                    topicName: lesson.title,
+                    standard: std,
+                    subject: 'English',
+                    category: 'LITERATURE',
+                    jmapUrl: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards',
+                  }));
+                  setWorksheetQuestions(prev => {
+                    const newTopics = lessonTopics.filter(lt => !prev.some(p => p.id === lt.id));
+                    return [...prev, ...newTopics];
+                  });
+                  toast({
+                    title: 'Lesson Added',
+                    description: `Added "${lesson.title}" topics to your worksheet`,
+                  });
+                }}
+                onGenerateWorksheet={(textId, questions) => {
+                  // Add questions as topics to worksheet
+                  const questionTopics: WorksheetQuestion[] = questions.map((q, idx) => ({
+                    id: `${textId}-${q.level}-${idx}`,
+                    topicName: q.question.slice(0, 50) + '...',
+                    standard: q.standard,
+                    subject: 'English',
+                    category: 'LITERATURE',
+                    jmapUrl: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards',
+                  }));
+                  setWorksheetQuestions(prev => [...prev, ...questionTopics.slice(0, 5)]);
+                  toast({
+                    title: 'Questions Added',
+                    description: `Added ${Math.min(5, questions.length)} ${questions[0]?.level || ''} questions to worksheet`,
+                  });
+                }}
+              />
+            )}
 
             {/* Add Selected Button */}
             {selectedTopics.size > 0 && (

@@ -12,9 +12,9 @@ import { useToast } from '@/hooks/use-toast';
 interface ClassWithStudentCount {
   id: string;
   name: string;
-  class_code: string | null;
+  join_code: string;
   school_year: string | null;
-  period: string | null;
+  class_period: string | null;
   created_at: string;
   student_count: number;
 }
@@ -133,7 +133,7 @@ export default function Classes() {
                       <EditClassDialog
                         classId={cls.id}
                         currentName={cls.name}
-                        currentPeriod={cls.period}
+                        currentPeriod={cls.class_period}
                         currentYear={cls.school_year}
                         onUpdate={fetchClasses}
                       />
@@ -144,9 +144,9 @@ export default function Classes() {
                   </CardTitle>
                   <CardDescription className="flex items-center gap-2">
                     {cls.school_year || 'No year set'}
-                    {cls.period && (
+                    {cls.class_period && (
                       <Badge variant="secondary" className="text-xs">
-                        {cls.period}
+                        {cls.class_period}
                       </Badge>
                     )}
                   </CardDescription>
@@ -162,15 +162,15 @@ export default function Classes() {
                       size="sm"
                       onClick={(e) => {
                         e.preventDefault();
-                        if (cls.class_code) copyJoinCode(cls.class_code);
+                        if (cls.join_code) copyJoinCode(cls.join_code);
                       }}
                     >
-                      {copiedCode === cls.class_code ? (
+                      {copiedCode === cls.join_code ? (
                         <Check className="h-3 w-3" />
                       ) : (
                         <Copy className="h-3 w-3" />
                       )}
-                      {cls.class_code || 'No code'}
+                      {cls.join_code || 'No code'}
                     </Button>
                   </div>
                 </CardContent>

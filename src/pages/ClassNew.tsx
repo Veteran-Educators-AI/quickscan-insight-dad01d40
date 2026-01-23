@@ -49,9 +49,9 @@ export default function ClassNew() {
         .insert({
           teacher_id: user.id,
           name,
-          class_code: joinCode,
+          join_code: joinCode,
           school_year: schoolYear || null,
-          period: classPeriod === 'other' ? customPeriod.trim() || null : classPeriod || null,
+          class_period: classPeriod === 'other' ? customPeriod.trim() || null : classPeriod || null,
         })
         .select()
         .single();
