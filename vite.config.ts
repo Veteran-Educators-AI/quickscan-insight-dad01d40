@@ -13,6 +13,16 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "popper.js": path.resolve(__dirname, "./node_modules/popper.js/dist/popper.js"),
     },
+  },
+  optimizeDeps: {
+    exclude: ["popper.js"],
+    esbuildOptions: {
+      sourcemap: false,
+    },
+  },
+  build: {
+    sourcemap: false,
   },
 }));

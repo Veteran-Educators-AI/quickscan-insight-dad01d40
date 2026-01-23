@@ -6,11 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { StudentNameProvider } from "@/lib/StudentNameContext";
-import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
-import { WhatsNewDialog } from "@/components/WhatsNewDialog";
-import { useMfaStatus } from "@/hooks/useMfaStatus";
 
-import { useDeepLinks } from "./hooks/useDeepLinks";
 import Login from "./pages/Login";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
@@ -37,79 +33,30 @@ import StudentDashboard from "./pages/StudentDashboard";
 import PresentationView from "./pages/PresentationView";
 import PresentationLibrary from "./pages/PresentationLibrary";
 import TeacherLibrary from "./pages/TeacherLibrary";
-import { BetaFeedbackButton } from "./components/BetaFeedbackButton";
 
 const queryClient = new QueryClient();
 
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
-          <div className="max-w-md text-center">
-            <h1 className="text-xl font-bold text-red-600 mb-2">Something went wrong</h1>
-            <p className="text-sm text-gray-600 mb-4">{this.state.error?.message}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Reload Page
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
+// Simple protected route - just checks if user is logged in
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  const { status: mfaStatus, isLoading: mfaLoading } = useMfaStatus();
 
-  if (loading || mfaLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
       </div>
     );
   }
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Only require MFA verification if user has already enrolled
-  // 2FA is now optional - users won't be forced to enroll
-  if (mfaStatus === 'needs_verification') {
-    return <Navigate to="/mfa-challenge" replace />;
-  }
-  
   return <>{children}</>;
 }
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-
-  useDeepLinks();
-
-  React.useEffect(() => {
-    const redirectPath = sessionStorage.getItem('redirect_path');
-    if (redirectPath && redirectPath !== '/') {
-      sessionStorage.removeItem('redirect_path');
-      window.history.replaceState(null, '', redirectPath);
-    }
-  }, []);
 
   if (loading) {
     return (
@@ -160,24 +107,19 @@ function AppRoutes() {
 }
 
 const App = () => (
-  <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <StudentNameProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <OnboardingTour />
-              <WhatsNewDialog />
-              <BetaFeedbackButton />
-              <AppRoutes />
-            </BrowserRouter>
-          </TooltipProvider>
-        </StudentNameProvider>
-      </AuthProvider>
-    </QueryClientProvider>
-  </ErrorBoundary>
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <StudentNameProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </TooltipProvider>
+      </StudentNameProvider>
+    </AuthProvider>
+  </QueryClientProvider>
 );
 
 export default App;
