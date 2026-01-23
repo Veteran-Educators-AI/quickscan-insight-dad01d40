@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw, FileText, Brain, BookOpen } from 'lucide-react';
 import { resizeImage, blobToBase64, compressImage } from '@/lib/imageUtils';
+import { pdfToImages, isPdfFile } from '@/lib/pdfUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -432,20 +433,40 @@ export default function Scan() {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const resizedBlob = await resizeImage(file);
-        const dataUrl = await blobToBase64(resizedBlob);
-        setCapturedImage(dataUrl);
-        setScanState('preview');
-      } catch (err) {
-        console.error('Error resizing image:', err);
-        // Fallback to original file
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const dataUrl = ev.target?.result as string;
+        // Check if it's a PDF
+        if (isPdfFile(file)) {
+          toast.info('Converting PDF to images...');
+          const images = await pdfToImages(file);
+          if (images.length === 0) {
+            toast.error('Could not extract pages from PDF');
+            return;
+          }
+          // For single scan, use the first page
+          setCapturedImage(images[0]);
+          setScanState('preview');
+          if (images.length > 1) {
+            toast.info(`PDF has ${images.length} pages. First page loaded. Use Batch mode for multi-page PDFs.`);
+          }
+        } else {
+          const resizedBlob = await resizeImage(file);
+          const dataUrl = await blobToBase64(resizedBlob);
           setCapturedImage(dataUrl);
           setScanState('preview');
-        };
-        reader.readAsDataURL(file);
+        }
+      } catch (err) {
+        console.error('Error processing file:', err);
+        // Fallback to original file (for images only)
+        if (!isPdfFile(file)) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const dataUrl = ev.target?.result as string;
+            setCapturedImage(dataUrl);
+            setScanState('preview');
+          };
+          reader.readAsDataURL(file);
+        } else {
+          toast.error('Failed to process PDF file');
+        }
       }
     }
     e.target.value = '';
@@ -456,38 +477,59 @@ export default function Scan() {
     if (!files) return;
     
     const fileCount = files.length;
-    toast.info(`Adding ${fileCount} image(s)...`);
+    toast.info(`Processing ${fileCount} file(s)...`);
+    
+    let totalPages = 0;
     
     // Process files with auto-identification if class is selected
     const processFile = async (file: File) => {
       try {
-        const resizedBlob = await resizeImage(file);
-        const dataUrl = await blobToBase64(resizedBlob);
-        if (selectedClassId && students.length > 0) {
-          await batch.addImageWithAutoIdentify(dataUrl, students);
+        // Check if it's a PDF
+        if (isPdfFile(file)) {
+          const images = await pdfToImages(file);
+          for (const dataUrl of images) {
+            if (selectedClassId && students.length > 0) {
+              await batch.addImageWithAutoIdentify(dataUrl, students);
+            } else {
+              batch.addImage(dataUrl);
+            }
+            totalPages++;
+          }
         } else {
-          batch.addImage(dataUrl);
-        }
-      } catch (err) {
-        console.error('Error resizing image:', err);
-        // Fallback to original file
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const dataUrl = ev.target?.result as string;
+          const resizedBlob = await resizeImage(file);
+          const dataUrl = await blobToBase64(resizedBlob);
           if (selectedClassId && students.length > 0) {
             await batch.addImageWithAutoIdentify(dataUrl, students);
           } else {
             batch.addImage(dataUrl);
           }
-        };
-        reader.readAsDataURL(file);
+          totalPages++;
+        }
+      } catch (err) {
+        console.error('Error processing file:', err);
+        // Fallback to original file (for images only)
+        if (!isPdfFile(file)) {
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const dataUrl = ev.target?.result as string;
+            if (selectedClassId && students.length > 0) {
+              await batch.addImageWithAutoIdentify(dataUrl, students);
+            } else {
+              batch.addImage(dataUrl);
+            }
+            totalPages++;
+          };
+          reader.readAsDataURL(file);
+        } else {
+          toast.error(`Failed to process PDF: ${file.name}`);
+        }
       }
     };
 
     // Process all files
     await Promise.all(Array.from(files).map(processFile));
     
-    toast.success(`Added ${fileCount} image(s)${selectedClassId ? ' with auto-identification' : ''}`);
+    toast.success(`Added ${totalPages} page(s) from ${fileCount} file(s)${selectedClassId ? ' with auto-identification' : ''}`);
     e.target.value = '';
   };
 
@@ -1775,7 +1817,7 @@ export default function Scan() {
                           <input
                             ref={fileInputRef}
                             type="file"
-                            accept="image/*"
+                            accept="image/*,.pdf,application/pdf"
                             onChange={handleFileUpload}
                             className="hidden"
                           />
@@ -1785,7 +1827,7 @@ export default function Scan() {
                             onClick={() => fileInputRef.current?.click()}
                           >
                             <Upload className="h-5 w-5 mr-2" />
-                            Upload Image
+                            Upload Image/PDF
                           </Button>
                         </div>
 
@@ -1903,7 +1945,7 @@ export default function Scan() {
                           <input
                             ref={batchInputRef}
                             type="file"
-                            accept="image/*"
+                            accept="image/*,.pdf,application/pdf"
                             multiple
                             onChange={handleBatchUpload}
                             className="hidden"

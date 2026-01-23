@@ -355,7 +355,7 @@ export function SaveForLaterTab({ pendingScans, onRefresh, onAnalyzeScan }: Save
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.pdf,application/pdf"
                 multiple
                 onChange={handleFileUpload}
                 className="hidden"
