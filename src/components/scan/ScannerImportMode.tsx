@@ -19,6 +19,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { resizeImage, blobToBase64, applyPhotocopyFilter } from '@/lib/imageUtils';
+import { pdfToImages, isPdfFile } from '@/lib/pdfUtils';
 import { GoogleDriveImport } from './GoogleDriveImport';
 import { GoogleDriveAutoSyncConfig } from './GoogleDriveAutoSyncConfig';
 import { HotFolderAlert } from './HotFolderAlert';
@@ -292,14 +293,53 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
       fileArray.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
     }
     
-    toast.info(`Processing ${fileArray.length} scanned pages...`);
+    toast.info(`Processing ${fileArray.length} file(s)...`);
     
     try {
       const newPages: ScanPage[] = [];
+      let totalItems = 0;
+      
+      // First pass: count total items (including PDF pages)
+      for (const file of fileArray) {
+        if (isPdfFile(file)) {
+          // We'll count PDF pages during processing
+          totalItems += 1; // Placeholder, will adjust
+        } else {
+          totalItems += 1;
+        }
+      }
+      
+      let processedCount = 0;
       
       for (let i = 0; i < fileArray.length; i++) {
-        const page = await processImage(fileArray[i], i, fileArray.length);
-        newPages.push(page);
+        const file = fileArray[i];
+        
+        if (isPdfFile(file)) {
+          // Convert PDF to images
+          toast.info(`Converting PDF: ${file.name}...`);
+          try {
+            const pdfImages = await pdfToImages(file);
+            for (let pageIdx = 0; pageIdx < pdfImages.length; pageIdx++) {
+              // Create a mock file from the PDF page image for processing
+              const pageDataUrl = pdfImages[pageIdx];
+              const page = await processImageFromDataUrl(
+                pageDataUrl, 
+                `${file.name}-page${pageIdx + 1}`,
+                processedCount, 
+                totalItems + pdfImages.length - 1
+              );
+              newPages.push(page);
+              processedCount++;
+            }
+          } catch (pdfErr) {
+            console.error('Error processing PDF:', pdfErr);
+            toast.error(`Failed to process PDF: ${file.name}`);
+          }
+        } else {
+          const page = await processImage(file, processedCount, totalItems);
+          newPages.push(page);
+          processedCount++;
+        }
       }
       
       // Append to existing pages
@@ -322,6 +362,53 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
       e.target.value = '';
     }
   };
+
+  // Helper to process an image from data URL (for PDF pages)
+  const processImageFromDataUrl = useCallback(async (
+    dataUrl: string,
+    filename: string,
+    index: number,
+    total: number
+  ): Promise<ScanPage> => {
+    const id = `page-${Date.now()}-${index}`;
+    
+    let processedDataUrl = dataUrl;
+    
+    // Apply photocopy filter if enabled
+    if (settings.applyPhotocopyFilter) {
+      processedDataUrl = await applyPhotocopyFilter(processedDataUrl);
+    }
+    
+    let rotation = 0;
+    let autoRotated = false;
+    let detectedOrientation: 'portrait' | 'landscape' | 'unknown' = 'unknown';
+    
+    // Auto-detect and fix rotation if enabled
+    if (settings.autoRotate) {
+      const orientationResult = await detectTextOrientation(processedDataUrl);
+      detectedOrientation = orientationResult.orientation;
+      
+      if (orientationResult.suggestedRotation !== 0 && orientationResult.confidence > 0.6) {
+        processedDataUrl = await rotateImage(processedDataUrl, orientationResult.suggestedRotation);
+        rotation = orientationResult.suggestedRotation;
+        autoRotated = true;
+      }
+    }
+    
+    setProcessProgress(((index + 1) / total) * 100);
+    
+    return {
+      id,
+      originalDataUrl: dataUrl,
+      processedDataUrl,
+      rotation,
+      order: index + 1,
+      filename,
+      autoRotated,
+      isProcessing: false,
+      detectedOrientation,
+    };
+  }, [settings.applyPhotocopyFilter, settings.autoRotate]);
 
   const handleRotatePage = async (pageId: string, direction: 'cw' | 'ccw') => {
     const page = pages.find(p => p.id === pageId);
@@ -791,7 +878,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf,application/pdf"
               multiple
               className="hidden"
               onChange={handleFileSelect}

@@ -1235,7 +1235,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.pdf,application/pdf"
                     onChange={handleFileSelect}
                     className="hidden"
                   />
@@ -1447,7 +1447,7 @@ export function MultiStudentScanner({ onClose, rubricSteps }: MultiStudentScanne
                     <label className="cursor-pointer">
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,.pdf,application/pdf"
                         multiple
                         onChange={handleBatchFileSelect}
                         className="hidden"
