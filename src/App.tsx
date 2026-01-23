@@ -41,10 +41,42 @@ import { BetaFeedbackButton } from "./components/BetaFeedbackButton";
 
 const queryClient = new QueryClient();
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
+          <div className="max-w-md text-center">
+            <h1 className="text-xl font-bold text-red-600 mb-2">Something went wrong</h1>
+            <p className="text-sm text-gray-600 mb-4">{this.state.error?.message}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const { status: mfaStatus, isLoading: mfaLoading } = useMfaStatus();
-  
+
   if (loading || mfaLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -68,11 +100,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-  
-  // Handle deep links from Capacitor native wrapper
+
   useDeepLinks();
 
-  // Handle SPA redirect from 404.html fallback
   React.useEffect(() => {
     const redirectPath = sessionStorage.getItem('redirect_path');
     if (redirectPath && redirectPath !== '/') {
@@ -130,22 +160,24 @@ function AppRoutes() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <StudentNameProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <OnboardingTour />
-            <WhatsNewDialog />
-            <BetaFeedbackButton />
-            <AppRoutes />
-          </BrowserRouter>
-        </TooltipProvider>
-      </StudentNameProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <StudentNameProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <OnboardingTour />
+              <WhatsNewDialog />
+              <BetaFeedbackButton />
+              <AppRoutes />
+            </BrowserRouter>
+          </TooltipProvider>
+        </StudentNameProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

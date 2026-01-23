@@ -1,4 +1,4 @@
-project_id = "wihddyjdfihvnxvvynek"
+project_id = "dvkarvdcstavlhnaoisr"
 
 [functions.analyze-student-work]
 verify_jwt = false
@@ -55,4 +55,62 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-performance-drop-alert]
+verify_jwt = false
+
+# Functions from student app
+[functions.send-parent-notification]
+verify_jwt = false
+
+[functions.grade-assignment]
+verify_jwt = false
+
+[functions.sync-to-nycologic]
+verify_jwt = false
+
+[functions.generate-invite]
+verify_jwt = false
+
+[functions.nycologic-webhook]
+verify_jwt = false
+
+[functions.sync-student]
+verify_jwt = false
+
+[functions.geoblox-sync]
+verify_jwt = false
+
+[functions.generate-question-image]
+verify_jwt = false
+
+[functions.algebra-tutor]
+verify_jwt = false
+
+[functions.award-rewards]
+verify_jwt = false
+
+[functions.external-api]
+verify_jwt = false
+
+[functions.generate-study-plan]
+verify_jwt = false
+
+[functions.geoblox-webhook]
+verify_jwt = false
+
+[functions.import-nycologic-classes]
+verify_jwt = false
+
+[functions.push-daily-quote]
+verify_jwt = false
+
+[functions.send-password-reset-confirmation]
+verify_jwt = false
+
+[functions.send-welcome-email]
+verify_jwt = false
+
+[functions.teacher-push]
+verify_jwt = false
+
+[functions.translate]
 verify_jwt = false

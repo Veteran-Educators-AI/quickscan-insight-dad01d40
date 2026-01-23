@@ -55,7 +55,7 @@ export function EditClassDialog({
         .from('classes')
         .update({
           name: name.trim(),
-          class_period: period.trim() || null,
+          period: period.trim() || null,
           school_year: year.trim() || null,
         })
         .eq('id', classId);
