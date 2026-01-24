@@ -17,7 +17,7 @@ import { DifferentiatedWorksheetGenerator } from '@/components/questions/Differe
 import { AdaptiveWorksheetGenerator } from '@/components/questions/AdaptiveWorksheetGenerator';
 import { LessonPlanGenerator } from '@/components/questions/LessonPlanGenerator';
 import { LessonPlanLibrary } from '@/components/questions/LessonPlanLibrary';
-import { LessonTopicSelector, type PresentationTheme } from '@/components/questions/LessonTopicSelector';
+import { LessonTopicSelector, type PresentationTheme, PRESENTATION_THEMES } from '@/components/questions/LessonTopicSelector';
 import { MasteryChallengeGenerator } from '@/components/questions/MasteryChallengeGenerator';
 import { TrainingFormGenerator } from '@/components/scan/TrainingFormGenerator';
 import { TeacherAnswerSampleUploader } from '@/components/scan/TeacherAnswerSampleUploader';
@@ -494,22 +494,19 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
             {selectedSubject === 'english' && !searchQuery.trim() && (
               <EnglishLiteratureSuggestions 
                 onSelectLesson={(lesson) => {
-                  // Add lesson topics to worksheet
-                  const lessonTopics: WorksheetQuestion[] = lesson.standards.map((std, idx) => ({
-                    id: `${lesson.id}-${std}-${idx}`,
+                  // Open the lesson plan generator with this lesson's data
+                  setSelectedLessonTopic({
                     topicName: lesson.title,
-                    standard: std,
+                    standard: lesson.standards[0] || 'ELA',
                     subject: 'English',
-                    category: 'LITERATURE',
-                    jmapUrl: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards',
-                  }));
-                  setWorksheetQuestions(prev => {
-                    const newTopics = lessonTopics.filter(lt => !prev.some(p => p.id === lt.id));
-                    return [...prev, ...newTopics];
                   });
+                  // Set the sunset theme for English literature (warm, literary feel)
+                  const literatureTheme = PRESENTATION_THEMES.find(t => t.id === 'sunset') || PRESENTATION_THEMES[0];
+                  setSelectedTheme(literatureTheme);
+                  setShowLessonGenerator(true);
                   toast({
-                    title: 'Lesson Added',
-                    description: `Added "${lesson.title}" topics to your worksheet`,
+                    title: 'Opening Lesson Planner',
+                    description: `Creating presentation for "${lesson.title}"`,
                   });
                 }}
                 onGenerateWorksheet={(textId, questions) => {
