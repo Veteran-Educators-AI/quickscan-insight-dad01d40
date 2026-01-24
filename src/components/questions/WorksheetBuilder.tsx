@@ -2635,7 +2635,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
                         onClick={() => onRemoveQuestion(question.id)}
                       >
                         <X className="h-4 w-4" />
