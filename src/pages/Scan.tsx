@@ -40,6 +40,8 @@ import { GradingModeSelector, GradingMode } from '@/components/scan/GradingModeS
 import { BatchGradingModeSelector, BatchGradingMode } from '@/components/scan/BatchGradingModeSelector';
 import { GradingComparisonView } from '@/components/scan/GradingComparisonView';
 import { GoogleClassroomImport, type ImportedSubmission } from '@/components/scan/GoogleClassroomImport';
+import { GoogleConnectionPanel } from '@/components/scan/GoogleConnectionPanel';
+import { GoogleDriveImport } from '@/components/scan/GoogleDriveImport';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
@@ -181,8 +183,10 @@ export default function Scan() {
   
   // Google Classroom import
   const [showGoogleClassroomImport, setShowGoogleClassroomImport] = useState(false);
+  
+  // Google Drive import  
+  const [showGoogleDriveImport, setShowGoogleDriveImport] = useState(false);
 
-  // Mock rubric steps
   const mockRubricSteps = [
     { step_number: 1, description: 'Correctly identifies the problem type', points: 1 },
     { step_number: 2, description: 'Sets up equations/approach correctly', points: 2 },
@@ -1116,17 +1120,14 @@ export default function Scan() {
           {/* AI Learning Progress Indicator */}
           <AILearningProgress compact />
 
-          {/* Train AI, Answer Key, and Import Buttons */}
+          {/* Google Connection Panel */}
+          <GoogleConnectionPanel 
+            onDriveImport={() => setShowGoogleDriveImport(true)}
+            onClassroomImport={() => setShowGoogleClassroomImport(true)}
+          />
+
+          {/* Train AI and Answer Key Buttons */}
           <div className="flex justify-end gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowGoogleClassroomImport(true)}
-              className="gap-2"
-            >
-              <BookOpen className="h-4 w-4" />
-              Import from Classroom
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -2609,6 +2610,45 @@ export default function Scan() {
           });
         }}
       />
+
+      {/* Google Drive Import */}
+      <Dialog open={showGoogleDriveImport} onOpenChange={setShowGoogleDriveImport}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Import from Google Drive
+            </DialogTitle>
+          </DialogHeader>
+          <GoogleDriveImport 
+            onFilesSelected={async (files) => {
+              setShowGoogleDriveImport(false);
+              if (files.length === 0) return;
+              
+              toast.info(`Processing ${files.length} file(s) from Drive...`);
+              
+              for (const file of files) {
+                try {
+                  const dataUrl = await blobToBase64(file.blob);
+                  if (singleScanClassId && singleScanStudents.length > 0) {
+                    await batch.addImageWithAutoIdentify(dataUrl, singleScanStudents);
+                  } else if (selectedClassId && students.length > 0) {
+                    await batch.addImageWithAutoIdentify(dataUrl, students);
+                  } else {
+                    batch.addImage(dataUrl);
+                  }
+                } catch (err) {
+                  console.error('Error processing Drive file:', err);
+                }
+              }
+              
+              setScanMode('batch');
+              toast.success(`Added ${files.length} file(s) to batch`);
+            }}
+            onClose={() => setShowGoogleDriveImport(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
