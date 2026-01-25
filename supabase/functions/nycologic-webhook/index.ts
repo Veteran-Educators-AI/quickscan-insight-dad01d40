@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key, x-source-app",
 };
 
 interface AssignmentPayload {
@@ -73,7 +73,35 @@ interface RemediationPayload {
   };
 }
 
-type WebhookPayload = AssignmentPayload | StudentProfilePayload | StatusQueryPayload | RemediationPayload;
+interface TopicPerformance {
+  topic: string;
+  standardCode: string;
+  questionsAttempted: number;
+  questionsCorrect: number;
+  masteryPercentage: number;
+}
+
+interface PracticeSessionPayload {
+  source: "scholar-app";
+  timestamp: string;
+  event_type: "practice_session_completed";
+  data: {
+    student_id: string;
+    student_email?: string;
+    exam_type?: string;
+    subject: string;
+    questions_attempted: number;
+    questions_correct: number;
+    percentage: number;
+    max_streak?: number;
+    timed_mode?: boolean;
+    topic_performance: TopicPerformance[];
+    completed_at: string;
+    request_plan_adjustment: boolean;
+  };
+}
+
+type WebhookPayload = AssignmentPayload | StudentProfilePayload | StatusQueryPayload | RemediationPayload | PracticeSessionPayload;
 
 async function verifyApiKey(apiKey: string, supabaseUrl: string, supabaseKey: string): Promise<boolean> {
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -153,26 +181,158 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify API key
+    // Check for x-source-app header for Scholar app authentication
+    const sourceApp = req.headers.get("x-source-app");
+    
+    // Verify API key (skip for scholar-app with valid source header)
     const apiKey = req.headers.get("x-api-key");
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: "Missing API key" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (sourceApp !== "scholar-app") {
+      if (!apiKey) {
+        return new Response(
+          JSON.stringify({ error: "Missing API key" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const isValid = await verifyApiKey(apiKey, supabaseUrl, supabaseServiceKey);
+      if (!isValid) {
+        return new Response(
+          JSON.stringify({ error: "Invalid or inactive API key" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      console.log("Received request from scholar-app");
     }
 
-    const isValid = await verifyApiKey(apiKey, supabaseUrl, supabaseServiceKey);
-    if (!isValid) {
-      return new Response(
-        JSON.stringify({ error: "Invalid or inactive API key" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const payload = await req.json();
+    
+    // Determine the event type - support both 'type' and 'event_type' fields
+    const eventType = payload.type || payload.event_type;
+    
+    switch (eventType) {
+      case "practice_session_completed": {
+        // Handle practice session data from Scholar app
+        const sessionData = payload.data;
+        console.log(`Processing practice session for student ${sessionData.student_id}`);
+        
+        // Find student by ID or email
+        let studentId = sessionData.student_id;
+        let studentRecord = null;
+        
+        // Try to find by user_id first
+        const { data: studentByUserId } = await supabase
+          .from("students")
+          .select("id, first_name, last_name, class_id")
+          .eq("user_id", studentId)
+          .single();
+        
+        if (studentByUserId) {
+          studentRecord = studentByUserId;
+        } else if (sessionData.student_email) {
+          // Fallback to email lookup
+          const { data: studentByEmail } = await supabase
+            .from("students")
+            .select("id, first_name, last_name, class_id")
+            .eq("email", sessionData.student_email)
+            .single();
+          
+          if (studentByEmail) {
+            studentRecord = studentByEmail;
+          }
+        }
+        
+        // Update mastery levels from topic_performance array
+        let masteryUpdated = false;
+        if (sessionData.topic_performance && sessionData.topic_performance.length > 0) {
+          for (const topic of sessionData.topic_performance) {
+            // Record grade history for each topic
+            const { error: gradeError } = await supabase
+              .from("grade_history")
+              .insert({
+                student_id: studentRecord?.id || studentId,
+                teacher_id: studentRecord?.class_id ? 
+                  (await supabase.from("classes").select("teacher_id").eq("id", studentRecord.class_id).single()).data?.teacher_id 
+                  : null,
+                topic_name: topic.topic,
+                grade: topic.masteryPercentage,
+                nys_standard: topic.standardCode,
+                raw_score_earned: topic.questionsCorrect,
+                raw_score_possible: topic.questionsAttempted,
+                grade_justification: `Scholar app practice: ${topic.questionsCorrect}/${topic.questionsAttempted} correct`,
+              });
+            
+            if (!gradeError) {
+              masteryUpdated = true;
+              console.log(`Updated mastery for topic ${topic.topic}: ${topic.masteryPercentage}%`);
+            } else {
+              console.error(`Failed to update mastery for ${topic.topic}:`, gradeError);
+            }
+          }
+        }
+        
+        // Handle study plan adjustment if requested
+        let planUpdated = false;
+        if (sessionData.request_plan_adjustment) {
+          console.log("Study plan adjustment requested");
+          
+          // Identify weak topics (below 70% mastery)
+          const weakTopics = sessionData.topic_performance
+            ?.filter((t: TopicPerformance) => t.masteryPercentage < 70)
+            .map((t: TopicPerformance) => ({
+              topic: t.topic,
+              standard: t.standardCode,
+              mastery: t.masteryPercentage,
+            })) || [];
+          
+          // Identify strong topics (80%+ mastery)
+          const strongTopics = sessionData.topic_performance
+            ?.filter((t: TopicPerformance) => t.masteryPercentage >= 80)
+            .map((t: TopicPerformance) => t.topic) || [];
+          
+          // Create study plan recommendation
+          if (weakTopics.length > 0) {
+            const focusAreas = weakTopics.slice(0, 3).map((w: { topic: string; standard: string; mastery: number }) => 
+              `${w.topic} (${w.standard}): ${w.mastery}% mastery`
+            );
+            
+            // Store recommendation as a diagnostic result or note
+            await supabase
+              .from("diagnostic_results")
+              .insert({
+                student_id: studentRecord?.id || studentId,
+                teacher_id: studentRecord?.class_id ? 
+                  (await supabase.from("classes").select("teacher_id").eq("id", studentRecord.class_id).single()).data?.teacher_id 
+                  : null,
+                topic_name: sessionData.subject || "General Practice",
+                recommended_level: weakTopics[0]?.mastery < 50 ? "A" : weakTopics[0]?.mastery < 70 ? "B" : "C",
+                notes: JSON.stringify({
+                  source: "scholar-app",
+                  session_date: sessionData.completed_at,
+                  overall_percentage: sessionData.percentage,
+                  focus_areas: focusAreas,
+                  strong_topics: strongTopics,
+                  max_streak: sessionData.max_streak,
+                  timed_mode: sessionData.timed_mode,
+                }),
+              });
+            
+            planUpdated = true;
+            console.log(`Study plan updated with ${weakTopics.length} focus areas`);
+          }
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            plan_updated: planUpdated,
+            mastery_updated: masteryUpdated,
+            topics_processed: sessionData.topic_performance?.length || 0,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-    const payload: WebhookPayload = await req.json();
-
-    switch (payload.type) {
       case "assignment": {
         const { data } = payload as AssignmentPayload;
         
