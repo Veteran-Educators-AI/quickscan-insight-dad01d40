@@ -4358,6 +4358,1186 @@ export const LESSON_SUGGESTIONS: LessonSuggestion[] = [
       'Comparative analysis with other tragedies',
     ],
   },
+
+  // ============================================
+  // THE ODYSSEY (6 lessons)
+  // ============================================
+  {
+    id: 'odyssey-epic-hero',
+    title: 'Odysseus: The Original Epic Hero',
+    description: 'Analyze the characteristics that define Odysseus as an epic hero.',
+    textId: 'odyssey',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'SL.9-10.1'],
+    objectives: [
+      'Define epic hero characteristics',
+      'Identify heroic qualities in Odysseus',
+      'Discuss how ancient heroism differs from modern',
+    ],
+    activities: [
+      'Epic hero trait checklist',
+      'Evidence collection from key episodes',
+      'Debate: Is Odysseus a hero by modern standards?',
+    ],
+    assessmentIdeas: [
+      'Epic hero analysis essay',
+      'Creative: Modern epic hero comparison',
+    ],
+  },
+  {
+    id: 'odyssey-xenia',
+    title: 'Xenia: The Sacred Law of Hospitality',
+    description: 'Explore the Greek concept of hospitality and its role in the epic.',
+    textId: 'odyssey',
+    duration: '45 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.4', 'SL.9-10.1'],
+    objectives: [
+      'Define xenia and its cultural importance',
+      'Identify examples of good and bad hospitality',
+      'Analyze consequences of violating xenia',
+    ],
+    activities: [
+      'Xenia examples chart (positive vs. negative)',
+      'Analysis of Polyphemus and suitors scenes',
+      'Discussion: Modern hospitality expectations',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on hospitality',
+      'Creative: Modern xenia scenario',
+    ],
+  },
+  {
+    id: 'odyssey-monsters-meaning',
+    title: 'Monsters as Metaphors: What Do They Represent?',
+    description: 'Analyze the symbolic meaning of monsters Odysseus encounters.',
+    textId: 'odyssey',
+    duration: '55 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.2', 'W.9-10.9'],
+    objectives: [
+      'Identify major monsters and their characteristics',
+      'Analyze what each monster represents symbolically',
+      'Connect monsters to temptations Odysseus must overcome',
+    ],
+    activities: [
+      'Monster symbolism chart',
+      'Close reading of Sirens and Scylla/Charybdis',
+      'Creative: Design a modern monster test',
+    ],
+    assessmentIdeas: [
+      'Symbolism analysis essay',
+      'Monster creation with symbolic meaning',
+    ],
+  },
+  {
+    id: 'odyssey-penelope',
+    title: 'Penelope: Patience, Cleverness, and Loyalty',
+    description: 'Analyze Penelope as a parallel hero to Odysseus.',
+    textId: 'odyssey',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.6', 'SL.9-10.1'],
+    objectives: [
+      'Analyze Penelope\'s character traits and strategies',
+      'Compare her cleverness to Odysseus\'s',
+      'Discuss her role as a female hero',
+    ],
+    activities: [
+      'Character trait evidence collection',
+      'Weaving shroud scene analysis',
+      'Comparison: Penelope vs. Odysseus as strategists',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Creative: Penelope\'s internal monologue',
+    ],
+  },
+  {
+    id: 'odyssey-literary-techniques',
+    title: 'Epic Conventions: In Medias Res, Epithets, and Similes',
+    description: 'Study the literary techniques that define epic poetry.',
+    textId: 'odyssey',
+    duration: '45 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.5', 'W.9-10.9'],
+    objectives: [
+      'Identify in medias res structure and its effect',
+      'Recognize and analyze epithets',
+      'Understand epic similes and their purpose',
+    ],
+    activities: [
+      'Epithet collection and analysis',
+      'Epic simile identification and interpretation',
+      'Rewrite: Create modern epithets for characters',
+    ],
+    assessmentIdeas: [
+      'Literary techniques essay',
+      'Creative: Write an epic simile',
+    ],
+  },
+  {
+    id: 'odyssey-homecoming',
+    title: 'Nostos: The Meaning of Homecoming',
+    description: 'Explore the theme of home and identity in the epic.',
+    textId: 'odyssey',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.3', 'SL.9-10.1'],
+    objectives: [
+      'Define nostos and its importance to Greeks',
+      'Analyze how Odysseus changes during his journey',
+      'Discuss what "home" means beyond physical location',
+    ],
+    activities: [
+      'Journey transformation timeline',
+      'Recognition scenes analysis',
+      'Discussion: What makes a place "home"?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on homecoming',
+      'Personal reflection on identity and place',
+    ],
+  },
+
+  // ============================================
+  // BRAVE NEW WORLD (6 lessons)
+  // ============================================
+  {
+    id: 'bnw-world-state',
+    title: 'The World State: Utopia or Dystopia?',
+    description: 'Analyze Huxley\'s society and its methods of control.',
+    textId: 'brave-new-world',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
+    objectives: [
+      'Identify features of the World State',
+      'Analyze methods of social control',
+      'Debate whether citizens are happy or enslaved',
+    ],
+    activities: [
+      'World State features chart',
+      'Control methods analysis (soma, conditioning, etc.)',
+      'Debate: Is the World State a utopia?',
+    ],
+    assessmentIdeas: [
+      'Analytical essay on control mechanisms',
+      'Creative: World State propaganda poster',
+    ],
+  },
+  {
+    id: 'bnw-individuality',
+    title: 'The Cost of Conformity: Bernard and John',
+    description: 'Analyze characters who resist or struggle with the system.',
+    textId: 'brave-new-world',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'W.11-12.9'],
+    objectives: [
+      'Compare Bernard and John as outsiders',
+      'Analyze what individuality costs in this world',
+      'Discuss whether resistance is possible',
+    ],
+    activities: [
+      'Character comparison chart',
+      'Outsider evidence collection',
+      'Discussion: Why does John reject paradise?',
+    ],
+    assessmentIdeas: [
+      'Comparative character essay',
+      'Creative: Letter from Bernard to John',
+    ],
+  },
+  {
+    id: 'bnw-technology-humanity',
+    title: 'Technology vs. Humanity',
+    description: 'Examine how technology replaces human connections.',
+    textId: 'brave-new-world',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.4', 'SL.11-12.1'],
+    objectives: [
+      'Identify technologies used for social control',
+      'Analyze what is lost when technology replaces relationships',
+      'Connect to modern technology concerns',
+    ],
+    activities: [
+      'Technology impact chart',
+      'Soma analysis: drug as technology',
+      'Discussion: Are we becoming the World State?',
+    ],
+    assessmentIdeas: [
+      'Essay connecting to modern technology',
+      'Research: Huxley\'s predictions that came true',
+    ],
+  },
+  {
+    id: 'bnw-shakespeare',
+    title: 'The Role of Shakespeare: Art and Humanity',
+    description: 'Analyze why Shakespeare matters to John and the novel.',
+    textId: 'brave-new-world',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.9', 'W.11-12.9'],
+    objectives: [
+      'Identify Shakespeare allusions throughout the novel',
+      'Analyze why John connects to The Tempest',
+      'Discuss what literature represents vs. World State values',
+    ],
+    activities: [
+      'Shakespeare allusion tracking',
+      'Close reading of Miranda allusions',
+      'Discussion: Why is literature dangerous to the state?',
+    ],
+    assessmentIdeas: [
+      'Allusion analysis essay',
+      'Creative: John\'s reading journal',
+    ],
+  },
+  {
+    id: 'bnw-happiness-freedom',
+    title: 'Happiness vs. Freedom: The Central Debate',
+    description: 'Explore Huxley\'s philosophical questions about human nature.',
+    textId: 'brave-new-world',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.6', 'SL.11-12.3'],
+    objectives: [
+      'Articulate the happiness vs. freedom debate',
+      'Analyze Mustapha Mond\'s arguments',
+      'Formulate a personal position',
+    ],
+    activities: [
+      'Mond-John debate analysis',
+      'Philosophical chairs activity',
+      'Personal reflection: What would you choose?',
+    ],
+    assessmentIdeas: [
+      'Argumentative essay on freedom vs. happiness',
+      'Socratic seminar on human nature',
+    ],
+  },
+  {
+    id: 'bnw-satire',
+    title: 'Huxley\'s Satirical Targets',
+    description: 'Identify what aspects of 1930s society Huxley critiques.',
+    textId: 'brave-new-world',
+    duration: '50 minutes',
+    standards: ['RL.11-12.6', 'RL.11-12.9', 'W.11-12.9'],
+    objectives: [
+      'Define satire and its techniques',
+      'Identify 1930s targets: consumerism, Ford, mass production',
+      'Analyze how exaggeration creates critique',
+    ],
+    activities: [
+      'Historical context research',
+      'Satire identification chart',
+      'Modern parallels discussion',
+    ],
+    assessmentIdeas: [
+      'Essay on Huxley\'s satire',
+      'Creative: Modern satirical addition',
+    ],
+  },
+
+  // ============================================
+  // JANE EYRE (6 lessons)
+  // ============================================
+  {
+    id: 'jane-independence',
+    title: 'Jane\'s Quest for Independence',
+    description: 'Trace Jane\'s development as an independent woman.',
+    textId: 'jane-eyre',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Identify key moments of Jane asserting independence',
+      'Analyze obstacles to female independence in Victorian era',
+      'Discuss Jane as a proto-feminist character',
+    ],
+    activities: [
+      'Independence timeline with quotes',
+      'Victorian context research',
+      'Discussion: Is Jane a feminist?',
+    ],
+    assessmentIdeas: [
+      'Character development essay',
+      'Research: Victorian women\'s rights',
+    ],
+  },
+  {
+    id: 'jane-gothic',
+    title: 'Gothic Elements in Jane Eyre',
+    description: 'Analyze how Brontë uses Gothic conventions.',
+    textId: 'jane-eyre',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.5', 'W.11-12.9'],
+    objectives: [
+      'Define Gothic literature conventions',
+      'Identify Gothic elements in the novel',
+      'Analyze the function of Bertha and Thornfield',
+    ],
+    activities: [
+      'Gothic conventions checklist',
+      'Setting analysis: Thornfield atmosphere',
+      'Bertha as Gothic figure discussion',
+    ],
+    assessmentIdeas: [
+      'Gothic elements essay',
+      'Creative: Gothic scene in modern setting',
+    ],
+  },
+  {
+    id: 'jane-class-love',
+    title: 'Class and Romance: Jane and Rochester',
+    description: 'Examine how social class affects the central relationship.',
+    textId: 'jane-eyre',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Analyze the class difference between Jane and Rochester',
+      'Discuss how their relationship challenges conventions',
+      'Evaluate the ending\'s resolution of class issues',
+    ],
+    activities: [
+      'Class dynamics analysis',
+      'Key proposal scenes comparison',
+      'Debate: Does the ending satisfy or compromise?',
+    ],
+    assessmentIdeas: [
+      'Essay on class and romance',
+      'Comparative: Modern class in relationships',
+    ],
+  },
+  {
+    id: 'jane-bertha',
+    title: 'The Madwoman in the Attic: Bertha Mason',
+    description: 'Analyze Bertha\'s role and critical interpretations.',
+    textId: 'jane-eyre',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Bertha\'s characterization in the novel',
+      'Explore feminist and postcolonial readings',
+      'Discuss Bertha as Jane\'s double',
+    ],
+    activities: [
+      'Bertha description analysis',
+      'Introduction to Wide Sargasso Sea',
+      'Discussion: Victim or monster?',
+    ],
+    assessmentIdeas: [
+      'Critical interpretation essay',
+      'Creative: Bertha\'s story',
+    ],
+  },
+  {
+    id: 'jane-religion-morality',
+    title: 'Faith and Morality in Jane Eyre',
+    description: 'Examine the role of religion in Jane\'s decisions.',
+    textId: 'jane-eyre',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'W.11-12.9'],
+    objectives: [
+      'Compare religious figures: Brocklehurst, Helen, St. John',
+      'Analyze Jane\'s personal moral code',
+      'Discuss the tension between passion and duty',
+    ],
+    activities: [
+      'Religious character comparison',
+      'Jane\'s moral decisions analysis',
+      'Discussion: Faith vs. personal morality',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on religion',
+      'Character study of St. John',
+    ],
+  },
+  {
+    id: 'jane-narrator-reader',
+    title: 'Reader, I Married Him: Narrative Voice',
+    description: 'Analyze Jane as narrator and her relationship with readers.',
+    textId: 'jane-eyre',
+    duration: '45 minutes',
+    standards: ['RL.11-12.6', 'RL.11-12.5', 'W.11-12.9'],
+    objectives: [
+      'Identify moments of direct reader address',
+      'Analyze how narrative voice creates intimacy',
+      'Discuss reliability and perspective',
+    ],
+    activities: [
+      'Reader address collection',
+      'Narrative voice style analysis',
+      'Comparison: Modern first-person narrators',
+    ],
+    assessmentIdeas: [
+      'Narrative voice essay',
+      'Creative: Scene from Rochester\'s POV',
+    ],
+  },
+
+  // ============================================
+  // PRIDE AND PREJUDICE (6 lessons)
+  // ============================================
+  {
+    id: 'pp-first-impressions',
+    title: 'First Impressions: The Danger of Judgment',
+    description: 'Analyze how initial judgments mislead characters.',
+    textId: 'pride-and-prejudice',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Identify characters\' first impressions of each other',
+      'Analyze how pride and prejudice cause misjudgment',
+      'Trace how opinions change with new information',
+    ],
+    activities: [
+      'First impressions chart',
+      'Evidence of changed opinions',
+      'Discussion: When have you misjudged someone?',
+    ],
+    assessmentIdeas: [
+      'Essay on judgment and change',
+      'Personal reflection on first impressions',
+    ],
+  },
+  {
+    id: 'pp-marriage-economics',
+    title: 'Marriage as Economic Transaction',
+    description: 'Examine marriage customs and women\'s limited options.',
+    textId: 'pride-and-prejudice',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Understand entailment and women\'s economic position',
+      'Compare different marriages in the novel',
+      'Analyze Charlotte\'s choice to marry Collins',
+    ],
+    activities: [
+      'Marriage motivations chart',
+      'Historical context: Regency marriage laws',
+      'Debate: Was Charlotte right to marry Collins?',
+    ],
+    assessmentIdeas: [
+      'Essay on marriage and economics',
+      'Research: Women\'s legal status in 1800s',
+    ],
+  },
+  {
+    id: 'pp-austen-irony',
+    title: 'Austen\'s Wit: Irony and Satire',
+    description: 'Analyze Austen\'s use of irony to critique society.',
+    textId: 'pride-and-prejudice',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.6', 'W.11-12.9'],
+    objectives: [
+      'Define verbal, situational, and dramatic irony',
+      'Identify ironic passages and their targets',
+      'Analyze the famous opening line',
+    ],
+    activities: [
+      'Irony examples collection',
+      'Close reading: Mr. Bennet\'s dialogue',
+      'Satire target identification',
+    ],
+    assessmentIdeas: [
+      'Essay on Austen\'s irony',
+      'Creative: Modern ironic opening',
+    ],
+  },
+  {
+    id: 'pp-elizabeth-darcy',
+    title: 'Elizabeth and Darcy: A Battle of Equals',
+    description: 'Analyze the central relationship and character development.',
+    textId: 'pride-and-prejudice',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.5', 'SL.11-12.1'],
+    objectives: [
+      'Trace Elizabeth\'s and Darcy\'s character arcs',
+      'Analyze key scenes: proposals, letter, Pemberley',
+      'Discuss what makes them compatible',
+    ],
+    activities: [
+      'Dual character arc timeline',
+      'Proposal comparison analysis',
+      'The letter: turning point close reading',
+    ],
+    assessmentIdeas: [
+      'Character development essay',
+      'Creative: Darcy\'s perspective',
+    ],
+  },
+  {
+    id: 'pp-class-status',
+    title: 'Class Consciousness in Regency England',
+    description: 'Explore how class shapes characters\' choices and judgments.',
+    textId: 'pride-and-prejudice',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
+    objectives: [
+      'Identify class distinctions among characters',
+      'Analyze Lady Catherine\'s role as class enforcer',
+      'Discuss how love crosses class lines',
+    ],
+    activities: [
+      'Class hierarchy chart',
+      'Lady Catherine confrontation analysis',
+      'Discussion: Does class still matter today?',
+    ],
+    assessmentIdeas: [
+      'Essay on class and love',
+      'Research: British class system today',
+    ],
+  },
+  {
+    id: 'pp-sisters',
+    title: 'The Bennet Sisters: Foils and Contrasts',
+    description: 'Compare the five sisters and what they represent.',
+    textId: 'pride-and-prejudice',
+    duration: '45 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.5', 'W.11-12.9'],
+    objectives: [
+      'Characterize each Bennet sister',
+      'Analyze Jane and Elizabeth as foils',
+      'Discuss Lydia\'s role in the plot',
+    ],
+    activities: [
+      'Five sisters comparison chart',
+      'Jane-Elizabeth foil analysis',
+      'Lydia\'s consequences discussion',
+    ],
+    assessmentIdeas: [
+      'Comparative character essay',
+      'Creative: A sixth Bennet sister',
+    ],
+  },
+
+  // ============================================
+  // HEART OF DARKNESS (5 lessons)
+  // ============================================
+  {
+    id: 'hod-colonialism',
+    title: 'Colonialism and Its Critique',
+    description: 'Analyze Conrad\'s portrayal of European imperialism.',
+    textId: 'heart-of-darkness',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Understand the historical context of Congo colonization',
+      'Analyze Conrad\'s critique of imperialism',
+      'Discuss the controversy over racist elements',
+    ],
+    activities: [
+      'Historical context research',
+      'Colonial critique evidence collection',
+      'Reading Chinua Achebe\'s critique',
+    ],
+    assessmentIdeas: [
+      'Essay: Critique or complicity?',
+      'Research: Belgian Congo history',
+    ],
+  },
+  {
+    id: 'hod-darkness-symbol',
+    title: 'The Symbolism of Darkness',
+    description: 'Explore the multiple meanings of darkness in the novella.',
+    textId: 'heart-of-darkness',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.2', 'W.11-12.9'],
+    objectives: [
+      'Identify uses of light/darkness imagery',
+      'Analyze multiple interpretations of "darkness"',
+      'Discuss problematic racial implications',
+    ],
+    activities: [
+      'Light/darkness imagery collection',
+      'Symbolic interpretation brainstorm',
+      'Critical perspectives comparison',
+    ],
+    assessmentIdeas: [
+      'Symbol analysis essay',
+      'Discussion: Can we separate symbol from racism?',
+    ],
+  },
+  {
+    id: 'hod-kurtz',
+    title: 'The Horror: Understanding Kurtz',
+    description: 'Analyze Kurtz as a symbol of colonial corruption.',
+    textId: 'heart-of-darkness',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Kurtz\'s transformation',
+      'Interpret "the horror, the horror"',
+      'Discuss what Kurtz represents',
+    ],
+    activities: [
+      'Kurtz description tracking',
+      'Final words interpretation',
+      'Discussion: What drove Kurtz mad?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Creative: Kurtz\'s journal entries',
+    ],
+  },
+  {
+    id: 'hod-frame-narrative',
+    title: 'Frames Within Frames: Narrative Structure',
+    description: 'Analyze Conrad\'s complex frame narrative technique.',
+    textId: 'heart-of-darkness',
+    duration: '50 minutes',
+    standards: ['RL.11-12.5', 'RL.11-12.6', 'W.11-12.9'],
+    objectives: [
+      'Identify the multiple narrative layers',
+      'Analyze how framing affects interpretation',
+      'Discuss reliability and perspective',
+    ],
+    activities: [
+      'Narrative layers diagram',
+      'Narrator comparison: frame vs. Marlow',
+      'Effects of distance analysis',
+    ],
+    assessmentIdeas: [
+      'Narrative structure essay',
+      'Creative: Alternative narrator',
+    ],
+  },
+  {
+    id: 'hod-journey-myth',
+    title: 'The Journey Into the Self',
+    description: 'Explore the novella as psychological journey.',
+    textId: 'heart-of-darkness',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
+    objectives: [
+      'Analyze the journey as inward exploration',
+      'Connect to mythic hero journey patterns',
+      'Discuss what Marlow learns about himself',
+    ],
+    activities: [
+      'Hero\'s journey mapping',
+      'Psychological interpretation discussion',
+      'Marlow\'s transformation analysis',
+    ],
+    assessmentIdeas: [
+      'Psychological reading essay',
+      'Journey archetype comparison',
+    ],
+  },
+
+  // ============================================
+  // AMERICAN POETRY COLLECTION (6 lessons)
+  // ============================================
+  {
+    id: 'poetry-am-whitman',
+    title: 'Walt Whitman: The Voice of America',
+    description: 'Analyze Whitman\'s democratic vision and free verse revolution.',
+    textId: 'poetry-american',
+    duration: '50 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.2', 'SL.9-10.1'],
+    objectives: [
+      'Understand Whitman\'s free verse innovation',
+      'Analyze democratic themes in "Song of Myself"',
+      'Discuss Whitman\'s vision of American identity',
+    ],
+    activities: [
+      'Free verse characteristics analysis',
+      'Close reading of key Whitman passages',
+      'Discussion: What is the American voice?',
+    ],
+    assessmentIdeas: [
+      'Poetry analysis essay',
+      'Creative: Free verse poem in Whitman\'s style',
+    ],
+  },
+  {
+    id: 'poetry-am-dickinson',
+    title: 'Emily Dickinson: Dashes and Depths',
+    description: 'Explore Dickinson\'s unique style and themes.',
+    textId: 'poetry-american',
+    duration: '50 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.5', 'W.9-10.9'],
+    objectives: [
+      'Analyze Dickinson\'s distinctive punctuation and form',
+      'Explore themes of death, immortality, and nature',
+      'Compare Dickinson to Whitman',
+    ],
+    activities: [
+      'Style analysis: dashes and slant rhyme',
+      'Close reading of death poems',
+      'Dickinson vs. Whitman comparison',
+    ],
+    assessmentIdeas: [
+      'Poetry analysis essay',
+      'Creative: Poem using Dickinson\'s techniques',
+    ],
+  },
+  {
+    id: 'poetry-am-frost',
+    title: 'Robert Frost: The Deceptive Simplicity',
+    description: 'Analyze how Frost uses accessible form for complex ideas.',
+    textId: 'poetry-american',
+    duration: '45 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.2', 'SL.9-10.1'],
+    objectives: [
+      'Identify traditional form in Frost\'s poetry',
+      'Analyze deeper meanings beneath simple surfaces',
+      'Discuss Frost\'s use of nature imagery',
+    ],
+    activities: [
+      'Form and meter analysis',
+      'Close reading: "The Road Not Taken" misconceptions',
+      'Nature as metaphor discussion',
+    ],
+    assessmentIdeas: [
+      'Essay on form and meaning',
+      'Multiple interpretation comparison',
+    ],
+  },
+  {
+    id: 'poetry-am-hughes',
+    title: 'Langston Hughes: Dreams and Justice',
+    description: 'Explore Hughes\'s Harlem Renaissance poetry and themes.',
+    textId: 'poetry-american',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.4', 'SL.9-10.1'],
+    objectives: [
+      'Understand Hughes\'s role in Harlem Renaissance',
+      'Analyze jazz rhythms in his poetry',
+      'Discuss themes of dreams deferred and racial justice',
+    ],
+    activities: [
+      'Jazz poetry rhythm analysis',
+      'Close reading: "Harlem" interpretations',
+      'Historical context connection',
+    ],
+    assessmentIdeas: [
+      'Poetry analysis essay',
+      'Creative: Jazz-influenced poem',
+    ],
+  },
+  {
+    id: 'poetry-am-plath',
+    title: 'Sylvia Plath and Confessional Poetry',
+    description: 'Analyze Plath\'s intense, personal poetic voice.',
+    textId: 'poetry-american',
+    duration: '55 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.5', 'SL.11-12.1'],
+    objectives: [
+      'Define confessional poetry movement',
+      'Analyze Plath\'s imagery and metaphors',
+      'Discuss personal vs. universal themes',
+    ],
+    activities: [
+      'Confessional poetry characteristics',
+      'Close reading of selected poems',
+      'Imagery and metaphor analysis',
+    ],
+    assessmentIdeas: [
+      'Poetry analysis essay',
+      'Movement comparison: confessional vs. other styles',
+    ],
+  },
+  {
+    id: 'poetry-am-contemporary',
+    title: 'Contemporary American Voices',
+    description: 'Explore diverse voices in modern American poetry.',
+    textId: 'poetry-american',
+    duration: '50 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.6', 'SL.9-10.1'],
+    objectives: [
+      'Identify diverse contemporary poets',
+      'Analyze how poetry reflects modern experience',
+      'Compare themes across generations',
+    ],
+    activities: [
+      'Contemporary poet exploration',
+      'Theme comparison across eras',
+      'Poetry reading and response',
+    ],
+    assessmentIdeas: [
+      'Comparative essay across eras',
+      'Creative: Response poem to contemporary work',
+    ],
+  },
+
+  // ============================================
+  // HARLEM RENAISSANCE POETRY (5 lessons)
+  // ============================================
+  {
+    id: 'hr-historical-context',
+    title: 'The Harlem Renaissance: A Cultural Explosion',
+    description: 'Understand the historical context of the movement.',
+    textId: 'poetry-harlem-renaissance',
+    duration: '55 minutes',
+    standards: ['RL.9-10.6', 'RL.9-10.9', 'SL.9-10.1'],
+    objectives: [
+      'Understand the Great Migration and its effects',
+      'Identify key figures of the Harlem Renaissance',
+      'Analyze the relationship between art and social change',
+    ],
+    activities: [
+      'Historical timeline creation',
+      'Movement overview research',
+      'Art and activism discussion',
+    ],
+    assessmentIdeas: [
+      'Historical context essay',
+      'Research: Key Harlem Renaissance figures',
+    ],
+  },
+  {
+    id: 'hr-hughes-voice',
+    title: 'Langston Hughes: The Voice of Harlem',
+    description: 'Deep dive into Hughes\'s major poems and themes.',
+    textId: 'poetry-harlem-renaissance',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.4', 'W.9-10.9'],
+    objectives: [
+      'Analyze Hughes\'s signature themes',
+      'Explore jazz and blues influences',
+      'Discuss his vision for Black America',
+    ],
+    activities: [
+      'Multiple Hughes poems analysis',
+      'Jazz/blues rhythm identification',
+      'Theme tracking across poems',
+    ],
+    assessmentIdeas: [
+      'Poet study essay',
+      'Creative: Blues poem',
+    ],
+  },
+  {
+    id: 'hr-mckay-cullen',
+    title: 'Claude McKay and Countee Cullen: Dual Traditions',
+    description: 'Compare two distinct voices of the movement.',
+    textId: 'poetry-harlem-renaissance',
+    duration: '50 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.5', 'SL.9-10.1'],
+    objectives: [
+      'Compare McKay\'s and Cullen\'s styles',
+      'Analyze traditional vs. experimental forms',
+      'Discuss different approaches to racial identity',
+    ],
+    activities: [
+      'Poet style comparison',
+      'Form analysis: sonnet vs. free verse',
+      'Debate: Which approach is more effective?',
+    ],
+    assessmentIdeas: [
+      'Comparative analysis essay',
+      'Poet presentation',
+    ],
+  },
+  {
+    id: 'hr-themes',
+    title: 'Pride, Pain, and Perseverance: Core Themes',
+    description: 'Analyze recurring themes across Harlem Renaissance poetry.',
+    textId: 'poetry-harlem-renaissance',
+    duration: '55 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.4', 'W.9-10.9'],
+    objectives: [
+      'Identify common themes: identity, pride, injustice, dreams',
+      'Trace themes across multiple poets',
+      'Connect historical context to poetic expression',
+    ],
+    activities: [
+      'Theme collection across poems',
+      'Evidence chart by poet',
+      'Theme discussion: Which resonates most today?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay across poets',
+      'Personal response to key themes',
+    ],
+  },
+  {
+    id: 'hr-legacy',
+    title: 'The Legacy of the Harlem Renaissance',
+    description: 'Connect Harlem Renaissance to contemporary Black voices.',
+    textId: 'poetry-harlem-renaissance',
+    duration: '50 minutes',
+    standards: ['RL.9-10.9', 'RL.9-10.6', 'SL.9-10.1'],
+    objectives: [
+      'Trace influence on later poets and artists',
+      'Connect to contemporary spoken word and hip-hop',
+      'Discuss ongoing relevance of movement themes',
+    ],
+    activities: [
+      'Influence mapping to today',
+      'Contemporary comparison',
+      'Discussion: Is there a new renaissance today?',
+    ],
+    assessmentIdeas: [
+      'Legacy essay',
+      'Creative: Response to a Harlem Renaissance poem',
+    ],
+  },
+
+  // ============================================
+  // CRIME AND PUNISHMENT (6 lessons)
+  // ============================================
+  {
+    id: 'cp-psychology',
+    title: 'Inside Raskolnikov\'s Mind: Psychological Realism',
+    description: 'Analyze Dostoevsky\'s groundbreaking psychological portrait.',
+    textId: 'crime-and-punishment',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.5', 'SL.11-12.1'],
+    objectives: [
+      'Understand psychological realism as a technique',
+      'Analyze Raskolnikov\'s mental state before and after',
+      'Discuss stream of consciousness elements',
+    ],
+    activities: [
+      'Mental state tracking chart',
+      'Stream of consciousness passage analysis',
+      'Psychology vs. action discussion',
+    ],
+    assessmentIdeas: [
+      'Psychological analysis essay',
+      'Character study: Raskolnikov\'s psyche',
+    ],
+  },
+  {
+    id: 'cp-theory',
+    title: 'The Extraordinary Man Theory',
+    description: 'Examine Raskolnikov\'s philosophical justification.',
+    textId: 'crime-and-punishment',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.3'],
+    objectives: [
+      'Understand Raskolnikov\'s Napoleon theory',
+      'Analyze flaws in his reasoning',
+      'Connect to 19th-century philosophical debates',
+    ],
+    activities: [
+      'Theory explanation and analysis',
+      'Philosophical debate activity',
+      'Discussion: Where does this thinking lead?',
+    ],
+    assessmentIdeas: [
+      'Philosophical analysis essay',
+      'Creative: Defense or prosecution of the theory',
+    ],
+  },
+  {
+    id: 'cp-guilt-suffering',
+    title: 'Guilt and Suffering: The Path to Redemption',
+    description: 'Trace Raskolnikov\'s journey through guilt to confession.',
+    textId: 'crime-and-punishment',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'W.11-12.9'],
+    objectives: [
+      'Track manifestations of guilt throughout the novel',
+      'Analyze the role of suffering in redemption',
+      'Discuss whether true redemption is achieved',
+    ],
+    activities: [
+      'Guilt symptoms timeline',
+      'Suffering as theme analysis',
+      'Debate: Is Raskolnikov redeemed?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on guilt and redemption',
+      'Character transformation analysis',
+    ],
+  },
+  {
+    id: 'cp-sonia',
+    title: 'Sonia: Faith and Sacrifice',
+    description: 'Analyze Sonia as moral counterweight to Raskolnikov.',
+    textId: 'crime-and-punishment',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Sonia\'s characterization',
+      'Discuss her role in Raskolnikov\'s redemption',
+      'Explore faith as counterpoint to rationalism',
+    ],
+    activities: [
+      'Character evidence collection',
+      'Lazarus scene close reading',
+      'Discussion: Is Sonia idealized?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Faith vs. reason thematic essay',
+    ],
+  },
+  {
+    id: 'cp-porfiry',
+    title: 'The Cat and Mouse: Porfiry\'s Investigation',
+    description: 'Analyze the psychological battle between detective and criminal.',
+    textId: 'crime-and-punishment',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.5', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Porfiry\'s investigative methods',
+      'Examine psychological warfare in their conversations',
+      'Discuss cat-and-mouse narrative tension',
+    ],
+    activities: [
+      'Interrogation scene analysis',
+      'Power dynamic tracking',
+      'Discussion: Who is in control?',
+    ],
+    assessmentIdeas: [
+      'Character interaction essay',
+      'Creative: Scene from Porfiry\'s POV',
+    ],
+  },
+  {
+    id: 'cp-doubles',
+    title: 'Doubles and Mirrors: Character Foils',
+    description: 'Explore how other characters reflect aspects of Raskolnikov.',
+    textId: 'crime-and-punishment',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.5', 'W.11-12.9'],
+    objectives: [
+      'Identify character doubles in the novel',
+      'Analyze Svidrigailov as dark mirror',
+      'Discuss doppelganger tradition',
+    ],
+    activities: [
+      'Double identification chart',
+      'Svidrigailov comparison analysis',
+      'What-if discussion: Raskolnikov\'s other paths',
+    ],
+    assessmentIdeas: [
+      'Foil analysis essay',
+      'Comparative character study',
+    ],
+  },
+
+  // ============================================
+  // INVISIBLE MAN (6 lessons)
+  // ============================================
+  {
+    id: 'im-invisibility',
+    title: 'The Meaning of Invisibility',
+    description: 'Analyze Ellison\'s central metaphor for Black experience.',
+    textId: 'invisible-man',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.4', 'SL.11-12.1'],
+    objectives: [
+      'Analyze the prologue\'s invisibility metaphor',
+      'Trace different forms of invisibility throughout',
+      'Connect to ongoing discussions of race in America',
+    ],
+    activities: [
+      'Prologue close reading',
+      'Invisibility examples collection',
+      'Discussion: Who is invisible today?',
+    ],
+    assessmentIdeas: [
+      'Metaphor analysis essay',
+      'Personal reflection on visibility',
+    ],
+  },
+  {
+    id: 'im-identity-search',
+    title: 'The Search for Identity',
+    description: 'Trace the narrator\'s journey to self-understanding.',
+    textId: 'invisible-man',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'W.11-12.9'],
+    objectives: [
+      'Track the narrator\'s identity crisis through episodes',
+      'Analyze how others try to define him',
+      'Discuss the ending\'s resolution (or lack thereof)',
+    ],
+    activities: [
+      'Identity transformation timeline',
+      'Episode analysis: How is he seen?',
+      'Discussion: Does he find himself?',
+    ],
+    assessmentIdeas: [
+      'Character development essay',
+      'Identity journey mapping',
+    ],
+  },
+  {
+    id: 'im-institutions',
+    title: 'Institutions and Betrayal: College to Brotherhood',
+    description: 'Analyze how institutions fail the narrator.',
+    textId: 'invisible-man',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Bledsoe and the college\'s betrayal',
+      'Examine the Brotherhood\'s manipulation',
+      'Discuss institutional racism across the novel',
+    ],
+    activities: [
+      'Institution comparison chart',
+      'Bledsoe\'s letters analysis',
+      'Brotherhood ideology discussion',
+    ],
+    assessmentIdeas: [
+      'Essay on institutional critique',
+      'Research: Historical parallels',
+    ],
+  },
+  {
+    id: 'im-symbols',
+    title: 'Symbols: Briefcase, Paint, and More',
+    description: 'Analyze Ellison\'s rich symbolic imagery.',
+    textId: 'invisible-man',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.2', 'W.11-12.9'],
+    objectives: [
+      'Identify major symbols throughout the novel',
+      'Analyze the briefcase\'s evolving meaning',
+      'Interpret the Liberty Paints episode',
+    ],
+    activities: [
+      'Symbol tracking chart',
+      'Liberty Paints close reading',
+      'Briefcase contents analysis',
+    ],
+    assessmentIdeas: [
+      'Symbol analysis essay',
+      'Creative: Modern symbol addition',
+    ],
+  },
+  {
+    id: 'im-surrealism',
+    title: 'Surreal Episodes: Dreams and Nightmares',
+    description: 'Analyze Ellison\'s surrealist techniques.',
+    textId: 'invisible-man',
+    duration: '55 minutes',
+    standards: ['RL.11-12.5', 'RL.11-12.4', 'SL.11-12.1'],
+    objectives: [
+      'Identify surrealist elements in key episodes',
+      'Analyze the battle royal and hospital scenes',
+      'Discuss how surrealism conveys racism\'s absurdity',
+    ],
+    activities: [
+      'Surrealist episode analysis',
+      'Battle royal close reading',
+      'Discussion: Why use surrealism?',
+    ],
+    assessmentIdeas: [
+      'Literary technique essay',
+      'Creative: Surrealist scene',
+    ],
+  },
+  {
+    id: 'im-music-culture',
+    title: 'Jazz, Blues, and African American Culture',
+    description: 'Explore cultural references and their significance.',
+    textId: 'invisible-man',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Identify jazz and blues references',
+      'Analyze the significance of Louis Armstrong',
+      'Connect musical form to narrative structure',
+    ],
+    activities: [
+      'Musical reference collection',
+      'Prologue music analysis',
+      'Jazz as metaphor discussion',
+    ],
+    assessmentIdeas: [
+      'Cultural analysis essay',
+      'Research: Jazz and the novel',
+    ],
+  },
 ];
 
 // ============================================
