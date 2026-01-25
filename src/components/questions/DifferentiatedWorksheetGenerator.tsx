@@ -2003,6 +2003,67 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
         questions: formQuestionCache,
       });
       setShowPreview(true);
+
+      // Auto-generate geometry shapes if includeGeometry is enabled
+      if (includeGeometry) {
+        setGenerationStatus('Generating geometry diagrams...');
+        const shapesToGenerate: { questionKey: string; questionText: string; imagePrompt?: string }[] = [];
+        
+        for (const [cacheKey, questions] of Object.entries(formQuestionCache)) {
+          questions.warmUp?.forEach((q, idx) => {
+            if (q.imagePrompt || q.question) {
+              shapesToGenerate.push({
+                questionKey: `${cacheKey}-warmUp-${idx}`,
+                questionText: q.question,
+                imagePrompt: q.imagePrompt,
+              });
+            }
+          });
+          questions.main?.forEach((q, idx) => {
+            if (q.imagePrompt || q.question) {
+              shapesToGenerate.push({
+                questionKey: `${cacheKey}-main-${idx}`,
+                questionText: q.question,
+                imagePrompt: q.imagePrompt,
+              });
+            }
+          });
+        }
+
+        // Generate shapes in batches to avoid overwhelming the API
+        const batchSize = 5;
+        for (let i = 0; i < shapesToGenerate.length; i += batchSize) {
+          const batch = shapesToGenerate.slice(i, i + batchSize);
+          await Promise.all(
+            batch.map(async ({ questionKey, questionText, imagePrompt }) => {
+              try {
+                const prompt = imagePrompt || questionText;
+                const { data } = await supabase.functions.invoke('generate-diagram-images', {
+                  body: {
+                    questions: [{
+                      questionNumber: 1,
+                      imagePrompt: prompt,
+                    }],
+                    useNanoBanana: useAIImages,
+                    preferDeterministicSVG: preferDeterministicSVG,
+                  },
+                });
+                
+                const imageUrl = data?.results?.[0]?.imageUrl;
+                if (imageUrl) {
+                  setGeometryShapes(prev => ({
+                    ...prev,
+                    [questionKey]: imageUrl,
+                  }));
+                }
+              } catch (error) {
+                console.error(`Error generating shape for ${questionKey}:`, error);
+              }
+            })
+          );
+          setGenerationProgress(Math.min(100, ((i + batchSize) / shapesToGenerate.length) * 100));
+        }
+      }
     } catch (error) {
       console.error('Error generating preview:', error);
       toast({
@@ -2013,6 +2074,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     } finally {
       setIsGenerating(false);
       setGenerationProgress(0);
+      setGenerationStatus('');
     }
   };
 
