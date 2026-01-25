@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, CheckCircle, Chrome, AlertCircle, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, CheckCircle, Chrome, AlertCircle, Loader2, Play, Shield, GraduationCap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,8 +16,27 @@ import nycologicLogo from '@/assets/nycologic-brain-logo.png';
 
 const REMEMBER_ME_KEY = 'scan_genius_remember_me';
 
+// Demo account credentials
+const DEMO_ACCOUNTS = {
+  teacher: {
+    email: 'demo.teacher@nyclogic.edu',
+    password: 'DemoTeacher2025!',
+    label: 'Teacher Demo',
+    description: 'Explore classroom features',
+    icon: GraduationCap,
+  },
+  admin: {
+    email: 'demo.admin@nyclogic.edu',
+    password: 'DemoAdmin2025!',
+    label: 'Admin Demo',
+    description: 'Full system access',
+    icon: Shield,
+  },
+};
+
 export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState<'teacher' | 'admin' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -42,6 +61,30 @@ export default function Login() {
   const [signupEmailError, setSignupEmailError] = useState('');
   const [signupEmailTouched, setSignupEmailTouched] = useState(false);
   const [signupPasswordTouched, setSignupPasswordTouched] = useState(false);
+
+  // Demo login handler
+  const handleDemoLogin = async (type: 'teacher' | 'admin') => {
+    const demo = DEMO_ACCOUNTS[type];
+    setDemoLoading(type);
+    
+    const { error } = await signIn(demo.email, demo.password);
+    
+    if (error) {
+      toast({
+        title: "Demo login failed",
+        description: "Demo account may not be set up yet. Please contact support or try again later.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: `Welcome to ${demo.label}!`,
+        description: "You're exploring the system with demo access.",
+      });
+      navigate('/dashboard');
+    }
+    
+    setDemoLoading(null);
+  };
 
   // Password validation
   const passwordValidation = useMemo(
@@ -437,6 +480,52 @@ export default function Login() {
                     <Chrome className="mr-2 h-4 w-4" />
                     Sign in with Google
                   </Button>
+
+                  {/* Demo Access Section */}
+                  <div className="relative my-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground flex items-center gap-1">
+                        <Play className="h-3 w-3" />
+                        Try Demo
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-col h-auto py-3 border-dashed hover:border-primary hover:bg-primary/5"
+                      disabled={isLoading || demoLoading !== null}
+                      onClick={() => handleDemoLogin('teacher')}
+                    >
+                      {demoLoading === 'teacher' ? (
+                        <Loader2 className="h-5 w-5 animate-spin mb-1" />
+                      ) : (
+                        <GraduationCap className="h-5 w-5 mb-1 text-primary" />
+                      )}
+                      <span className="text-xs font-medium">Teacher Demo</span>
+                      <span className="text-[10px] text-muted-foreground">Classroom features</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-col h-auto py-3 border-dashed hover:border-primary hover:bg-primary/5"
+                      disabled={isLoading || demoLoading !== null}
+                      onClick={() => handleDemoLogin('admin')}
+                    >
+                      {demoLoading === 'admin' ? (
+                        <Loader2 className="h-5 w-5 animate-spin mb-1" />
+                      ) : (
+                        <Shield className="h-5 w-5 mb-1 text-amber-500" />
+                      )}
+                      <span className="text-xs font-medium">Admin Demo</span>
+                      <span className="text-[10px] text-muted-foreground">Full system access</span>
+                    </Button>
+                  </div>
                 </form>
               </TabsContent>
 
