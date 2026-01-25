@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn, UserPlus, FilePlus2, RotateCcw, Play } from 'lucide-react';
+import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn, UserPlus, FilePlus2, RotateCcw, Play, Cloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,6 +35,7 @@ import { MultiAnalysisBreakdownDialog } from './MultiAnalysisBreakdownDialog';
 import { ManualLinkDialog } from './ManualLinkDialog';
 import { BatchImageZoomDialog } from './BatchImageZoomDialog';
 import { AddUnknownStudentDialog } from './AddUnknownStudentDialog';
+import { SaveToDriveDialog } from './SaveToDriveDialog';
 import {
   DndContext,
   closestCenter,
@@ -72,6 +73,7 @@ interface BatchQueueProps {
   onConvertToSeparate?: (itemId: string) => void;
   onReorder?: (activeId: string, overId: string) => void;
   onSaveToGradebook?: () => Promise<void>;
+  onSaveToDrive?: () => void;
   onOverrideGrade?: (itemId: string, newGrade: number, justification: string) => void;
   onSelectRunAsGrade?: (itemId: string, runIndex: number) => void;
   currentIndex: number;
@@ -80,6 +82,7 @@ interface BatchQueueProps {
   isRestoredFromStorage?: boolean;
   isSaving?: boolean;
   allSaved?: boolean;
+  driveSaved?: boolean;
 }
 
 // Sortable item wrapper component
@@ -165,6 +168,7 @@ export function BatchQueue({
   onConvertToSeparate,
   onReorder,
   onSaveToGradebook,
+  onSaveToDrive,
   onOverrideGrade,
   onSelectRunAsGrade,
   currentIndex, 
@@ -173,6 +177,7 @@ export function BatchQueue({
   isRestoredFromStorage = false,
   isSaving = false,
   allSaved = false,
+  driveSaved = false,
 }: BatchQueueProps) {
   const [addStudentForItem, setAddStudentForItem] = useState<string | null>(null);
   const [showRestoredBanner, setShowRestoredBanner] = useState(isRestoredFromStorage);
@@ -878,35 +883,63 @@ export function BatchQueue({
           </DndContext>
         </ScrollArea>
         
-        {/* Save to Gradebook button - shown immediately after all items analyzed */}
-        {allAnalyzed && completedCount > 0 && onSaveToGradebook && (
-          <div className="p-3 border-t bg-green-50 dark:bg-green-950/20">
-            <Button
-              variant={allSaved ? "outline" : "default"}
-              className={allSaved 
-                ? "w-full bg-green-100 text-green-700 border-green-300 hover:bg-green-200" 
-                : "w-full bg-green-600 hover:bg-green-700"
-              }
-              onClick={onSaveToGradebook}
-              disabled={isSaving || allSaved}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving to Gradebook...
-                </>
-              ) : allSaved ? (
-                <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Saved to Gradebook
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save All to Gradebook ({completedCount})
-                </>
-              )}
-            </Button>
+        {/* Save options - shown immediately after all items analyzed */}
+        {allAnalyzed && completedCount > 0 && (
+          <div className="p-3 border-t bg-muted/30 space-y-2">
+            {/* Save to Gradebook */}
+            {onSaveToGradebook && (
+              <Button
+                variant={allSaved ? "outline" : "default"}
+                className={allSaved 
+                  ? "w-full bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-800" 
+                  : "w-full bg-green-600 hover:bg-green-700"
+                }
+                onClick={onSaveToGradebook}
+                disabled={isSaving || allSaved}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving to Gradebook...
+                  </>
+                ) : allSaved ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Saved to Gradebook
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save All to Gradebook ({completedCount})
+                  </>
+                )}
+              </Button>
+            )}
+            
+            {/* Save to Google Drive */}
+            {onSaveToDrive && (
+              <Button
+                variant={driveSaved ? "outline" : "secondary"}
+                className={driveSaved 
+                  ? "w-full bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800" 
+                  : "w-full"
+                }
+                onClick={onSaveToDrive}
+                disabled={driveSaved}
+              >
+                {driveSaved ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Saved to Drive
+                  </>
+                ) : (
+                  <>
+                    <Cloud className="h-4 w-4 mr-2" />
+                    Save to Google Drive (for later)
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         )}
       </CardContent>

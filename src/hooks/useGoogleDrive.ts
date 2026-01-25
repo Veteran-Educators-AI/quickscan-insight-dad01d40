@@ -279,6 +279,114 @@ export function useGoogleDrive() {
     }
   }, [selectedFolderId, fetchImagesFromFolder]);
 
+  // Create a folder in Drive
+  const createFolder = useCallback(async (folderName: string, parentId: string = 'root'): Promise<string | null> => {
+    try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        toast.error('Please sign in with Google to access Drive');
+        return null;
+      }
+
+      const metadata = {
+        name: folderName,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: [parentId],
+      };
+
+      const response = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(metadata),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create folder');
+      }
+
+      const data = await response.json();
+      return data.id;
+    } catch (error) {
+      console.error('Error creating folder:', error);
+      toast.error('Failed to create folder');
+      return null;
+    }
+  }, []);
+
+  // Upload a file to Drive
+  const uploadFile = useCallback(async (
+    file: Blob,
+    fileName: string,
+    folderId: string = 'root',
+    mimeType: string = 'image/jpeg'
+  ): Promise<string | null> => {
+    try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        toast.error('Please sign in with Google to access Drive');
+        return null;
+      }
+
+      // Create metadata
+      const metadata = {
+        name: fileName,
+        parents: [folderId],
+      };
+
+      // Create form data with metadata and file
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', file);
+
+      const response = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: form,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to upload file');
+      }
+
+      const data = await response.json();
+      return data.id;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      return null;
+    }
+  }, []);
+
+  // Upload multiple files to Drive
+  const uploadMultipleFiles = useCallback(async (
+    files: { blob: Blob; name: string; mimeType?: string }[],
+    folderId: string = 'root',
+    onProgress?: (current: number, total: number) => void
+  ): Promise<{ name: string; fileId: string | null }[]> => {
+    const results: { name: string; fileId: string | null }[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      if (onProgress) {
+        onProgress(i + 1, files.length);
+      }
+
+      const fileId = await uploadFile(file.blob, file.name, folderId, file.mimeType || 'image/jpeg');
+      results.push({ name: file.name, fileId });
+    }
+
+    return results;
+  }, [uploadFile]);
+
   return {
     loading,
     connected,
@@ -295,5 +403,8 @@ export function useGoogleDrive() {
     navigateUp,
     navigateToRoot,
     refreshCurrentFolder,
+    createFolder,
+    uploadFile,
+    uploadMultipleFiles,
   };
 }
