@@ -89,14 +89,12 @@ export function useMfaStatus() {
     checkMfaStatus();
 
     // Listen for auth state changes
+    // Keep the callback synchronous and defer auth calls to avoid deadlocks.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       // On auth state change, recheck MFA status
-      // But give a small delay for OAuth callbacks to fully process
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        setTimeout(() => checkMfaStatus(), 100);
-      } else {
-        checkMfaStatus();
-      }
+      // Give a small delay for OAuth callbacks to fully process
+      const delay = (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') ? 100 : 0;
+      setTimeout(() => checkMfaStatus(), delay);
     });
 
     return () => subscription.unsubscribe();
