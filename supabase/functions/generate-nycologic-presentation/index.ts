@@ -246,10 +246,19 @@ Return ONLY the JSON object, no markdown formatting or code blocks.`;
     try {
       presentation = JSON.parse(cleanedResponse);
       
-      // Ensure all slides have IDs
+      // Ensure all slides have IDs and content is properly formatted as strings
       presentation.slides = presentation.slides.map((slide, index) => ({
         ...slide,
         id: slide.id || `slide-${index + 1}`,
+        // Ensure content array only contains strings (AI sometimes returns objects)
+        content: (slide.content || []).map((item: string | Record<string, unknown>) => {
+          if (typeof item === 'string') return item;
+          if (typeof item === 'object' && item !== null) {
+            // Handle {heading, text} or {text} objects
+            return String(item.text || item.heading || JSON.stringify(item));
+          }
+          return String(item || '');
+        }) as string[],
       }));
       
       // Ensure presentation has an ID

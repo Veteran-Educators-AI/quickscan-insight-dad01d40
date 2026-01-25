@@ -1259,7 +1259,14 @@ export default function PresentationView() {
                         onClick={() => isEditing && setEditingField('content-0')}
                         className={cn(isEditing && 'cursor-text hover:bg-white/5 px-4 py-2 rounded-lg transition-colors block')}
                       >
-                        {slide.content[0] || (isEditing ? 'Click to add content' : '')}
+                        {(() => {
+                          const content0 = slide.content[0];
+                          if (!content0) return isEditing ? 'Click to add content' : '';
+                          if (typeof content0 === 'object' && content0 !== null) {
+                            return (content0 as any).text || (content0 as any).heading || '';
+                          }
+                          return String(content0);
+                        })()}
                       </span>
                     )}
                   </motion.div>
@@ -1606,34 +1613,40 @@ export default function PresentationView() {
                     transition={{ delay: 0.3 }}
                     className="space-y-4"
                   >
-                    {slide.content.map((item, idx) => (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.4 + idx * 0.1 }}
-                        className="flex items-start gap-4 group"
-                      >
-                        <span className={cn("w-2 h-2 rounded-full mt-3 flex-shrink-0", colors.accent.replace('text-', 'bg-'))} />
-                        {isEditing && editingField === `content-item-${idx}` ? (
-                          <Textarea
-                            value={item}
-                            onChange={(e) => updateContentItem(idx, e.target.value)}
-                            onBlur={() => setEditingField(null)}
-                            autoFocus
-                            className="bg-white/10 border-white/20 text-white/80 text-lg resize-none flex-1 min-h-[40px]"
-                          />
-                        ) : (
-                          <p 
-                            onClick={() => isEditing && setEditingField(`content-item-${idx}`)}
-                            className={cn(
-                              "text-white/80 text-lg lg:text-xl leading-relaxed flex-1",
-                              isEditing && 'cursor-text hover:bg-white/5 px-2 py-1 rounded transition-colors'
-                            )}
-                          >
-                            {item}
-                          </p>
-                        )}
+                    {slide.content.map((item, idx) => {
+                      // Handle case where AI returns object with {heading, text} instead of string
+                      const itemText = typeof item === 'object' && item !== null 
+                        ? ((item as any).text || (item as any).heading || JSON.stringify(item))
+                        : String(item || '');
+                      
+                      return (
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.4 + idx * 0.1 }}
+                          className="flex items-start gap-4 group"
+                        >
+                          <span className={cn("w-2 h-2 rounded-full mt-3 flex-shrink-0", colors.accent.replace('text-', 'bg-'))} />
+                          {isEditing && editingField === `content-item-${idx}` ? (
+                            <Textarea
+                              value={itemText}
+                              onChange={(e) => updateContentItem(idx, e.target.value)}
+                              onBlur={() => setEditingField(null)}
+                              autoFocus
+                              className="bg-white/10 border-white/20 text-white/80 text-lg resize-none flex-1 min-h-[40px]"
+                            />
+                          ) : (
+                            <p 
+                              onClick={() => isEditing && setEditingField(`content-item-${idx}`)}
+                              className={cn(
+                                "text-white/80 text-lg lg:text-xl leading-relaxed flex-1",
+                                isEditing && 'cursor-text hover:bg-white/5 px-2 py-1 rounded transition-colors'
+                              )}
+                            >
+                              {itemText}
+                            </p>
+                          )}
                         {isEditing && slide.content.length > 1 && (
                           <button
                             onClick={() => removeContentItem(idx)}
@@ -1643,8 +1656,9 @@ export default function PresentationView() {
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
-                      </motion.div>
-                    ))}
+                        </motion.div>
+                      );
+                    })}
                     {isEditing && (
                       <motion.button
                         initial={{ opacity: 0 }}
