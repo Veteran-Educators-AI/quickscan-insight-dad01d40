@@ -1,10 +1,10 @@
 # Nyclogic Scholar App Webhook Schema
 
-This document describes the payload format sent from **Nyclogic Ai** to the **Nyclogic Scholar** app via the `push-to-sister-app` edge function.
+This document describes the bidirectional payload formats between **Nyclogic AI** and **Nyclogic Scholar** app.
 
 ---
 
-## Endpoint Configuration
+## Outbound: From Nyclogic AI to Scholar App
 
 The Scholar app must expose an endpoint that accepts POST requests. Configure this endpoint URL in the `NYCOLOGIC_API_URL` secret.
 
@@ -19,9 +19,79 @@ Headers:
 
 ---
 
-## Payload Types
+## Inbound: From Scholar App to Nyclogic AI
 
-### 1. Grade Completed (with Questions)
+The `nycologic-webhook` edge function accepts POST requests from the Scholar app.
+
+### Endpoint
+`POST https://wihddyjdfihvnxvvynek.supabase.co/functions/v1/nycologic-webhook`
+
+### Authentication
+```
+Headers:
+  Content-Type: application/json
+  x-source-app: scholar-app
+```
+
+---
+
+## Inbound Payload Types
+
+### Practice Session Completed
+
+Sent when a student completes a practice session in the Scholar app.
+
+```json
+{
+  "source": "scholar-app",
+  "timestamp": "2025-01-25T12:00:00Z",
+  "event_type": "practice_session_completed",
+  "data": {
+    "student_id": "uuid",
+    "student_email": "student@example.com",
+    "exam_type": "algebra1",
+    "subject": "Algebra I",
+    "questions_attempted": 10,
+    "questions_correct": 7,
+    "percentage": 70,
+    "max_streak": 4,
+    "timed_mode": false,
+    "topic_performance": [
+      {
+        "topic": "A-REI",
+        "standardCode": "A-REI.B.3",
+        "questionsAttempted": 3,
+        "questionsCorrect": 2,
+        "masteryPercentage": 67
+      }
+    ],
+    "completed_at": "2025-01-25T12:00:00Z",
+    "request_plan_adjustment": true
+  }
+}
+```
+
+### Response Format
+
+```json
+{
+  "success": true,
+  "plan_updated": true,
+  "mastery_updated": true,
+  "topics_processed": 3
+}
+```
+
+### Processing Logic
+
+| Field | Action |
+|-------|--------|
+| `topic_performance` | Parse array to update mastery levels per student in `grade_history` |
+| `request_plan_adjustment: true` | Recalculate weekly study plan based on new mastery data, store in `diagnostic_results` |
+
+---
+
+## Outbound Payload Types
 
 Sent when a teacher pushes remediation or mastery challenges to students.
 
