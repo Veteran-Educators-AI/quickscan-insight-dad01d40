@@ -594,7 +594,7 @@ export function Gradebook({ classId }: GradebookProps) {
 
       if (data?.success) {
         toast.success(
-          `Synced ${data.synced_count} grades for ${data.student_count} students to NYCLogic Scholar AI!`,
+          `Synced ${data.synced_grades || 0} grades for ${data.synced_students || 0} students to NYCLogic Scholar AI!`,
           { 
             description: 'Students can now view their grades and earn rewards in the Scholar app.',
             duration: 5000,
