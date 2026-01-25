@@ -1035,6 +1035,8 @@ export function BatchQueue({
         studentName={items[zoomPreviewIndex].studentName || 'Unassigned'}
         paperIndex={zoomPreviewIndex}
         totalPapers={items.length}
+        misconceptions={items[zoomPreviewIndex].result?.misconceptions}
+        grade={items[zoomPreviewIndex].result?.grade}
         onNavigate={(direction) => {
           if (direction === 'prev' && zoomPreviewIndex > 0) {
             setZoomPreviewIndex(zoomPreviewIndex - 1);
