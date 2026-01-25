@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown, Cloud, CloudOff, Library, ImagePlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown, Cloud, CloudOff, Library, ImagePlus, Radio, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 import { SlideImageGenerator, GeneratedImageData } from '@/components/presentation/SlideImageGenerator';
+import { LiveSessionControls } from '@/components/presentation/LiveSessionControls';
 
 interface PresentationSlide {
   id: string;
@@ -89,6 +90,8 @@ export default function PresentationView() {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showImageGenerator, setShowImageGenerator] = useState(false);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   
   // Touch gesture states
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
@@ -122,6 +125,22 @@ export default function PresentationView() {
       navigate('/dashboard');
     }
   }, [navigate]);
+
+  // Fetch teacher's classes for live session
+  useEffect(() => {
+    if (!user) return;
+    const fetchClasses = async () => {
+      const { data } = await supabase
+        .from('classes')
+        .select('id, name')
+        .eq('teacher_id', user.id);
+      if (data) {
+        setClasses(data);
+        if (data.length > 0) setSelectedClassId(data[0].id);
+      }
+    };
+    fetchClasses();
+  }, [user]);
 
   // Presenters can generate images on-the-fly using the image generator dialog
   // No automatic image generation - slides are content-focused by default
@@ -1693,6 +1712,19 @@ export default function PresentationView() {
         slideTitle={slide?.title || ''}
         topic={presentation?.topic || ''}
       />
+
+      {/* Live Session Controls for Teachers */}
+      {user && selectedClassId && (
+        <LiveSessionControls
+          presentationId={presentation?.id || ''}
+          presentationTitle={presentation?.title || ''}
+          topic={presentation?.topic || ''}
+          classId={selectedClassId}
+          currentSlideIndex={currentSlide}
+          currentSlideQuestion={slide?.question}
+          themeAccentHex={colors.accentHex}
+        />
+      )}
     </div>
   );
 }

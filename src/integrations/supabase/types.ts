@@ -1048,6 +1048,234 @@ export type Database = {
           },
         ]
       }
+      live_presentation_sessions: {
+        Row: {
+          class_id: string
+          created_at: string
+          credit_for_participation: number
+          current_slide_index: number
+          deduction_for_non_participation: number
+          ended_at: string | null
+          id: string
+          participation_mode: string
+          presentation_id: string
+          session_code: string
+          status: string
+          teacher_id: string
+          title: string
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          credit_for_participation?: number
+          current_slide_index?: number
+          deduction_for_non_participation?: number
+          ended_at?: string | null
+          id?: string
+          participation_mode?: string
+          presentation_id: string
+          session_code: string
+          status?: string
+          teacher_id: string
+          title: string
+          topic: string
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          credit_for_participation?: number
+          current_slide_index?: number
+          deduction_for_non_participation?: number
+          ended_at?: string | null
+          id?: string
+          participation_mode?: string
+          presentation_id?: string
+          session_code?: string
+          status?: string
+          teacher_id?: string
+          title?: string
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_presentation_sessions_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_presentation_sessions_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_session_answers: {
+        Row: {
+          answered_at: string
+          id: string
+          is_correct: boolean | null
+          participant_id: string
+          question_id: string
+          selected_answer: string
+          time_taken_seconds: number | null
+        }
+        Insert: {
+          answered_at?: string
+          id?: string
+          is_correct?: boolean | null
+          participant_id: string
+          question_id: string
+          selected_answer: string
+          time_taken_seconds?: number | null
+        }
+        Update: {
+          answered_at?: string
+          id?: string
+          is_correct?: boolean | null
+          participant_id?: string
+          question_id?: string
+          selected_answer?: string
+          time_taken_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_session_answers_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "live_session_participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_session_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "live_session_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_session_participants: {
+        Row: {
+          correct_answers: number
+          credit_awarded: number
+          id: string
+          joined_at: string
+          last_active_at: string
+          partner_student_id: string | null
+          session_id: string
+          status: string
+          student_id: string
+          total_questions_answered: number
+        }
+        Insert: {
+          correct_answers?: number
+          credit_awarded?: number
+          id?: string
+          joined_at?: string
+          last_active_at?: string
+          partner_student_id?: string | null
+          session_id: string
+          status?: string
+          student_id: string
+          total_questions_answered?: number
+        }
+        Update: {
+          correct_answers?: number
+          credit_awarded?: number
+          id?: string
+          joined_at?: string
+          last_active_at?: string
+          partner_student_id?: string | null
+          session_id?: string
+          status?: string
+          student_id?: string
+          total_questions_answered?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_session_participants_partner_student_id_fkey"
+            columns: ["partner_student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_session_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_presentation_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_session_participants_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_session_questions: {
+        Row: {
+          activated_at: string | null
+          closed_at: string | null
+          correct_answer: string | null
+          created_at: string
+          explanation: string | null
+          id: string
+          is_active: boolean
+          options: Json
+          question_prompt: string
+          session_id: string
+          slide_index: number
+          time_limit_seconds: number | null
+        }
+        Insert: {
+          activated_at?: string | null
+          closed_at?: string | null
+          correct_answer?: string | null
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          is_active?: boolean
+          options?: Json
+          question_prompt: string
+          session_id: string
+          slide_index: number
+          time_limit_seconds?: number | null
+        }
+        Update: {
+          activated_at?: string | null
+          closed_at?: string | null
+          correct_answer?: string | null
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          is_active?: boolean
+          options?: Json
+          question_prompt?: string
+          session_id?: string
+          slide_index?: number
+          time_limit_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_session_questions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_presentation_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mfa_recovery_codes: {
         Row: {
           code_hash: string
