@@ -250,50 +250,139 @@ serve(async (req) => {
       // ---------------------------------------------------------------------
       // Process comprehensive learning profiles from NYCLogic AI
       // This includes grades, misconceptions, weak topics, and remediation
+      // IMPORTANT: Persist actual data, not just logs!
       // ---------------------------------------------------------------------
-      console.log('Processing batch sync:', body.summary);
+      console.log('Processing batch sync with FULL data persistence:', body.summary);
+      console.log('First student sample:', JSON.stringify(body.student_profiles?.[0] ? {
+        student_id: body.student_profiles[0].student_id,
+        student_name: body.student_profiles[0].student_name,
+        overall_average: body.student_profiles[0].overall_average,
+        grades_count: body.student_profiles[0].grades?.length || 0,
+        weak_topics_count: body.student_profiles[0].weak_topics?.length || 0,
+        misconceptions_count: body.student_profiles[0].misconceptions?.length || 0,
+        sample_grade: body.student_profiles[0].grades?.[0] || null,
+      } : 'No profiles'));
 
       const profiles = body.student_profiles!;
       let gradesProcessed = 0;
+      let gradesSaved = 0;
+      let misconceptionsProcessed = 0;
+      let misconceptionsSaved = 0;
       let remediationsCreated = 0;
 
       for (const profile of profiles) {
-        // Log each student's sync (including email for auto-linking)
+        // ===================================================================
+        // PERSIST ACTUAL GRADE HISTORY ENTRIES
+        // ===================================================================
+        if (profile.grades && profile.grades.length > 0) {
+          for (const grade of profile.grades) {
+            gradesProcessed++;
+            
+            // Check if this grade already exists (avoid duplicates)
+            const { data: existingGrade } = await supabaseAdmin
+              .from('grade_history')
+              .select('id')
+              .eq('student_id', profile.student_id)
+              .eq('topic_name', grade.topic_name)
+              .eq('created_at', grade.created_at)
+              .maybeSingle();
+
+            if (!existingGrade) {
+              const { error: gradeError } = await supabaseAdmin
+                .from('grade_history')
+                .insert({
+                  student_id: profile.student_id,
+                  teacher_id: keyRecord.teacher_id,
+                  topic_name: grade.topic_name,
+                  grade: grade.grade,
+                  regents_score: grade.regents_score,
+                  nys_standard: grade.nys_standard,
+                  grade_justification: grade.grade_justification || `Synced from ScanGenius: ${grade.topic_name}`,
+                  created_at: grade.created_at,
+                });
+
+              if (gradeError) {
+                console.error('Error saving grade:', gradeError.message);
+              } else {
+                gradesSaved++;
+              }
+            }
+          }
+        }
+
+        // ===================================================================
+        // PERSIST MISCONCEPTIONS DATA
+        // ===================================================================
+        if (profile.misconceptions && profile.misconceptions.length > 0) {
+          for (const misconception of profile.misconceptions) {
+            misconceptionsProcessed++;
+            
+            // Check if this misconception already exists
+            const { data: existingMis } = await supabaseAdmin
+              .from('analysis_misconceptions')
+              .select('id')
+              .eq('student_id', profile.student_id)
+              .eq('misconception_text', misconception.name)
+              .eq('topic_name', misconception.topic_name || 'General')
+              .maybeSingle();
+
+            if (!existingMis) {
+              const { error: misError } = await supabaseAdmin
+                .from('analysis_misconceptions')
+                .insert({
+                  student_id: profile.student_id,
+                  teacher_id: keyRecord.teacher_id,
+                  topic_name: misconception.topic_name || 'General',
+                  misconception_text: misconception.name,
+                  severity: misconception.severity,
+                  suggested_remedies: misconception.suggested_remedies,
+                });
+
+              if (misError) {
+                console.error('Error saving misconception:', misError.message);
+              } else {
+                misconceptionsSaved++;
+              }
+            }
+          }
+        }
+
+        // ===================================================================
+        // LOG COMPREHENSIVE STUDENT PROFILE WITH ALL DATA
+        // ===================================================================
         await supabaseAdmin.from('sister_app_sync_log').insert({
           teacher_id: keyRecord.teacher_id,
           student_id: profile.student_id,
           action: 'batch_sync_student',
           data: {
             student_name: profile.student_name,
-            student_email: profile.student_email,  // Email for Scholar auto-linking
+            student_email: profile.student_email,
             overall_average: profile.overall_average,
-            grades_count: profile.grades.length,
-            misconceptions_count: profile.misconceptions.length,
+            grades_count: profile.grades?.length || 0,
+            grades_saved: gradesSaved,
+            misconceptions_count: profile.misconceptions?.length || 0,
+            misconceptions_saved: misconceptionsSaved,
             weak_topics: profile.weak_topics,
             recommended_remediation: profile.recommended_remediation,
             xp_potential: profile.xp_potential,
             coin_potential: profile.coin_potential,
+            // Include sample data for debugging
+            sample_grades: profile.grades?.slice(0, 3) || [],
+            sample_misconceptions: profile.misconceptions?.slice(0, 3) || [],
           },
           source_app: 'nycologic_ai',
           processed: true,
           processed_at: new Date().toISOString(),
         });
 
-        gradesProcessed += profile.grades.length;
-
-        // Here Scholar would:
-        // 1. Create targeted practice assignments based on weak_topics
-        // 2. Track misconceptions for student progress views
-        // 3. Set up XP/coin rewards for improvement
-        // 4. Generate personalized learning paths
-        
-        // For now, we log it - the actual Scholar app would implement these
-        if (profile.recommended_remediation.length > 0) {
+        if (profile.recommended_remediation && profile.recommended_remediation.length > 0) {
           remediationsCreated++;
         }
       }
 
-      // Log the batch sync summary
+      console.log(`Batch sync complete: ${gradesSaved}/${gradesProcessed} grades saved, ${misconceptionsSaved}/${misconceptionsProcessed} misconceptions saved`);
+
+      // Log the batch sync summary with actual save counts
       const { data: summaryLog } = await supabaseAdmin
         .from('sister_app_sync_log')
         .insert({
@@ -305,6 +394,9 @@ serve(async (req) => {
             sync_timestamp: body.sync_timestamp,
             profiles_processed: profiles.length,
             grades_processed: gradesProcessed,
+            grades_saved: gradesSaved,
+            misconceptions_processed: misconceptionsProcessed,
+            misconceptions_saved: misconceptionsSaved,
           },
           source_app: 'nycologic_ai',
           processed: true,
@@ -319,8 +411,11 @@ serve(async (req) => {
         batch_processed: true,
         students_synced: profiles.length,
         grades_received: gradesProcessed,
+        grades_saved: gradesSaved,
+        misconceptions_received: misconceptionsProcessed,
+        misconceptions_saved: misconceptionsSaved,
         remediations_queued: remediationsCreated,
-        message: 'Scholar will auto-assign remediation, track misconceptions, and award XP for improvement',
+        message: `Persisted ${gradesSaved} grades and ${misconceptionsSaved} misconceptions to database`,
       };
 
     } else {
