@@ -80,8 +80,8 @@ export function StudentWorkDetailDialog({
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));
+  const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.02, 3));
+  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.02, 0.5));
   const handleRotate = () => setRotation(prev => (prev + 90) % 360);
   const resetView = () => {
     setZoom(1);
