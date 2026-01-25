@@ -42,6 +42,7 @@ import { GradingComparisonView } from '@/components/scan/GradingComparisonView';
 import { GoogleClassroomImport, type ImportedSubmission } from '@/components/scan/GoogleClassroomImport';
 import { GoogleConnectionPanel } from '@/components/scan/GoogleConnectionPanel';
 import { GoogleDriveImport } from '@/components/scan/GoogleDriveImport';
+import { SaveToDriveDialog } from '@/components/scan/SaveToDriveDialog';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
@@ -77,6 +78,8 @@ export default function Scan() {
   const [batchSavedStudents, setBatchSavedStudents] = useState<Set<string>>(new Set());
   const [showBatchGradingModeSelector, setShowBatchGradingModeSelector] = useState(false);
   const [batchAnswerGuideImage, setBatchAnswerGuideImage] = useState<string | null>(null);
+  const [showSaveToDriveDialog, setShowSaveToDriveDialog] = useState(false);
+  const [driveSaved, setDriveSaved] = useState(false);
   
   // Drag and drop state
   const [isDragging, setIsDragging] = useState(false);
@@ -2239,6 +2242,7 @@ export default function Scan() {
                     onConvertToSeparate={batch.convertToSeparatePaper}
                     onReorder={batch.reorderItems}
                     onSaveToGradebook={handleBatchSaveToGradebook}
+                    onSaveToDrive={() => setShowSaveToDriveDialog(true)}
                     onOverrideGrade={batch.overrideGrade}
                     onSelectRunAsGrade={batch.selectRunAsGrade}
                     currentIndex={batch.currentIndex}
@@ -2247,6 +2251,7 @@ export default function Scan() {
                     isRestoredFromStorage={batch.isRestoredFromStorage}
                     isSaving={batchSaving}
                     allSaved={allBatchSaved}
+                    driveSaved={driveSaved}
                   />
 
                   {/* Action buttons */}
@@ -2649,6 +2654,36 @@ export default function Scan() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Save to Google Drive Dialog */}
+      <SaveToDriveDialog
+        open={showSaveToDriveDialog}
+        onOpenChange={setShowSaveToDriveDialog}
+        files={batch.items
+          .filter(item => item.status === 'completed' || item.status === 'pending')
+          .map((item, index) => {
+            // Convert base64 to blob
+            const base64Data = item.imageDataUrl.split(',')[1];
+            const byteString = atob(base64Data);
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+              ia[i] = byteString.charCodeAt(i);
+            }
+            const blob = new Blob([ab], { type: 'image/jpeg' });
+            
+            // Generate meaningful filename
+            const studentName = item.studentName?.replace(/\s+/g, '_') || 'Unknown';
+            const date = new Date().toISOString().split('T')[0];
+            const topicName = item.result?.problemIdentified?.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30) || 'Scan';
+            const fileName = `${studentName}_${topicName}_${date}_${index + 1}.jpg`;
+            
+            return { blob, name: fileName };
+          })}
+        onSaveComplete={(count, folderName) => {
+          setDriveSaved(true);
+        }}
+      />
     </>
   );
 }
