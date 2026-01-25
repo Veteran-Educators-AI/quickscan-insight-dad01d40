@@ -71,7 +71,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               className="h-9 w-auto drop-shadow-[0_0_8px_rgba(220,38,38,0.3)] transition-transform duration-200 hover:scale-110"
             />
             <span className="font-display text-lg font-semibold text-foreground">
-              NYClogic <span className="text-primary">Ai</span>
+              Nyclogic <span className="text-primary">Ai<sup className="text-[8px] align-super ml-0.5">™</sup></span>
             </span>
             <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded border border-amber-500/30">
               Beta

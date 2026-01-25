@@ -320,7 +320,7 @@ export default function Login() {
           />
           <div className="flex items-center justify-center gap-3">
             <h1 className="text-5xl md:text-6xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Darker Grotesque', sans-serif" }}>
-              NYClogic <span className="text-primary">Ai</span>
+              Nyclogic <span className="text-primary">Ai<sup className="text-xs align-super ml-0.5">™</sup></span>
             </h1>
             <span className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-md border border-amber-500/30 animate-pulse">
               Beta
