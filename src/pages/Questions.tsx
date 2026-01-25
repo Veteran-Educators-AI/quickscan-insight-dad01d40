@@ -24,6 +24,7 @@ import { TeacherAnswerSampleUploader } from '@/components/scan/TeacherAnswerSamp
 import { TeacherAnswerSampleList } from '@/components/scan/TeacherAnswerSampleList';
 import { DiagnosticGapsDialog } from '@/components/reports/DiagnosticGapsSummary';
 import { EnglishLiteratureSuggestions } from '@/components/questions/EnglishLiteratureSuggestions';
+import { SubjectLessonSuggestions } from '@/components/questions/SubjectLessonSuggestions';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Questions() {
@@ -490,42 +491,97 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
               />
             </div>
 
-            {/* English Literature Suggestions - Show when English is selected */}
-            {selectedSubject === 'english' && !searchQuery.trim() && (
-              <EnglishLiteratureSuggestions 
-                onSelectLesson={(lesson) => {
-                  // Open the lesson plan generator with this lesson's data
-                  setSelectedLessonTopic({
-                    topicName: lesson.title,
-                    standard: lesson.standards[0] || 'ELA',
-                    subject: 'English',
-                  });
-                  // Set the sunset theme for English literature (warm, literary feel)
-                  const literatureTheme = PRESENTATION_THEMES.find(t => t.id === 'sunset') || PRESENTATION_THEMES[0];
-                  setSelectedTheme(literatureTheme);
-                  setShowLessonGenerator(true);
-                  toast({
-                    title: 'Opening Lesson Planner',
-                    description: `Creating presentation for "${lesson.title}"`,
-                  });
-                }}
-                onGenerateWorksheet={(textId, questions) => {
-                  // Add questions as topics to worksheet
-                  const questionTopics: WorksheetQuestion[] = questions.map((q, idx) => ({
-                    id: `${textId}-${q.level}-${idx}`,
-                    topicName: q.question.slice(0, 50) + '...',
-                    standard: q.standard,
-                    subject: 'English',
-                    category: 'LITERATURE',
-                    jmapUrl: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards',
-                  }));
-                  setWorksheetQuestions(prev => [...prev, ...questionTopics.slice(0, 5)]);
-                  toast({
-                    title: 'Questions Added',
-                    description: `Added ${Math.min(5, questions.length)} ${questions[0]?.level || ''} questions to worksheet`,
-                  });
-                }}
-              />
+            {/* Subject Lesson Suggestions - Show for all subjects when not searching */}
+            {!searchQuery.trim() && currentSubject && (
+              <>
+                {/* English Literature has its own specialized component */}
+                {selectedSubject === 'english' ? (
+                  <EnglishLiteratureSuggestions 
+                    onSelectLesson={(lesson) => {
+                      setSelectedLessonTopic({
+                        topicName: lesson.title,
+                        standard: lesson.standards[0] || 'ELA',
+                        subject: 'English',
+                      });
+                      const literatureTheme = PRESENTATION_THEMES.find(t => t.id === 'sunset') || PRESENTATION_THEMES[0];
+                      setSelectedTheme(literatureTheme);
+                      setShowLessonGenerator(true);
+                      toast({
+                        title: 'Opening Lesson Planner',
+                        description: `Creating presentation for "${lesson.title}"`,
+                      });
+                    }}
+                    onGenerateWorksheet={(textId, questions) => {
+                      const questionTopics: WorksheetQuestion[] = questions.map((q, idx) => ({
+                        id: `${textId}-${q.level}-${idx}`,
+                        topicName: q.question.slice(0, 50) + '...',
+                        standard: q.standard,
+                        subject: 'English',
+                        category: 'LITERATURE',
+                        jmapUrl: 'https://www.nysed.gov/curriculum-instruction/english-language-arts-learning-standards',
+                      }));
+                      setWorksheetQuestions(prev => [...prev, ...questionTopics.slice(0, 5)]);
+                      toast({
+                        title: 'Questions Added',
+                        description: `Added ${Math.min(5, questions.length)} ${questions[0]?.level || ''} questions to worksheet`,
+                      });
+                    }}
+                  />
+                ) : (
+                  /* All other subjects use the unified SubjectLessonSuggestions component */
+                  <SubjectLessonSuggestions
+                    subject={currentSubject.name}
+                    subjectId={currentSubject.id}
+                    categories={currentSubject.categories}
+                    onSelectTopic={(topic, category) => {
+                      setSelectedLessonTopic({
+                        topicName: topic.name,
+                        standard: topic.standard,
+                        subject: currentSubject.name,
+                      });
+                      // Pick theme based on subject
+                      const subjectThemes: Record<string, string> = {
+                        algebra1: 'ocean',
+                        algebra2: 'corporate',
+                        geometry: 'midnight',
+                        precalculus: 'nature',
+                        physics: 'sunset',
+                        chemistry: 'nature',
+                        biology: 'nature',
+                        earthscience: 'nature',
+                        history: 'sunset',
+                        government: 'corporate',
+                        economics: 'corporate',
+                        financialmath: 'corporate',
+                      };
+                      const themeId = subjectThemes[currentSubject.id] || 'ocean';
+                      const theme = PRESENTATION_THEMES.find(t => t.id === themeId) || PRESENTATION_THEMES[0];
+                      setSelectedTheme(theme);
+                      setShowLessonGenerator(true);
+                      toast({
+                        title: 'Opening Lesson Planner',
+                        description: `Creating presentation for "${topic.name}"`,
+                      });
+                    }}
+                    onGenerateQuestions={(questions) => {
+                      // Add generated questions to worksheet
+                      const newQuestions: WorksheetQuestion[] = questions.map((q, idx) => ({
+                        id: `generated-${currentSubject.id}-${Date.now()}-${idx}`,
+                        topicName: q.topic,
+                        standard: q.standard,
+                        subject: currentSubject.name,
+                        category: q.topic,
+                        jmapUrl: currentSubject.categories[0]?.topics[0]?.url || '',
+                      }));
+                      setWorksheetQuestions(prev => [...prev, ...newQuestions]);
+                      toast({
+                        title: 'Questions Generated',
+                        description: `Added ${questions.length} questions to your worksheet`,
+                      });
+                    }}
+                  />
+                )}
+              </>
             )}
 
             {/* Add Selected Button */}
