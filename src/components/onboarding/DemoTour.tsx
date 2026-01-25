@@ -85,11 +85,11 @@ const DemoScanFeature = () => (
     <div className="text-sm space-y-2">
       <div className="flex items-start gap-2">
         <Zap className="h-4 w-4 text-yellow-500 mt-0.5" />
-        <span>Snap a photo of student work</span>
+        <span>Scan student work with camera or scanner</span>
       </div>
       <div className="flex items-start gap-2">
         <Zap className="h-4 w-4 text-yellow-500 mt-0.5" />
-        <span>QR code identifies the student</span>
+        <span>Upload to Google Drive for auto-sync</span>
       </div>
       <div className="flex items-start gap-2">
         <Zap className="h-4 w-4 text-yellow-500 mt-0.5" />
@@ -242,7 +242,7 @@ const demoTourSteps: Step[] = [
     title: '📷 Step 3: Scan & Grade',
     content: (
       <div className="text-left space-y-2">
-        <p>This is the <strong>game-changer</strong>. Photograph student work and get instant AI grading with detailed feedback.</p>
+        <p>This is the <strong>game-changer</strong>. Scan student work with a camera or scanner, upload to Google Drive, and get instant AI grading.</p>
         <DemoScanFeature />
       </div>
     ),
