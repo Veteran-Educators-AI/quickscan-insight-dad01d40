@@ -580,7 +580,7 @@ serve(async (req) => {
       console.log(`Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(studentPayloads.length / BATCH_SIZE)} complete: ${syncResults.successful} synced, ${syncResults.failed} failed`);
     }
 
-    // Log the sync action
+    // Log the sync action with response for dashboard status display
     await supabase.from('sister_app_sync_log').insert({
       teacher_id: user.id,
       action: 'individual_sync',
@@ -588,6 +588,15 @@ serve(async (req) => {
         ...batchPayload.summary,
         class_id,
         sync_results: syncResults,
+        response: {
+          success: syncResults.failed === 0 || syncResults.successful > 0,
+          message: `Synced ${syncResults.successful} students`,
+          processed: {
+            students_synced: syncResults.successful,
+            grades_received: (grades || []).length,
+            misconceptions_tracked: totalMisconceptions,
+          },
+        },
       },
     });
 

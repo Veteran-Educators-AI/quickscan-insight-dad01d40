@@ -32,6 +32,12 @@ interface SyncLogData {
   total_misconceptions?: number;
   weak_topics_identified?: number;
   class_id?: string;
+  // Handle sync_results format from individual_sync
+  sync_results?: {
+    successful?: number;
+    failed?: number;
+    errors?: string[];
+  };
   // Handle nested summary format from nycologic_ai
   summary?: {
     total_students?: number;
@@ -152,7 +158,12 @@ export function ScholarSyncDashboard({ classId }: ScholarSyncDashboardProps) {
 
   const getStatusBadge = (log: SyncLog) => {
     const response = log.data?.response;
-    if (response?.success) {
+    const syncResults = log.data?.sync_results;
+    
+    // Check both response.success (new format) and sync_results (existing format)
+    const isSuccess = response?.success || (syncResults && syncResults.successful !== undefined && syncResults.failed === 0) || (syncResults && (syncResults.successful || 0) > 0);
+    
+    if (isSuccess) {
       return (
         <Badge variant="default" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
           <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -170,7 +181,11 @@ export function ScholarSyncDashboard({ classId }: ScholarSyncDashboardProps) {
 
   const latestSync = syncLogs?.[0];
   const totalSyncs = syncLogs?.length || 0;
-  const successfulSyncs = syncLogs?.filter(log => log.data?.response?.success).length || 0;
+  const successfulSyncs = syncLogs?.filter(log => {
+    const response = log.data?.response;
+    const syncResults = log.data?.sync_results;
+    return response?.success || (syncResults && (syncResults.successful || 0) > 0);
+  }).length || 0;
 
   // Helper to extract values from nested or flat data structure
   const getDataValue = (data: SyncLogData | undefined, key: 'total_students' | 'total_grades' | 'total_misconceptions' | 'weak_topics_identified'): number => {
