@@ -32,12 +32,22 @@ interface SyncLogData {
   total_misconceptions?: number;
   weak_topics_identified?: number;
   class_id?: string;
+  // Handle nested summary format from nycologic_ai
+  summary?: {
+    total_students?: number;
+    total_grades?: number;
+    total_misconceptions?: number;
+    weak_topics_identified?: number;
+  };
   response?: {
     success?: boolean;
     message?: string;
     processed?: {
       students_processed?: number;
+      students_synced?: number;  // Alternative key name
+      grades_received?: number;
       remediation_assigned?: number;
+      remediations_queued?: number;  // Alternative key name
       misconceptions_tracked?: number;
       xp_awarded?: number;
       coins_awarded?: number;
@@ -162,18 +172,26 @@ export function ScholarSyncDashboard({ classId }: ScholarSyncDashboardProps) {
   const totalSyncs = syncLogs?.length || 0;
   const successfulSyncs = syncLogs?.filter(log => log.data?.response?.success).length || 0;
 
+  // Helper to extract values from nested or flat data structure
+  const getDataValue = (data: SyncLogData | undefined, key: 'total_students' | 'total_grades' | 'total_misconceptions' | 'weak_topics_identified'): number => {
+    if (!data) return 0;
+    // Try direct access first, then check summary object
+    return data[key] ?? data.summary?.[key] ?? 0;
+  };
+
   // Calculate totals from all syncs
   const totals = syncLogs?.reduce((acc, log) => {
     const data = log.data;
     const processed = data?.response?.processed;
     return {
-      students: acc.students + (processed?.students_processed || data?.total_students || 0),
-      misconceptions: acc.misconceptions + (processed?.misconceptions_tracked || data?.total_misconceptions || 0),
-      remediation: acc.remediation + (processed?.remediation_assigned || 0),
+      students: acc.students + (processed?.students_processed || processed?.students_synced || getDataValue(data, 'total_students')),
+      grades: acc.grades + (processed?.grades_received || getDataValue(data, 'total_grades')),
+      misconceptions: acc.misconceptions + (processed?.misconceptions_tracked || getDataValue(data, 'total_misconceptions')),
+      remediation: acc.remediation + (processed?.remediation_assigned || processed?.remediations_queued || 0),
       xp: acc.xp + (processed?.xp_awarded || 0),
       coins: acc.coins + (processed?.coins_awarded || 0),
     };
-  }, { students: 0, misconceptions: 0, remediation: 0, xp: 0, coins: 0 }) || { students: 0, misconceptions: 0, remediation: 0, xp: 0, coins: 0 };
+  }, { students: 0, grades: 0, misconceptions: 0, remediation: 0, xp: 0, coins: 0 }) || { students: 0, grades: 0, misconceptions: 0, remediation: 0, xp: 0, coins: 0 };
 
   if (isLoading) {
     return (
@@ -326,7 +344,7 @@ export function ScholarSyncDashboard({ classId }: ScholarSyncDashboardProps) {
                               {format(new Date(log.created_at), 'MMM d, yyyy h:mm a')}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {log.data?.total_students || 0} students • {log.data?.total_grades || 0} grades • {log.data?.total_misconceptions || 0} misconceptions
+                              {getDataValue(log.data, 'total_students')} students • {getDataValue(log.data, 'total_grades')} grades • {getDataValue(log.data, 'total_misconceptions')} misconceptions
                             </p>
                           </div>
                         </div>
@@ -341,15 +359,15 @@ export function ScholarSyncDashboard({ classId }: ScholarSyncDashboardProps) {
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
                             <p className="text-muted-foreground">Students Processed</p>
-                            <p className="font-medium">{log.data?.response?.processed?.students_processed || log.data?.total_students || 0}</p>
+                            <p className="font-medium">{log.data?.response?.processed?.students_processed || log.data?.response?.processed?.students_synced || getDataValue(log.data, 'total_students')}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Grades Synced</p>
-                            <p className="font-medium">{log.data?.total_grades || 0}</p>
+                            <p className="font-medium">{log.data?.response?.processed?.grades_received || getDataValue(log.data, 'total_grades')}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Misconceptions Tracked</p>
-                            <p className="font-medium">{log.data?.response?.processed?.misconceptions_tracked || log.data?.total_misconceptions || 0}</p>
+                            <p className="font-medium">{log.data?.response?.processed?.misconceptions_tracked || getDataValue(log.data, 'total_misconceptions')}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Remediation Assigned</p>
