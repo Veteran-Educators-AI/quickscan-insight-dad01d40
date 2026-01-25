@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, Move, AlertTriangle, MapPin, Check, X, Save, Brain, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { ZoomIn, ZoomOut, RotateCw, Move, AlertTriangle, MapPin, Check, X, Save, Brain, Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -15,7 +15,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ImageErrorOverlay } from './ImageErrorOverlay';
+import { ImageErrorOverlay, ErrorRegion } from './ImageErrorOverlay';
 import { extractErrorRegions } from './MisconceptionComparison';
 import { useMisconceptionFeedback, MisconceptionDecision } from '@/hooks/useMisconceptionFeedback';
 import { cn } from '@/lib/utils';
@@ -56,6 +56,8 @@ export function BatchImageZoomDialog({
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   const [highlightedError, setHighlightedError] = useState<number | null>(null);
   const [showAnnotations, setShowAnnotations] = useState(true);
+  const [isEditingRegions, setIsEditingRegions] = useState(false);
+  const [customRegions, setCustomRegions] = useState<Record<number, Partial<ErrorRegion>>>({});
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -69,14 +71,28 @@ export function BatchImageZoomDialog({
     hasDecisions,
   } = useMisconceptionFeedback();
 
-  // Extract error regions from misconceptions
-  const errorRegions = extractErrorRegions(misconceptions);
+  // Extract error regions from misconceptions and merge with custom positions
+  const baseErrorRegions = extractErrorRegions(misconceptions);
+  const errorRegions = baseErrorRegions.map(region => ({
+    ...region,
+    ...customRegions[region.id],
+  }));
+
+  // Handle region updates (drag/resize)
+  const handleRegionUpdate = useCallback((id: number, updates: Partial<ErrorRegion>) => {
+    setCustomRegions(prev => ({
+      ...prev,
+      [id]: { ...prev[id], ...updates },
+    }));
+  }, []);
 
   // Reset view when image changes
   useEffect(() => {
     resetView();
     setHighlightedError(null);
     resetDecisions();
+    setCustomRegions({});
+    setIsEditingRegions(false);
   }, [imageUrl, resetDecisions]);
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 5));
@@ -226,17 +242,44 @@ export function BatchImageZoomDialog({
             )}
           </DialogTitle>
           <div className="flex items-center gap-1">
-            {/* Toggle annotations */}
+            {/* Toggle annotations and edit mode */}
             {hasMisconceptions && (
-              <Button
-                variant={showAnnotations ? "default" : "outline"}
-                size="sm"
-                onClick={() => setShowAnnotations(!showAnnotations)}
-                className="h-7 px-2 gap-1 mr-2"
-              >
-                <AlertTriangle className="h-3 w-3" />
-                {showAnnotations ? 'Hide' : 'Show'} Errors
-              </Button>
+              <div className="flex items-center gap-1 mr-2">
+                <Button
+                  variant={showAnnotations ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowAnnotations(!showAnnotations)}
+                  className="h-7 px-2 gap-1"
+                >
+                  <AlertTriangle className="h-3 w-3" />
+                  {showAnnotations ? 'Hide' : 'Show'} Errors
+                </Button>
+                {showAnnotations && hasAnnotatableErrors && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={isEditingRegions ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setIsEditingRegions(!isEditingRegions)}
+                          className={cn(
+                            "h-7 px-2 gap-1",
+                            isEditingRegions && "bg-primary"
+                          )}
+                        >
+                          <Pencil className="h-3 w-3" />
+                          {isEditingRegions ? 'Done' : 'Edit'}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {isEditingRegions 
+                          ? 'Exit edit mode' 
+                          : 'Drag to move boxes, drag corners to resize'}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
             )}
 
             {/* Navigation */}
@@ -327,8 +370,10 @@ export function BatchImageZoomDialog({
                     highlightedError={highlightedError}
                     onErrorHover={setHighlightedError}
                     onErrorClick={(id) => setHighlightedError(id === highlightedError ? null : id)}
+                    onRegionUpdate={handleRegionUpdate}
                     zoom={zoom}
                     rotation={rotation}
+                    isEditing={isEditingRegions}
                   />
                 )}
               </div>
@@ -351,9 +396,13 @@ export function BatchImageZoomDialog({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-4 h-4 rounded border-2 border-destructive bg-destructive/20" />
-                  <span className="text-muted-foreground">Selected error</span>
+                  <span className="text-muted-foreground">Selected</span>
                 </div>
-                <span className="text-muted-foreground">• Click to highlight</span>
+                {isEditingRegions ? (
+                  <span className="text-primary font-medium">• Drag to move, corners to resize</span>
+                ) : (
+                  <span className="text-muted-foreground">• Click Edit to adjust boxes</span>
+                )}
               </div>
             )}
           </div>
