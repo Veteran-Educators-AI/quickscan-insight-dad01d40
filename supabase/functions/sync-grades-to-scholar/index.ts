@@ -541,20 +541,39 @@ serve(async (req) => {
       },
     }));
 
-    // Log first payload for debugging
+    // Log detailed payload information for debugging data transmission issues
+    console.log('=== SCHOLAR SYNC PAYLOAD DEBUG START ===');
+    console.log(`Total students: ${studentPayloads.length}, Total grades: ${(grades || []).length}`);
+    
     if (studentPayloads.length > 0) {
       const samplePayload = studentPayloads[0].payload;
-      console.log('Sample student payload being sent:', JSON.stringify({
+      console.log('SAMPLE STUDENT PAYLOAD:', JSON.stringify({
         student_id: samplePayload.student_id,
         student_name: samplePayload.student_name,
+        student_email: samplePayload.student_email,
         overall_average: samplePayload.overall_average,
         grades_count: samplePayload.grades?.length || 0,
         weak_topics_count: samplePayload.weak_topics?.length || 0,
         misconceptions_count: samplePayload.misconceptions?.length || 0,
-        sample_grade: samplePayload.grades?.[0] || null,
-        sample_weak_topic: samplePayload.weak_topics?.[0] || null,
+        remediation_count: samplePayload.remediation_recommendations?.length || 0,
       }));
+      
+      // Log actual grade data samples
+      if (samplePayload.grades && samplePayload.grades.length > 0) {
+        console.log('SAMPLE GRADES (first 3):', JSON.stringify(samplePayload.grades.slice(0, 3)));
+      }
+      
+      // Log actual weak topics
+      if (samplePayload.weak_topics && samplePayload.weak_topics.length > 0) {
+        console.log('WEAK TOPICS:', JSON.stringify(samplePayload.weak_topics));
+      }
+      
+      // Log remediation recommendations
+      if (samplePayload.remediation_recommendations && samplePayload.remediation_recommendations.length > 0) {
+        console.log('REMEDIATION RECOMMENDATIONS:', JSON.stringify(samplePayload.remediation_recommendations));
+      }
     }
+    console.log('=== SCHOLAR SYNC PAYLOAD DEBUG END ===');
 
     // Process all batches in parallel using Promise.all for speed
     const allBatchPromises = [];
