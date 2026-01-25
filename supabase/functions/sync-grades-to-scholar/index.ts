@@ -545,6 +545,21 @@ serve(async (req) => {
     for (let i = 0; i < studentPayloads.length; i += BATCH_SIZE) {
       const batch = studentPayloads.slice(i, i + BATCH_SIZE);
       
+      // Log first batch details for debugging
+      if (i === 0 && batch.length > 0) {
+        const samplePayload = batch[0].payload;
+        console.log('Sample student payload being sent:', JSON.stringify({
+          student_id: samplePayload.student_id,
+          student_name: samplePayload.student_name,
+          overall_average: samplePayload.overall_average,
+          grades_count: samplePayload.grades?.length || 0,
+          weak_topics_count: samplePayload.weak_topics?.length || 0,
+          misconceptions_count: samplePayload.misconceptions?.length || 0,
+          sample_grade: samplePayload.grades?.[0] || null,
+          sample_weak_topic: samplePayload.weak_topics?.[0] || null,
+        }));
+      }
+      
       const batchResults = await Promise.allSettled(
         batch.map(async ({ profile, payload }) => {
           const response = await fetch(syncStudentEndpoint, {
