@@ -857,40 +857,53 @@ export default function Scan() {
     openBatchGradingModeSelector();
   };
 
-  const exportPDF = () => {
-    const doc = new jsPDF();
+  const exportPDF = async () => {
     const summary = batch.summary;
     if (!summary) return;
 
-    doc.setFontSize(20);
-    doc.text('Class Grading Report', 20, 20);
+    // Import and use the detailed export function
+    const { exportGradingReportPDF } = await import('@/lib/gradingReportExport');
     
-    doc.setFontSize(12);
-    doc.text(`Total Students: ${summary.totalStudents}`, 20, 35);
-    doc.text(`Class Average: ${summary.averageScore}%`, 20, 45);
-    doc.text(`Pass Rate: ${summary.passRate}%`, 20, 55);
-    doc.text(`Score Range: ${summary.lowestScore}% - ${summary.highestScore}%`, 20, 65);
-
-    doc.text('Individual Results:', 20, 80);
-    
-    let y = 90;
-    batch.items
-      .filter(item => item.status === 'completed' && item.result)
-      .forEach((item, i) => {
-        if (y > 270) {
-          doc.addPage();
-          y = 20;
-        }
-        doc.text(
-          `${i + 1}. ${item.studentName}: ${item.result!.totalScore.earned}/${item.result!.totalScore.possible} (${item.result!.totalScore.percentage}%)`,
-          20,
-          y
-        );
-        y += 10;
+    try {
+      await exportGradingReportPDF({
+        items: batch.items,
+        className: selectedClassId ? 'Class Grading Report' : 'Grading Report',
+        assignmentName: batch.items[0]?.result?.problemIdentified || 'Assignment',
+        includeImages: true,
+        includeAnnotations: true,
+        includeDetailedFeedback: true,
       });
-
-    doc.save('grading-report.pdf');
-    toast.success('Report exported as PDF');
+      toast.success('Detailed grading report exported as PDF');
+    } catch (err) {
+      console.error('Error exporting detailed PDF:', err);
+      // Fallback to basic export
+      const doc = new jsPDF();
+      doc.setFontSize(20);
+      doc.text('Class Grading Report', 20, 20);
+      doc.setFontSize(12);
+      doc.text(`Total Students: ${summary.totalStudents}`, 20, 35);
+      doc.text(`Class Average: ${summary.averageScore}%`, 20, 45);
+      doc.text(`Pass Rate: ${summary.passRate}%`, 20, 55);
+      doc.text(`Score Range: ${summary.lowestScore}% - ${summary.highestScore}%`, 20, 65);
+      doc.text('Individual Results:', 20, 80);
+      let y = 90;
+      batch.items
+        .filter(item => item.status === 'completed' && item.result)
+        .forEach((item, i) => {
+          if (y > 270) {
+            doc.addPage();
+            y = 20;
+          }
+          doc.text(
+            `${i + 1}. ${item.studentName}: ${item.result!.totalScore.earned}/${item.result!.totalScore.possible} (${item.result!.totalScore.percentage}%)`,
+            20,
+            y
+          );
+          y += 10;
+        });
+      doc.save('grading-report.pdf');
+      toast.success('Basic report exported as PDF');
+    }
   };
 
   // Save all batch results to gradebook directly from BatchQueue
