@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { StudentNameProvider } from "@/lib/StudentNameContext";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { DemoTour } from "@/components/onboarding/DemoTour";
 import { WhatsNewDialog } from "@/components/WhatsNewDialog";
 import { useMfaStatus } from "@/hooks/useMfaStatus";
 
@@ -169,6 +170,7 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <OnboardingTour />
+              <DemoTour />
               <WhatsNewDialog />
               <BetaFeedbackButton />
               <AppRoutes />
