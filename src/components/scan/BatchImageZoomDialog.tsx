@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, Maximize2, Move, X, AlertTriangle, MapPin } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, Move, AlertTriangle, MapPin, Check, X, Save, Brain, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -9,8 +9,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ImageErrorOverlay, ErrorRegion } from './ImageErrorOverlay';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { ImageErrorOverlay } from './ImageErrorOverlay';
 import { extractErrorRegions } from './MisconceptionComparison';
+import { useMisconceptionFeedback, MisconceptionDecision } from '@/hooks/useMisconceptionFeedback';
 import { cn } from '@/lib/utils';
 
 interface BatchImageZoomDialogProps {
@@ -23,6 +30,9 @@ interface BatchImageZoomDialogProps {
   onNavigate?: (direction: 'prev' | 'next') => void;
   misconceptions?: string[];
   grade?: number;
+  studentId?: string;
+  attemptId?: string;
+  topicName?: string;
 }
 
 export function BatchImageZoomDialog({
@@ -35,6 +45,9 @@ export function BatchImageZoomDialog({
   onNavigate,
   misconceptions = [],
   grade,
+  studentId,
+  attemptId,
+  topicName = 'Unknown Topic',
 }: BatchImageZoomDialogProps) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -45,6 +58,17 @@ export function BatchImageZoomDialog({
   const [showAnnotations, setShowAnnotations] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const {
+    decisions,
+    confirmError,
+    dismissError,
+    clearDecision,
+    resetDecisions,
+    saveFeedback,
+    isSaving,
+    hasDecisions,
+  } = useMisconceptionFeedback();
+
   // Extract error regions from misconceptions
   const errorRegions = extractErrorRegions(misconceptions);
 
@@ -52,7 +76,8 @@ export function BatchImageZoomDialog({
   useEffect(() => {
     resetView();
     setHighlightedError(null);
-  }, [imageUrl]);
+    resetDecisions();
+  }, [imageUrl, resetDecisions]);
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 5));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.25));
@@ -144,8 +169,45 @@ export function BatchImageZoomDialog({
     return 'bg-red-500';
   };
 
+  const handleSaveFeedback = async () => {
+    const feedback = Object.entries(decisions).map(([id, decision]) => {
+      const errorIndex = parseInt(id);
+      const misconceptionText = misconceptions[errorIndex - 1] || '';
+      const region = errorRegions.find(r => r.id === errorIndex);
+      
+      return {
+        misconceptionText,
+        decision: decision as MisconceptionDecision,
+        errorIndex,
+        location: region ? { vertical: region.vertical, horizontal: region.horizontal } : undefined,
+      };
+    });
+
+    const result = await saveFeedback({
+      studentId,
+      attemptId,
+      topicName,
+      feedback,
+      aiGrade: grade,
+    });
+
+    if (result.success) {
+      resetDecisions();
+    }
+  };
+
+  const handleConfirmAll = () => {
+    misconceptions.forEach((_, i) => confirmError(i + 1));
+  };
+
+  const handleDismissAll = () => {
+    misconceptions.forEach((_, i) => dismissError(i + 1));
+  };
+
   const hasMisconceptions = misconceptions.length > 0;
   const hasAnnotatableErrors = errorRegions.length > 0;
+  const confirmedCount = Object.values(decisions).filter(d => d === 'confirmed').length;
+  const dismissedCount = Object.values(decisions).filter(d => d === 'dismissed').length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -296,24 +358,69 @@ export function BatchImageZoomDialog({
             )}
           </div>
 
-          {/* Sidebar - Misconceptions list */}
+          {/* Sidebar - Misconceptions list with confirm/dismiss */}
           {hasMisconceptions && showAnnotations && (
             <div className="w-80 border-l bg-background flex flex-col">
               <div className="p-3 border-b bg-muted/30">
-                <h3 className="text-sm font-medium flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  Errors Found ({misconceptions.length})
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Click an error to highlight it on the image
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    Errors Found ({misconceptions.length})
+                  </h3>
+                  {hasDecisions && (
+                    <Badge variant="outline" className="text-xs">
+                      {confirmedCount}✓ {dismissedCount}✗
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Review AI findings and train by confirming or dismissing
                 </p>
+                
+                {/* Bulk actions */}
+                <div className="flex items-center gap-2 mt-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1 flex-1"
+                          onClick={handleConfirmAll}
+                        >
+                          <Check className="h-3 w-3 text-green-600" />
+                          Confirm All
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>All errors are correct</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1 flex-1"
+                          onClick={handleDismissAll}
+                        >
+                          <X className="h-3 w-3 text-red-600" />
+                          Dismiss All
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>All errors are wrong</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               </div>
+              
               <ScrollArea className="flex-1">
                 <div className="p-3 space-y-2">
                   {misconceptions.map((m, i) => {
                     const errorNum = i + 1;
                     const region = errorRegions.find(r => r.id === errorNum);
                     const isHighlighted = highlightedError === errorNum;
+                    const decision = decisions[errorNum];
                     
                     // Parse out the location prefix if present
                     const cleanText = m.replace(/^ERROR_LOCATION:\s*\w+-\w+\s*\|\s*/i, '');
@@ -322,23 +429,26 @@ export function BatchImageZoomDialog({
                       <div
                         key={i}
                         className={cn(
-                          "p-3 rounded-lg border cursor-pointer transition-all",
-                          isHighlighted
-                            ? "border-destructive bg-destructive/10 shadow-md"
-                            : "border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20 hover:border-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-900/30"
+                          "p-3 rounded-lg border transition-all",
+                          decision === 'confirmed' && "border-green-400 bg-green-50/50 dark:bg-green-950/20",
+                          decision === 'dismissed' && "border-red-300 bg-red-50/50 dark:bg-red-950/20 opacity-60",
+                          !decision && isHighlighted && "border-destructive bg-destructive/10 shadow-md",
+                          !decision && !isHighlighted && "border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20"
                         )}
                         onMouseEnter={() => setHighlightedError(errorNum)}
                         onMouseLeave={() => setHighlightedError(null)}
-                        onClick={() => setHighlightedError(isHighlighted ? null : errorNum)}
                       >
                         <div className="flex items-start gap-2">
                           <div className={cn(
                             "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold shrink-0",
-                            isHighlighted
-                              ? "bg-destructive text-destructive-foreground"
-                              : "bg-amber-500 text-white"
+                            decision === 'confirmed' && "bg-green-500 text-white",
+                            decision === 'dismissed' && "bg-red-400 text-white",
+                            !decision && isHighlighted && "bg-destructive text-destructive-foreground",
+                            !decision && !isHighlighted && "bg-amber-500 text-white"
                           )}>
-                            {errorNum}
+                            {decision === 'confirmed' ? <Check className="h-3 w-3" /> :
+                             decision === 'dismissed' ? <X className="h-3 w-3" /> :
+                             errorNum}
                           </div>
                           <div className="flex-1 min-w-0">
                             {region && (
@@ -346,18 +456,80 @@ export function BatchImageZoomDialog({
                                 variant="outline" 
                                 className={cn(
                                   "text-[10px] mb-1.5",
-                                  isHighlighted 
-                                    ? "border-destructive text-destructive"
-                                    : "border-amber-400 text-amber-700 dark:text-amber-300"
+                                  decision === 'confirmed' && "border-green-400 text-green-700 dark:text-green-300",
+                                  decision === 'dismissed' && "border-red-300 text-red-600 dark:text-red-400",
+                                  !decision && isHighlighted && "border-destructive text-destructive",
+                                  !decision && !isHighlighted && "border-amber-400 text-amber-700 dark:text-amber-300"
                                 )}
                               >
                                 <MapPin className="h-2.5 w-2.5 mr-1" />
                                 {region.vertical}-{region.horizontal}
                               </Badge>
                             )}
-                            <p className="text-xs leading-relaxed text-foreground/80">
+                            <p className={cn(
+                              "text-xs leading-relaxed",
+                              decision === 'dismissed' && "line-through text-muted-foreground",
+                              !decision && "text-foreground/80"
+                            )}>
                               {cleanText}
                             </p>
+
+                            {/* Confirm/Dismiss buttons */}
+                            <div className="flex items-center gap-1 mt-2">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant={decision === 'confirmed' ? 'default' : 'outline'}
+                                      size="sm"
+                                      className={cn(
+                                        "h-6 px-2 text-xs gap-1",
+                                        decision === 'confirmed' && "bg-green-600 hover:bg-green-700"
+                                      )}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (decision === 'confirmed') {
+                                          clearDecision(errorNum);
+                                        } else {
+                                          confirmError(errorNum);
+                                        }
+                                      }}
+                                    >
+                                      <Check className="h-3 w-3" />
+                                      {decision === 'confirmed' ? 'Confirmed' : 'Confirm'}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>AI correctly identified this error</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant={decision === 'dismissed' ? 'default' : 'outline'}
+                                      size="sm"
+                                      className={cn(
+                                        "h-6 px-2 text-xs gap-1",
+                                        decision === 'dismissed' && "bg-red-500 hover:bg-red-600"
+                                      )}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (decision === 'dismissed') {
+                                          clearDecision(errorNum);
+                                        } else {
+                                          dismissError(errorNum);
+                                        }
+                                      }}
+                                    >
+                                      <X className="h-3 w-3" />
+                                      {decision === 'dismissed' ? 'Dismissed' : 'Dismiss'}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>AI incorrectly flagged this as an error</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -365,6 +537,27 @@ export function BatchImageZoomDialog({
                   })}
                 </div>
               </ScrollArea>
+
+              {/* Save feedback button */}
+              {hasDecisions && (
+                <div className="p-3 border-t bg-muted/30">
+                  <Button
+                    className="w-full gap-2"
+                    onClick={handleSaveFeedback}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Brain className="h-4 w-4" />
+                    )}
+                    Save & Train AI
+                  </Button>
+                  <p className="text-[10px] text-muted-foreground text-center mt-1.5">
+                    Your feedback improves future grading accuracy
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
