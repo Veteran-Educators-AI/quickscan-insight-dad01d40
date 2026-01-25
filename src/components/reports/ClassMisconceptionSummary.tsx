@@ -720,21 +720,23 @@ export function ClassMisconceptionSummary({ classId }: ClassMisconceptionSummary
                       
                         <CollapsibleContent>
                         <div className="px-3 pb-3 space-y-3 border-t bg-muted/20">
-                          {/* Suggested Remediation - Clear bounded section */}
+                          {/* Suggested Remediation - Clear bounded section with scroll */}
                           <div className="pt-3">
                             <div className="rounded-lg border border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/30 p-3">
                               <div className="flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400 mb-2">
                                 <Lightbulb className="h-4 w-4" />
                                 Recommended Remediation Strategies
                               </div>
-                              <ul className="space-y-1.5 ml-1">
-                                {group.suggestedRemedies.map((remedy, idx) => (
-                                  <li key={idx} className="text-sm text-green-800 dark:text-green-300 flex items-start gap-2">
-                                    <span className="text-green-600 dark:text-green-500 mt-0.5">•</span>
-                                    <span>{remedy}</span>
-                                  </li>
-                                ))}
-                              </ul>
+                              <ScrollArea className="max-h-40">
+                                <ul className="space-y-1.5 ml-1 pr-3">
+                                  {group.suggestedRemedies.map((remedy, idx) => (
+                                    <li key={idx} className="text-sm text-green-800 dark:text-green-300 flex items-start gap-2">
+                                      <span className="text-green-600 dark:text-green-500 mt-0.5">•</span>
+                                      <span>{remedy}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </ScrollArea>
                               <p className="text-xs text-green-600 dark:text-green-500 mt-2 italic border-t border-green-200 dark:border-green-800 pt-2">
                                 These practice sets will be suggested to push to the Scholar App for student completion.
                               </p>
