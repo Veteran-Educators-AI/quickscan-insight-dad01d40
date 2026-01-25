@@ -125,12 +125,14 @@ export function SlideImageGenerator({
     
     setIsGenerating(true);
     try {
-      // Use Nano Banana (Gemini image model) via edge function
+      // Use the presentation-specific generation which properly handles non-math content
+      // Pass the full prompt with topic/slide context for accurate image generation
       const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
         body: {
-          prompt: `${prompt}. Style: professional, educational, clean design, suitable for classroom presentation. No text in image.`,
-          style: 'presentation',
-          useNanoBanana: true,
+          prompt: prompt, // Use the user's exact prompt - the edge function will enhance it
+          style: 'presentation', // This routes to the correct handler that respects the prompt
+          topic: topic,
+          slideTitle: slideTitle,
         },
       });
 
