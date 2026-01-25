@@ -1378,9 +1378,15 @@ export const NYS_SUBJECTS: Subject[] = [
   },
   {
     id: 'biology',
-    name: 'Biology',
-    shortName: 'BIO',
+    name: 'Living Environment',
+    shortName: 'LE',
     categories: BIOLOGY_TOPICS,
+  },
+  {
+    id: 'earthscience',
+    name: 'Earth Science',
+    shortName: 'ES',
+    categories: EARTH_SCIENCE_TOPICS,
   },
   {
     id: 'chemistry',
