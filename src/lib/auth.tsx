@@ -22,38 +22,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ALLOWED_ROLES: UserRole[] = ['teacher', 'admin'];
 
-function withTimeout<T>(promise: Promise<T>, ms: number, errorMsg: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(errorMsg)), ms)
-    )
-  ]);
-}
-
-function clearSupabaseAuth() {
-  const keysToRemove: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && (key.includes('supabase') || key.includes('sb-'))) {
-      keysToRemove.push(key);
-    }
-  }
-  keysToRemove.forEach(key => localStorage.removeItem(key));
-}
-
 async function fetchUserRole(userId: string): Promise<UserRole | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
 
-  if (error || !data) {
+    if (error || !data) {
+      console.error('Failed to fetch user role:', error);
+      return null;
+    }
+
+    return data.role as UserRole;
+  } catch (err) {
+    console.error('Error fetching role:', err);
     return null;
   }
-
-  return data.role as UserRole;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -65,114 +51,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearAuthError = () => setAuthError(null);
 
+  // Handle role verification - called after session is set
+  const verifyRoleAndUpdateState = async (userId: string) => {
+    const role = await fetchUserRole(userId);
+    
+    if (!role) {
+      await supabase.auth.signOut();
+      setSession(null);
+      setUser(null);
+      setUserRole(null);
+      return;
+    }
+
+    if (!ALLOWED_ROLES.includes(role)) {
+      await supabase.auth.signOut();
+      setSession(null);
+      setUser(null);
+      setUserRole(null);
+      setAuthError('This portal is for teachers only. Please use the Student Portal to sign in.');
+      return;
+    }
+
+    setUserRole(role);
+  };
+
   useEffect(() => {
     let isMounted = true;
 
+    // Safety timeout - if auth takes too long, stop loading
     const safetyTimeout = setTimeout(() => {
-      if (isMounted) {
-        clearSupabaseAuth();
+      if (isMounted && loading) {
+        console.warn('Auth initialization timed out');
         setLoading(false);
-        setSession(null);
-        setUser(null);
-        setUserRole(null);
       }
-    }, 10000);
+    }, 8000);
 
+    // CRITICAL: onAuthStateChange callback must be synchronous
+    // Defer any additional Supabase calls with setTimeout to prevent deadlock
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        try {
-          if (session?.user) {
-            const role = await fetchUserRole(session.user.id);
-
-            if (!role) {
-              await supabase.auth.signOut();
-              setSession(null);
-              setUser(null);
-              setUserRole(null);
-              setLoading(false);
-              return;
-            }
-
-            if (!ALLOWED_ROLES.includes(role)) {
-              await supabase.auth.signOut();
-              setSession(null);
-              setUser(null);
-              setUserRole(null);
-              setAuthError('This portal is for teachers only. Please use the Student Portal to sign in.');
-              setLoading(false);
-              return;
-            }
-
-            setUserRole(role);
-          } else {
-            setUserRole(null);
-          }
-
-          setSession(session);
-          setUser(session?.user ?? null);
-        } catch (error) {
-          await supabase.auth.signOut();
-          setSession(null);
-          setUser(null);
-          setUserRole(null);
-        } finally {
-          setLoading(false);
-        }
-      }
-    );
-
-    const getSessionWithTimeout = withTimeout(
-      supabase.auth.getSession(),
-      5000,
-      'Session fetch timed out'
-    );
-
-    getSessionWithTimeout.then(async ({ data: { session } }) => {
-      try {
-        if (session?.user) {
-          const role = await withTimeout(
-            fetchUserRole(session.user.id),
-            5000,
-            'Role fetch timed out'
-          );
-
-          if (!role) {
-            clearSupabaseAuth();
-            await supabase.auth.signOut();
-            setSession(null);
-            setUser(null);
-            setUserRole(null);
-            setLoading(false);
-            return;
-          }
-
-          if (!ALLOWED_ROLES.includes(role)) {
-            await supabase.auth.signOut();
-            setSession(null);
-            setUser(null);
-            setUserRole(null);
-            setAuthError('This portal is for teachers only. Please use the Student Portal to sign in.');
-            setLoading(false);
-            return;
-          }
-
-          setUserRole(role);
-        }
-
+      (event, session) => {
+        // Synchronous state updates only
         setSession(session);
         setUser(session?.user ?? null);
-      } catch (error) {
-        clearSupabaseAuth();
-        await supabase.auth.signOut();
-        setSession(null);
-        setUser(null);
-        setUserRole(null);
-      } finally {
+        setLoading(false);
+
+        // Defer role verification to prevent auth deadlock
+        if (session?.user) {
+          setTimeout(() => {
+            if (isMounted) {
+              verifyRoleAndUpdateState(session.user.id);
+            }
+          }, 0);
+        } else {
+          setUserRole(null);
+        }
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+
+      if (session?.user) {
+        verifyRoleAndUpdateState(session.user.id);
+      }
+    }).catch((err) => {
+      console.error('Failed to get session:', err);
+      if (isMounted) {
         setLoading(false);
       }
-    }).catch(() => {
-      clearSupabaseAuth();
-      setLoading(false);
     });
 
     return () => {
@@ -205,13 +156,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: error as Error };
       }
 
+      // Role will be verified via onAuthStateChange, but we also check here
+      // for immediate feedback
       if (data.user) {
-        // Use timeout to prevent hanging on role fetch
-        const role = await withTimeout(
-          fetchUserRole(data.user.id),
-          8000,
-          'Role verification timed out. Please try again.'
-        ).catch(() => null);
+        const role = await fetchUserRole(data.user.id);
 
         if (!role) {
           await supabase.auth.signOut();
