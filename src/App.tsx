@@ -35,6 +35,7 @@ import NotFound from "./pages/NotFound";
 import StudentLogin from "./pages/StudentLogin";
 import StudentJoinClass from "./pages/StudentJoinClass";
 import StudentDashboard from "./pages/StudentDashboard";
+import StudentLiveSession from "./pages/StudentLiveSession";
 import PresentationView from "./pages/PresentationView";
 import PresentationLibrary from "./pages/PresentationLibrary";
 import TeacherLibrary from "./pages/TeacherLibrary";
@@ -150,6 +151,7 @@ function AppRoutes() {
       <Route path="/student/login" element={<StudentLogin />} />
       <Route path="/student/join" element={<StudentJoinClass />} />
       <Route path="/student/dashboard" element={<StudentDashboard />} />
+      <Route path="/student/live" element={<StudentLiveSession />} />
       {/* Presentation routes */}
       <Route path="/presentation" element={<PresentationView />} />
       <Route path="/presentation/library" element={<ProtectedRoute><PresentationLibrary /></ProtectedRoute>} />
