@@ -25,18 +25,34 @@ export function GoogleConnectionPanel({ onDriveImport, onClassroomImport }: Goog
   const [classroomConnected, setClassroomConnected] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    
     const checkConnections = async () => {
-      setIsLoading(true);
+      // Quick timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        if (isMounted) setIsLoading(false);
+      }, 3000);
+      
       try {
-        await checkDriveConnection();
-        const hasAccess = await hasClassroomAccess();
-        setClassroomConnected(hasAccess);
+        const driveOk = await checkDriveConnection();
+        if (!isMounted) return;
+        
+        if (driveOk) {
+          const hasAccess = await hasClassroomAccess();
+          if (isMounted) setClassroomConnected(hasAccess);
+        }
+      } catch (err) {
+        console.log('Google connection check failed:', err);
       } finally {
-        setIsLoading(false);
+        clearTimeout(timeout);
+        if (isMounted) setIsLoading(false);
       }
     };
+    
     checkConnections();
-  }, [checkDriveConnection, hasClassroomAccess]);
+    
+    return () => { isMounted = false; };
+  }, []);
 
   const handleConnect = async () => {
     setIsConnecting(true);
