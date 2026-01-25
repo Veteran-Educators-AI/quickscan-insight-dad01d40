@@ -36,6 +36,7 @@ const DEMO_ACCOUNTS = {
 
 export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
+  const [showRetry, setShowRetry] = useState(false);
   const [demoLoading, setDemoLoading] = useState<'teacher' | 'admin' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -47,6 +48,27 @@ export default function Login() {
   const navigate = useNavigate();
   const { signIn, signUp, resetPassword, authError, clearAuthError } = useAuth();
   const { toast } = useToast();
+
+  // Show retry button after 5 seconds of loading
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isLoading) {
+      setShowRetry(false);
+      timer = setTimeout(() => setShowRetry(true), 5000);
+    } else {
+      setShowRetry(false);
+    }
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
+  const handleRetry = () => {
+    setIsLoading(false);
+    setShowRetry(false);
+    toast({
+      title: "Login cancelled",
+      description: "Please try signing in again.",
+    });
+  };
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -434,16 +456,29 @@ export default function Login() {
                     </button>
                   </div>
 
-                  <Button type="submit" className="w-full" variant="hero" disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing in...
-                      </>
-                    ) : (
-                      "Sign In"
+                  <div className="space-y-2">
+                    <Button type="submit" className="w-full" variant="hero" disabled={isLoading}>
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Signing in...
+                        </>
+                      ) : (
+                        "Sign In"
+                      )}
+                    </Button>
+                    
+                    {showRetry && isLoading && (
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="w-full animate-in fade-in slide-in-from-bottom-2"
+                        onClick={handleRetry}
+                      >
+                        Taking too long? Click to retry
+                      </Button>
                     )}
-                  </Button>
+                  </div>
 
                   <div className="relative my-4">
                     <div className="absolute inset-0 flex items-center">
