@@ -643,11 +643,13 @@ export const TEXT_QUESTIONS: Record<string, TextQuestion[]> = {
 
 // ============================================
 // PRE-BUILT LESSON SUGGESTIONS
-// Organized by text with multiple lesson options
+// 5-10 lessons per text covering themes, devices, characters, and skills
 // ============================================
 
 export const LESSON_SUGGESTIONS: LessonSuggestion[] = [
-  // THE OUTSIDERS
+  // ============================================
+  // THE OUTSIDERS (7 lessons)
+  // ============================================
   {
     id: 'outsiders-class-conflict',
     title: 'Understanding Class Conflict in The Outsiders',
@@ -657,345 +659,199 @@ export const LESSON_SUGGESTIONS: LessonSuggestion[] = [
     standards: ['RL.9-10.2', 'RL.9-10.3', 'SL.9-10.1'],
     objectives: [
       'Identify examples of class conflict between Greasers and Socs',
-      'Analyze how economic status shapes character perspectives',
-      'Discuss real-world connections to social class divisions',
+      'Analyze how economic status affects character behavior',
+      'Discuss stereotypes and their harmful effects',
     ],
     activities: [
-      'Character comparison T-chart (Ponyboy vs. Cherry)',
-      'Small group discussion on privilege and perspective',
-      'Written reflection on personal experiences with social groups',
+      'Create a Venn diagram comparing Greasers and Socs',
+      'Socratic seminar on class and identity',
+      'Journal: When have you felt judged by your background?',
     ],
     assessmentIdeas: [
-      'Essay: How does class determine fate in The Outsiders?',
-      'Venn diagram comparing characters across class lines',
+      'Essay on how class shapes identity in the novel',
+      'Character analysis comparing Johnny and Bob',
     ],
   },
   {
     id: 'outsiders-symbolism',
-    title: 'Symbolism Deep Dive: Gold, Sunsets, and Identity',
-    description: 'Analyze key symbols and their connection to themes of innocence and identity.',
+    title: 'Symbolism in The Outsiders: Gold, Sunsets, and More',
+    description: 'Analyze key symbols and their deeper meanings throughout the novel.',
     textId: 'the-outsiders',
     duration: '50 minutes',
     standards: ['RL.9-10.4', 'RL.9-10.2', 'W.9-10.9'],
     objectives: [
-      'Identify and interpret major symbols in the novel',
-      'Connect symbols to character development and themes',
-      'Write analytically about symbolic meaning',
+      'Identify major symbols: sunsets, gold, the church, hair',
+      'Analyze how symbols connect to themes of innocence and change',
+      'Connect Robert Frost\'s poem to the novel\'s message',
     ],
     activities: [
-      'Symbol hunt: Find quotes containing gold, sunsets, or the poem',
-      'Partner analysis of "Nothing Gold Can Stay"',
-      'Create symbol map connecting images to themes',
-    ],
-    assessmentIdeas: [
-      'Symbol analysis paragraph with textual evidence',
-      'Creative project: Design a symbolic book cover',
-    ],
-  },
-
-  // TO KILL A MOCKINGBIRD
-  {
-    id: 'tkam-racial-justice',
-    title: 'Racial Injustice and the Justice System',
-    description: 'Examine how Harper Lee portrays systemic racism through the Tom Robinson trial.',
-    textId: 'to-kill-a-mockingbird',
-    duration: '55 minutes',
-    standards: ['RL.9-10.2', 'RL.9-10.6', 'SL.9-10.1'],
-    objectives: [
-      'Analyze how the trial exposes racial prejudice in Maycomb',
-      'Evaluate Atticus\'s role as a moral compass',
-      'Connect the novel\'s themes to contemporary discussions of justice',
-    ],
-    activities: [
-      'Mock trial preparation and role-play',
-      'Close reading of Atticus\'s closing argument',
-      'Socratic seminar on justice in 1930s vs. today',
-    ],
-    assessmentIdeas: [
-      'Argumentative essay on justice and equality',
-      'Character analysis of Tom Robinson',
-    ],
-  },
-  {
-    id: 'tkam-coming-of-age',
-    title: 'Scout\'s Moral Development',
-    description: 'Trace Scout\'s journey from innocence to understanding of the adult world.',
-    textId: 'to-kill-a-mockingbird',
-    duration: '45 minutes',
-    standards: ['RL.9-10.3', 'RL.9-10.5', 'W.9-10.3'],
-    objectives: [
-      'Identify key moments that shape Scout\'s worldview',
-      'Analyze how point of view affects the narrative',
-      'Reflect on personal coming-of-age experiences',
-    ],
-    activities: [
-      'Timeline of Scout\'s moral lessons',
-      'Journal entries from Scout\'s perspective',
-      'Discussion: What does "walking in someone\'s shoes" mean?',
-    ],
-    assessmentIdeas: [
-      'Personal narrative: A moment that changed your perspective',
-      'Character growth analysis essay',
-    ],
-  },
-
-  // THE GREAT GATSBY
-  {
-    id: 'gatsby-american-dream',
-    title: 'Deconstructing the American Dream',
-    description: 'Analyze how Fitzgerald uses Gatsby to critique the American Dream.',
-    textId: 'the-great-gatsby',
-    duration: '55 minutes',
-    standards: ['RL.11-12.2', 'RL.11-12.4', 'SL.11-12.1'],
-    objectives: [
-      'Define and contextualize the American Dream in the 1920s',
-      'Analyze how Gatsby embodies and fails the Dream',
-      'Evaluate the Dream\'s relevance today',
-    ],
-    activities: [
-      'Gallery walk: Images of 1920s excess and poverty',
-      'Close reading of key passages about Gatsby\'s parties',
-      'Debate: Is the American Dream achievable today?',
-    ],
-    assessmentIdeas: [
-      'Argumentative essay on the American Dream',
-      'Visual project comparing 1920s to modern wealth culture',
-    ],
-  },
-  {
-    id: 'gatsby-symbolism',
-    title: 'The Green Light and Beyond: Symbolism in Gatsby',
-    description: 'Explore Fitzgerald\'s use of color, setting, and objects as symbols.',
-    textId: 'the-great-gatsby',
-    duration: '50 minutes',
-    standards: ['RL.11-12.4', 'RL.11-12.5', 'W.11-12.9'],
-    objectives: [
-      'Identify major symbols: green light, Valley of Ashes, eyes of Dr. T.J. Eckleburg',
-      'Analyze how symbols develop themes',
-      'Write symbolism-focused literary analysis',
-    ],
-    activities: [
-      'Symbol scavenger hunt with textual evidence',
-      'Color-coding exercise for Fitzgerald\'s palette',
-      'Create symbol map connecting images to themes',
+      'Symbol hunt with textual evidence chart',
+      'Close reading of "Nothing Gold Can Stay"',
+      'Create symbolic artwork representing a theme',
     ],
     assessmentIdeas: [
       'Symbol analysis essay with textual evidence',
-      'Creative: Design a movie poster with symbolic elements',
-    ],
-  },
-
-  // HAMLET
-  {
-    id: 'hamlet-revenge',
-    title: 'The Complexity of Revenge',
-    description: 'Analyze how Shakespeare explores the moral implications of revenge.',
-    textId: 'hamlet',
-    duration: '55 minutes',
-    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
-    objectives: [
-      'Trace the revenge plot and its consequences',
-      'Compare Hamlet\'s approach to Laertes\' and Fortinbras\'',
-      'Evaluate Shakespeare\'s message about revenge',
-    ],
-    activities: [
-      'Character comparison chart: Three avengers',
-      'Fishbowl discussion on revenge ethics',
-      'Performance of key confrontation scenes',
-    ],
-    assessmentIdeas: [
-      'Comparative essay on the three revenge plots',
-      'Modern parallel: When is revenge justified?',
+      'Creative: Design a book cover with symbolic elements',
     ],
   },
   {
-    id: 'hamlet-soliloquies',
-    title: 'Inside Hamlet\'s Mind: The Soliloquies',
-    description: 'Deep dive into Hamlet\'s famous soliloquies and what they reveal.',
-    textId: 'hamlet',
-    duration: '50 minutes',
-    standards: ['RL.11-12.4', 'RL.11-12.5', 'SL.11-12.4'],
-    objectives: [
-      'Understand the function of soliloquies in drama',
-      'Analyze language, imagery, and rhetorical devices',
-      'Perform and interpret soliloquies',
-    ],
-    activities: [
-      'Close reading of "To be or not to be"',
-      'Student performances with director\'s notes',
-      'Modernize a soliloquy in contemporary language',
-    ],
-    assessmentIdeas: [
-      'Soliloquy analysis essay',
-      'Creative: Write your own soliloquy in Hamlet\'s voice',
-    ],
-  },
-
-  // MACBETH
-  {
-    id: 'macbeth-ambition',
-    title: 'The Corruption of Ambition',
-    description: 'Explore how unchecked ambition leads to moral decay and destruction.',
-    textId: 'macbeth',
-    duration: '55 minutes',
-    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
-    objectives: [
-      'Trace Macbeth\'s moral decline through the play',
-      'Analyze Lady Macbeth\'s influence and parallel arc',
-      'Discuss modern examples of corrupting ambition',
-    ],
-    activities: [
-      'Character arc timeline with key decisions',
-      'Debate: Who is more responsible—Macbeth or Lady Macbeth?',
-      'Journal: When does ambition become dangerous?',
-    ],
-    assessmentIdeas: [
-      'Character analysis essay on moral corruption',
-      'Creative: News report on Macbeth\'s reign of terror',
-    ],
-  },
-  {
-    id: 'macbeth-supernatural',
-    title: 'The Supernatural in Macbeth',
-    description: 'Analyze Shakespeare\'s use of witches, ghosts, and prophecy.',
-    textId: 'macbeth',
+    id: 'outsiders-ponyboy-growth',
+    title: 'Ponyboy\'s Coming-of-Age Journey',
+    description: 'Trace Ponyboy\'s character development from beginning to end.',
+    textId: 'the-outsiders',
     duration: '45 minutes',
-    standards: ['RL.11-12.4', 'RL.11-12.5', 'W.11-12.9'],
+    standards: ['RL.9-10.3', 'RL.9-10.5', 'W.9-10.3'],
     objectives: [
-      'Identify supernatural elements and their function',
-      'Analyze how the supernatural creates atmosphere',
-      'Debate fate vs. free will in the play',
+      'Identify key moments of growth for Ponyboy',
+      'Analyze how events change his perspective',
+      'Compare his views at the beginning vs. end',
     ],
     activities: [
-      'Witch scene performance and analysis',
-      'Imagery hunt: darkness, blood, sleep',
-      'Discussion: Do the witches cause events or predict them?',
+      'Character arc timeline with quotes',
+      'Before/after perspective comparison',
+      'Journal: Write as Ponyboy reflecting on his journey',
     ],
     assessmentIdeas: [
-      'Essay on the role of the supernatural',
-      'Creative: Modern witch prophecy scene',
-    ],
-  },
-
-  // 1984
-  {
-    id: '1984-surveillance',
-    title: 'Big Brother Is Watching: Surveillance and Privacy',
-    description: 'Examine Orwell\'s warnings about government surveillance.',
-    textId: '1984',
-    duration: '55 minutes',
-    standards: ['RL.11-12.2', 'RL.11-12.6', 'SL.11-12.1'],
-    objectives: [
-      'Analyze how the Party uses surveillance for control',
-      'Connect Orwell\'s dystopia to modern technology',
-      'Evaluate the trade-offs between security and privacy',
-    ],
-    activities: [
-      'Mapping surveillance in Oceania',
-      'Research: Modern surveillance technologies',
-      'Socratic seminar on privacy rights',
-    ],
-    assessmentIdeas: [
-      'Argumentative essay on surveillance in society',
-      'Research project on digital privacy',
+      'Character development essay',
+      'Creative: Letter from older Ponyboy to his younger self',
     ],
   },
   {
-    id: '1984-language-power',
-    title: 'Newspeak: Language as a Tool of Control',
-    description: 'Explore how the Party uses language manipulation to limit thought.',
-    textId: '1984',
+    id: 'outsiders-heroism',
+    title: 'Defining Heroism: Johnny and Dally',
+    description: 'Examine different types of heroism through character analysis.',
+    textId: 'the-outsiders',
     duration: '50 minutes',
-    standards: ['RL.11-12.4', 'RL.11-12.5', 'L.11-12.1'],
+    standards: ['RL.9-10.3', 'RL.9-10.1', 'SL.9-10.4'],
     objectives: [
-      'Understand Newspeak principles and purpose',
-      'Analyze how language shapes thought',
-      'Create Newspeak translations and discuss implications',
+      'Define heroism and identify heroic acts in the novel',
+      'Compare Johnny\'s heroism to Dally\'s',
+      'Discuss whether heroism requires sacrifice',
     ],
     activities: [
-      'Newspeak dictionary creation',
-      'Rewrite famous quotes in Newspeak',
-      'Discussion: Can language limit freedom?',
+      'Heroism definition brainstorm',
+      'Character comparison chart',
+      'Debate: Who is the true hero?',
     ],
     assessmentIdeas: [
-      'Essay on the relationship between language and freedom',
-      'Creative: Design a modern Newspeak',
+      'Comparative essay on heroism',
+      'Presentation on real-world heroes',
     ],
   },
-
-  // THE CRUCIBLE
   {
-    id: 'crucible-mass-hysteria',
-    title: 'Mass Hysteria: Salem and Beyond',
-    description: 'Analyze how fear leads to persecution in Salem and modern parallels.',
-    textId: 'the-crucible',
-    duration: '55 minutes',
-    standards: ['RL.11-12.2', 'RL.11-12.9', 'SL.11-12.1'],
+    id: 'outsiders-loyalty-family',
+    title: 'Loyalty and Chosen Family in The Outsiders',
+    description: 'Explore themes of brotherhood, loyalty, and found family.',
+    textId: 'the-outsiders',
+    duration: '45 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.3', 'SL.9-10.1'],
     objectives: [
-      'Understand the historical context of Salem witch trials',
-      'Analyze how Miller depicts mass hysteria',
-      'Connect to McCarthyism and modern examples',
+      'Identify examples of loyalty among the Greasers',
+      'Analyze the concept of chosen vs. biological family',
+      'Discuss how loyalty affects character decisions',
     ],
     activities: [
-      'Historical context presentation',
-      'Scene analysis: The court scenes',
-      'Research project on McCarthyism',
+      'Loyalty web mapping relationships',
+      'Scene analysis: moments of sacrifice',
+      'Discussion: What makes a family?',
     ],
     assessmentIdeas: [
-      'Comparative essay: Salem and McCarthy era',
-      'Research: Modern witch hunts',
+      'Thematic essay on loyalty',
+      'Creative: Write a scene showing the gang five years later',
     ],
   },
-
-  // BELOVED
   {
-    id: 'beloved-memory-trauma',
-    title: 'Rememory: Trauma and Memory in Beloved',
-    description: 'Explore how Morrison uses non-linear narrative to depict trauma.',
-    textId: 'beloved',
-    duration: '55 minutes',
-    standards: ['RL.11-12.5', 'RL.11-12.2', 'SL.11-12.1'],
+    id: 'outsiders-first-person',
+    title: 'The Power of First-Person Narration',
+    description: 'Analyze how Ponyboy\'s perspective shapes our understanding.',
+    textId: 'the-outsiders',
+    duration: '45 minutes',
+    standards: ['RL.9-10.6', 'RL.9-10.5', 'W.9-10.3'],
     objectives: [
-      'Understand Morrison\'s concept of "rememory"',
-      'Analyze the non-linear structure and its purpose',
-      'Discuss how literature can represent trauma',
+      'Identify characteristics of first-person narration',
+      'Analyze how Ponyboy\'s bias affects the story',
+      'Consider events from other characters\' perspectives',
     ],
     activities: [
-      'Timeline reconstruction exercise',
-      'Close reading of memory passages',
-      'Discussion: How do we process collective trauma?',
+      'Rewrite a scene from Cherry\'s perspective',
+      'Identify moments of narrator bias',
+      'Compare first-person to third-person passages',
     ],
     assessmentIdeas: [
-      'Essay on narrative structure and meaning',
-      'Creative: Write a "rememory" of a historical event',
+      'Point of view analysis essay',
+      'Creative: Retell a key scene from another character\'s POV',
     ],
   },
-
-  // FRANKENSTEIN
   {
-    id: 'frankenstein-creation',
-    title: 'Playing God: Science and Responsibility',
-    description: 'Examine the ethical implications of Victor\'s experiment.',
-    textId: 'frankenstein',
-    duration: '55 minutes',
-    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
+    id: 'outsiders-violence',
+    title: 'Violence and Its Consequences',
+    description: 'Examine how violence affects characters and perpetuates cycles.',
+    textId: 'the-outsiders',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.3', 'SL.9-10.1'],
     objectives: [
-      'Analyze Victor\'s motivations and moral blindness',
-      'Evaluate the Creature\'s humanity',
-      'Connect to modern debates about scientific ethics',
+      'Identify acts of violence and their consequences',
+      'Analyze how violence creates cycles of retaliation',
+      'Discuss alternatives to violence in conflicts',
     ],
     activities: [
-      'Trial: Victor vs. The Creature',
-      'Research: Modern "Frankenstein" technologies',
-      'Debate: Should science have limits?',
+      'Violence consequence chain mapping',
+      'Character analysis: Who is most affected by violence?',
+      'Discussion: How can cycles of violence be broken?',
     ],
     assessmentIdeas: [
-      'Argumentative essay on scientific responsibility',
-      'Research project on AI or genetic engineering ethics',
+      'Essay on violence and consequences',
+      'Research: Youth violence prevention programs',
     ],
   },
 
-  // ROMEO AND JULIET
+  // ============================================
+  // ROMEO AND JULIET (8 lessons)
+  // ============================================
+  {
+    id: 'rj-prologue',
+    title: 'Decoding the Prologue: Fate and Foreshadowing',
+    description: 'Analyze the prologue\'s structure, language, and thematic hints.',
+    textId: 'romeo-and-juliet',
+    duration: '45 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.5', 'SL.9-10.1'],
+    objectives: [
+      'Understand the sonnet structure of the prologue',
+      'Identify key terms and foreshadowing elements',
+      'Discuss how knowing the ending affects reading',
+    ],
+    activities: [
+      'Line-by-line annotation of the prologue',
+      'Sonnet structure analysis',
+      'Discussion: Why spoil the ending?',
+    ],
+    assessmentIdeas: [
+      'Prologue analysis essay',
+      'Creative: Write a prologue for a modern love story',
+    ],
+  },
+  {
+    id: 'rj-language-love',
+    title: 'The Language of Love: Poetry and Passion',
+    description: 'Explore how Shakespeare uses poetry to express love.',
+    textId: 'romeo-and-juliet',
+    duration: '50 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.5', 'W.9-10.3'],
+    objectives: [
+      'Analyze the balcony scene for poetic devices',
+      'Identify metaphors, similes, and imagery in love scenes',
+      'Compare Shakespeare\'s love language to modern expressions',
+    ],
+    activities: [
+      'Balcony scene close reading',
+      'Poetic device scavenger hunt',
+      'Modern translation activity',
+    ],
+    assessmentIdeas: [
+      'Essay on Shakespeare\'s love language',
+      'Creative: Write a love poem using Shakespearean techniques',
+    ],
+  },
   {
     id: 'rj-dramatic-irony',
     title: 'The Power of Dramatic Irony',
@@ -1040,8 +896,1178 @@ export const LESSON_SUGGESTIONS: LessonSuggestion[] = [
       'Creative: Rewrite the ending with love triumphant',
     ],
   },
+  {
+    id: 'rj-youth-vs-age',
+    title: 'Youth vs. Age: Generational Conflict',
+    description: 'Explore how adults and youth clash throughout the play.',
+    textId: 'romeo-and-juliet',
+    duration: '45 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'SL.9-10.1'],
+    objectives: [
+      'Identify conflicts between generations',
+      'Analyze how adults fail the young lovers',
+      'Discuss whether the tragedy could have been prevented',
+    ],
+    activities: [
+      'Character chart: adults vs. youth',
+      'Role-play: Parent council meeting',
+      'Discussion: Who is most to blame?',
+    ],
+    assessmentIdeas: [
+      'Essay on generational conflict',
+      'Mock trial assigning blame',
+    ],
+  },
+  {
+    id: 'rj-fate-choice',
+    title: 'Fate vs. Free Will: Are the Lovers Doomed?',
+    description: 'Debate whether fate or choices determine the tragedy.',
+    textId: 'romeo-and-juliet',
+    duration: '55 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.6', 'SL.9-10.3'],
+    objectives: [
+      'Identify references to fate and stars',
+      'Analyze moments where characters make choices',
+      'Formulate an argument about fate vs. free will',
+    ],
+    activities: [
+      'Fate vs. choice evidence chart',
+      'Philosophical chairs debate',
+      'Close reading of "star-crossed" passages',
+    ],
+    assessmentIdeas: [
+      'Argumentative essay on fate',
+      'Creative: Rewrite a scene changing one choice',
+    ],
+  },
+  {
+    id: 'rj-mercutio-tybalt',
+    title: 'Foils and Fighters: Mercutio and Tybalt',
+    description: 'Analyze how supporting characters illuminate themes.',
+    textId: 'romeo-and-juliet',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.4', 'W.9-10.9'],
+    objectives: [
+      'Define foil and identify examples',
+      'Compare Mercutio and Tybalt as characters',
+      'Analyze how their deaths affect the plot',
+    ],
+    activities: [
+      'Character comparison chart',
+      'Queen Mab speech analysis',
+      'Scene performance: the duel',
+    ],
+    assessmentIdeas: [
+      'Foil analysis essay',
+      'Character study presentation',
+    ],
+  },
+  {
+    id: 'rj-performing-shakespeare',
+    title: 'From Page to Stage: Performing Shakespeare',
+    description: 'Explore how performance choices affect interpretation.',
+    textId: 'romeo-and-juliet',
+    duration: '60 minutes',
+    standards: ['RL.9-10.7', 'SL.9-10.6', 'RL.9-10.4'],
+    objectives: [
+      'Compare different film/stage interpretations',
+      'Analyze how performance choices convey meaning',
+      'Perform scenes with deliberate interpretive choices',
+    ],
+    activities: [
+      'Film comparison (Zeffirelli vs. Luhrmann)',
+      'Scene blocking workshop',
+      'Performance with director\'s notes',
+    ],
+    assessmentIdeas: [
+      'Comparative analysis of interpretations',
+      'Group performance with written rationale',
+    ],
+  },
 
-  // HOUSE ON MANGO STREET
+  // ============================================
+  // TO KILL A MOCKINGBIRD (8 lessons)
+  // ============================================
+  {
+    id: 'tkam-racial-injustice',
+    title: 'Confronting Racial Injustice in Maycomb',
+    description: 'Analyze the trial and its representation of systemic racism.',
+    textId: 'to-kill-a-mockingbird',
+    duration: '55 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.6', 'SL.9-10.1'],
+    objectives: [
+      'Understand the historical context of Jim Crow South',
+      'Analyze the trial as a representation of injustice',
+      'Discuss connections to contemporary issues',
+    ],
+    activities: [
+      'Historical context research',
+      'Mock trial analysis',
+      'Discussion: Has justice improved?',
+    ],
+    assessmentIdeas: [
+      'Essay connecting to modern civil rights issues',
+      'Research on historical trials',
+    ],
+  },
+  {
+    id: 'tkam-atticus-heroism',
+    title: 'Atticus Finch: Hero or Flawed Figure?',
+    description: 'Critically analyze Atticus as a moral compass.',
+    textId: 'to-kill-a-mockingbird',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.6', 'SL.9-10.1'],
+    objectives: [
+      'Identify Atticus\'s heroic qualities',
+      'Analyze criticisms of Atticus\'s approach',
+      'Debate whether he is a true hero or complicit',
+    ],
+    activities: [
+      'Character evidence chart',
+      'Reading contemporary critiques',
+      'Debate: Is Atticus the hero we need?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Response to Go Set a Watchman revelations',
+    ],
+  },
+  {
+    id: 'tkam-scout-innocence',
+    title: 'Scout\'s Loss of Innocence',
+    description: 'Trace Scout\'s moral development throughout the novel.',
+    textId: 'to-kill-a-mockingbird',
+    duration: '45 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.5', 'W.9-10.3'],
+    objectives: [
+      'Identify key moments of Scout\'s growth',
+      'Analyze how she learns empathy',
+      'Connect her journey to the mockingbird symbol',
+    ],
+    activities: [
+      'Character arc timeline',
+      'Quote analysis: Scout\'s changing perspective',
+      'Journal: A time you learned a hard truth',
+    ],
+    assessmentIdeas: [
+      'Coming-of-age essay',
+      'Creative: Scout as an adult reflecting on childhood',
+    ],
+  },
+  {
+    id: 'tkam-mockingbird-symbol',
+    title: 'The Mockingbird Symbol: Innocence Destroyed',
+    description: 'Analyze the mockingbird as a central symbol.',
+    textId: 'to-kill-a-mockingbird',
+    duration: '45 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.2', 'W.9-10.9'],
+    objectives: [
+      'Identify characters represented by the mockingbird',
+      'Analyze how innocence is destroyed in the novel',
+      'Connect the symbol to the novel\'s message',
+    ],
+    activities: [
+      'Symbol mapping activity',
+      'Close reading of mockingbird passages',
+      'Discussion: Who are today\'s mockingbirds?',
+    ],
+    assessmentIdeas: [
+      'Symbol analysis essay',
+      'Creative: Modern mockingbird poem',
+    ],
+  },
+  {
+    id: 'tkam-boo-radley',
+    title: 'Boo Radley: From Monster to Mockingbird',
+    description: 'Trace how perception of Boo changes throughout the novel.',
+    textId: 'to-kill-a-mockingbird',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'SL.9-10.1'],
+    objectives: [
+      'Track Boo Radley references throughout the novel',
+      'Analyze how Scout\'s perception changes',
+      'Discuss themes of prejudice and understanding',
+    ],
+    activities: [
+      'Boo Radley perception timeline',
+      'Symbolic gifts analysis',
+      'Discussion: Judging the unknown',
+    ],
+    assessmentIdeas: [
+      'Character transformation essay',
+      'Creative: Boo\'s perspective on the children',
+    ],
+  },
+  {
+    id: 'tkam-setting-character',
+    title: 'Maycomb as Character: Setting and Society',
+    description: 'Analyze how setting shapes characters and plot.',
+    textId: 'to-kill-a-mockingbird',
+    duration: '45 minutes',
+    standards: ['RL.9-10.1', 'RL.9-10.5', 'W.9-10.9'],
+    objectives: [
+      'Identify elements of the Maycomb setting',
+      'Analyze how setting reflects social hierarchy',
+      'Discuss how place shapes identity',
+    ],
+    activities: [
+      'Maycomb map creation',
+      'Setting description analysis',
+      'Comparison: Maycomb vs. your community',
+    ],
+    assessmentIdeas: [
+      'Setting analysis essay',
+      'Creative: Description of Maycomb in a different era',
+    ],
+  },
+  {
+    id: 'tkam-courage',
+    title: 'Types of Courage in Maycomb',
+    description: 'Explore different definitions and examples of courage.',
+    textId: 'to-kill-a-mockingbird',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.3', 'SL.9-10.1'],
+    objectives: [
+      'Define different types of courage',
+      'Identify courageous acts by various characters',
+      'Discuss Atticus\'s definition of real courage',
+    ],
+    activities: [
+      'Courage definition brainstorm',
+      'Mrs. Dubose analysis',
+      'Discussion: When is it hardest to be brave?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on courage',
+      'Personal narrative: A time you showed courage',
+    ],
+  },
+  {
+    id: 'tkam-narrator-perspective',
+    title: 'The Adult Scout Looking Back',
+    description: 'Analyze the dual perspective of child and adult narrator.',
+    textId: 'to-kill-a-mockingbird',
+    duration: '45 minutes',
+    standards: ['RL.9-10.6', 'RL.9-10.5', 'W.9-10.3'],
+    objectives: [
+      'Identify moments of adult vs. child perspective',
+      'Analyze how dual perspective creates meaning',
+      'Discuss the effect of retrospective narration',
+    ],
+    activities: [
+      'Perspective identification exercise',
+      'Quote sorting: child vs. adult Scout',
+      'Writing: Describe a childhood memory as an adult',
+    ],
+    assessmentIdeas: [
+      'Point of view analysis essay',
+      'Creative: Scene from adult Scout\'s present',
+    ],
+  },
+
+  // ============================================
+  // THE GREAT GATSBY (10 lessons)
+  // ============================================
+  {
+    id: 'gatsby-american-dream',
+    title: 'The American Dream: Promise and Corruption',
+    description: 'Analyze how Fitzgerald critiques the American Dream.',
+    textId: 'the-great-gatsby',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Define the American Dream and its historical context',
+      'Analyze how Gatsby embodies and fails the Dream',
+      'Discuss whether the Dream is achievable or illusory',
+    ],
+    activities: [
+      'American Dream definition brainstorm',
+      'Gatsby\'s journey mapping',
+      'Debate: Is the Dream alive today?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on the American Dream',
+      'Research on modern wealth inequality',
+    ],
+  },
+  {
+    id: 'gatsby-symbolism',
+    title: 'Symbols of Desire: Green Light, Eyes, Valley of Ashes',
+    description: 'Analyze the major symbols and their meanings.',
+    textId: 'the-great-gatsby',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.2', 'W.11-12.9'],
+    objectives: [
+      'Identify and interpret major symbols',
+      'Analyze how symbols reinforce themes',
+      'Connect symbols to character motivations',
+    ],
+    activities: [
+      'Symbol mapping with textual evidence',
+      'Visual representation of symbols',
+      'Close reading of symbolic passages',
+    ],
+    assessmentIdeas: [
+      'Symbol analysis essay',
+      'Creative: Design Gatsby\'s mansion with symbolic elements',
+    ],
+  },
+  {
+    id: 'gatsby-nick-narrator',
+    title: 'Nick Carraway: Reliable or Unreliable?',
+    description: 'Critically analyze Nick\'s role and reliability as narrator.',
+    textId: 'the-great-gatsby',
+    duration: '50 minutes',
+    standards: ['RL.11-12.6', 'RL.11-12.3', 'SL.11-12.1'],
+    objectives: [
+      'Identify characteristics of Nick\'s narration',
+      'Analyze moments of bias or contradiction',
+      'Discuss the effect of an unreliable narrator',
+    ],
+    activities: [
+      'Nick\'s contradictions scavenger hunt',
+      'Rewrite scenes from another perspective',
+      'Debate: Can we trust Nick?',
+    ],
+    assessmentIdeas: [
+      'Narrator analysis essay',
+      'Creative: The story from Jordan\'s perspective',
+    ],
+  },
+  {
+    id: 'gatsby-class-wealth',
+    title: 'Old Money vs. New Money: Class in the 1920s',
+    description: 'Analyze class divisions and their effects on characters.',
+    textId: 'the-great-gatsby',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Distinguish between old money and new money',
+      'Analyze how class affects character relationships',
+      'Discuss Tom and Gatsby as class representatives',
+    ],
+    activities: [
+      'East Egg vs. West Egg comparison',
+      'Character positioning on class spectrum',
+      'Discussion: Does wealth equal worth?',
+    ],
+    assessmentIdeas: [
+      'Essay on class and character',
+      'Research on Gilded Age wealth',
+    ],
+  },
+  {
+    id: 'gatsby-daisy-women',
+    title: 'Women in Gatsby: Daisy, Jordan, and Myrtle',
+    description: 'Analyze the portrayal and roles of women in the novel.',
+    textId: 'the-great-gatsby',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Analyze each woman\'s characterization',
+      'Discuss 1920s gender expectations',
+      'Evaluate Fitzgerald\'s portrayal of women',
+    ],
+    activities: [
+      'Character comparison chart',
+      'Historical context on flappers and women\'s roles',
+      'Discussion: How are women judged in the novel?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Creative: One woman\'s diary entries',
+    ],
+  },
+  {
+    id: 'gatsby-past-present',
+    title: 'The Past as Obsession: Time in Gatsby',
+    description: 'Analyze Gatsby\'s relationship with the past.',
+    textId: 'the-great-gatsby',
+    duration: '45 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.4', 'W.11-12.9'],
+    objectives: [
+      'Identify Gatsby\'s attempts to recreate the past',
+      'Analyze the famous "boats against the current" ending',
+      'Discuss whether we can escape our past',
+    ],
+    activities: [
+      'Timeline of Gatsby\'s past vs. present',
+      'Close reading of final paragraphs',
+      'Philosophical discussion on memory and time',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on time and memory',
+      'Creative: Letter from Gatsby to young Jimmy Gatz',
+    ],
+  },
+  {
+    id: 'gatsby-roaring-twenties',
+    title: 'The Jazz Age: Historical Context',
+    description: 'Connect the novel to its historical and cultural moment.',
+    textId: 'the-great-gatsby',
+    duration: '55 minutes',
+    standards: ['RL.11-12.9', 'RL.11-12.6', 'W.11-12.7'],
+    objectives: [
+      'Research key elements of the 1920s',
+      'Connect historical events to novel themes',
+      'Analyze how Fitzgerald captures the era',
+    ],
+    activities: [
+      'Jazz Age research stations',
+      'Party scene analysis',
+      'Comparison: 1920s vs. today',
+    ],
+    assessmentIdeas: [
+      'Research project on the 1920s',
+      'Creative: Invitation to one of Gatsby\'s parties',
+    ],
+  },
+  {
+    id: 'gatsby-moral-decay',
+    title: 'Moral Decay and Carelessness',
+    description: 'Analyze the moral failures of the novel\'s wealthy characters.',
+    textId: 'the-great-gatsby',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
+    objectives: [
+      'Identify examples of moral carelessness',
+      'Analyze the hit-and-run as moral symbol',
+      'Discuss Tom and Daisy\'s "carelessness"',
+    ],
+    activities: [
+      'Moral failures evidence chart',
+      'Close reading of "careless people" passage',
+      'Discussion: What is moral responsibility?',
+    ],
+    assessmentIdeas: [
+      'Essay on moral decay',
+      'Mock trial: Who is responsible for Gatsby\'s death?',
+    ],
+  },
+  {
+    id: 'gatsby-color-imagery',
+    title: 'The Color Palette of Gatsby',
+    description: 'Analyze Fitzgerald\'s use of color symbolism.',
+    textId: 'the-great-gatsby',
+    duration: '45 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.5', 'W.11-12.9'],
+    objectives: [
+      'Identify recurring colors and their associations',
+      'Analyze how color reinforces characterization',
+      'Create a color-coded character/theme map',
+    ],
+    activities: [
+      'Color tracking through the novel',
+      'Color symbolism chart',
+      'Visual art project: Gatsby\'s color world',
+    ],
+    assessmentIdeas: [
+      'Imagery analysis essay',
+      'Creative: Paint or describe a scene emphasizing color',
+    ],
+  },
+  {
+    id: 'gatsby-tragic-hero',
+    title: 'Gatsby as Tragic Hero',
+    description: 'Apply classical tragic hero elements to Gatsby.',
+    textId: 'the-great-gatsby',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.9', 'SL.11-12.1'],
+    objectives: [
+      'Define tragic hero characteristics',
+      'Identify Gatsby\'s tragic flaw',
+      'Debate whether Gatsby is truly heroic',
+    ],
+    activities: [
+      'Tragic hero checklist application',
+      'Comparison to classical tragic heroes',
+      'Discussion: Is Gatsby admirable or foolish?',
+    ],
+    assessmentIdeas: [
+      'Tragic hero analysis essay',
+      'Comparative essay: Gatsby vs. another tragic hero',
+    ],
+  },
+
+  // ============================================
+  // HAMLET (9 lessons)
+  // ============================================
+  {
+    id: 'hamlet-revenge',
+    title: 'Revenge Tragedy: Justice or Destruction?',
+    description: 'Explore the revenge tragedy genre and its implications.',
+    textId: 'hamlet',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.9', 'SL.11-12.1'],
+    objectives: [
+      'Define the revenge tragedy genre',
+      'Trace the cycle of revenge in the play',
+      'Discuss whether revenge achieves justice',
+    ],
+    activities: [
+      'Revenge cycle mapping',
+      'Comparison to other revenge tragedies',
+      'Debate: Is revenge ever justified?',
+    ],
+    assessmentIdeas: [
+      'Essay on revenge and consequences',
+      'Research on revenge in different cultures',
+    ],
+  },
+  {
+    id: 'hamlet-soliloquies',
+    title: 'Inside Hamlet\'s Mind: The Soliloquies',
+    description: 'Analyze Hamlet\'s major soliloquies for insight into his character.',
+    textId: 'hamlet',
+    duration: '60 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.5', 'SL.11-12.6'],
+    objectives: [
+      'Identify and interpret major soliloquies',
+      'Trace Hamlet\'s psychological development',
+      'Perform soliloquies with interpretive choices',
+    ],
+    activities: [
+      'Soliloquy annotation stations',
+      'Performance workshop',
+      'Psychological analysis of Hamlet',
+    ],
+    assessmentIdeas: [
+      'Close reading essay on a soliloquy',
+      'Memorization and performance',
+    ],
+  },
+  {
+    id: 'hamlet-action-inaction',
+    title: 'To Act or Not to Act: Hamlet\'s Delay',
+    description: 'Analyze why Hamlet delays his revenge.',
+    textId: 'hamlet',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Identify moments where Hamlet could act',
+      'Analyze psychological and philosophical reasons for delay',
+      'Discuss different theories about Hamlet\'s inaction',
+    ],
+    activities: [
+      'Timeline of opportunities and delays',
+      'Scholarly theory jigsaw',
+      'Philosophical discussion on action vs. contemplation',
+    ],
+    assessmentIdeas: [
+      'Essay defending a theory of Hamlet\'s delay',
+      'Creative: Hamlet\'s therapy session',
+    ],
+  },
+  {
+    id: 'hamlet-appearance-reality',
+    title: 'Appearance vs. Reality: Masks and Deception',
+    description: 'Explore the theme of seeming vs. being.',
+    textId: 'hamlet',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.4', 'W.11-12.9'],
+    objectives: [
+      'Identify characters who hide their true nature',
+      'Analyze imagery of masks, acting, and deception',
+      'Discuss the play-within-a-play as thematic mirror',
+    ],
+    activities: [
+      'Character deception chart',
+      'Mousetrap scene analysis',
+      'Discussion: When is deception acceptable?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on deception',
+      'Creative: Claudius\'s private diary',
+    ],
+  },
+  {
+    id: 'hamlet-women',
+    title: 'Gertrude and Ophelia: Women in Elsinore',
+    description: 'Analyze the roles and treatment of women in the play.',
+    textId: 'hamlet',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Gertrude and Ophelia as characters',
+      'Discuss how men control and judge them',
+      'Evaluate Shakespeare\'s portrayal of women',
+    ],
+    activities: [
+      'Character analysis comparison',
+      'Closet scene and nunnery scene analysis',
+      'Discussion: Agency and victimhood',
+    ],
+    assessmentIdeas: [
+      'Character study essay',
+      'Creative: Ophelia\'s unsent letters',
+    ],
+  },
+  {
+    id: 'hamlet-mortality',
+    title: 'Confronting Mortality: Death in Hamlet',
+    description: 'Explore how death pervades the play\'s imagery and action.',
+    textId: 'hamlet',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.4', 'W.11-12.9'],
+    objectives: [
+      'Identify death imagery throughout the play',
+      'Analyze the graveyard scene\'s significance',
+      'Discuss Hamlet\'s changing views on death',
+    ],
+    activities: [
+      'Death imagery tracking',
+      'Yorick scene close reading',
+      '"To be or not to be" philosophical discussion',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on mortality',
+      'Creative: Modern meditation on death inspired by Hamlet',
+    ],
+  },
+  {
+    id: 'hamlet-corruption',
+    title: 'Something Rotten: Corruption in Denmark',
+    description: 'Analyze political and moral corruption throughout the play.',
+    textId: 'hamlet',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.4', 'SL.11-12.1'],
+    objectives: [
+      'Identify examples of corruption and decay',
+      'Analyze disease and rot imagery',
+      'Connect to themes of political corruption',
+    ],
+    activities: [
+      'Corruption evidence chart',
+      'Imagery analysis of disease and rot',
+      'Modern parallels discussion',
+    ],
+    assessmentIdeas: [
+      'Essay on corruption imagery',
+      'Research on political corruption',
+    ],
+  },
+  {
+    id: 'hamlet-foils',
+    title: 'Foils for Hamlet: Laertes, Fortinbras, Horatio',
+    description: 'Analyze how other characters illuminate Hamlet\'s character.',
+    textId: 'hamlet',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.5', 'W.11-12.9'],
+    objectives: [
+      'Define and identify foil characters',
+      'Compare Hamlet to Laertes, Fortinbras, and Horatio',
+      'Analyze what each foil reveals about Hamlet',
+    ],
+    activities: [
+      'Foil comparison chart',
+      'Scene analysis: revenge approaches',
+      'Discussion: Who makes the best choices?',
+    ],
+    assessmentIdeas: [
+      'Foil analysis essay',
+      'Creative: Scene between foils without Hamlet',
+    ],
+  },
+  {
+    id: 'hamlet-madness',
+    title: 'Madness Real and Performed',
+    description: 'Analyze the theme of madness and its theatrical elements.',
+    textId: 'hamlet',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.4', 'SL.11-12.6'],
+    objectives: [
+      'Distinguish between Hamlet\'s and Ophelia\'s madness',
+      'Analyze the purpose of performed madness',
+      'Discuss how madness relates to truth-telling',
+    ],
+    activities: [
+      'Madness comparison chart',
+      'Performance of "mad" scenes',
+      'Discussion: Method in madness',
+    ],
+    assessmentIdeas: [
+      'Essay on madness as theme',
+      'Performance with director\'s notes',
+    ],
+  },
+
+  // ============================================
+  // 1984 (8 lessons)
+  // ============================================
+  {
+    id: '1984-totalitarianism',
+    title: 'Anatomy of Totalitarianism',
+    description: 'Analyze the mechanisms of Party control.',
+    textId: '1984',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.5', 'SL.11-12.1'],
+    objectives: [
+      'Identify methods of totalitarian control',
+      'Analyze how the Party maintains power',
+      'Connect to historical totalitarian regimes',
+    ],
+    activities: [
+      'Control mechanisms chart',
+      'Historical connections research',
+      'Discussion: Could it happen here?',
+    ],
+    assessmentIdeas: [
+      'Essay on methods of control',
+      'Research on historical dictatorships',
+    ],
+  },
+  {
+    id: '1984-language-power',
+    title: 'Newspeak: Language as Control',
+    description: 'Analyze how language shapes and limits thought.',
+    textId: '1984',
+    duration: '55 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.2', 'W.11-12.9'],
+    objectives: [
+      'Understand the principles of Newspeak',
+      'Analyze the connection between language and thought',
+      'Discuss modern examples of language manipulation',
+    ],
+    activities: [
+      'Newspeak dictionary analysis',
+      'Translation exercises',
+      'Discussion: Euphemisms in modern politics',
+    ],
+    assessmentIdeas: [
+      'Essay on language and power',
+      'Creative: Newspeak version of a text',
+    ],
+  },
+  {
+    id: '1984-doublethink',
+    title: 'Doublethink and Reality Control',
+    description: 'Explore the concept of holding contradictory beliefs.',
+    textId: '1984',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Define and analyze doublethink',
+      'Identify examples in the novel',
+      'Discuss real-world parallels',
+    ],
+    activities: [
+      'Doublethink examples chart',
+      'Philosophical discussion on truth',
+      'Modern media analysis',
+    ],
+    assessmentIdeas: [
+      'Essay on reality and truth',
+      'Media analysis project',
+    ],
+  },
+  {
+    id: '1984-surveillance',
+    title: 'Big Brother Is Watching: Surveillance and Privacy',
+    description: 'Analyze surveillance as a tool of control.',
+    textId: '1984',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.9', 'SL.11-12.1'],
+    objectives: [
+      'Identify surveillance methods in the novel',
+      'Analyze the psychological effects of constant observation',
+      'Connect to modern surveillance technology',
+    ],
+    activities: [
+      'Surveillance methods chart',
+      'Research on modern surveillance',
+      'Debate: Security vs. privacy',
+    ],
+    assessmentIdeas: [
+      'Argumentative essay on surveillance',
+      'Research on privacy rights',
+    ],
+  },
+  {
+    id: '1984-winston-julia',
+    title: 'Rebellion and Love: Winston and Julia',
+    description: 'Analyze the relationship as political resistance.',
+    textId: '1984',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'W.11-12.9'],
+    objectives: [
+      'Analyze the relationship\'s development',
+      'Discuss love as a form of rebellion',
+      'Evaluate the relationship\'s ultimate failure',
+    ],
+    activities: [
+      'Relationship timeline',
+      'Close reading of key scenes',
+      'Discussion: Why does the Party fear love?',
+    ],
+    assessmentIdeas: [
+      'Essay on love and rebellion',
+      'Creative: Their story after the end',
+    ],
+  },
+  {
+    id: '1984-obrien-party',
+    title: 'O\'Brien and the Nature of Power',
+    description: 'Analyze O\'Brien\'s role and the Party\'s philosophy.',
+    textId: '1984',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Analyze O\'Brien as antagonist and symbol',
+      'Understand the Party\'s philosophy of power',
+      'Discuss the Room 101 scenes',
+    ],
+    activities: [
+      'O\'Brien character analysis',
+      'Close reading of torture scenes',
+      'Discussion: Power for power\'s sake',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Philosophical response to O\'Brien\'s arguments',
+    ],
+  },
+  {
+    id: '1984-memory-history',
+    title: 'Controlling the Past: Memory and History',
+    description: 'Analyze the Party\'s manipulation of historical truth.',
+    textId: '1984',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.4', 'W.11-12.9'],
+    objectives: [
+      'Understand Winston\'s job at the Ministry of Truth',
+      'Analyze why controlling history matters',
+      'Discuss the importance of accurate history',
+    ],
+    activities: [
+      'Memory hole examples',
+      'Historical manipulation research',
+      'Discussion: Who writes history?',
+    ],
+    assessmentIdeas: [
+      'Essay on history and power',
+      'Research on historical revisionism',
+    ],
+  },
+  {
+    id: '1984-ending',
+    title: 'The Crushing Conclusion: Analyzing the Ending',
+    description: 'Interpret the novel\'s devastating final pages.',
+    textId: '1984',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.5', 'SL.11-12.1'],
+    objectives: [
+      'Analyze the final chapter closely',
+      'Discuss what Winston\'s transformation means',
+      'Evaluate Orwell\'s message about resistance',
+    ],
+    activities: [
+      'Final chapter close reading',
+      '"He loved Big Brother" analysis',
+      'Discussion: Is the ending hopeful at all?',
+    ],
+    assessmentIdeas: [
+      'Essay on the ending\'s meaning',
+      'Creative: Alternative ending',
+    ],
+  },
+
+  // ============================================
+  // BELOVED (7 lessons)
+  // ============================================
+  {
+    id: 'beloved-trauma-memory',
+    title: 'Rememory: Trauma and the Past',
+    description: 'Explore Morrison\'s concept of rememory and collective trauma.',
+    textId: 'beloved',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.5', 'SL.11-12.1'],
+    objectives: [
+      'Define and analyze "rememory" as a concept',
+      'Trace how the past intrudes on the present',
+      'Discuss intergenerational trauma',
+    ],
+    activities: [
+      'Rememory passages analysis',
+      'Non-linear timeline construction',
+      'Discussion: How does trauma persist?',
+    ],
+    assessmentIdeas: [
+      'Essay on memory and narrative',
+      'Research on intergenerational trauma',
+    ],
+  },
+  {
+    id: 'beloved-motherhood',
+    title: 'Thick Love: Motherhood Under Slavery',
+    description: 'Analyze the impossible choices of enslaved mothers.',
+    textId: 'beloved',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Sethe\'s relationship with her children',
+      'Understand Margaret Garner\'s historical story',
+      'Discuss the ethics of Sethe\'s choice',
+    ],
+    activities: [
+      'Historical context research',
+      'Close reading of the infanticide scene',
+      'Ethical discussion: Was Sethe right?',
+    ],
+    assessmentIdeas: [
+      'Essay on motherhood and slavery',
+      'Research on enslaved mothers\' experiences',
+    ],
+  },
+  {
+    id: 'beloved-identity',
+    title: 'Who Is Beloved? Identity and Interpretation',
+    description: 'Explore the multiple meanings of Beloved\'s character.',
+    textId: 'beloved',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.4', 'W.11-12.9'],
+    objectives: [
+      'Analyze different interpretations of Beloved',
+      'Discuss supernatural vs. psychological readings',
+      'Connect Beloved to the Middle Passage',
+    ],
+    activities: [
+      'Evidence chart for interpretations',
+      'Middle Passage monologue analysis',
+      'Discussion: What is Beloved?',
+    ],
+    assessmentIdeas: [
+      'Interpretation argument essay',
+      'Creative: Beloved\'s full story',
+    ],
+  },
+  {
+    id: 'beloved-community',
+    title: 'Community and Isolation',
+    description: 'Analyze the role of community in healing.',
+    textId: 'beloved',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
+    objectives: [
+      'Trace Sethe\'s isolation from the community',
+      'Analyze the women\'s exorcism scene',
+      'Discuss community as healing force',
+    ],
+    activities: [
+      'Community relationship map',
+      'Exorcism scene analysis',
+      'Discussion: When should communities intervene?',
+    ],
+    assessmentIdeas: [
+      'Essay on community and healing',
+      'Creative: Community member\'s perspective',
+    ],
+  },
+  {
+    id: 'beloved-narrative-structure',
+    title: 'Fragmented Narrative: Morrison\'s Technique',
+    description: 'Analyze how the non-linear structure mirrors trauma.',
+    textId: 'beloved',
+    duration: '55 minutes',
+    standards: ['RL.11-12.5', 'RL.11-12.4', 'W.11-12.9'],
+    objectives: [
+      'Map the novel\'s narrative structure',
+      'Analyze why Morrison chose fragmentation',
+      'Connect structure to traumatic memory',
+    ],
+    activities: [
+      'Timeline reconstruction',
+      'Structure analysis',
+      'Writing exercise: Fragmented memory',
+    ],
+    assessmentIdeas: [
+      'Essay on form and meaning',
+      'Creative: Write in Morrison\'s style',
+    ],
+  },
+  {
+    id: 'beloved-slavery-legacy',
+    title: 'The Legacy of Slavery',
+    description: 'Connect the novel to ongoing discussions of slavery\'s aftermath.',
+    textId: 'beloved',
+    duration: '55 minutes',
+    standards: ['RL.11-12.9', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Understand the novel\'s historical context',
+      'Analyze how slavery\'s effects persist',
+      'Discuss reparations and memorialization',
+    ],
+    activities: [
+      'Historical research stations',
+      'Discussion: How should we remember slavery?',
+      'Connection to contemporary issues',
+    ],
+    assessmentIdeas: [
+      'Research essay on slavery\'s legacy',
+      'Op-ed on memorializing the past',
+    ],
+  },
+  {
+    id: 'beloved-denver',
+    title: 'Denver\'s Coming of Age',
+    description: 'Trace Denver\'s development and emergence.',
+    textId: 'beloved',
+    duration: '45 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.5', 'W.11-12.3'],
+    objectives: [
+      'Analyze Denver\'s isolation and growth',
+      'Identify her turning point',
+      'Discuss hope and the future',
+    ],
+    activities: [
+      'Denver character arc timeline',
+      'Close reading of her emergence',
+      'Discussion: What does Denver represent?',
+    ],
+    assessmentIdeas: [
+      'Character development essay',
+      'Creative: Denver\'s future',
+    ],
+  },
+
+  // ============================================
+  // LORD OF THE FLIES (6 lessons)
+  // ============================================
+  {
+    id: 'lotf-civilization',
+    title: 'Civilization vs. Savagery',
+    description: 'Explore Golding\'s allegory about human nature and society.',
+    textId: 'lord-of-the-flies',
+    duration: '55 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.4', 'SL.9-10.1'],
+    objectives: [
+      'Identify the allegorical elements of the novel',
+      'Analyze how the boys\' society degenerates',
+      'Debate Golding\'s view of human nature',
+    ],
+    activities: [
+      'Symbol mapping: conch, fire, glasses, beast',
+      'Character allegory identification',
+      'Philosophical discussion on human nature',
+    ],
+    assessmentIdeas: [
+      'Essay on allegory and meaning',
+      'Creative: What would you have done on the island?',
+    ],
+  },
+  {
+    id: 'lotf-symbols',
+    title: 'Symbols of Power and Destruction',
+    description: 'Analyze the major symbols and their meanings.',
+    textId: 'lord-of-the-flies',
+    duration: '50 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.2', 'W.9-10.9'],
+    objectives: [
+      'Identify and interpret the conch, fire, glasses, and Lord of the Flies',
+      'Trace how symbols change meaning',
+      'Connect symbols to the allegory',
+    ],
+    activities: [
+      'Symbol tracking chart',
+      'Scene analysis for symbolic moments',
+      'Visual representation project',
+    ],
+    assessmentIdeas: [
+      'Symbol analysis essay',
+      'Creative: Design symbolic artifacts',
+    ],
+  },
+  {
+    id: 'lotf-leadership',
+    title: 'Ralph vs. Jack: Leadership Styles',
+    description: 'Compare and contrast different approaches to leadership.',
+    textId: 'lord-of-the-flies',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'SL.9-10.1'],
+    objectives: [
+      'Analyze Ralph\'s and Jack\'s leadership qualities',
+      'Discuss why Jack\'s approach succeeds',
+      'Connect to real-world leadership dynamics',
+    ],
+    activities: [
+      'Leadership comparison chart',
+      'Key scene analysis',
+      'Debate: Which leader would you follow?',
+    ],
+    assessmentIdeas: [
+      'Comparative essay on leadership',
+      'Research on leadership psychology',
+    ],
+  },
+  {
+    id: 'lotf-beast',
+    title: 'The Beast Within: Fear and the Unknown',
+    description: 'Analyze the beast as both external and internal threat.',
+    textId: 'lord-of-the-flies',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.4', 'SL.9-10.1'],
+    objectives: [
+      'Trace the evolving concept of the beast',
+      'Analyze Simon\'s understanding of the beast',
+      'Discuss how fear creates monsters',
+    ],
+    activities: [
+      'Beast evolution timeline',
+      'Simon\'s encounter close reading',
+      'Discussion: What are we really afraid of?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on fear',
+      'Creative: The beast\'s perspective',
+    ],
+  },
+  {
+    id: 'lotf-simon-piggy',
+    title: 'The Fate of Reason and Spirituality',
+    description: 'Analyze Simon and Piggy as symbolic characters.',
+    textId: 'lord-of-the-flies',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.4', 'W.9-10.9'],
+    objectives: [
+      'Analyze what Simon and Piggy represent',
+      'Discuss why they must die in the allegory',
+      'Connect their deaths to Golding\'s message',
+    ],
+    activities: [
+      'Character symbolism analysis',
+      'Death scene close readings',
+      'Discussion: What dies with them?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Creative: Eulogies for Simon and Piggy',
+    ],
+  },
+  {
+    id: 'lotf-ending',
+    title: 'The Naval Officer: Rescue or Irony?',
+    description: 'Analyze the ending\'s complexity and irony.',
+    textId: 'lord-of-the-flies',
+    duration: '45 minutes',
+    standards: ['RL.9-10.5', 'RL.9-10.6', 'SL.9-10.1'],
+    objectives: [
+      'Analyze the rescue scene closely',
+      'Identify irony in the officer\'s arrival',
+      'Discuss what the boys return to',
+    ],
+    activities: [
+      'Final chapter close reading',
+      'Irony identification',
+      'Discussion: Is this really a rescue?',
+    ],
+    assessmentIdeas: [
+      'Essay on the ending\'s irony',
+      'Creative: Ralph\'s first day back home',
+    ],
+  },
+
+  // ============================================
+  // THE HOUSE ON MANGO STREET (6 lessons)
+  // ============================================
   {
     id: 'homs-identity',
     title: 'Finding Voice: Esperanza\'s Identity Journey',
@@ -1086,32 +2112,142 @@ export const LESSON_SUGGESTIONS: LessonSuggestion[] = [
       'Visual representation with written explanation',
     ],
   },
-
-  // LORD OF THE FLIES
   {
-    id: 'lotf-civilization',
-    title: 'Civilization vs. Savagery',
-    description: 'Explore Golding\'s allegory about human nature and society.',
-    textId: 'lord-of-the-flies',
-    duration: '55 minutes',
-    standards: ['RL.9-10.2', 'RL.9-10.4', 'SL.9-10.1'],
+    id: 'homs-women',
+    title: 'Women at the Window: Gender and Confinement',
+    description: 'Analyze the portrayal of women\'s limited roles.',
+    textId: 'house-on-mango-street',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'SL.9-10.1'],
     objectives: [
-      'Identify the allegorical elements of the novel',
-      'Analyze how the boys\' society degenerates',
-      'Debate Golding\'s view of human nature',
+      'Identify women characters and their situations',
+      'Analyze the window as recurring image',
+      'Discuss Esperanza\'s determination to be different',
     ],
     activities: [
-      'Symbol mapping: conch, fire, glasses, beast',
-      'Character allegory identification',
-      'Philosophical discussion on human nature',
+      'Women characters chart',
+      'Window imagery analysis',
+      'Discussion: How does Esperanza resist?',
     ],
     assessmentIdeas: [
-      'Essay on allegory and meaning',
-      'Creative: What would you have done on the island?',
+      'Essay on gender roles',
+      'Creative: A trapped woman\'s inner monologue',
+    ],
+  },
+  {
+    id: 'homs-vignette-form',
+    title: 'The Art of the Vignette',
+    description: 'Analyze Cisneros\'s unique narrative structure.',
+    textId: 'house-on-mango-street',
+    duration: '50 minutes',
+    standards: ['RL.9-10.5', 'RL.9-10.4', 'W.9-10.3'],
+    objectives: [
+      'Define vignette as a literary form',
+      'Analyze how vignettes work together',
+      'Write original vignettes',
+    ],
+    activities: [
+      'Vignette structure analysis',
+      'Connection mapping between vignettes',
+      'Vignette writing workshop',
+    ],
+    assessmentIdeas: [
+      'Essay on form and meaning',
+      'Personal vignette collection',
+    ],
+  },
+  {
+    id: 'homs-community',
+    title: 'Mango Street: Community and Culture',
+    description: 'Explore the neighborhood as character and influence.',
+    textId: 'house-on-mango-street',
+    duration: '45 minutes',
+    standards: ['RL.9-10.1', 'RL.9-10.3', 'SL.9-10.1'],
+    objectives: [
+      'Identify community members and their roles',
+      'Analyze how the neighborhood shapes Esperanza',
+      'Discuss cultural identity and belonging',
+    ],
+    activities: [
+      'Neighborhood character map',
+      'Cultural elements identification',
+      'Discussion: How does place shape identity?',
+    ],
+    assessmentIdeas: [
+      'Essay on community and identity',
+      'Creative: Vignette about your neighborhood',
+    ],
+  },
+  {
+    id: 'homs-leaving-returning',
+    title: 'Leaving to Come Back: Esperanza\'s Promise',
+    description: 'Analyze the ending and Esperanza\'s commitment.',
+    textId: 'house-on-mango-street',
+    duration: '45 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.5', 'SL.9-10.1'],
+    objectives: [
+      'Analyze the final vignettes',
+      'Discuss Esperanza\'s promise to return',
+      'Connect to themes of responsibility and success',
+    ],
+    activities: [
+      'Final vignettes close reading',
+      'Discussion: What does she owe Mango Street?',
+      'Personal reflection: What do we owe our communities?',
+    ],
+    assessmentIdeas: [
+      'Essay on responsibility and success',
+      'Creative: Esperanza returns to Mango Street',
     ],
   },
 
-  // THINGS FALL APART
+  // ============================================
+  // THINGS FALL APART (6 lessons)
+  // ============================================
+  {
+    id: 'tfa-igbo-culture',
+    title: 'Understanding Igbo Culture',
+    description: 'Learn about pre-colonial Igbo society as Achebe presents it.',
+    textId: 'things-fall-apart',
+    duration: '55 minutes',
+    standards: ['RL.9-10.1', 'RL.9-10.6', 'SL.9-10.1'],
+    objectives: [
+      'Identify key aspects of Igbo culture',
+      'Understand proverbs as cultural expression',
+      'Discuss the complexity of traditional society',
+    ],
+    activities: [
+      'Cultural elements chart',
+      'Proverb analysis and creation',
+      'Discussion: Strengths and tensions in Igbo society',
+    ],
+    assessmentIdeas: [
+      'Cultural analysis essay',
+      'Creative: Modern proverbs',
+    ],
+  },
+  {
+    id: 'tfa-okonkwo',
+    title: 'Okonkwo: Tragic Hero or Flawed Man?',
+    description: 'Analyze Okonkwo\'s character and downfall.',
+    textId: 'things-fall-apart',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'SL.9-10.1'],
+    objectives: [
+      'Analyze Okonkwo\'s motivations and fears',
+      'Apply tragic hero criteria',
+      'Discuss his relationship with masculinity',
+    ],
+    activities: [
+      'Character trait evidence chart',
+      'Tragic hero checklist',
+      'Discussion: Is Okonkwo sympathetic?',
+    ],
+    assessmentIdeas: [
+      'Tragic hero essay',
+      'Creative: Okonkwo\'s inner thoughts',
+    ],
+  },
   {
     id: 'tfa-colonialism',
     title: 'Things Fall Apart: The Impact of Colonialism',
@@ -1134,32 +2270,686 @@ export const LESSON_SUGGESTIONS: LessonSuggestion[] = [
       'Research: Post-colonial perspectives on African history',
     ],
   },
-
-  // FAHRENHEIT 451
   {
-    id: 'f451-censorship',
-    title: 'Burning Books, Burning Ideas',
-    description: 'Explore Bradbury\'s warning about censorship and intellectual freedom.',
-    textId: 'fahrenheit-451',
-    duration: '55 minutes',
-    standards: ['RL.9-10.2', 'RL.9-10.9', 'SL.9-10.1'],
+    id: 'tfa-missionaries',
+    title: 'Religion and Resistance',
+    description: 'Analyze the role of Christianity in colonial conquest.',
+    textId: 'things-fall-apart',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.3', 'SL.9-10.1'],
     objectives: [
-      'Analyze the society\'s reasons for banning books',
-      'Connect to real-world book banning and censorship',
-      'Evaluate the importance of intellectual freedom',
+      'Analyze how missionaries gain converts',
+      'Discuss why some Igbo people convert',
+      'Evaluate Mr. Brown vs. Reverend Smith',
     ],
     activities: [
-      'Research: Banned books in America',
-      'Debate: When, if ever, is censorship justified?',
-      'Book defense presentation',
+      'Missionary strategy analysis',
+      'Character comparison',
+      'Discussion: Religion as tool of colonialism',
     ],
     assessmentIdeas: [
-      'Argumentative essay on intellectual freedom',
-      'Research on a banned book and its controversy',
+      'Essay on religion and colonialism',
+      'Research on missionary history',
+    ],
+  },
+  {
+    id: 'tfa-title',
+    title: 'Things Fall Apart: Understanding the Title',
+    description: 'Connect Yeats\'s poem to the novel\'s themes.',
+    textId: 'things-fall-apart',
+    duration: '45 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.2', 'W.9-10.9'],
+    objectives: [
+      'Analyze Yeats\'s "The Second Coming"',
+      'Connect poem to novel themes',
+      'Discuss what "falls apart" on multiple levels',
+    ],
+    activities: [
+      'Poem annotation and analysis',
+      'Connection to novel events',
+      'Discussion: Multiple levels of collapse',
+    ],
+    assessmentIdeas: [
+      'Essay connecting poem and novel',
+      'Creative: Modern "things fall apart" poem',
+    ],
+  },
+  {
+    id: 'tfa-ending',
+    title: 'The Commissioner\'s Paragraph: Narrative Power',
+    description: 'Analyze the ironic ending and its implications.',
+    textId: 'things-fall-apart',
+    duration: '50 minutes',
+    standards: ['RL.9-10.6', 'RL.9-10.5', 'SL.9-10.1'],
+    objectives: [
+      'Analyze the final paragraph closely',
+      'Discuss whose story gets told',
+      'Connect to Achebe\'s purpose in writing',
+    ],
+    activities: [
+      'Final page close reading',
+      'Discussion: What story would the Commissioner tell?',
+      'Achebe\'s critique of Heart of Darkness',
+    ],
+    assessmentIdeas: [
+      'Essay on narrative and power',
+      'Research on Achebe\'s literary criticism',
     ],
   },
 
-  // NIGHT
+  // ============================================
+  // MACBETH (7 lessons)
+  // ============================================
+  {
+    id: 'macbeth-ambition',
+    title: 'Vaulting Ambition: The Seeds of Destruction',
+    description: 'Analyze ambition as Macbeth\'s tragic flaw.',
+    textId: 'macbeth',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
+    objectives: [
+      'Trace how ambition corrupts Macbeth',
+      'Analyze key ambition soliloquies',
+      'Discuss the nature of ambition',
+    ],
+    activities: [
+      'Ambition timeline',
+      'Soliloquy annotation',
+      'Discussion: When does ambition become dangerous?',
+    ],
+    assessmentIdeas: [
+      'Essay on ambition and corruption',
+      'Modern parallel analysis',
+    ],
+  },
+  {
+    id: 'macbeth-lady-macbeth',
+    title: 'Lady Macbeth: Partner in Crime',
+    description: 'Analyze Lady Macbeth\'s role and transformation.',
+    textId: 'macbeth',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.4', 'SL.11-12.6'],
+    objectives: [
+      'Analyze Lady Macbeth\'s characterization',
+      'Trace her psychological deterioration',
+      'Discuss gender and power dynamics',
+    ],
+    activities: [
+      'Character arc mapping',
+      'Sleepwalking scene analysis',
+      'Performance: "Unsex me here" speech',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Performance with interpretation notes',
+    ],
+  },
+  {
+    id: 'macbeth-supernatural',
+    title: 'The Weird Sisters: Fate and Free Will',
+    description: 'Analyze the witches and supernatural elements.',
+    textId: 'macbeth',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.4', 'SL.11-12.1'],
+    objectives: [
+      'Analyze the witches\' role and language',
+      'Discuss fate vs. free will',
+      'Connect to Jacobean beliefs',
+    ],
+    activities: [
+      'Witch scene analysis',
+      'Prophecy tracking',
+      'Debate: Did the witches cause Macbeth\'s fall?',
+    ],
+    assessmentIdeas: [
+      'Essay on supernatural and choice',
+      'Research on Jacobean witchcraft',
+    ],
+  },
+  {
+    id: 'macbeth-blood-imagery',
+    title: 'Out, Damned Spot: Blood Imagery',
+    description: 'Analyze the recurring blood motif.',
+    textId: 'macbeth',
+    duration: '45 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.5', 'W.11-12.9'],
+    objectives: [
+      'Track blood imagery throughout the play',
+      'Analyze what blood represents',
+      'Connect imagery to guilt and violence',
+    ],
+    activities: [
+      'Blood imagery collection',
+      'Meaning evolution chart',
+      'Visual art: Blood in Macbeth',
+    ],
+    assessmentIdeas: [
+      'Imagery analysis essay',
+      'Creative: Poem using blood imagery',
+    ],
+  },
+  {
+    id: 'macbeth-guilt',
+    title: 'The Psychology of Guilt',
+    description: 'Analyze how guilt manifests in the Macbeths.',
+    textId: 'macbeth',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Identify manifestations of guilt',
+      'Compare how Macbeth and Lady Macbeth handle guilt',
+      'Discuss psychological accuracy',
+    ],
+    activities: [
+      'Guilt manifestation chart',
+      'Character comparison',
+      'Discussion: Can guilt be escaped?',
+    ],
+    assessmentIdeas: [
+      'Essay on guilt and psychology',
+      'Creative: Macbeth\'s therapy session',
+    ],
+  },
+  {
+    id: 'macbeth-tyranny',
+    title: 'From King to Tyrant: Political Power',
+    description: 'Analyze Macbeth\'s rule and its consequences.',
+    textId: 'macbeth',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Trace Macbeth\'s transformation as ruler',
+      'Compare to legitimate kingship (Duncan, Malcolm)',
+      'Connect to political philosophy',
+    ],
+    activities: [
+      'Kingship comparison chart',
+      'Scotland under Macbeth analysis',
+      'Discussion: What makes a good leader?',
+    ],
+    assessmentIdeas: [
+      'Essay on power and corruption',
+      'Modern parallel analysis',
+    ],
+  },
+  {
+    id: 'macbeth-tomorrow',
+    title: 'Tomorrow and Tomorrow: The Final Speeches',
+    description: 'Analyze Macbeth\'s famous final soliloquies.',
+    textId: 'macbeth',
+    duration: '55 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.5', 'SL.11-12.6'],
+    objectives: [
+      'Close read the "Tomorrow" speech',
+      'Analyze Macbeth\'s final philosophy',
+      'Discuss nihilism and meaning',
+    ],
+    activities: [
+      'Line-by-line annotation',
+      'Performance workshop',
+      'Philosophical discussion on meaning',
+    ],
+    assessmentIdeas: [
+      'Close reading essay',
+      'Performance with interpretation notes',
+    ],
+  },
+
+  // ============================================
+  // THE CRUCIBLE (6 lessons)
+  // ============================================
+  {
+    id: 'crucible-hysteria',
+    title: 'Mass Hysteria: Then and Now',
+    description: 'Analyze how fear spreads in Salem.',
+    textId: 'the-crucible',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.9', 'SL.11-12.1'],
+    objectives: [
+      'Trace the spread of hysteria in the play',
+      'Analyze the psychology of mass fear',
+      'Connect to modern examples',
+    ],
+    activities: [
+      'Hysteria timeline',
+      'Psychology of panic research',
+      'Modern examples discussion',
+    ],
+    assessmentIdeas: [
+      'Essay on mass hysteria',
+      'Research on historical witch hunts',
+    ],
+  },
+  {
+    id: 'crucible-mccarthyism',
+    title: 'The Crucible as Allegory: McCarthyism',
+    description: 'Connect the play to Miller\'s historical moment.',
+    textId: 'the-crucible',
+    duration: '55 minutes',
+    standards: ['RL.11-12.9', 'RL.11-12.6', 'W.11-12.7'],
+    objectives: [
+      'Understand McCarthyism historical context',
+      'Identify allegorical connections',
+      'Analyze why Miller chose Salem',
+    ],
+    activities: [
+      'McCarthyism research',
+      'Allegory mapping',
+      'Discussion: Art as political response',
+    ],
+    assessmentIdeas: [
+      'Essay on allegory and meaning',
+      'Research on Miller\'s HUAC testimony',
+    ],
+  },
+  {
+    id: 'crucible-proctor',
+    title: 'John Proctor: Flawed Hero',
+    description: 'Analyze Proctor\'s moral journey.',
+    textId: 'the-crucible',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Proctor\'s character development',
+      'Discuss his final choice',
+      'Evaluate his heroism',
+    ],
+    activities: [
+      'Character arc mapping',
+      'Final scene analysis',
+      'Discussion: What would you choose?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Creative: Proctor\'s final letter',
+    ],
+  },
+  {
+    id: 'crucible-reputation',
+    title: 'Name and Reputation',
+    description: 'Analyze the theme of reputation and integrity.',
+    textId: 'the-crucible',
+    duration: '45 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.4', 'SL.11-12.1'],
+    objectives: [
+      'Analyze what "name" means to characters',
+      'Discuss integrity vs. survival',
+      'Connect to modern reputation concerns',
+    ],
+    activities: [
+      'Character reputation chart',
+      '"Because it is my name" analysis',
+      'Discussion: What would you die for?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on reputation',
+      'Personal reflection on integrity',
+    ],
+  },
+  {
+    id: 'crucible-authority',
+    title: 'Dangerous Authority: The Court',
+    description: 'Analyze the corruption of institutional authority.',
+    textId: 'the-crucible',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
+    objectives: [
+      'Analyze the court\'s procedures',
+      'Discuss Danforth\'s motivations',
+      'Connect to justice system concerns',
+    ],
+    activities: [
+      'Court scene analysis',
+      'Danforth character study',
+      'Mock court procedure',
+    ],
+    assessmentIdeas: [
+      'Essay on justice and authority',
+      'Research on wrongful convictions',
+    ],
+  },
+  {
+    id: 'crucible-girls',
+    title: 'The Power of the Accusers',
+    description: 'Analyze Abigail and the girls\' motivations.',
+    textId: 'the-crucible',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Abigail\'s characterization',
+      'Discuss the girls\' power dynamics',
+      'Evaluate whether the girls are victims or villains',
+    ],
+    activities: [
+      'Abigail motivation analysis',
+      'Group dynamics study',
+      'Debate: How should we judge Abigail?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Creative: Abigail years later',
+    ],
+  },
+
+  // ============================================
+  // FRANKENSTEIN (7 lessons)
+  // ============================================
+  {
+    id: 'frankenstein-creation',
+    title: 'Playing God: The Ethics of Creation',
+    description: 'Analyze Victor\'s responsibility as creator.',
+    textId: 'frankenstein',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Victor\'s motivations and methods',
+      'Discuss the ethics of creation',
+      'Connect to modern bioethics debates',
+    ],
+    activities: [
+      'Creation scene analysis',
+      'Ethics debate',
+      'Modern science connections',
+    ],
+    assessmentIdeas: [
+      'Essay on creator responsibility',
+      'Research on bioethics',
+    ],
+  },
+  {
+    id: 'frankenstein-monster',
+    title: 'Who Is the Monster?',
+    description: 'Analyze the Creature\'s character and humanity.',
+    textId: 'frankenstein',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Analyze the Creature\'s development',
+      'Discuss nature vs. nurture',
+      'Evaluate who is truly monstrous',
+    ],
+    activities: [
+      'Creature\'s journey timeline',
+      'Evidence for both readings',
+      'Debate: Who is the real monster?',
+    ],
+    assessmentIdeas: [
+      'Argumentative essay',
+      'Creative: Creature\'s autobiography',
+    ],
+  },
+  {
+    id: 'frankenstein-frame',
+    title: 'Stories Within Stories: Frame Narrative',
+    description: 'Analyze Shelley\'s complex narrative structure.',
+    textId: 'frankenstein',
+    duration: '45 minutes',
+    standards: ['RL.11-12.5', 'RL.11-12.6', 'W.11-12.9'],
+    objectives: [
+      'Map the frame narrative structure',
+      'Analyze effects of multiple narrators',
+      'Discuss reliability and perspective',
+    ],
+    activities: [
+      'Narrative structure diagram',
+      'Narrator reliability analysis',
+      'Writing exercise: Nested narrative',
+    ],
+    assessmentIdeas: [
+      'Essay on narrative structure',
+      'Creative: Another character\'s frame',
+    ],
+  },
+  {
+    id: 'frankenstein-knowledge',
+    title: 'Dangerous Knowledge',
+    description: 'Analyze the novel\'s warning about unchecked pursuit of knowledge.',
+    textId: 'frankenstein',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.4', 'SL.11-12.1'],
+    objectives: [
+      'Identify the novel\'s critique of ambition',
+      'Connect to the Prometheus myth',
+      'Discuss limits of scientific inquiry',
+    ],
+    activities: [
+      'Knowledge and consequence chart',
+      'Prometheus myth comparison',
+      'Discussion: Should science have limits?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay',
+      'Research on scientific ethics',
+    ],
+  },
+  {
+    id: 'frankenstein-nature',
+    title: 'Nature and the Sublime',
+    description: 'Analyze Romantic nature imagery in the novel.',
+    textId: 'frankenstein',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.5', 'W.11-12.9'],
+    objectives: [
+      'Identify nature descriptions',
+      'Understand the Romantic sublime',
+      'Analyze nature\'s role in the narrative',
+    ],
+    activities: [
+      'Nature imagery collection',
+      'Sublime concept exploration',
+      'Visual art response',
+    ],
+    assessmentIdeas: [
+      'Imagery analysis essay',
+      'Creative: Nature description in Romantic style',
+    ],
+  },
+  {
+    id: 'frankenstein-gothic',
+    title: 'Gothic Elements in Frankenstein',
+    description: 'Analyze the novel\'s Gothic conventions.',
+    textId: 'frankenstein',
+    duration: '50 minutes',
+    standards: ['RL.11-12.9', 'RL.11-12.5', 'W.11-12.9'],
+    objectives: [
+      'Identify Gothic elements',
+      'Analyze how Shelley uses Gothic conventions',
+      'Connect to other Gothic works',
+    ],
+    activities: [
+      'Gothic elements scavenger hunt',
+      'Comparison to other Gothic works',
+      'Gothic scene creation',
+    ],
+    assessmentIdeas: [
+      'Essay on Gothic conventions',
+      'Creative: Gothic scene in modern setting',
+    ],
+  },
+  {
+    id: 'frankenstein-isolation',
+    title: 'Isolation and Connection',
+    description: 'Analyze loneliness as a central theme.',
+    textId: 'frankenstein',
+    duration: '45 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
+    objectives: [
+      'Trace isolation in Victor and the Creature',
+      'Analyze causes and effects of isolation',
+      'Discuss human need for connection',
+    ],
+    activities: [
+      'Isolation timeline for both characters',
+      'Parallel moment analysis',
+      'Discussion: What do we need from others?',
+    ],
+    assessmentIdeas: [
+      'Comparative essay',
+      'Creative: Creature finds a friend',
+    ],
+  },
+
+  // ============================================
+  // OF MICE AND MEN (6 lessons)
+  // ============================================
+  {
+    id: 'omam-american-dream',
+    title: 'The Dream That Never Comes: The American Dream',
+    description: 'Analyze how the novel critiques the American Dream.',
+    textId: 'of-mice-and-men',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.3', 'SL.9-10.1'],
+    objectives: [
+      'Analyze George and Lennie\'s dream',
+      'Discuss why the dream fails',
+      'Connect to Depression-era context',
+    ],
+    activities: [
+      'Dream descriptions analysis',
+      'Historical context research',
+      'Discussion: Is the dream ever achievable?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay',
+      'Research on migrant workers',
+    ],
+  },
+  {
+    id: 'omam-loneliness',
+    title: 'The Loneliest Characters in Literature',
+    description: 'Explore Steinbeck\'s portrayal of isolation and connection.',
+    textId: 'of-mice-and-men',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.3', 'SL.9-10.1'],
+    objectives: [
+      'Identify lonely characters and their coping mechanisms',
+      'Analyze George and Lennie\'s friendship as antidote',
+      'Connect to themes of belonging and community',
+    ],
+    activities: [
+      'Character loneliness scale',
+      'Close reading of Crooks\' room scene',
+      'Discussion: What makes us feel connected?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay on isolation',
+      'Creative: Letter from one lonely character to another',
+    ],
+  },
+  {
+    id: 'omam-foreshadowing',
+    title: 'The Writing on the Wall: Foreshadowing',
+    description: 'Analyze Steinbeck\'s use of foreshadowing.',
+    textId: 'of-mice-and-men',
+    duration: '45 minutes',
+    standards: ['RL.9-10.5', 'RL.9-10.4', 'W.9-10.9'],
+    objectives: [
+      'Identify foreshadowing elements',
+      'Analyze how Candy\'s dog parallels Lennie',
+      'Discuss the effect of knowing the ending',
+    ],
+    activities: [
+      'Foreshadowing evidence collection',
+      'Candy\'s dog scene analysis',
+      'Discussion: How does knowing affect reading?',
+    ],
+    assessmentIdeas: [
+      'Essay on foreshadowing',
+      'Creative: Alternate ending avoiding foreshadowed fate',
+    ],
+  },
+  {
+    id: 'omam-marginalized',
+    title: 'The Outsiders of the Bunkhouse',
+    description: 'Analyze marginalized characters: Crooks, Curley\'s wife, Candy.',
+    textId: 'of-mice-and-men',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.6', 'SL.9-10.1'],
+    objectives: [
+      'Analyze how marginalized characters are portrayed',
+      'Discuss intersections of race, gender, age, ability',
+      'Evaluate Steinbeck\'s representation',
+    ],
+    activities: [
+      'Character profile comparisons',
+      'Crooks\' room scene analysis',
+      'Discussion: Who has power on the ranch?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Research on 1930s discrimination',
+    ],
+  },
+  {
+    id: 'omam-george-lennie',
+    title: 'The Friendship of George and Lennie',
+    description: 'Analyze the central relationship.',
+    textId: 'of-mice-and-men',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'W.9-10.9'],
+    objectives: [
+      'Analyze the nature of their friendship',
+      'Discuss codependency and caregiving',
+      'Evaluate George\'s final decision',
+    ],
+    activities: [
+      'Relationship evidence chart',
+      'Key moment analysis',
+      'Discussion: Is George a good friend?',
+    ],
+    assessmentIdeas: [
+      'Relationship analysis essay',
+      'Creative: George\'s letter to Lennie\'s aunt',
+    ],
+  },
+  {
+    id: 'omam-ending',
+    title: 'The Mercy Killing: Analyzing the Ending',
+    description: 'Discuss the ethics of George\'s final act.',
+    textId: 'of-mice-and-men',
+    duration: '55 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.6', 'SL.9-10.3'],
+    objectives: [
+      'Analyze the final scene closely',
+      'Discuss the ethics of George\'s decision',
+      'Connect to themes of mercy and justice',
+    ],
+    activities: [
+      'Final scene close reading',
+      'Ethics debate',
+      'Discussion: Was there any other way?',
+    ],
+    assessmentIdeas: [
+      'Argumentative essay on the ending',
+      'Mock trial: George\'s defense',
+    ],
+  },
+
+  // ============================================
+  // NIGHT (6 lessons)
+  // ============================================
+  {
+    id: 'night-historical',
+    title: 'Historical Context: The Holocaust',
+    description: 'Build essential background knowledge.',
+    textId: 'night',
+    duration: '55 minutes',
+    standards: ['RL.9-10.9', 'SL.9-10.1', 'W.9-10.7'],
+    objectives: [
+      'Understand key Holocaust events and terms',
+      'Learn about Jewish life before the Holocaust',
+      'Prepare for reading with historical context',
+    ],
+    activities: [
+      'Timeline creation',
+      'Key terms vocabulary',
+      'Geographic mapping of events',
+    ],
+    assessmentIdeas: [
+      'Timeline with annotations',
+      'Research on pre-war Jewish communities',
+    ],
+  },
   {
     id: 'night-witness',
     title: 'Bearing Witness: The Power of Testimony',
@@ -1182,8 +2972,98 @@ export const LESSON_SUGGESTIONS: LessonSuggestion[] = [
       'Research on genocide prevention',
     ],
   },
+  {
+    id: 'night-faith',
+    title: 'Crisis of Faith',
+    description: 'Analyze Elie\'s spiritual journey.',
+    textId: 'night',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.3', 'SL.9-10.1'],
+    objectives: [
+      'Trace Elie\'s relationship with God',
+      'Analyze key moments of faith crisis',
+      'Discuss theodicy and suffering',
+    ],
+    activities: [
+      'Faith evolution timeline',
+      'Key passage analysis',
+      'Discussion: Where is God in suffering?',
+    ],
+    assessmentIdeas: [
+      'Essay on faith and suffering',
+      'Personal reflection on belief and adversity',
+    ],
+  },
+  {
+    id: 'night-father-son',
+    title: 'Father and Son: Love Under Pressure',
+    description: 'Analyze the father-son relationship.',
+    textId: 'night',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'W.9-10.3'],
+    objectives: [
+      'Trace the evolving relationship',
+      'Analyze moments of devotion and doubt',
+      'Discuss family bonds under extreme stress',
+    ],
+    activities: [
+      'Relationship evidence chart',
+      'Key scene analysis',
+      'Discussion: What does Elie owe his father?',
+    ],
+    assessmentIdeas: [
+      'Relationship essay',
+      'Creative: Letter from Elie to his father',
+    ],
+  },
+  {
+    id: 'night-imagery',
+    title: 'Night, Fire, and Silence: Imagery and Symbol',
+    description: 'Analyze Wiesel\'s powerful imagery.',
+    textId: 'night',
+    duration: '45 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.5', 'W.9-10.9'],
+    objectives: [
+      'Identify recurring images and symbols',
+      'Analyze what they represent',
+      'Discuss why Wiesel chose the title "Night"',
+    ],
+    activities: [
+      'Imagery collection',
+      'Symbol analysis',
+      'Title significance discussion',
+    ],
+    assessmentIdeas: [
+      'Imagery essay',
+      'Creative: Poem using Night\'s imagery',
+    ],
+  },
+  {
+    id: 'night-dehumanization',
+    title: 'The Process of Dehumanization',
+    description: 'Analyze how the Nazis stripped humanity from victims.',
+    textId: 'night',
+    duration: '55 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.3', 'SL.9-10.1'],
+    objectives: [
+      'Identify stages of dehumanization',
+      'Analyze how prisoners were degraded',
+      'Connect to warning signs of genocide',
+    ],
+    activities: [
+      'Dehumanization progression chart',
+      'Key scene analysis',
+      'Discussion: Early warning signs',
+    ],
+    assessmentIdeas: [
+      'Essay on dehumanization',
+      'Research on genocide prevention',
+    ],
+  },
 
-  // A RAISIN IN THE SUN
+  // ============================================
+  // A RAISIN IN THE SUN (6 lessons)
+  // ============================================
   {
     id: 'raisin-dreams',
     title: 'Dreams Deferred: The Younger Family\'s Aspirations',
@@ -1206,28 +3086,250 @@ export const LESSON_SUGGESTIONS: LessonSuggestion[] = [
       'Creative: Update the play to the present day',
     ],
   },
-
-  // OF MICE AND MEN
   {
-    id: 'omam-loneliness',
-    title: 'The Loneliest Characters in Literature',
-    description: 'Explore Steinbeck\'s portrayal of isolation and connection.',
-    textId: 'of-mice-and-men',
+    id: 'raisin-walter',
+    title: 'Walter Lee: Man of the House?',
+    description: 'Analyze Walter\'s character and struggles.',
+    textId: 'a-raisin-in-the-sun',
     duration: '50 minutes',
-    standards: ['RL.9-10.2', 'RL.9-10.3', 'SL.9-10.1'],
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'SL.9-10.1'],
     objectives: [
-      'Identify lonely characters and their coping mechanisms',
-      'Analyze George and Lennie\'s friendship as antidote',
-      'Connect to themes of belonging and community',
+      'Analyze Walter\'s motivations and frustrations',
+      'Discuss masculinity and economic opportunity',
+      'Evaluate his character arc',
     ],
     activities: [
-      'Character loneliness scale',
-      'Close reading of Crooks\' room scene',
-      'Discussion: What makes us feel connected?',
+      'Character development timeline',
+      'Key monologue analysis',
+      'Discussion: Is Walter sympathetic?',
     ],
     assessmentIdeas: [
-      'Character analysis essay on isolation',
-      'Creative: Letter from one lonely character to another',
+      'Character analysis essay',
+      'Creative: Walter\'s internal monologue',
+    ],
+  },
+  {
+    id: 'raisin-mama',
+    title: 'Mama and the Plant: Hope and Resilience',
+    description: 'Analyze Lena Younger as the family\'s moral center.',
+    textId: 'a-raisin-in-the-sun',
+    duration: '45 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.4', 'W.9-10.9'],
+    objectives: [
+      'Analyze Mama\'s character and values',
+      'Interpret the plant as symbol',
+      'Discuss generational differences',
+    ],
+    activities: [
+      'Character trait evidence chart',
+      'Plant symbolism tracking',
+      'Discussion: What does Mama want most?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Creative: Mama\'s letter to Big Walter',
+    ],
+  },
+  {
+    id: 'raisin-beneatha',
+    title: 'Beneatha\'s Search for Identity',
+    description: 'Analyze Beneatha\'s character and aspirations.',
+    textId: 'a-raisin-in-the-sun',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'SL.9-10.1'],
+    objectives: [
+      'Analyze Beneatha\'s identity exploration',
+      'Compare Asagai and George as influences',
+      'Discuss assimilation vs. African heritage',
+    ],
+    activities: [
+      'Character exploration chart',
+      'Suitors comparison',
+      'Discussion: What does identity mean?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Research on African diaspora identity',
+    ],
+  },
+  {
+    id: 'raisin-housing',
+    title: 'Clybourne Park: Housing and Discrimination',
+    description: 'Analyze the housing subplot and its historical context.',
+    textId: 'a-raisin-in-the-sun',
+    duration: '55 minutes',
+    standards: ['RL.9-10.9', 'RL.9-10.2', 'SL.9-10.1'],
+    objectives: [
+      'Understand housing discrimination history',
+      'Analyze the Karl Lindner scene',
+      'Connect to ongoing housing issues',
+    ],
+    activities: [
+      'Historical context research',
+      'Lindner scene analysis',
+      'Modern housing inequality research',
+    ],
+    assessmentIdeas: [
+      'Essay on housing and racism',
+      'Research on redlining',
+    ],
+  },
+  {
+    id: 'raisin-ending',
+    title: 'Hope or Naivety? The Ending',
+    description: 'Analyze and debate the play\'s conclusion.',
+    textId: 'a-raisin-in-the-sun',
+    duration: '50 minutes',
+    standards: ['RL.9-10.5', 'RL.9-10.6', 'SL.9-10.3'],
+    objectives: [
+      'Analyze the final scene',
+      'Debate whether the ending is hopeful',
+      'Predict what happens next',
+    ],
+    activities: [
+      'Final scene close reading',
+      'Debate: Hope or naivety?',
+      'Creative: The Youngers one year later',
+    ],
+    assessmentIdeas: [
+      'Essay on the ending',
+      'Creative: Sequel scene',
+    ],
+  },
+
+  // ============================================
+  // FAHRENHEIT 451 (6 lessons)
+  // ============================================
+  {
+    id: 'f451-censorship',
+    title: 'Burning Books, Burning Ideas',
+    description: 'Explore Bradbury\'s warning about censorship and intellectual freedom.',
+    textId: 'fahrenheit-451',
+    duration: '55 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.9', 'SL.9-10.1'],
+    objectives: [
+      'Analyze the society\'s reasons for banning books',
+      'Connect to real-world book banning and censorship',
+      'Evaluate the importance of intellectual freedom',
+    ],
+    activities: [
+      'Research: Banned books in America',
+      'Debate: When, if ever, is censorship justified?',
+      'Book defense presentation',
+    ],
+    assessmentIdeas: [
+      'Argumentative essay on intellectual freedom',
+      'Research on a banned book and its controversy',
+    ],
+  },
+  {
+    id: 'f451-technology',
+    title: 'The Parlor Walls: Technology and Disconnection',
+    description: 'Analyze how technology isolates people.',
+    textId: 'fahrenheit-451',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.4', 'SL.9-10.1'],
+    objectives: [
+      'Analyze technology in the novel',
+      'Discuss how technology creates disconnection',
+      'Connect to modern technology concerns',
+    ],
+    activities: [
+      'Technology in the novel chart',
+      'Comparison to modern tech',
+      'Discussion: Are we heading there?',
+    ],
+    assessmentIdeas: [
+      'Essay on technology and isolation',
+      'Creative: A day without screens',
+    ],
+  },
+  {
+    id: 'f451-montag',
+    title: 'Montag\'s Awakening',
+    description: 'Trace Montag\'s transformation from fireman to rebel.',
+    textId: 'fahrenheit-451',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'W.9-10.9'],
+    objectives: [
+      'Trace Montag\'s character development',
+      'Identify key turning points',
+      'Analyze what triggers his change',
+    ],
+    activities: [
+      'Character arc timeline',
+      'Turning point analysis',
+      'Discussion: What awakens us?',
+    ],
+    assessmentIdeas: [
+      'Character development essay',
+      'Creative: Montag\'s diary entries',
+    ],
+  },
+  {
+    id: 'f451-clarisse',
+    title: 'Clarisse: The Catalyst',
+    description: 'Analyze Clarisse\'s role and significance.',
+    textId: 'fahrenheit-451',
+    duration: '45 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.4', 'SL.9-10.1'],
+    objectives: [
+      'Analyze Clarisse\'s characterization',
+      'Discuss her function in the plot',
+      'Evaluate her significance despite brief appearance',
+    ],
+    activities: [
+      'Clarisse quotation analysis',
+      'Discussion: Why does she disappear?',
+      'Character foil analysis',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Creative: Clarisse\'s full story',
+    ],
+  },
+  {
+    id: 'f451-symbolism',
+    title: 'Fire, the Salamander, and the Phoenix',
+    description: 'Analyze Bradbury\'s major symbols.',
+    textId: 'fahrenheit-451',
+    duration: '50 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.2', 'W.9-10.9'],
+    objectives: [
+      'Identify major symbols and their evolution',
+      'Analyze how fire\'s meaning changes',
+      'Connect symbols to themes',
+    ],
+    activities: [
+      'Symbol tracking chart',
+      'Fire meaning evolution',
+      'Visual art project',
+    ],
+    assessmentIdeas: [
+      'Symbol analysis essay',
+      'Creative: Poem using novel\'s symbols',
+    ],
+  },
+  {
+    id: 'f451-ending',
+    title: 'The Book People: Hope and Renewal',
+    description: 'Analyze the ending and its message.',
+    textId: 'fahrenheit-451',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.5', 'SL.9-10.1'],
+    objectives: [
+      'Analyze the novel\'s conclusion',
+      'Discuss the significance of memorizing books',
+      'Evaluate whether the ending is hopeful',
+    ],
+    activities: [
+      'Final section close reading',
+      'Discussion: Is this ending hopeful?',
+      'Which book would you memorize?',
+    ],
+    assessmentIdeas: [
+      'Essay on the ending',
+      'Book selection with rationale',
     ],
   },
 ];
