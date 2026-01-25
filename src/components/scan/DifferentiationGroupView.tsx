@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BatchItem } from '@/hooks/useBatchAnalysis';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface ReassessmentCriteria {
@@ -322,7 +323,7 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
 
   const handlePushGroup = async (group: StudentGroup) => {
     if (!classId) {
-      toast.error('Class ID required to push to NYClogic Scholar AI');
+      toast.error('Class ID required to push to Nyclogic Scholar Ai');
       return;
     }
 
@@ -346,6 +347,51 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
         const difficulty = group.level === 'struggling' ? 'scaffolded' : 
                           group.level === 'developing' ? 'practice' : 'challenge';
 
+        // Generate actual questions based on the student's level
+        let generatedQuestions = [];
+        try {
+          if (group.level === 'proficient') {
+            // Generate mastery challenge questions for proficient students
+            const { data: questionsData, error: questionsError } = await supabase.functions.invoke('generate-worksheet-questions', {
+              body: {
+                topics: [{
+                  topicName: topicName,
+                  standard: item.result?.nysStandard || '',
+                  subject: 'Mathematics',
+                  category: 'Mastery Challenge',
+                }],
+                questionCount: 3,
+                difficultyLevels: ['challenging', 'hard'],
+                worksheetMode: 'practice',
+                includeHints: true,
+                customInstructions: `Create advanced mastery challenge problems for a student who scored ${effectiveGrade}% on ${topicName}. These should be extension problems that go beyond standard curriculum, requiring deeper understanding and application. Include real-world scenarios and multi-step problems.`,
+              },
+            });
+
+            if (!questionsError && questionsData?.questions) {
+              generatedQuestions = questionsData.questions;
+            }
+          } else {
+            // Generate remediation questions for struggling/developing students
+            const { data: questionsData, error: questionsError } = await supabase.functions.invoke('generate-remediation-questions', {
+              body: {
+                misconceptions: misconceptions.length > 0 ? misconceptions : [`Needs practice on ${topicName}`],
+                topicName: topicName,
+                questionsPerMisconception: group.level === 'struggling' ? 3 : 2,
+                difficulty: difficulty,
+                standard: item.result?.nysStandard,
+              },
+            });
+
+            if (!questionsError && questionsData?.questions) {
+              generatedQuestions = questionsData.questions;
+            }
+          }
+        } catch (genError) {
+          console.error('Error generating questions:', genError);
+          // Continue with push even if question generation fails
+        }
+
         const result = await pushToSisterApp({
           class_id: classId,
           title: `${group.remediationType}: ${topicName}`,
@@ -359,6 +405,7 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
           xp_reward: group.xpReward,
           coin_reward: group.coinReward,
           grade: effectiveGrade,
+          questions: generatedQuestions,
         });
 
         if (result.success) {
@@ -369,7 +416,7 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
       }
 
       if (successCount > 0 && failCount === 0) {
-        toast.success(`Sent ${group.remediationType} to ${successCount} student(s)!`);
+        toast.success(`Sent ${group.remediationType} with ${group.level === 'proficient' ? 'mastery challenges' : 'remediation questions'} to ${successCount} student(s)!`);
         setPushedGroups(prev => new Set([...prev, group.level]));
       } else if (successCount > 0) {
         toast.warning(`${successCount} sent, ${failCount} failed`);
@@ -378,7 +425,7 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
       }
     } catch (err) {
       console.error('Push group error:', err);
-      toast.error('Failed to send to NYClogic Scholar AI');
+      toast.error('Failed to send to Nyclogic Scholar Ai');
     } finally {
       setPushingGroups(prev => {
         const next = new Set(prev);
