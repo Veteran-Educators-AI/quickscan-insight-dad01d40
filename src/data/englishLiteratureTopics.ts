@@ -3332,6 +3332,1032 @@ export const LESSON_SUGGESTIONS: LessonSuggestion[] = [
       'Book selection with rationale',
     ],
   },
+
+  // ============================================
+  // ANIMAL FARM (5 lessons)
+  // ============================================
+  {
+    id: 'animal-farm-allegory',
+    title: 'Reading the Revolution: Animal Farm as Allegory',
+    description: 'Understand how Orwell uses allegory to critique the Russian Revolution.',
+    textId: 'animal-farm',
+    duration: '55 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.2', 'SL.9-10.1'],
+    objectives: [
+      'Define allegory and identify allegorical elements',
+      'Match characters to historical figures (Napoleon/Stalin, Snowball/Trotsky)',
+      'Analyze how the allegory conveys Orwell\'s message',
+    ],
+    activities: [
+      'Character-to-historical-figure matching activity',
+      'Timeline comparison: Farm events vs. Russian Revolution',
+      'Discussion: Why use animals instead of people?',
+    ],
+    assessmentIdeas: [
+      'Essay on allegory and political critique',
+      'Research on the Russian Revolution parallels',
+    ],
+  },
+  {
+    id: 'animal-farm-propaganda',
+    title: 'Squealer and the Art of Propaganda',
+    description: 'Analyze how language is manipulated to control the animals.',
+    textId: 'animal-farm',
+    duration: '50 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.6', 'SL.9-10.3'],
+    objectives: [
+      'Identify propaganda techniques used by Squealer',
+      'Analyze how the Seven Commandments are gradually altered',
+      'Connect to modern propaganda and media manipulation',
+    ],
+    activities: [
+      'Propaganda technique identification',
+      'Commandment evolution tracking chart',
+      'Create counter-propaganda posters',
+    ],
+    assessmentIdeas: [
+      'Essay on language and power',
+      'Modern propaganda analysis project',
+    ],
+  },
+  {
+    id: 'animal-farm-power-corruption',
+    title: 'Power Corrupts: The Pigs\' Transformation',
+    description: 'Trace how the pigs become indistinguishable from humans.',
+    textId: 'animal-farm',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.3', 'W.9-10.9'],
+    objectives: [
+      'Trace the pigs\' gradual corruption',
+      'Analyze key moments of betrayal',
+      'Discuss the famous final scene',
+    ],
+    activities: [
+      'Corruption timeline',
+      'Close reading of the final scene',
+      'Discussion: Is power always corrupting?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on power and corruption',
+      'Creative: Diary from a pig\'s perspective',
+    ],
+  },
+  {
+    id: 'animal-farm-satire',
+    title: 'Orwell\'s Satire: Humor with a Message',
+    description: 'Analyze how satire makes political critique accessible.',
+    textId: 'animal-farm',
+    duration: '45 minutes',
+    standards: ['RL.9-10.6', 'RL.9-10.4', 'SL.9-10.1'],
+    objectives: [
+      'Define satire and identify satirical elements',
+      'Analyze how humor conveys serious themes',
+      'Evaluate the effectiveness of satire',
+    ],
+    activities: [
+      'Satire identification exercise',
+      'Compare to modern political satire',
+      'Create satirical writing',
+    ],
+    assessmentIdeas: [
+      'Essay on satire and social commentary',
+      'Creative: Write a satirical fable',
+    ],
+  },
+  {
+    id: 'animal-farm-boxer',
+    title: 'Boxer and the Betrayal of the Working Class',
+    description: 'Analyze Boxer as symbol of exploited workers.',
+    textId: 'animal-farm',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'SL.9-10.1'],
+    objectives: [
+      'Analyze Boxer\'s character and what he represents',
+      'Discuss why his fate is so significant',
+      'Connect to exploitation of workers',
+    ],
+    activities: [
+      'Character symbolism analysis',
+      'Close reading of Boxer\'s death scene',
+      'Discussion: Who are today\'s Boxers?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Research on workers\' rights movements',
+    ],
+  },
+
+  // ============================================
+  // JULIUS CAESAR (5 lessons)
+  // ============================================
+  {
+    id: 'julius-caesar-rhetoric',
+    title: 'The Power of Words: Rhetoric in Julius Caesar',
+    description: 'Analyze the famous funeral speeches and rhetorical strategies.',
+    textId: 'julius-caesar',
+    duration: '55 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.6', 'SL.9-10.3'],
+    objectives: [
+      'Identify ethos, pathos, and logos in the speeches',
+      'Compare Brutus and Antony\'s rhetorical strategies',
+      'Evaluate which speech is more effective and why',
+    ],
+    activities: [
+      'Funeral speech annotation and comparison',
+      'Rhetorical device scavenger hunt',
+      'Deliver speeches to the class',
+    ],
+    assessmentIdeas: [
+      'Comparative analysis essay on rhetoric',
+      'Write and deliver a persuasive speech',
+    ],
+  },
+  {
+    id: 'julius-caesar-ambition',
+    title: 'Ambition: Virtue or Vice?',
+    description: 'Explore how ambition drives and destroys characters.',
+    textId: 'julius-caesar',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.3', 'SL.9-10.1'],
+    objectives: [
+      'Analyze how ambition motivates different characters',
+      'Debate whether Caesar was truly ambitious',
+      'Discuss ambition\'s role in the tragedy',
+    ],
+    activities: [
+      'Character ambition chart',
+      'Close reading of "ambition" references',
+      'Debate: Was the assassination justified?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on ambition',
+      'Creative: Defense or prosecution of Brutus',
+    ],
+  },
+  {
+    id: 'julius-caesar-betrayal',
+    title: 'Et Tu, Brute: Friendship and Betrayal',
+    description: 'Examine the theme of betrayal in personal and political relationships.',
+    textId: 'julius-caesar',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'W.9-10.3'],
+    objectives: [
+      'Analyze the friendship between Caesar and Brutus',
+      'Examine Brutus\'s internal conflict',
+      'Discuss loyalty vs. political ideals',
+    ],
+    activities: [
+      'Relationship mapping',
+      'Brutus soliloquy analysis',
+      'Journal: When principle conflicts with loyalty',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay on Brutus',
+      'Creative: Caesar\'s last thoughts',
+    ],
+  },
+  {
+    id: 'julius-caesar-fate',
+    title: 'Fate and Omens: The Supernatural in Shakespeare',
+    description: 'Analyze the role of omens, prophecy, and fate.',
+    textId: 'julius-caesar',
+    duration: '50 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.5', 'SL.9-10.1'],
+    objectives: [
+      'Identify omens and supernatural elements',
+      'Analyze characters\' responses to warnings',
+      'Discuss fate vs. free will',
+    ],
+    activities: [
+      'Omen tracking throughout the play',
+      'Soothsayer scene analysis',
+      'Discussion: Do the characters have free will?',
+    ],
+    assessmentIdeas: [
+      'Essay on fate and free will',
+      'Creative: Modern omen scene',
+    ],
+  },
+  {
+    id: 'julius-caesar-tragedy',
+    title: 'Tragedy and the Tragic Hero',
+    description: 'Apply tragic hero elements to Brutus and Caesar.',
+    textId: 'julius-caesar',
+    duration: '55 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.5', 'W.9-10.9'],
+    objectives: [
+      'Define Shakespearean tragedy characteristics',
+      'Debate who is the true tragic hero',
+      'Identify hamartia and catharsis',
+    ],
+    activities: [
+      'Tragic hero checklist for both characters',
+      'Debate: Brutus or Caesar as tragic hero',
+      'Final scene analysis',
+    ],
+    assessmentIdeas: [
+      'Argumentative essay on the tragic hero',
+      'Compare to other Shakespearean tragedies',
+    ],
+  },
+
+  // ============================================
+  // PERSEPOLIS (5 lessons)
+  // ============================================
+  {
+    id: 'persepolis-visual-storytelling',
+    title: 'Reading Images: Visual Storytelling in Persepolis',
+    description: 'Analyze how Satrapi uses the graphic novel form.',
+    textId: 'persepolis',
+    duration: '50 minutes',
+    standards: ['RL.9-10.4', 'RL.9-10.5', 'SL.9-10.5'],
+    objectives: [
+      'Understand graphic novel conventions (panels, gutters, visual symbols)',
+      'Analyze how black-and-white art creates meaning',
+      'Interpret visual metaphors unique to this medium',
+    ],
+    activities: [
+      'Graphic novel terminology introduction',
+      'Panel analysis activity',
+      'Create a visual metaphor panel',
+    ],
+    assessmentIdeas: [
+      'Visual analysis essay',
+      'Create a graphic memoir page',
+    ],
+  },
+  {
+    id: 'persepolis-identity',
+    title: 'Between Two Worlds: Marjane\'s Identity Struggle',
+    description: 'Explore how Marjane navigates conflicting cultural identities.',
+    textId: 'persepolis',
+    duration: '50 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'SL.9-10.1'],
+    objectives: [
+      'Trace Marjane\'s identity evolution',
+      'Analyze her relationship with Western and Iranian culture',
+      'Discuss third culture identity',
+    ],
+    activities: [
+      'Identity map at different life stages',
+      'Culture clash scene analysis',
+      'Discussion: Belonging to multiple cultures',
+    ],
+    assessmentIdeas: [
+      'Character development essay',
+      'Personal reflection on cultural identity',
+    ],
+  },
+  {
+    id: 'persepolis-revolution',
+    title: 'Revolution Through a Child\'s Eyes',
+    description: 'Analyze how Satrapi depicts the Islamic Revolution.',
+    textId: 'persepolis',
+    duration: '55 minutes',
+    standards: ['RL.9-10.6', 'RL.9-10.9', 'SL.9-10.1'],
+    objectives: [
+      'Understand historical context of the Iranian Revolution',
+      'Analyze the effect of a child narrator',
+      'Discuss how revolution impacts ordinary families',
+    ],
+    activities: [
+      'Historical context research',
+      'Child perspective analysis',
+      'Family stories during political upheaval',
+    ],
+    assessmentIdeas: [
+      'Essay on perspective and history',
+      'Research on the Iranian Revolution',
+    ],
+  },
+  {
+    id: 'persepolis-family',
+    title: 'Family as Foundation: The Satrapi Family',
+    description: 'Analyze family relationships and their influence on Marjane.',
+    textId: 'persepolis',
+    duration: '45 minutes',
+    standards: ['RL.9-10.3', 'RL.9-10.2', 'W.9-10.3'],
+    objectives: [
+      'Analyze relationships with parents and grandmother',
+      'Discuss family values and rebellion',
+      'Examine generational perspectives on politics',
+    ],
+    activities: [
+      'Family relationship map',
+      'Grandmother wisdom analysis',
+      'Discussion: Family influence on beliefs',
+    ],
+    assessmentIdeas: [
+      'Relationship analysis essay',
+      'Creative: Family memoir scene',
+    ],
+  },
+  {
+    id: 'persepolis-resilience',
+    title: 'Resilience and Humor in Dark Times',
+    description: 'Analyze how humor and resilience appear throughout the memoir.',
+    textId: 'persepolis',
+    duration: '50 minutes',
+    standards: ['RL.9-10.2', 'RL.9-10.4', 'SL.9-10.1'],
+    objectives: [
+      'Identify moments of humor and resilience',
+      'Analyze how comedy functions in serious narrative',
+      'Discuss coping mechanisms during trauma',
+    ],
+    activities: [
+      'Humor moment collection',
+      'Tone analysis of difficult scenes',
+      'Discussion: How does humor help us cope?',
+    ],
+    assessmentIdeas: [
+      'Essay on humor and trauma',
+      'Creative: Finding humor in difficulty',
+    ],
+  },
+
+  // ============================================
+  // THE SCARLET LETTER (5 lessons)
+  // ============================================
+  {
+    id: 'scarlet-letter-symbolism',
+    title: 'The Many Meanings of "A"',
+    description: 'Analyze how the scarlet letter\'s meaning transforms.',
+    textId: 'scarlet-letter',
+    duration: '55 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.2', 'W.11-12.9'],
+    objectives: [
+      'Trace how the letter\'s meaning changes',
+      'Analyze multiple interpretations: Adultery, Able, Angel',
+      'Discuss how meaning is socially constructed',
+    ],
+    activities: [
+      'Letter meaning timeline',
+      'Community vs. individual interpretation',
+      'Symbol evolution analysis',
+    ],
+    assessmentIdeas: [
+      'Essay on symbol and meaning',
+      'Creative: Design your own symbolic letter',
+    ],
+  },
+  {
+    id: 'scarlet-letter-sin-guilt',
+    title: 'Public Sin, Private Guilt',
+    description: 'Compare Hester\'s public punishment with Dimmesdale\'s hidden guilt.',
+    textId: 'scarlet-letter',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Compare Hester and Dimmesdale\'s experiences',
+      'Analyze effects of public vs. private shame',
+      'Discuss which suffers more',
+    ],
+    activities: [
+      'Character comparison chart',
+      'Scaffold scene analysis',
+      'Debate: Public or private guilt is worse',
+    ],
+    assessmentIdeas: [
+      'Comparative essay',
+      'Creative: Dimmesdale\'s confession letter',
+    ],
+  },
+  {
+    id: 'scarlet-letter-pearl',
+    title: 'Pearl: The Living Symbol',
+    description: 'Analyze Pearl as both character and symbol.',
+    textId: 'scarlet-letter',
+    duration: '45 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.4', 'W.11-12.9'],
+    objectives: [
+      'Analyze Pearl\'s dual role as character and symbol',
+      'Discuss her connection to nature and wildness',
+      'Evaluate her function in the narrative',
+    ],
+    activities: [
+      'Pearl characterization evidence',
+      'Symbol and character comparison',
+      'Nature imagery analysis',
+    ],
+    assessmentIdeas: [
+      'Character/symbol analysis essay',
+      'Creative: Pearl\'s adult life',
+    ],
+  },
+  {
+    id: 'scarlet-letter-puritanism',
+    title: 'Puritan Society and Hypocrisy',
+    description: 'Examine Hawthorne\'s critique of Puritan society.',
+    textId: 'scarlet-letter',
+    duration: '55 minutes',
+    standards: ['RL.11-12.6', 'RL.11-12.9', 'SL.11-12.1'],
+    objectives: [
+      'Understand Puritan values and society',
+      'Identify Hawthorne\'s critique of hypocrisy',
+      'Connect to American identity themes',
+    ],
+    activities: [
+      'Puritan society research',
+      'Hypocrisy evidence collection',
+      'Discussion: American moral identity',
+    ],
+    assessmentIdeas: [
+      'Essay on social critique',
+      'Research on Puritan New England',
+    ],
+  },
+  {
+    id: 'scarlet-letter-nature',
+    title: 'The Forest and the Town: Nature vs. Society',
+    description: 'Analyze the contrast between natural and social spaces.',
+    textId: 'scarlet-letter',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.5', 'W.11-12.9'],
+    objectives: [
+      'Analyze setting symbolism',
+      'Compare forest scenes to town scenes',
+      'Discuss nature as freedom from social constraint',
+    ],
+    activities: [
+      'Setting comparison chart',
+      'Forest meeting scene analysis',
+      'Romantic era nature philosophy',
+    ],
+    assessmentIdeas: [
+      'Essay on setting and meaning',
+      'Creative: Modern forest/town parallel',
+    ],
+  },
+
+  // ============================================
+  // ADVENTURES OF HUCKLEBERRY FINN (5 lessons)
+  // ============================================
+  {
+    id: 'huck-finn-satire',
+    title: 'Twain\'s Satirical Lens: Critiquing American Society',
+    description: 'Analyze how Twain uses satire to expose hypocrisy.',
+    textId: 'adventures-of-huckleberry-finn',
+    duration: '55 minutes',
+    standards: ['RL.11-12.6', 'RL.11-12.4', 'SL.11-12.1'],
+    objectives: [
+      'Identify satirical targets: religion, civilization, racism',
+      'Analyze how humor conveys serious critique',
+      'Discuss the effectiveness of satire',
+    ],
+    activities: [
+      'Satire identification and categorization',
+      'Key scene analysis',
+      'Modern parallels discussion',
+    ],
+    assessmentIdeas: [
+      'Essay on satire and social commentary',
+      'Creative: Satirical piece on modern issue',
+    ],
+  },
+  {
+    id: 'huck-finn-moral-development',
+    title: 'Huck\'s Moral Journey: Following His Heart',
+    description: 'Trace Huck\'s moral development throughout the novel.',
+    textId: 'adventures-of-huckleberry-finn',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'W.11-12.3'],
+    objectives: [
+      'Trace Huck\'s evolving moral conscience',
+      'Analyze the "I\'ll go to hell" moment',
+      'Discuss conscience vs. society',
+    ],
+    activities: [
+      'Moral development timeline',
+      'Key decision point analysis',
+      'Journal: When have you defied expectations?',
+    ],
+    assessmentIdeas: [
+      'Character development essay',
+      'Creative: Huck\'s moral manifesto',
+    ],
+  },
+  {
+    id: 'huck-finn-river',
+    title: 'The River as Symbol: Freedom and Flow',
+    description: 'Analyze the Mississippi River as central symbol.',
+    textId: 'adventures-of-huckleberry-finn',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.5', 'SL.11-12.1'],
+    objectives: [
+      'Analyze river symbolism',
+      'Compare river scenes to shore scenes',
+      'Discuss nature as escape from civilization',
+    ],
+    activities: [
+      'River passage analysis',
+      'Shore vs. river comparison',
+      'Map the journey with symbolic moments',
+    ],
+    assessmentIdeas: [
+      'Symbol analysis essay',
+      'Creative: River journal entries',
+    ],
+  },
+  {
+    id: 'huck-finn-jim',
+    title: 'Jim\'s Humanity: Challenging Racial Assumptions',
+    description: 'Analyze Jim\'s characterization and humanity.',
+    textId: 'adventures-of-huckleberry-finn',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Jim as a fully realized character',
+      'Discuss Twain\'s approach to race',
+      'Examine the novel\'s controversial legacy',
+    ],
+    activities: [
+      'Jim characterization evidence',
+      'Key moment analysis',
+      'Discussion: Novel\'s place in curriculum',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Research on the novel\'s reception',
+    ],
+  },
+  {
+    id: 'huck-finn-dialect',
+    title: 'Voice and Dialect: Huck\'s Authentic Narration',
+    description: 'Analyze Twain\'s use of dialect and first-person voice.',
+    textId: 'adventures-of-huckleberry-finn',
+    duration: '45 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.5', 'W.11-12.3'],
+    objectives: [
+      'Analyze dialect and its effects',
+      'Discuss how voice creates authenticity',
+      'Examine Twain\'s explanatory note on dialect',
+    ],
+    activities: [
+      'Dialect translation exercise',
+      'Voice comparison across characters',
+      'Write in dialect',
+    ],
+    assessmentIdeas: [
+      'Essay on voice and authenticity',
+      'Creative: Scene in different dialect',
+    ],
+  },
+
+  // ============================================
+  // THEIR EYES WERE WATCHING GOD (5 lessons)
+  // ============================================
+  {
+    id: 'teewg-voice',
+    title: 'Finding Her Voice: Janie\'s Self-Discovery',
+    description: 'Trace Janie\'s journey toward authentic self-expression.',
+    textId: 'their-eyes-were-watching-god',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'W.11-12.3'],
+    objectives: [
+      'Trace Janie\'s voice development through marriages',
+      'Analyze how each relationship shapes her',
+      'Discuss finding authentic identity',
+    ],
+    activities: [
+      'Voice evolution timeline',
+      'Key speech moment analysis',
+      'Journal: Finding your own voice',
+    ],
+    assessmentIdeas: [
+      'Character development essay',
+      'Creative: Janie\'s letter to young women',
+    ],
+  },
+  {
+    id: 'teewg-hair',
+    title: 'The Symbolism of Janie\'s Hair',
+    description: 'Analyze hair as symbol of freedom, identity, and sexuality.',
+    textId: 'their-eyes-were-watching-god',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Analyze hair symbolism throughout the novel',
+      'Discuss connections to freedom and control',
+      'Explore cultural significance of hair',
+    ],
+    activities: [
+      'Hair imagery tracking',
+      'Symbol analysis by marriage',
+      'Discussion: Hair and identity',
+    ],
+    assessmentIdeas: [
+      'Symbol analysis essay',
+      'Research on hair in African American culture',
+    ],
+  },
+  {
+    id: 'teewg-marriages',
+    title: 'Three Marriages, Three Lessons',
+    description: 'Compare Janie\'s three marriages and what each teaches her.',
+    textId: 'their-eyes-were-watching-god',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.5', 'SL.11-12.1'],
+    objectives: [
+      'Compare and contrast the three husbands',
+      'Analyze what Janie learns from each',
+      'Discuss love vs. security vs. independence',
+    ],
+    activities: [
+      'Husband comparison chart',
+      'Key scene analysis for each marriage',
+      'Discussion: What makes a good partnership?',
+    ],
+    assessmentIdeas: [
+      'Comparative essay on relationships',
+      'Creative: Advice column from Janie',
+    ],
+  },
+  {
+    id: 'teewg-dialect',
+    title: 'Hurston\'s Dialect: Preserving Voice and Culture',
+    description: 'Analyze Hurston\'s use of dialect and its significance.',
+    textId: 'their-eyes-were-watching-god',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.6', 'W.11-12.9'],
+    objectives: [
+      'Analyze dialect and its effects',
+      'Discuss Hurston\'s role in Harlem Renaissance',
+      'Examine debates about dialect in literature',
+    ],
+    activities: [
+      'Dialect analysis exercise',
+      'Historical context research',
+      'Compare narration vs. dialogue voice',
+    ],
+    assessmentIdeas: [
+      'Essay on voice and representation',
+      'Research on Harlem Renaissance literature',
+    ],
+  },
+  {
+    id: 'teewg-nature',
+    title: 'The Pear Tree and the Hurricane: Nature Imagery',
+    description: 'Analyze Hurston\'s use of nature symbolism.',
+    textId: 'their-eyes-were-watching-god',
+    duration: '50 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Analyze the pear tree as symbol of ideal love',
+      'Interpret the hurricane scene',
+      'Discuss nature\'s role in the narrative',
+    ],
+    activities: [
+      'Nature imagery collection',
+      'Pear tree passage analysis',
+      'Hurricane scene interpretation',
+    ],
+    assessmentIdeas: [
+      'Imagery analysis essay',
+      'Creative: Nature metaphor writing',
+    ],
+  },
+
+  // ============================================
+  // DEATH OF A SALESMAN (5 lessons)
+  // ============================================
+  {
+    id: 'salesman-american-dream',
+    title: 'The American Dream on Trial',
+    description: 'Analyze Miller\'s critique of the American Dream.',
+    textId: 'death-of-a-salesman',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Define Willy\'s version of the American Dream',
+      'Analyze how the Dream fails the Lomans',
+      'Discuss the Dream\'s relevance today',
+    ],
+    activities: [
+      'American Dream definition brainstorm',
+      'Willy\'s beliefs analysis',
+      'Debate: Is the Dream achievable?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on the American Dream',
+      'Research on economic mobility',
+    ],
+  },
+  {
+    id: 'salesman-memory-time',
+    title: 'Memory and Reality: Miller\'s Time Structure',
+    description: 'Analyze how the play moves between past and present.',
+    textId: 'death-of-a-salesman',
+    duration: '50 minutes',
+    standards: ['RL.11-12.5', 'RL.11-12.3', 'W.11-12.9'],
+    objectives: [
+      'Analyze the play\'s non-linear structure',
+      'Distinguish memory from reality',
+      'Discuss how form reflects Willy\'s mental state',
+    ],
+    activities: [
+      'Timeline reconstruction',
+      'Memory sequence analysis',
+      'Discussion: Why this structure?',
+    ],
+    assessmentIdeas: [
+      'Essay on form and meaning',
+      'Creative: Memory scene from your life',
+    ],
+  },
+  {
+    id: 'salesman-father-son',
+    title: 'Fathers and Sons: The Loman Legacy',
+    description: 'Analyze the destructive father-son relationships.',
+    textId: 'death-of-a-salesman',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Willy\'s relationships with Biff and Happy',
+      'Examine Willy\'s relationship with his father',
+      'Discuss generational patterns',
+    ],
+    activities: [
+      'Relationship mapping',
+      'Requiem scene analysis',
+      'Discussion: Breaking family patterns',
+    ],
+    assessmentIdeas: [
+      'Relationship analysis essay',
+      'Creative: Biff ten years later',
+    ],
+  },
+  {
+    id: 'salesman-tragedy',
+    title: 'Modern Tragedy: The Common Man as Hero',
+    description: 'Examine Miller\'s definition of modern tragedy.',
+    textId: 'death-of-a-salesman',
+    duration: '55 minutes',
+    standards: ['RL.11-12.5', 'RL.11-12.9', 'SL.11-12.1'],
+    objectives: [
+      'Understand Miller\'s "Tragedy and the Common Man"',
+      'Analyze Willy as a tragic hero',
+      'Compare to classical tragedy',
+    ],
+    activities: [
+      'Miller\'s essay analysis',
+      'Tragic hero criteria application',
+      'Discussion: Can anyone be tragic?',
+    ],
+    assessmentIdeas: [
+      'Essay on modern tragedy',
+      'Compare Willy to classical tragic heroes',
+    ],
+  },
+  {
+    id: 'salesman-women',
+    title: 'Linda and The Woman: Women in Willy\'s World',
+    description: 'Analyze the portrayal and roles of women in the play.',
+    textId: 'death-of-a-salesman',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Linda\'s characterization and role',
+      'Discuss The Woman\'s function',
+      'Evaluate Miller\'s portrayal of women',
+    ],
+    activities: [
+      'Linda character analysis',
+      'Women\'s roles in 1940s context',
+      'Discussion: How are women portrayed?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Creative: Linda\'s perspective',
+    ],
+  },
+
+  // ============================================
+  // THE CATCHER IN THE RYE (5 lessons)
+  // ============================================
+  {
+    id: 'catcher-alienation',
+    title: 'Holden\'s Alienation: Outsider Looking In',
+    description: 'Analyze Holden\'s sense of isolation and disconnection.',
+    textId: 'catcher-in-the-rye',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Identify sources of Holden\'s alienation',
+      'Analyze how he pushes people away',
+      'Discuss alienation as protection',
+    ],
+    activities: [
+      'Alienation evidence collection',
+      'Failed connection analysis',
+      'Discussion: Why do we isolate ourselves?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Creative: Letter from Holden to a friend',
+    ],
+  },
+  {
+    id: 'catcher-phoniness',
+    title: 'The Phony World: Holden\'s Critique',
+    description: 'Analyze Holden\'s concept of phoniness and its implications.',
+    textId: 'catcher-in-the-rye',
+    duration: '50 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.6', 'SL.11-12.1'],
+    objectives: [
+      'Define what Holden means by "phony"',
+      'Analyze who and what he calls phony',
+      'Discuss whether Holden is also phony',
+    ],
+    activities: [
+      'Phony instances chart',
+      'Self-awareness analysis',
+      'Debate: Is Holden a hypocrite?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on authenticity',
+      'Creative: Define phoniness today',
+    ],
+  },
+  {
+    id: 'catcher-innocence',
+    title: 'Catcher in the Rye: Protecting Innocence',
+    description: 'Analyze the title\'s meaning and theme of innocence.',
+    textId: 'catcher-in-the-rye',
+    duration: '55 minutes',
+    standards: ['RL.11-12.4', 'RL.11-12.2', 'W.11-12.9'],
+    objectives: [
+      'Analyze the catcher fantasy',
+      'Discuss Holden\'s desire to protect innocence',
+      'Connect to his grief over Allie',
+    ],
+    activities: [
+      'Title scene close reading',
+      'Innocence loss evidence',
+      'Discussion: Can innocence be preserved?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on innocence',
+      'Creative: Holden\'s letter to Allie',
+    ],
+  },
+  {
+    id: 'catcher-narrator',
+    title: 'Holden as Unreliable Narrator',
+    description: 'Analyze how Holden\'s perspective shapes the story.',
+    textId: 'catcher-in-the-rye',
+    duration: '50 minutes',
+    standards: ['RL.11-12.6', 'RL.11-12.5', 'SL.11-12.1'],
+    objectives: [
+      'Identify characteristics of unreliable narration',
+      'Analyze contradictions and exaggerations',
+      'Discuss reading between the lines',
+    ],
+    activities: [
+      'Contradiction identification',
+      'What Holden doesn\'t tell us',
+      'Alternative interpretation exercise',
+    ],
+    assessmentIdeas: [
+      'Narrator analysis essay',
+      'Creative: Scene from another perspective',
+    ],
+  },
+  {
+    id: 'catcher-mental-health',
+    title: 'Reading Holden\'s Breakdown',
+    description: 'Analyze Holden\'s mental health with sensitivity and insight.',
+    textId: 'catcher-in-the-rye',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.2', 'SL.11-12.1'],
+    objectives: [
+      'Identify signs of Holden\'s mental distress',
+      'Analyze trauma and grief in the narrative',
+      'Discuss mental health awareness',
+    ],
+    activities: [
+      'Mental health symptom identification',
+      'Grief and loss analysis',
+      'Discussion: How can we support others?',
+    ],
+    assessmentIdeas: [
+      'Essay on mental health in literature',
+      'Research on teen mental health resources',
+    ],
+  },
+
+  // ============================================
+  // OTHELLO (5 lessons)
+  // ============================================
+  {
+    id: 'othello-jealousy',
+    title: 'The Green-Eyed Monster: Jealousy\'s Destruction',
+    description: 'Analyze how jealousy corrupts and destroys.',
+    textId: 'othello',
+    duration: '55 minutes',
+    standards: ['RL.11-12.2', 'RL.11-12.3', 'SL.11-12.1'],
+    objectives: [
+      'Trace how Iago plants and nurtures jealousy',
+      'Analyze Othello\'s transformation',
+      'Discuss jealousy as universal theme',
+    ],
+    activities: [
+      'Jealousy development timeline',
+      'Key scene analysis',
+      'Discussion: What makes us jealous?',
+    ],
+    assessmentIdeas: [
+      'Thematic essay on jealousy',
+      'Creative: Modern jealousy scenario',
+    ],
+  },
+  {
+    id: 'othello-iago',
+    title: 'Iago: Shakespeare\'s Greatest Villain',
+    description: 'Analyze Iago\'s character and motivations.',
+    textId: 'othello',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.6', 'W.11-12.9'],
+    objectives: [
+      'Analyze Iago\'s stated and possible motivations',
+      'Examine his manipulation techniques',
+      'Discuss the nature of evil',
+    ],
+    activities: [
+      'Motivation evidence collection',
+      'Soliloquy analysis',
+      'Discussion: Why does evil exist?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Creative: Iago\'s psychology',
+    ],
+  },
+  {
+    id: 'othello-race',
+    title: 'Race and Otherness in Othello',
+    description: 'Examine the play\'s treatment of race and prejudice.',
+    textId: 'othello',
+    duration: '55 minutes',
+    standards: ['RL.11-12.6', 'RL.11-12.9', 'SL.11-12.1'],
+    objectives: [
+      'Analyze racial language and imagery',
+      'Discuss Othello\'s outsider status',
+      'Examine how race affects interpretation',
+    ],
+    activities: [
+      'Racial language analysis',
+      'Historical context research',
+      'Discussion: How does race shape the tragedy?',
+    ],
+    assessmentIdeas: [
+      'Essay on race in the play',
+      'Research on performance history',
+    ],
+  },
+  {
+    id: 'othello-desdemona',
+    title: 'Desdemona: Victim or Agent?',
+    description: 'Analyze Desdemona\'s character and tragic fate.',
+    textId: 'othello',
+    duration: '50 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.5', 'SL.11-12.1'],
+    objectives: [
+      'Analyze Desdemona\'s characterization',
+      'Discuss her agency and choices',
+      'Evaluate her tragic role',
+    ],
+    activities: [
+      'Character evidence collection',
+      'Key scene analysis',
+      'Debate: How should we read Desdemona?',
+    ],
+    assessmentIdeas: [
+      'Character analysis essay',
+      'Creative: Desdemona\'s perspective',
+    ],
+  },
+  {
+    id: 'othello-tragedy',
+    title: 'Tragedy of a Noble Mind: Othello as Tragic Hero',
+    description: 'Apply tragic hero elements to Othello.',
+    textId: 'othello',
+    duration: '55 minutes',
+    standards: ['RL.11-12.3', 'RL.11-12.5', 'W.11-12.9'],
+    objectives: [
+      'Identify tragic hero characteristics in Othello',
+      'Analyze his hamartia and recognition',
+      'Compare to other Shakespearean tragic heroes',
+    ],
+    activities: [
+      'Tragic hero checklist',
+      'Final scene analysis',
+      'Comparison to Hamlet, Macbeth, Lear',
+    ],
+    assessmentIdeas: [
+      'Tragic hero essay',
+      'Comparative analysis with other tragedies',
+    ],
+  },
 ];
 
 // ============================================
