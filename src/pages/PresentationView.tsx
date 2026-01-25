@@ -36,6 +36,8 @@ interface VisualTheme {
   gradient: string;
   accent: string;
   pattern: string;
+  bgHex?: string;  // CSS background gradient string
+  accentHex?: string;  // Hex color for accent elements
 }
 
 interface NycologicPresentation {
@@ -56,17 +58,17 @@ const slideIcons = {
   sparkles: Sparkles,
 };
 
-// Theme color schemes
-const themeColors: Record<string, { bg: string; accent: string; glow: string }> = {
-  'neon-city': { bg: 'from-[#1a0a2e] via-[#2d1b4e] to-[#1a0a2e]', accent: 'text-fuchsia-400', glow: 'rgba(217, 70, 239, 0.15)' },
-  'ocean-wave': { bg: 'from-[#0a1628] via-[#0f2847] to-[#0a1628]', accent: 'text-cyan-400', glow: 'rgba(34, 211, 238, 0.15)' },
-  'sunset-glow': { bg: 'from-[#1a0a0a] via-[#2d1b1b] to-[#1a0a0a]', accent: 'text-amber-400', glow: 'rgba(251, 191, 36, 0.15)' },
-  'forest-zen': { bg: 'from-[#0a1a0a] via-[#1b2d1b] to-[#0a1a0a]', accent: 'text-emerald-400', glow: 'rgba(52, 211, 153, 0.15)' },
-  'galaxy-dreams': { bg: 'from-[#0f0a1a] via-[#1a0f2e] to-[#0f0a1a]', accent: 'text-violet-400', glow: 'rgba(167, 139, 250, 0.15)' },
-  'candy-pop': { bg: 'from-[#1a0a14] via-[#2d1b24] to-[#1a0a14]', accent: 'text-rose-400', glow: 'rgba(251, 113, 133, 0.15)' },
+// Theme color schemes with hex values for inline styling
+const themeColors: Record<string, { bg: string; accent: string; glow: string; bgHex: string; accentHex: string }> = {
+  'neon-city': { bg: 'from-[#1a0a2e] via-[#2d1b4e] to-[#1a0a2e]', accent: 'text-fuchsia-400', glow: 'rgba(217, 70, 239, 0.15)', bgHex: 'linear-gradient(135deg, #9333ea 0%, #ec4899 50%, #f97316 100%)', accentHex: '#ec4899' },
+  'ocean-wave': { bg: 'from-[#0a1628] via-[#0f2847] to-[#0a1628]', accent: 'text-cyan-400', glow: 'rgba(34, 211, 238, 0.15)', bgHex: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #4f46e5 100%)', accentHex: '#22d3ee' },
+  'sunset-glow': { bg: 'from-[#1a0a0a] via-[#2d1b1b] to-[#1a0a0a]', accent: 'text-amber-400', glow: 'rgba(251, 191, 36, 0.15)', bgHex: 'linear-gradient(135deg, #fbbf24 0%, #f97316 50%, #f43f5e 100%)', accentHex: '#fbbf24' },
+  'forest-zen': { bg: 'from-[#0a1a0a] via-[#1b2d1b] to-[#0a1a0a]', accent: 'text-emerald-400', glow: 'rgba(52, 211, 153, 0.15)', bgHex: 'linear-gradient(135deg, #10b981 0%, #14b8a6 50%, #0891b2 100%)', accentHex: '#34d399' },
+  'galaxy-dreams': { bg: 'from-[#0f0a1a] via-[#1a0f2e] to-[#0f0a1a]', accent: 'text-violet-400', glow: 'rgba(167, 139, 250, 0.15)', bgHex: 'linear-gradient(135deg, #7c3aed 0%, #9333ea 50%, #d946ef 100%)', accentHex: '#a78bfa' },
+  'candy-pop': { bg: 'from-[#1a0a14] via-[#2d1b24] to-[#1a0a14]', accent: 'text-rose-400', glow: 'rgba(251, 113, 133, 0.15)', bgHex: 'linear-gradient(135deg, #f472b6 0%, #fb7185 50%, #f87171 100%)', accentHex: '#fda4af' },
 };
 
-const defaultColors = { bg: 'from-[#0a1628] via-[#0f1f3a] to-[#0a1628]', accent: 'text-amber-400', glow: 'rgba(251, 191, 36, 0.15)' };
+const defaultColors = { bg: 'from-[#0a1628] via-[#0f1f3a] to-[#0a1628]', accent: 'text-amber-400', glow: 'rgba(251, 191, 36, 0.15)', bgHex: 'linear-gradient(135deg, #0a1628 0%, #0f1f3a 50%, #0a1628 100%)', accentHex: '#fbbf24' };
 
 export default function PresentationView() {
   const navigate = useNavigate();
@@ -127,7 +129,14 @@ export default function PresentationView() {
   const slide = presentation?.slides[currentSlide];
   const totalSlides = presentation?.slides.length || 0;
   const themeId = presentation?.visualTheme?.id || 'sunset-glow';
-  const colors = themeColors[themeId] || defaultColors;
+  const baseColors = themeColors[themeId] || defaultColors;
+  
+  // Prioritize embedded hex values from presentation theme if available
+  const colors = {
+    ...baseColors,
+    bgHex: presentation?.visualTheme?.bgHex || baseColors.bgHex,
+    accentHex: presentation?.visualTheme?.accentHex || baseColors.accentHex,
+  };
   const IconComponent = slide?.icon ? slideIcons[slide.icon] : null;
 
   const goToSlide = useCallback((index: number) => {
@@ -634,8 +643,8 @@ export default function PresentationView() {
 
   return (
     <div 
-      className={cn("min-h-screen w-full overflow-hidden relative", `bg-gradient-to-br ${colors.bg}`)}
-      style={{ minHeight: '100vh' }}
+      className="min-h-screen w-full overflow-hidden relative"
+      style={{ minHeight: '100vh', background: colors.bgHex }}
     >
       {/* Ambient glow effects */}
       <div 
