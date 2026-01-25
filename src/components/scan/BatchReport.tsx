@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2, Save, CheckCircle, BookOpen, Link, Unlink, FileStack, Upload } from 'lucide-react';
+import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2, Save, CheckCircle, BookOpen, Link, Unlink, FileStack, Upload, FileText, Cloud, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,11 +11,24 @@ import { GradedPapersGallery } from './GradedPapersGallery';
 import { DifferentiationGroupView } from './DifferentiationGroupView';
 import { MissingSubmissionsAlert } from './MissingSubmissionsAlert';
 import { PushToClassroomDialog } from './PushToClassroomDialog';
+import { SaveToDriveDialog } from './SaveToDriveDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
+import {
+  exportGradingReportPDF,
+  exportGradingReportWord,
+  prepareGradingReportForDrive,
+} from '@/lib/gradingReportExport';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -43,6 +56,8 @@ interface BatchReportProps {
   summary: BatchSummary;
   classId?: string;
   questionId?: string;
+  className?: string;
+  assignmentName?: string;
   onExport: () => void;
   onUpdateNotes?: (itemId: string, notes: string) => void;
   onSaveComplete?: () => void;
@@ -51,16 +66,19 @@ interface BatchReportProps {
   assignmentTitle?: string;
 }
 
-export function BatchReport({ items, summary, classId, questionId, onExport, onUpdateNotes, onSaveComplete, onUnlinkContinuation, classroomContextMap, assignmentTitle }: BatchReportProps) {
+export function BatchReport({ items, summary, classId, questionId, className, assignmentName, onExport, onUpdateNotes, onSaveComplete, onUnlinkContinuation, classroomContextMap, assignmentTitle }: BatchReportProps) {
   const { user } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState<BatchItem | null>(null);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
   const [showComparison, setShowComparison] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [showClassroomPush, setShowClassroomPush] = useState(false);
+  const [showSaveToDrive, setShowSaveToDrive] = useState(false);
   const [isPushingAll, setIsPushingAll] = useState(false);
   const [isPushingBasicSkills, setIsPushingBasicSkills] = useState(false);
   const [isSavingAll, setIsSavingAll] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<{ blob: Blob; name: string }[]>([]);
   const [savedStudents, setSavedStudents] = useState<Set<string>>(new Set());
   const [pushedStudents, setPushedStudents] = useState<Set<string>>(new Set());
   const [classroomPushed, setClassroomPushed] = useState<Set<string>>(new Set());
