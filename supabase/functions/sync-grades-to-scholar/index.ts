@@ -498,7 +498,7 @@ serve(async (req) => {
 
     // For external Scholar API - sync students in parallel batches for speed
     // Use the dedicated /sync-student endpoint for bulk student syncing
-    const BATCH_SIZE = 10; // Process 10 students concurrently
+    const BATCH_SIZE = 20; // Increased batch size for faster processing
     const syncStudentEndpoint = baseEndpoint.replace('/nycologic-webhook', '/sync-student');
     console.log(`Syncing to Scholar API at ${syncStudentEndpoint} - processing ${studentProfiles.length} students in batches of ${BATCH_SIZE}...`);
     
@@ -541,26 +541,27 @@ serve(async (req) => {
       },
     }));
 
-    // Process in parallel batches
+    // Log first payload for debugging
+    if (studentPayloads.length > 0) {
+      const samplePayload = studentPayloads[0].payload;
+      console.log('Sample student payload being sent:', JSON.stringify({
+        student_id: samplePayload.student_id,
+        student_name: samplePayload.student_name,
+        overall_average: samplePayload.overall_average,
+        grades_count: samplePayload.grades?.length || 0,
+        weak_topics_count: samplePayload.weak_topics?.length || 0,
+        misconceptions_count: samplePayload.misconceptions?.length || 0,
+        sample_grade: samplePayload.grades?.[0] || null,
+        sample_weak_topic: samplePayload.weak_topics?.[0] || null,
+      }));
+    }
+
+    // Process all batches in parallel using Promise.all for speed
+    const allBatchPromises = [];
     for (let i = 0; i < studentPayloads.length; i += BATCH_SIZE) {
       const batch = studentPayloads.slice(i, i + BATCH_SIZE);
       
-      // Log first batch details for debugging
-      if (i === 0 && batch.length > 0) {
-        const samplePayload = batch[0].payload;
-        console.log('Sample student payload being sent:', JSON.stringify({
-          student_id: samplePayload.student_id,
-          student_name: samplePayload.student_name,
-          overall_average: samplePayload.overall_average,
-          grades_count: samplePayload.grades?.length || 0,
-          weak_topics_count: samplePayload.weak_topics?.length || 0,
-          misconceptions_count: samplePayload.misconceptions?.length || 0,
-          sample_grade: samplePayload.grades?.[0] || null,
-          sample_weak_topic: samplePayload.weak_topics?.[0] || null,
-        }));
-      }
-      
-      const batchResults = await Promise.allSettled(
+      const batchPromise = Promise.allSettled(
         batch.map(async ({ profile, payload }) => {
           const response = await fetch(syncStudentEndpoint, {
             method: 'POST',
@@ -578,8 +579,15 @@ serve(async (req) => {
           return profile.student_name;
         })
       );
+      
+      allBatchPromises.push(batchPromise);
+    }
 
-      // Process batch results
+    // Wait for all batches concurrently
+    const allBatchResults = await Promise.all(allBatchPromises);
+    
+    // Flatten and process all results
+    for (const batchResults of allBatchResults) {
       for (const result of batchResults) {
         if (result.status === 'fulfilled') {
           syncResults.successful++;
@@ -591,9 +599,9 @@ serve(async (req) => {
           console.error('Sync failed:', result.reason?.message);
         }
       }
-      
-      console.log(`Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(studentPayloads.length / BATCH_SIZE)} complete: ${syncResults.successful} synced, ${syncResults.failed} failed`);
     }
+    
+    console.log(`All batches complete: ${syncResults.successful} synced, ${syncResults.failed} failed`);
 
     // Log the sync action with response for dashboard status display
     await supabase.from('sister_app_sync_log').insert({
