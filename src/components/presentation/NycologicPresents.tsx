@@ -41,6 +41,8 @@ export interface VisualTheme {
   gradient: string;
   accent: string;
   pattern: string;
+  bgHex?: string;  // CSS background gradient string
+  accentHex?: string;  // Hex color for accent elements
 }
 
 export interface NycologicPresentation {
@@ -285,17 +287,23 @@ export function NycologicPresents({
     }
   };
 
-  // Get theme-specific colors
+  // Get theme-specific colors - prioritize embedded hex values from theme object
   const themeBgColors = visualTheme?.id ? themeBackgroundColors[visualTheme.id] : null;
   const themeGlow = visualTheme?.id ? themeGlowColors[visualTheme.id] : 'rgba(251, 191, 36, 0.4)';
+  const themeAccentHex = visualTheme?.accentHex || (visualTheme?.id ? themeAccentHexColors[visualTheme.id] : '#fbbf24');
+  
+  // Use embedded bgHex if available, otherwise construct from lookup table
+  const backgroundStyle = visualTheme?.bgHex 
+    ? visualTheme.bgHex 
+    : themeBgColors 
+      ? `linear-gradient(135deg, ${themeBgColors.start} 0%, ${themeBgColors.mid} 50%, ${themeBgColors.end} 100%)`
+      : 'linear-gradient(135deg, #0a1628 0%, #0f1f3a 50%, #0a1628 100%)';
   
   return (
     <div 
       className="fixed inset-0 z-[9999] w-screen h-screen overflow-hidden"
       style={{ 
-        background: themeBgColors 
-          ? `linear-gradient(135deg, ${themeBgColors.start} 0%, ${themeBgColors.mid} 50%, ${themeBgColors.end} 100%)`
-          : 'linear-gradient(135deg, #0a1628 0%, #0f1f3a 50%, #0a1628 100%)',
+        background: backgroundStyle,
         minHeight: '100vh',
         minWidth: '100vw',
       }}

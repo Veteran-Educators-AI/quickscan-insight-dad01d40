@@ -316,7 +316,7 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
       if (error) throw error;
 
       if (data.presentation) {
-        // Attach the selected visual theme to the presentation
+        // Attach the selected visual theme to the presentation with all styling info
         const selectedTheme = visualThemes.find(t => t.id === visualTheme);
         const presentationWithTheme: NycologicPresentation = {
           ...data.presentation,
@@ -326,6 +326,8 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
             gradient: selectedTheme.gradient,
             accent: selectedTheme.accent,
             pattern: selectedTheme.pattern,
+            bgHex: selectedTheme.bgHex,
+            accentHex: selectedTheme.accentHex,
           } : undefined,
         };
         setPresentation(presentationWithTheme);
@@ -432,13 +434,36 @@ export function NycologicPresentationBuilder({ open, onOpenChange, topic }: Nyco
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        {/* Mathematics & STEM */}
                         <SelectItem value="Mathematics">Mathematics</SelectItem>
-                        <SelectItem value="Algebra">Algebra</SelectItem>
+                        <SelectItem value="Algebra I">Algebra I</SelectItem>
+                        <SelectItem value="Algebra II">Algebra II</SelectItem>
                         <SelectItem value="Geometry">Geometry</SelectItem>
+                        <SelectItem value="Precalculus">Precalculus</SelectItem>
                         <SelectItem value="Statistics">Statistics</SelectItem>
-                        <SelectItem value="Calculus">Calculus</SelectItem>
-                        <SelectItem value="Science">Science</SelectItem>
-                        <SelectItem value="Financial Literacy">Financial Literacy</SelectItem>
+                        <SelectItem value="Financial Math">Financial Math</SelectItem>
+                        {/* Sciences */}
+                        <SelectItem value="Biology">Biology</SelectItem>
+                        <SelectItem value="Chemistry">Chemistry</SelectItem>
+                        <SelectItem value="Physics">Physics</SelectItem>
+                        <SelectItem value="Science">Science (General)</SelectItem>
+                        {/* English Language Arts */}
+                        <SelectItem value="English Language Arts">English Language Arts</SelectItem>
+                        <SelectItem value="English Literature">English Literature</SelectItem>
+                        <SelectItem value="Writing">Writing</SelectItem>
+                        {/* Social Studies */}
+                        <SelectItem value="History">History</SelectItem>
+                        <SelectItem value="US History">US History</SelectItem>
+                        <SelectItem value="World History">World History</SelectItem>
+                        <SelectItem value="Government">Government</SelectItem>
+                        <SelectItem value="Economics">Economics</SelectItem>
+                        {/* Languages */}
+                        <SelectItem value="LOTE - Spanish">LOTE - Spanish</SelectItem>
+                        <SelectItem value="LOTE - French">LOTE - French</SelectItem>
+                        <SelectItem value="LOTE - Mandarin">LOTE - Mandarin</SelectItem>
+                        <SelectItem value="LOTE - Italian">LOTE - Italian</SelectItem>
+                        <SelectItem value="LOTE - German">LOTE - German</SelectItem>
+                        <SelectItem value="Foreign Language">Foreign Language (Other)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
