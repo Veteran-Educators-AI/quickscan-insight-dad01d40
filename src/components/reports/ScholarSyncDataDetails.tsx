@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -25,7 +26,9 @@ import {
   GraduationCap,
   Target,
   Lightbulb,
+  RefreshCw,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface GradeEntry {
   topic_name: string;
@@ -66,6 +69,8 @@ export function ScholarSyncDataDetails({ classId }: ScholarSyncDataDetailsProps)
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['scholar-sync-data-details', user?.id, classId],
@@ -217,6 +222,54 @@ export function ScholarSyncDataDetails({ classId }: ScholarSyncDataDetailsProps)
     );
   }, [data?.students, searchTerm]);
 
+  const toggleStudentSelection = (studentId: string) => {
+    const newSelected = new Set(selectedStudents);
+    if (newSelected.has(studentId)) {
+      newSelected.delete(studentId);
+    } else {
+      newSelected.add(studentId);
+    }
+    setSelectedStudents(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedStudents.size === filteredStudents.length) {
+      setSelectedStudents(new Set());
+    } else {
+      setSelectedStudents(new Set(filteredStudents.map(s => s.student_id)));
+    }
+  };
+
+  const handleSyncSelected = async () => {
+    if (selectedStudents.size === 0) {
+      toast.error('No students selected', { description: 'Select at least one student to sync' });
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const response = await supabase.functions.invoke('sync-grades-to-scholar', {
+        body: { student_ids: Array.from(selectedStudents) },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+
+      const data = response.data;
+      if (data && !data.success) {
+        toast.error(data.error || 'Sync failed');
+        return;
+      }
+
+      toast.success(`Synced ${data?.synced_students || selectedStudents.size} students to Scholar AI`);
+      setSelectedStudents(new Set());
+    } catch (err) {
+      console.error('Sync error:', err);
+      toast.error('Failed to sync selected students');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const getSeverityColor = (severity: string | null) => {
     switch (severity) {
       case 'high': return 'text-red-600 bg-red-500/10 border-red-500/20';
@@ -317,15 +370,38 @@ export function ScholarSyncDataDetails({ classId }: ScholarSyncDataDetailsProps)
               </div>
             </div>
 
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search students, classes, or topics..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+            {/* Search and Actions */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search students, classes, or topics..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleSelectAll}
+                  className="whitespace-nowrap"
+                >
+                  {selectedStudents.size === filteredStudents.length && filteredStudents.length > 0 
+                    ? 'Deselect All' 
+                    : 'Select All'}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSyncSelected}
+                  disabled={selectedStudents.size === 0 || isSyncing}
+                  className="whitespace-nowrap"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? 'Syncing...' : `Sync Selected (${selectedStudents.size})`}
+                </Button>
+              </div>
             </div>
 
             {/* Student List */}
@@ -345,16 +421,23 @@ export function ScholarSyncDataDetails({ classId }: ScholarSyncDataDetailsProps)
                       open={expandedStudent === student.student_id}
                       onOpenChange={(open) => setExpandedStudent(open ? student.student_id : null)}
                     >
-                      <CollapsibleTrigger asChild>
-                        <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
-                          <div className="flex items-center gap-3">
-                            {expandedStudent === student.student_id ? (
-                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                            )}
-                            <div>
-                              <p className="font-medium">{student.student_name}</p>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={selectedStudents.has(student.student_id)}
+                          onCheckedChange={() => toggleStudentSelection(student.student_id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="data-[state=checked]:bg-primary"
+                        />
+                        <CollapsibleTrigger asChild>
+                          <div className="flex-1 flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
+                            <div className="flex items-center gap-3">
+                              {expandedStudent === student.student_id ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              <div>
+                                <p className="font-medium">{student.student_name}</p>
                               <p className="text-xs text-muted-foreground">{student.class_name}</p>
                             </div>
                           </div>
@@ -383,12 +466,13 @@ export function ScholarSyncDataDetails({ classId }: ScholarSyncDataDetailsProps)
                                 </Badge>
                               )}
                             </div>
-                            <Badge variant="outline" className="text-xs">
-                              {student.xp_potential} XP / {student.coin_potential} 🪙
-                            </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {student.xp_potential} XP / {student.coin_potential} 🪙
+                              </Badge>
+                            </div>
                           </div>
-                        </div>
-                      </CollapsibleTrigger>
+                        </CollapsibleTrigger>
+                      </div>
 
                       <CollapsibleContent>
                         <div className="ml-8 mt-2 space-y-4 pb-4">
