@@ -195,34 +195,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      return { error: error as Error };
-    }
-
-    if (data.user) {
-      const role = await fetchUserRole(data.user.id);
-
-      if (!role) {
-        await supabase.auth.signOut();
-        return { error: new Error('Account setup incomplete. Please try again.') };
+      if (error) {
+        return { error: error as Error };
       }
 
-      if (!ALLOWED_ROLES.includes(role)) {
-        await supabase.auth.signOut();
-        return {
-          error: new Error('This portal is for teachers only. Please use the Student Portal to sign in.')
-        };
+      if (data.user) {
+        // Use timeout to prevent hanging on role fetch
+        const role = await withTimeout(
+          fetchUserRole(data.user.id),
+          8000,
+          'Role verification timed out. Please try again.'
+        ).catch(() => null);
+
+        if (!role) {
+          await supabase.auth.signOut();
+          return { error: new Error('Account setup incomplete. Please try again.') };
+        }
+
+        if (!ALLOWED_ROLES.includes(role)) {
+          await supabase.auth.signOut();
+          return {
+            error: new Error('This portal is for teachers only. Please use the Student Portal to sign in.')
+          };
+        }
+
+        setUserRole(role);
       }
 
-      setUserRole(role);
+      return { error: null };
+    } catch (err) {
+      console.error('Sign in error:', err);
+      return { error: err instanceof Error ? err : new Error('Sign in failed. Please try again.') };
     }
-
-    return { error: null };
   };
 
   const resetPassword = async (email: string) => {
