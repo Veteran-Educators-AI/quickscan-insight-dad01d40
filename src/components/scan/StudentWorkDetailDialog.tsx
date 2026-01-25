@@ -22,7 +22,9 @@ import {
   Lightbulb,
   FileText,
   X,
-  Move
+  Move,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 import { MisconceptionComparison, extractErrorRegions } from './MisconceptionComparison';
@@ -56,6 +58,20 @@ interface StudentWorkDetailDialogProps {
   studentName: string;
   imageUrl?: string;
   result: AnalysisResult;
+  onReanalyze?: () => Promise<void>;
+  isReanalyzing?: boolean;
+}
+
+// Check if analysis is incomplete (missing key details)
+function isAnalysisIncomplete(result: AnalysisResult): boolean {
+  const hasNoOcr = !result.ocrText || result.ocrText.trim().length < 10;
+  const hasNoProblem = !result.problemIdentified || result.problemIdentified.trim().length < 5;
+  const hasNoApproach = !result.approachAnalysis || result.approachAnalysis.trim().length < 10;
+  const hasNoFeedback = !result.feedback || result.feedback.trim().length < 10;
+  
+  // If most fields are empty but we have a grade, analysis was likely incomplete
+  const emptyFields = [hasNoOcr, hasNoProblem, hasNoApproach, hasNoFeedback].filter(Boolean).length;
+  return emptyFields >= 3;
 }
 
 export function StudentWorkDetailDialog({
@@ -64,6 +80,8 @@ export function StudentWorkDetailDialog({
   studentName,
   imageUrl,
   result,
+  onReanalyze,
+  isReanalyzing = false,
 }: StudentWorkDetailDialogProps) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -321,6 +339,47 @@ export function StudentWorkDetailDialog({
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Incomplete Analysis Warning + Reanalyze Button */}
+                {isAnalysisIncomplete(result) && (
+                  <Card className="border-amber-300 bg-amber-50/50 dark:bg-amber-950/20">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                            Incomplete Analysis Detected
+                          </p>
+                          <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                            The AI analysis may not have captured all details from this student's work. 
+                            You can reanalyze to get more comprehensive feedback.
+                          </p>
+                          {onReanalyze && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={onReanalyze}
+                              disabled={isReanalyzing}
+                              className="mt-3 border-amber-400 text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                            >
+                              {isReanalyzing ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Reanalyzing...
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                  Reanalyze This Paper
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Rubric Breakdown */}
                 {result.rubricScores.length > 0 && (

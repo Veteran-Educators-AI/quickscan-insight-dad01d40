@@ -62,11 +62,12 @@ interface BatchReportProps {
   onUpdateNotes?: (itemId: string, notes: string) => void;
   onSaveComplete?: () => void;
   onUnlinkContinuation?: (continuationId: string) => void;
+  onReanalyzeItem?: (itemId: string) => Promise<BatchItem | null>;
   classroomContextMap?: Record<string, ClassroomContext>; // studentId -> classroom context
   assignmentTitle?: string;
 }
 
-export function BatchReport({ items, summary, classId, questionId, className, assignmentName, onExport, onUpdateNotes, onSaveComplete, onUnlinkContinuation, classroomContextMap, assignmentTitle }: BatchReportProps) {
+export function BatchReport({ items, summary, classId, questionId, className, assignmentName, onExport, onUpdateNotes, onSaveComplete, onUnlinkContinuation, onReanalyzeItem, classroomContextMap, assignmentTitle }: BatchReportProps) {
   const { user } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState<BatchItem | null>(null);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
@@ -78,6 +79,7 @@ export function BatchReport({ items, summary, classId, questionId, className, as
   const [isPushingBasicSkills, setIsPushingBasicSkills] = useState(false);
   const [isSavingAll, setIsSavingAll] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [driveFiles, setDriveFiles] = useState<{ blob: Blob; name: string }[]>([]);
   const [savedStudents, setSavedStudents] = useState<Set<string>>(new Set());
   const [pushedStudents, setPushedStudents] = useState<Set<string>>(new Set());
@@ -859,6 +861,19 @@ export function BatchReport({ items, summary, classId, questionId, className, as
           studentName={selectedStudent.studentName}
           imageUrl={selectedStudent.imageDataUrl}
           result={selectedStudent.result}
+          isReanalyzing={isReanalyzing}
+          onReanalyze={onReanalyzeItem ? async () => {
+            setIsReanalyzing(true);
+            try {
+              const result = await onReanalyzeItem(selectedStudent.id);
+              if (result?.result) {
+                // Update the selected student with new result
+                setSelectedStudent(result);
+              }
+            } finally {
+              setIsReanalyzing(false);
+            }
+          } : undefined}
         />
       )}
 

@@ -2137,6 +2137,7 @@ export default function Scan() {
                       toast.success('All grades saved to gradebook');
                     }}
                     onUnlinkContinuation={batch.unlinkContinuation}
+                    onReanalyzeItem={batch.reanalyzeItem}
                   />
                 </div>
               ) : (

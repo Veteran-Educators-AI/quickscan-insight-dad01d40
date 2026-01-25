@@ -132,6 +132,7 @@ interface UseBatchAnalysisReturn {
   startBatchAnalysis: (rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string, answerGuideImage?: string, useLearnedStyle?: boolean) => Promise<void>;
   startConfidenceAnalysis: (analysisCount: 2 | 3, rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<void>;
   startTeacherGuidedBatchAnalysis: (answerGuideImage: string, rubricSteps?: RubricStep[]) => Promise<void>;
+  reanalyzeItem: (itemId: string, rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string) => Promise<BatchItem | null>;
   overrideGrade: (itemId: string, newGrade: number, justification: string) => void;
   selectRunAsGrade: (itemId: string, runIndex: number) => void;
   isProcessing: boolean;
@@ -1676,6 +1677,77 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     return newSummary;
   }, [items]);
 
+  // Re-analyze a single item (useful when analysis was incomplete)
+  const reanalyzeItem = useCallback(async (
+    itemId: string,
+    rubricSteps?: RubricStep[],
+    assessmentMode?: 'teacher' | 'ai',
+    promptText?: string
+  ): Promise<BatchItem | null> => {
+    const itemIndex = items.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) {
+      toast.error('Item not found');
+      return null;
+    }
+
+    const item = items[itemIndex];
+    
+    // Mark item as analyzing
+    setItems(prev => prev.map((it, idx) => 
+      idx === itemIndex ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
+    ));
+
+    // Mark continuation pages as analyzing too
+    if (item.continuationPages && item.continuationPages.length > 0) {
+      setItems(prev => prev.map(it => 
+        item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing' } : it
+      ));
+    }
+
+    try {
+      const result = await analyzeItemWithContinuations(
+        { ...item, status: 'pending' }, 
+        items, 
+        rubricSteps, 
+        assessmentMode, 
+        promptText,
+        true // Use learned style by default for reanalysis
+      );
+
+      // Update the item with new result
+      setItems(prev => prev.map((it, idx) => 
+        idx === itemIndex ? result : it
+      ));
+
+      // Also mark continuation pages as completed
+      if (item.continuationPages && item.continuationPages.length > 0) {
+        setItems(prev => prev.map(it => 
+          item.continuationPages!.includes(it.id) ? { ...it, status: 'completed' } : it
+        ));
+      }
+
+      if (result.status === 'completed') {
+        toast.success(`Reanalysis complete for ${item.studentName || 'student'}`);
+      } else {
+        toast.error(`Reanalysis failed: ${result.error || 'Unknown error'}`);
+      }
+
+      // Regenerate summary
+      setTimeout(() => generateSummary(), 100);
+
+      return result;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Reanalysis failed';
+      toast.error(errorMsg);
+      
+      setItems(prev => prev.map((it, idx) => 
+        idx === itemIndex ? { ...it, status: 'failed', error: errorMsg } : it
+      ));
+
+      return null;
+    }
+  }, [items, analyzeItemWithContinuations, generateSummary]);
+
   return {
     items,
     addImage,
@@ -1697,6 +1769,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     startBatchAnalysis,
     startConfidenceAnalysis,
     startTeacherGuidedBatchAnalysis,
+    reanalyzeItem,
     overrideGrade,
     selectRunAsGrade,
     isProcessing,
