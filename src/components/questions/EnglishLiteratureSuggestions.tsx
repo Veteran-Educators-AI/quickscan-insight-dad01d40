@@ -1,15 +1,13 @@
 import { useState } from 'react';
-import { BookOpen, ChevronRight, Clock, Target, Sparkles, GraduationCap, Brain, Lightbulb } from 'lucide-react';
+import { BookOpen, ChevronRight, Clock, Target, Sparkles, GraduationCap, Brain, Lightbulb, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   LITERARY_TEXTS,
-  LESSON_SUGGESTIONS,
   TEXT_QUESTIONS,
   getLessonsByText,
   getQuestionsByLevel,
@@ -17,19 +15,25 @@ import {
   type LessonSuggestion,
   type TextQuestion,
 } from '@/data/englishLiteratureTopics';
+import { EnglishWorksheetGeneratorDialog, type GeneratedEnglishQuestion } from './EnglishWorksheetGeneratorDialog';
 
 interface EnglishLiteratureSuggestionsProps {
   onSelectLesson?: (lesson: LessonSuggestion) => void;
   onGenerateWorksheet?: (textId: string, questions: TextQuestion[]) => void;
+  onGenerateAIQuestions?: (questions: GeneratedEnglishQuestion[]) => void;
 }
 
 export function EnglishLiteratureSuggestions({ 
   onSelectLesson, 
-  onGenerateWorksheet 
+  onGenerateWorksheet,
+  onGenerateAIQuestions,
 }: EnglishLiteratureSuggestionsProps) {
   const [selectedText, setSelectedText] = useState<LiteraryText | null>(null);
   const [showLessonDetail, setShowLessonDetail] = useState<LessonSuggestion | null>(null);
   const [expandedTexts, setExpandedTexts] = useState<Set<string>>(new Set());
+  const [showWorksheetGenerator, setShowWorksheetGenerator] = useState(false);
+  const [selectedLesson, setSelectedLesson] = useState<LessonSuggestion | null>(null);
+  const [preselectedLevel, setPreselectedLevel] = useState<'comprehension' | 'analysis' | 'higher-order' | undefined>(undefined);
 
   const toggleText = (textId: string) => {
     setExpandedTexts(prev => {
@@ -189,11 +193,11 @@ export function EnglishLiteratureSuggestions({
                   ))}
                 </div>
 
-                {/* Question Levels Preview */}
+                {/* Question Levels - Opens AI Generator */}
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm flex items-center gap-2">
                     <Brain className="h-4 w-4 text-blue-500" />
-                    Question Bank by Level
+                    Generate Questions by Level
                   </h4>
                   <div className="grid grid-cols-3 gap-2">
                     {(['comprehension', 'analysis', 'higher-order'] as const).map((level) => {
@@ -203,7 +207,9 @@ export function EnglishLiteratureSuggestions({
                           key={level}
                           onClick={() => {
                             setSelectedText(text);
-                            onGenerateWorksheet?.(text.id, levelQuestions);
+                            setPreselectedLevel(level);
+                            setSelectedLesson(null);
+                            setShowWorksheetGenerator(true);
                           }}
                           className={`p-2 rounded-md border hover:shadow-sm transition-all ${getLevelColor(level)}`}
                         >
@@ -212,11 +218,27 @@ export function EnglishLiteratureSuggestions({
                             <span className="text-xs font-medium capitalize">{level.replace('-', ' ')}</span>
                           </div>
                           <p className="text-lg font-bold mt-1">{levelQuestions.length}</p>
-                          <p className="text-xs opacity-75">questions</p>
+                          <p className="text-xs opacity-75">sample questions</p>
                         </button>
                       );
                     })}
                   </div>
+                  
+                  {/* Generate Custom Questions Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-2"
+                    onClick={() => {
+                      setSelectedText(text);
+                      setPreselectedLevel(undefined);
+                      setSelectedLesson(null);
+                      setShowWorksheetGenerator(true);
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Generate Custom Worksheet
+                  </Button>
                 </div>
               </CollapsibleContent>
             </Collapsible>
@@ -292,6 +314,23 @@ export function EnglishLiteratureSuggestions({
                   >
                     Use This Lesson
                   </Button>
+                  <Button 
+                    variant="secondary"
+                    onClick={() => {
+                      // Find the text for this lesson
+                      const lessonText = LITERARY_TEXTS.find(t => t.id === showLessonDetail.textId);
+                      if (lessonText) {
+                        setSelectedText(lessonText);
+                        setSelectedLesson(showLessonDetail);
+                        setPreselectedLevel(undefined);
+                        setShowWorksheetGenerator(true);
+                        setShowLessonDetail(null);
+                      }
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Generate Questions
+                  </Button>
                   <Button variant="outline" onClick={() => setShowLessonDetail(null)}>
                     Close
                   </Button>
@@ -301,6 +340,29 @@ export function EnglishLiteratureSuggestions({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* AI Worksheet Generator Dialog */}
+      <EnglishWorksheetGeneratorDialog
+        open={showWorksheetGenerator}
+        onOpenChange={setShowWorksheetGenerator}
+        text={selectedText}
+        lesson={selectedLesson}
+        preselectedLevel={preselectedLevel}
+        onGenerate={(questions) => {
+          onGenerateAIQuestions?.(questions);
+          // Also trigger legacy callback for backward compatibility
+          if (selectedText && onGenerateWorksheet) {
+            const legacyQuestions = questions.map(q => ({
+              level: q.cognitiveLevel,
+              bloomLevel: q.cognitiveLevel === 'comprehension' ? 'understand' as const : 
+                         q.cognitiveLevel === 'analysis' ? 'analyze' as const : 'evaluate' as const,
+              question: q.question,
+              standard: q.standard,
+            }));
+            onGenerateWorksheet(selectedText.id, legacyQuestions);
+          }
+        }}
+      />
     </Card>
   );
 }

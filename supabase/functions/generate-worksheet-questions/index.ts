@@ -188,6 +188,7 @@ serve(async (req) => {
       includeAnswerKey,
       studentContext,
       targetMisconceptions,
+      englishContext,
     } = await req.json() as {
       topics: TopicInput[];
       questionCount: number;
@@ -213,6 +214,19 @@ serve(async (req) => {
         averageScore?: number;
       };
       targetMisconceptions?: string[];
+      englishContext?: {
+        textTitle: string;
+        author: string;
+        genre: string;
+        themes: string[];
+        literaryDevices: string[];
+        gradeLevel: string;
+        questionFormat: 'multiple_choice' | 'short_answer' | 'extended_response' | 'text_evidence' | 'mixed';
+        focusAreas: string[];
+        includeTextReferences: boolean;
+        includeRubric: boolean;
+        lessonObjectives?: string[];
+      };
     };
 
     if (!topics || topics.length === 0) {
@@ -590,7 +604,157 @@ WARM-UP MODE (Confidence Building):
   }
 ]`;
 
-const prompt = `You are an expert math educator creating a professional, textbook-quality worksheet structured around BLOOM'S TAXONOMY for NYS Regents preparation.
+// Check if this is an English Literature worksheet
+const isEnglishLiterature = englishContext && topics[0]?.subject === 'English';
+
+let prompt: string;
+
+if (isEnglishLiterature) {
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // ENGLISH LITERATURE WORKSHEET PROMPT
+  // ═══════════════════════════════════════════════════════════════════════════════
+  
+  const formatInstructions: Record<string, string> = {
+    'multiple_choice': `Generate ONLY multiple choice questions with exactly 4 options (A, B, C, D).
+Include the "options" field as an array of 4 strings.
+Include the "answer" field with the correct letter (A, B, C, or D).`,
+    'short_answer': `Generate short answer questions requiring 1-3 sentence responses.
+Include the "answer" field with a model response.`,
+    'extended_response': `Generate extended response questions requiring paragraph-length analysis (4-6 sentences).
+Include the "answer" field with key points the response should address.
+Include "rubricPoints" field with the point value (typically 4-6 points).`,
+    'text_evidence': `Generate text evidence questions that require students to cite AND explain evidence from the text.
+Each question should ask students to find a quote and explain its significance.
+Include the "answer" field with an example text reference and explanation.
+Include "textReference" field with a suggested passage reference (e.g., "Chapter 3, page 45").`,
+    'mixed': `Generate a MIX of question formats:
+- 30% Multiple Choice (include "options" array with 4 choices)
+- 30% Short Answer
+- 25% Extended Response (include "rubricPoints")
+- 15% Text Evidence (include "textReference")
+Include the appropriate fields for each question type.`
+  };
+
+  const focusAreaDescriptions: Record<string, string> = {
+    'character': 'character development, motivations, relationships, and character arcs',
+    'theme': 'central themes, recurring motifs, and thematic development',
+    'literary_devices': 'literary devices, figurative language, and stylistic choices',
+    'plot': 'plot structure, key events, conflict development, and resolution',
+    'setting': 'setting details, historical context, and how setting influences the narrative',
+    'author_purpose': "author's purpose, intended audience, and rhetorical strategies",
+    'symbolism': 'symbols, their meanings, and how they reinforce themes',
+    'conflict': 'types of conflict (internal/external), conflict development, and resolution',
+  };
+
+  const selectedFocusDescriptions = englishContext.focusAreas
+    .map(area => focusAreaDescriptions[area] || area)
+    .join('; ');
+
+  const textReferenceInstruction = englishContext.includeTextReferences
+    ? `IMPORTANT: Include specific text references in your questions when applicable.
+Examples: "In Chapter 3, when Scout says...", "Referring to the scene where...", "Based on the passage describing..."`
+    : '';
+
+  const rubricInstruction = englishContext.includeRubric
+    ? `Include a "rubricPoints" field (2-6 points) for extended response and text evidence questions.`
+    : '';
+
+  const lessonObjectivesInstruction = englishContext.lessonObjectives?.length
+    ? `\nALIGN QUESTIONS TO THESE LESSON OBJECTIVES:\n${englishContext.lessonObjectives.map((o, i) => `${i + 1}. ${o}`).join('\n')}`
+    : '';
+
+  prompt = `You are an expert English Language Arts educator creating a professional, NYS-aligned literature assessment.
+
+LITERARY TEXT CONTEXT:
+═══════════════════════════════════════════════════════════════════════════════
+Title: "${englishContext.textTitle}" by ${englishContext.author}
+Genre: ${englishContext.genre}
+Grade Level: ${englishContext.gradeLevel}
+Key Themes: ${englishContext.themes.join(', ')}
+Literary Devices: ${englishContext.literaryDevices.join(', ')}
+═══════════════════════════════════════════════════════════════════════════════
+
+TOPIC/LESSON FOCUS:
+${topicsList}
+${lessonObjectivesInstruction}
+
+QUESTION FORMAT REQUIREMENTS:
+═══════════════════════════════════════════════════════════════════════════════
+${formatInstructions[englishContext.questionFormat] || formatInstructions['mixed']}
+
+FOCUS AREAS (emphasize these in your questions):
+${selectedFocusDescriptions}
+
+${textReferenceInstruction}
+${rubricInstruction}
+
+COGNITIVE LEVELS (Bloom's Taxonomy for Literature):
+═══════════════════════════════════════════════════════════════════════════════
+${bloomInstruction}
+
+COMPREHENSION LEVEL (Remember/Understand):
+├── Identify characters, settings, plot events
+├── Summarize sections or chapters
+├── Define vocabulary in context
+└── Example: "Who is the narrator of the story?" / "What event triggers the main conflict?"
+
+ANALYSIS LEVEL (Apply/Analyze):
+├── Analyze character motivations and development
+├── Examine literary devices and their effects
+├── Compare and contrast elements within the text
+└── Example: "How does the author use symbolism to develop the theme of innocence?" / "Analyze the significance of the setting in Chapter 4."
+
+HIGHER-ORDER LEVEL (Evaluate/Create):
+├── Evaluate character decisions and author choices
+├── Synthesize themes across the text
+├── Construct arguments using textual evidence
+└── Example: "Evaluate whether the protagonist's final decision was justified. Use evidence from the text." / "How does this text reflect the social issues of its time?"
+
+REQUIREMENTS:
+1. Generate exactly ${questionCount} questions
+2. Include "bloomLevel" (remember, understand, apply, analyze, evaluate, or create) for each question
+3. Include "bloomVerb" with the action verb used
+4. Include "cognitiveLevel" (comprehension, analysis, or higher-order) 
+5. Questions should be engaging and require genuine engagement with the text
+6. Use specific character names, events, and details from the text
+7. For extended response, provide clear criteria for a strong answer
+8. Questions should be appropriate for grade level ${englishContext.gradeLevel}
+
+STANDARD ALIGNMENT:
+Use NYS/Common Core ELA standards. Common standards for literature:
+- RL.9-10.1 / RL.11-12.1: Cite textual evidence
+- RL.9-10.2 / RL.11-12.2: Determine themes
+- RL.9-10.3 / RL.11-12.3: Analyze character development
+- RL.9-10.4 / RL.11-12.4: Determine word meanings, analyze word choice
+- RL.9-10.5 / RL.11-12.5: Analyze text structure
+- RL.9-10.6 / RL.11-12.6: Analyze point of view
+
+Respond with a JSON array:
+[
+  {
+    "questionNumber": 1,
+    "topic": "${englishContext.textTitle}",
+    "standard": "RL.9-10.3",
+    "question": "The full question text here",
+    "difficulty": "medium",
+    "bloomLevel": "analyze",
+    "bloomVerb": "analyze",
+    "cognitiveLevel": "analysis",
+    "questionFormat": "short_answer",
+    "answer": "Model answer or key points"${englishContext.includeTextReferences ? ',\n    "textReference": "Chapter/page reference"' : ''}${englishContext.includeRubric ? ',\n    "rubricPoints": 4' : ''}
+  }
+]
+
+For multiple choice questions, include: "options": ["A. First option", "B. Second option", "C. Third option", "D. Fourth option"]
+
+IMPORTANT: Return ONLY the JSON array, no other text.`;
+
+} else {
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // ORIGINAL MATH/SCIENCE WORKSHEET PROMPT
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+prompt = `You are an expert math educator creating a professional, textbook-quality worksheet structured around BLOOM'S TAXONOMY for NYS Regents preparation.
 
 Based on the following standards and topics, generate exactly ${questionCount} questions that progressively move through Bloom's Taxonomy cognitive levels.
 
@@ -704,6 +868,8 @@ Bloom levels required: remember, understand, apply, analyze, evaluate, create (d
 ${worksheetMode === 'diagnostic' ? 'Advancement levels required: A, B, C, D, E, F (distribute across all levels)' : ''}
 
 IMPORTANT: Return ONLY the JSON array, no other text.`;
+
+}
 
     const content = await callLovableAI(prompt);
 
