@@ -103,6 +103,63 @@ Set isValid=false if there are ANY of the issues listed above.`,
   }
 }
 
+// Generate high-quality presentation image using Nano Banana Pro (google/gemini-3-pro-image-preview)
+// This uses the user's EXACT prompt without any math/geometry templating
+async function generatePresentationImage(prompt: string): Promise<string | null> {
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) {
+    console.error("LOVABLE_API_KEY not configured");
+    return null;
+  }
+
+  try {
+    console.log("Generating presentation image with Nano Banana Pro...");
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-pro-image-preview",
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        modalities: ["image", "text"],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Nano Banana Pro API error:", response.status, errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log("Nano Banana Pro response received");
+
+    // Extract image from the response
+    const images = data.choices?.[0]?.message?.images;
+    if (images && images.length > 0) {
+      const imageUrl = images[0]?.image_url?.url;
+      if (imageUrl) {
+        console.log("Successfully generated presentation image with Nano Banana Pro");
+        return imageUrl;
+      }
+    }
+
+    console.log("No image in Nano Banana Pro response");
+    return null;
+  } catch (error) {
+    console.error("Error generating presentation image:", error);
+    return null;
+  }
+}
+
 // Generate image using Nano Banana (google/gemini-2.5-flash-image-preview)
 async function generateImageWithNanoBanana(
   prompt: string,
@@ -1057,29 +1114,41 @@ serve(async (req) => {
   try {
     const body = await req.json();
 
-    // Support presentation-style image generation
+    // Support presentation-style and clipart image generation
+    // This path uses the user's EXACT prompt without math/coordinate plane templating
     if (body.prompt && (body.style === "clipart" || body.style === "presentation")) {
-      console.log(`Generating ${body.style} image with Nano Banana (google/gemini-2.5-flash-image-preview)...`);
+      console.log(`Generating ${body.style} image with Nano Banana Pro (google/gemini-3-pro-image-preview)...`);
 
       const isPresentation = body.style === "presentation";
+      const userPrompt = body.prompt;
+      const topic = body.topic || "";
+      const slideTitle = body.slideTitle || "";
 
-      const clipartPrompt = isPresentation
-        ? `Generate a high-quality, photorealistic or professionally illustrated image for an educational classroom presentation.
+      // Build a prompt that STRICTLY follows the user's description
+      // No math templates, no coordinate planes - just what the teacher asked for
+      const presentationPrompt = isPresentation
+        ? `Create a high-quality educational illustration for a classroom presentation.
 
-Topic/Subject: ${body.prompt}
+IMPORTANT: Generate EXACTLY what is described below. Do NOT add math elements, coordinate planes, graphs, or any content not explicitly requested.
 
-Image Requirements:
-- Ultra high resolution, sharp and detailed
-- Vibrant, rich colors with good contrast
-- Professional educational illustration style
-- Suitable for display on dark presentation backgrounds
-- NO TEXT, NO LABELS, NO WORDS in the image
-- Clean composition focused on the main subject
-- Modern, engaging visual that captures student attention
-- Think: National Geographic quality, textbook illustration quality`
+User's Description: "${userPrompt}"
+${topic ? `\nPresentation Topic: ${topic}` : ""}
+${slideTitle ? `\nSlide Title: ${slideTitle}` : ""}
+
+Image Style Requirements:
+- Ultra high resolution, sharp and detailed  
+- Vibrant, rich colors with good contrast for projection on dark backgrounds
+- Professional educational illustration quality
+- NO TEXT, NO LABELS, NO WORDS in the image whatsoever
+- Clean composition focused on the main subject described
+- Visually engaging for students
+- Photorealistic or high-quality digital illustration style
+- Match the subject matter exactly: if the user asks for books, create books; if they ask for Congress, create Congress imagery
+
+CRITICAL: The image MUST directly relate to the user's description. Do NOT default to mathematical diagrams.`
         : `Generate a clean, simple clipart-style illustration.
 
-Subject: ${body.prompt}
+Subject: ${userPrompt}
 
 Requirements:
 - Simple flat vector-style illustration
@@ -1087,10 +1156,19 @@ Requirements:
 - Suitable for presentations and educational materials
 - Single object, centered composition
 - Professional and friendly style
-- NO TEXT or labels`;
+- NO TEXT or labels
+- Do NOT include math elements unless specifically requested`;
 
-      const result = await generateImageWithNanoBanana(clipartPrompt);
-      let imageUrl = result.imageUrl;
+      // Use Gemini Pro for presentation images (higher quality)
+      const imageResult = await generatePresentationImage(presentationPrompt);
+      let imageUrl = imageResult;
+
+      // If Pro fails, try the standard Nano Banana
+      if (!imageUrl) {
+        console.log("Pro model failed, trying standard Nano Banana...");
+        const result = await generateImageWithNanoBanana(presentationPrompt);
+        imageUrl = result.imageUrl;
+      }
 
       // If Nano Banana fails, try SVG fallback (only for clipart style)
       if (!imageUrl && !isPresentation) {
@@ -1100,7 +1178,7 @@ Requirements:
 
       // Return imageUrl (null is acceptable - frontend should handle gracefully)
       return new Response(
-        JSON.stringify({ imageUrl: imageUrl || null, fallback: !imageUrl, validation: result.validation }),
+        JSON.stringify({ imageUrl: imageUrl || null, fallback: !imageUrl }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
