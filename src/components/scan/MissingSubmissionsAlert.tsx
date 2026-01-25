@@ -348,7 +348,7 @@ export function MissingSubmissionsAlert({
             </div>
 
             {/* Missing Students List */}
-            <ScrollArea className="max-h-[300px]">
+            <div className="max-h-[400px] overflow-y-auto pr-2">
               <div className="space-y-2">
                 {missingStudents.map(student => {
                   const markedReason = markedStudents.get(student.id);
@@ -421,7 +421,7 @@ export function MissingSubmissionsAlert({
                   );
                 })}
               </div>
-            </ScrollArea>
+            </div>
 
             {/* Summary Footer */}
             {markedStudents.size > 0 && (
