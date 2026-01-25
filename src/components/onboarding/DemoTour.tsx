@@ -242,7 +242,8 @@ const demoTourSteps: Step[] = [
     title: '📷 Step 3: Scan & Grade',
     content: (
       <div className="text-left space-y-2">
-        <p>This is the <strong>game-changer</strong>. Scan student work with a camera or scanner, upload to Google Drive, and get instant AI grading.</p>
+        <p>This is where the <strong>magic happens</strong>!</p>
+        <p className="text-sm text-muted-foreground">Scan in student work with a camera or scanner → Upload to Google Drive → AI grades and identifies misconceptions</p>
         <DemoScanFeature />
       </div>
     ),
