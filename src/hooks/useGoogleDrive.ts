@@ -31,8 +31,9 @@ export function useGoogleDrive() {
   const [currentPath, setCurrentPath] = useState<DriveFolder[]>([]);
 
   // Listen for auth state changes to capture provider tokens after OAuth
+  // Keep callback synchronous to avoid Supabase auth deadlocks.
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // After OAuth callback (SIGNED_IN or TOKEN_REFRESHED), capture and store the provider token
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.provider_token) {
         // Store the token and set expiry (provider tokens typically last 1 hour)
