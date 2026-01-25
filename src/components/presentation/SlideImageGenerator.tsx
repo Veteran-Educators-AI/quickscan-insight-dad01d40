@@ -1,11 +1,11 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Image, Wand2, Loader2, X, Move, ZoomIn, ZoomOut, 
   RotateCcw, Check, Trash2, GripVertical, Maximize2, Minimize2,
   LayoutGrid, PieChart, BarChart3, GitBranch, Layers, Target,
   Lightbulb, Workflow, Users, BookOpen, Beaker, Globe, Calculator,
-  Atom, Brain, Clock
+  Atom, Brain, Clock, Sparkles, Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getSubjectSuggestions, createTopicSpecificPrompt, type ImageSuggestion } from '@/data/presentationImageSuggestions';
 
 // Template categories and items
 const imageTemplates = {
@@ -91,6 +92,13 @@ export function SlideImageGenerator({
   const [initialSize, setInitialSize] = useState({ width: 400, height: 300 });
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
+
+  // Get topic-specific image suggestions
+  const topicSuggestions = useMemo(() => {
+    // Extract subject from topic if possible
+    const subject = topic.split(' - ')[0] || topic;
+    return getSubjectSuggestions(subject, topic, slideTitle);
+  }, [topic, slideTitle]);
 
   useEffect(() => {
     if (currentImage) {
@@ -288,13 +296,58 @@ export function SlideImageGenerator({
                 <LayoutGrid className="h-4 w-4" />
                 Quick Templates
               </Label>
-              <Tabs defaultValue="diagrams" className="w-full">
-                <TabsList className="w-full grid grid-cols-4 h-auto">
+              <Tabs defaultValue="suggested" className="w-full">
+                <TabsList className="w-full grid grid-cols-5 h-auto">
+                  <TabsTrigger value="suggested" className="text-xs py-1.5 gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    Topic
+                  </TabsTrigger>
                   <TabsTrigger value="diagrams" className="text-xs py-1.5">Diagrams</TabsTrigger>
                   <TabsTrigger value="charts" className="text-xs py-1.5">Charts</TabsTrigger>
                   <TabsTrigger value="concepts" className="text-xs py-1.5">Concepts</TabsTrigger>
                   <TabsTrigger value="subjects" className="text-xs py-1.5">Subjects</TabsTrigger>
                 </TabsList>
+
+                {/* Topic-Specific Suggestions - NEW TAB */}
+                <TabsContent value="suggested" className="mt-3">
+                  <ScrollArea className="h-[180px]">
+                    <div className="space-y-2 pr-4">
+                      {topicSuggestions.length > 0 ? (
+                        topicSuggestions.map((suggestion) => (
+                          <Button
+                            key={suggestion.id}
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                              "w-full h-auto py-3 px-3 flex items-center justify-between text-left",
+                              "hover:bg-primary/10 hover:border-primary transition-colors"
+                            )}
+                            onClick={() => {
+                              const fullPrompt = createTopicSpecificPrompt(suggestion.prompt, topic, slideTitle);
+                              setPrompt(fullPrompt);
+                              toast.success(`"${suggestion.title}" prompt loaded!`);
+                            }}
+                            disabled={isGenerating}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm truncate">{suggestion.title}</div>
+                              <div className="text-xs text-muted-foreground">{suggestion.category}</div>
+                            </div>
+                            <Plus className="h-4 w-4 text-primary flex-shrink-0 ml-2" />
+                          </Button>
+                        ))
+                      ) : (
+                        <div className="text-sm text-muted-foreground text-center py-4">
+                          No specific suggestions for this topic. Try the other tabs or write a custom prompt.
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ✨ Click any suggestion to load a detailed, topic-aligned prompt.
+                  </p>
+                </TabsContent>
+
                 {Object.entries(imageTemplates).map(([category, templates]) => (
                   <TabsContent key={category} value={category} className="mt-3">
                     <ScrollArea className="h-[140px]">
@@ -311,7 +364,7 @@ export function SlideImageGenerator({
                                 "hover:bg-primary/10 hover:border-primary transition-colors"
                               )}
                               onClick={() => {
-                                const contextualPrompt = `${template.prompt} Related to: ${topic} - ${slideTitle}.`;
+                                const contextualPrompt = `${template.prompt} This illustration is specifically for a presentation about "${topic}" with the current slide titled "${slideTitle}". Ensure the imagery directly relates to the subject matter being taught.`;
                                 setPrompt(contextualPrompt);
                                 toast.success(`Template "${template.label}" applied!`);
                               }}
