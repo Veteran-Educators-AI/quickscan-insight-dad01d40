@@ -49,6 +49,7 @@ interface PushRequest {
   student_name?: string;     // The student's name
   grade?: number;            // The grade (0-100)
   topic_name?: string;       // The topic/subject of the work
+  questions?: any[];         // Generated remediation or mastery challenge questions
   // Behavior deduction fields
   xp_deduction?: number;     // XP to remove for behavior
   coin_deduction?: number;   // Coins to remove for behavior
@@ -77,6 +78,7 @@ function convertToSisterAppFormat(requestData: PushRequest) {
       student_name: requestData.student_name,
       printable_url: requestData.printable_url,
       due_at: requestData.due_at,
+      questions: requestData.questions || [], // Include generated questions
       timestamp: new Date().toISOString(),
     }
   };

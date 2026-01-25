@@ -14,6 +14,7 @@ interface PushToSisterAppParams {
   student_name?: string;
   grade?: number;
   topic_name?: string;
+  questions?: any[]; // Generated remediation or mastery challenge questions
 }
 
 export function usePushToSisterApp() {
