@@ -48,31 +48,9 @@ export const SCHOOL_BRANDINGS: Record<string, SchoolBranding> = {
 
 // Get branding based on current context (could be domain, subdomain, or stored preference)
 export function getSchoolBranding(): SchoolBranding {
-  // Check localStorage for school override (for demo/testing)
-  const storedSchool = localStorage.getItem('school_branding');
-  if (storedSchool && SCHOOL_BRANDINGS[storedSchool]) {
-    return SCHOOL_BRANDINGS[storedSchool];
-  }
-
-  // Check URL for school parameter
-  const urlParams = new URLSearchParams(window.location.search);
-  const schoolParam = urlParams.get('school');
-  if (schoolParam && SCHOOL_BRANDINGS[schoolParam]) {
-    // Store in localStorage for persistence
-    localStorage.setItem('school_branding', schoolParam);
-    return SCHOOL_BRANDINGS[schoolParam];
-  }
-
-  // Check subdomain
-  const hostname = window.location.hostname;
-  for (const branding of Object.values(SCHOOL_BRANDINGS)) {
-    if (branding.domain && hostname.includes(branding.domain)) {
-      return branding;
-    }
-  }
-
-  // Default to NYClogic
-  return DEFAULT_BRANDING;
+  // For demo: Default to Hillcrest branding
+  // In production, this would be controlled by domain or admin settings
+  return SCHOOL_BRANDINGS.hillcrest;
 }
 
 // Set school branding (for admin/demo purposes)
