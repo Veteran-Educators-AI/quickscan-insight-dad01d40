@@ -563,40 +563,27 @@ export function NycologicPresents({
                       height: Math.min(slide.image.size?.height || 225, 300),
                     }}
                   >
-                    {/* Gradient overlay for seamless blending - top */}
+                    {/* Gradient mesh overlay for seamless blending - creates smooth transition on all edges */}
                     <div 
-                      className="absolute inset-x-0 top-0 h-12 z-10 pointer-events-none"
+                      className="absolute inset-0 z-10 pointer-events-none"
                       style={{
-                        background: `linear-gradient(to bottom, ${backgroundStyle.includes('linear-gradient') ? 
-                          backgroundStyle.match(/,\s*([^,]+)\s+0%/)?.[1] || 'rgba(15, 23, 42, 0.9)' : 
-                          'rgba(15, 23, 42, 0.9)'}, transparent)`
+                        background: `
+                          radial-gradient(ellipse at center, transparent 30%, rgba(15, 23, 42, 0.3) 70%, rgba(15, 23, 42, 0.85) 100%),
+                          linear-gradient(to bottom, rgba(15, 23, 42, 0.9) 0%, transparent 15%, transparent 85%, rgba(15, 23, 42, 0.9) 100%),
+                          linear-gradient(to right, rgba(15, 23, 42, 0.9) 0%, transparent 15%, transparent 85%, rgba(15, 23, 42, 0.9) 100%)
+                        `,
                       }}
                     />
-                    {/* Gradient overlay for seamless blending - bottom */}
+                    {/* Additional corner vignettes for smoother blending */}
                     <div 
-                      className="absolute inset-x-0 bottom-0 h-12 z-10 pointer-events-none"
+                      className="absolute inset-0 z-10 pointer-events-none"
                       style={{
-                        background: `linear-gradient(to top, ${backgroundStyle.includes('linear-gradient') ? 
-                          backgroundStyle.match(/,\s*([^,]+)\s+100%/)?.[1] || 'rgba(15, 23, 42, 0.9)' : 
-                          'rgba(15, 23, 42, 0.9)'}, transparent)`
-                      }}
-                    />
-                    {/* Gradient overlay for seamless blending - left */}
-                    <div 
-                      className="absolute inset-y-0 left-0 w-12 z-10 pointer-events-none"
-                      style={{
-                        background: `linear-gradient(to right, ${backgroundStyle.includes('linear-gradient') ? 
-                          backgroundStyle.match(/,\s*([^,]+)\s+0%/)?.[1] || 'rgba(15, 23, 42, 0.9)' : 
-                          'rgba(15, 23, 42, 0.9)'}, transparent)`
-                      }}
-                    />
-                    {/* Gradient overlay for seamless blending - right */}
-                    <div 
-                      className="absolute inset-y-0 right-0 w-12 z-10 pointer-events-none"
-                      style={{
-                        background: `linear-gradient(to left, ${backgroundStyle.includes('linear-gradient') ? 
-                          backgroundStyle.match(/,\s*([^,]+)\s+100%/)?.[1] || 'rgba(15, 23, 42, 0.9)' : 
-                          'rgba(15, 23, 42, 0.9)'}, transparent)`
+                        background: `
+                          radial-gradient(ellipse at top left, rgba(15, 23, 42, 0.7) 0%, transparent 50%),
+                          radial-gradient(ellipse at top right, rgba(15, 23, 42, 0.7) 0%, transparent 50%),
+                          radial-gradient(ellipse at bottom left, rgba(15, 23, 42, 0.7) 0%, transparent 50%),
+                          radial-gradient(ellipse at bottom right, rgba(15, 23, 42, 0.7) 0%, transparent 50%)
+                        `,
                       }}
                     />
                     {/* The actual image */}
