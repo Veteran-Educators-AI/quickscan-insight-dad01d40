@@ -683,6 +683,81 @@ Set isValid=false if there are ANY of the issues listed above.`,
 
 // Generate high-quality presentation image using Nano Banana Pro (google/gemini-3-pro-image-preview)
 // This uses the user's EXACT prompt without any math/geometry templating
+// Enhance an existing image by adding elements to it
+async function enhanceExistingImage(imageUrl: string, enhancement: string): Promise<string | null> {
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) {
+    console.error("LOVABLE_API_KEY not configured");
+    return null;
+  }
+
+  try {
+    console.log("Enhancing image with:", enhancement);
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-image",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Enhance this educational image by: ${enhancement}
+
+IMPORTANT REQUIREMENTS:
+- Keep the original subject and composition intact
+- Add the requested enhancement naturally and seamlessly
+- Maintain professional educational quality
+- Do NOT add any text, labels, or words
+- Keep the same style and color palette
+- The enhancement should complement, not replace, the existing content`,
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: imageUrl,
+                },
+              },
+            ],
+          },
+        ],
+        modalities: ["image", "text"],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Image enhancement API error:", response.status, errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log("Image enhancement response received");
+
+    // Extract image from the response
+    const images = data.choices?.[0]?.message?.images;
+    if (images && images.length > 0) {
+      const enhancedImageUrl = images[0]?.image_url?.url;
+      if (enhancedImageUrl) {
+        console.log("Successfully enhanced image");
+        return enhancedImageUrl;
+      }
+    }
+
+    console.log("No enhanced image in response");
+    return null;
+  } catch (error) {
+    console.error("Error enhancing image:", error);
+    return null;
+  }
+}
+
 async function generatePresentationImage(prompt: string): Promise<string | null> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
   if (!apiKey) {
@@ -1897,6 +1972,18 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
+
+    // Handle image enhancement requests
+    if (body.action === "enhance" && body.imageUrl && body.enhancement) {
+      console.log("Processing image enhancement request...");
+      
+      const enhancedUrl = await enhanceExistingImage(body.imageUrl, body.enhancement);
+      
+      return new Response(
+        JSON.stringify({ imageUrl: enhancedUrl, success: !!enhancedUrl }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // Support presentation-style and clipart image generation
     // Presentations use REAL PNG/JPEG image generation (not SVG) for better compatibility
