@@ -753,7 +753,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             const q = questions.warmUp[warmUpIdx];
             const sanitizedQuestion = formatPdfText(q.question);
             const shapeKey = `${assignedForm}-${student.recommendedLevel}-warmUp-${warmUpIdx}`;
-            const generatedShapeUrl = geometryShapes[shapeKey];
+            const altWarmUpKey = `${cacheKey}-warmUp-${warmUpIdx}`;
+            const generatedShapeUrl = geometryShapes[shapeKey] || geometryShapes[altWarmUpKey];
             const hasShape = ((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl;
             children.push(
               new Paragraph({
@@ -772,6 +773,21 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 let imageData = generatedShapeUrl || q.imageUrl || '';
                 if (!imageData && q.svg && !q.imageUrl) {
                   imageData = await svgToPngDataUrl(q.svg, 200, 200);
+                }
+                // If still no image but we have an imagePrompt, generate on-demand
+                if (!imageData && q.imagePrompt && includeGeometry) {
+                  try {
+                    const { data: genData } = await supabase.functions.invoke('generate-diagram-images', {
+                      body: {
+                        questions: [{ questionNumber: 1, imagePrompt: q.imagePrompt }],
+                        useNanoBanana: useAIImages,
+                        preferDeterministicSVG: preferDeterministicSVG,
+                      },
+                    });
+                    imageData = genData?.results?.[0]?.imageUrl || '';
+                  } catch (genError) {
+                    console.error('Error generating warm-up shape on-demand for Word:', genError);
+                  }
                 }
                 if (imageData) {
                   const imageBuffer = await fetchImageAsArrayBuffer(imageData);
@@ -879,11 +895,30 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             );
 
             // Add geometry image if available (for main questions) - check generated shapes first
-            if (generatedShapeUrl || ((q.imageUrl || q.svg) && includeGeometry)) {
+            // Also try alternative key formats for robustness
+            const altShapeKey = `${cacheKey}-main-${idx}`;
+            const finalShapeUrl = generatedShapeUrl || geometryShapes[altShapeKey];
+            
+            if (finalShapeUrl || ((q.imageUrl || q.svg) && includeGeometry)) {
               try {
-                let imageData = generatedShapeUrl || q.imageUrl || '';
+                let imageData = finalShapeUrl || q.imageUrl || '';
                 if (!imageData && q.svg && !q.imageUrl) {
                   imageData = await svgToPngDataUrl(q.svg, 200, 200);
+                }
+                // If still no image but we have an imagePrompt, generate on-demand
+                if (!imageData && q.imagePrompt && includeGeometry) {
+                  try {
+                    const { data: genData } = await supabase.functions.invoke('generate-diagram-images', {
+                      body: {
+                        questions: [{ questionNumber: 1, imagePrompt: q.imagePrompt }],
+                        useNanoBanana: useAIImages,
+                        preferDeterministicSVG: preferDeterministicSVG,
+                      },
+                    });
+                    imageData = genData?.results?.[0]?.imageUrl || '';
+                  } catch (genError) {
+                    console.error('Error generating shape on-demand for Word:', genError);
+                  }
                 }
                 if (imageData) {
                   const imageBuffer = await fetchImageAsArrayBuffer(imageData);
