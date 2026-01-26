@@ -12,6 +12,8 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { validateEmail, validatePassword } from '@/lib/passwordValidation';
 import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
+import { useSchoolBranding } from '@/hooks/useSchoolBranding';
+import { PoweredByBadge } from '@/components/PoweredByBadge';
 import nycologicLogo from '@/assets/nycologic-brain-logo.png';
 
 const REMEMBER_ME_KEY = 'scan_genius_remember_me';
@@ -48,6 +50,7 @@ export default function Login() {
   const navigate = useNavigate();
   const { signIn, signUp, resetPassword, authError, clearAuthError } = useAuth();
   const { toast } = useToast();
+  const { branding, isCustomBranding } = useSchoolBranding();
 
   // Show retry button after 5 seconds of loading
   useEffect(() => {
@@ -303,34 +306,34 @@ export default function Login() {
     signupConfirmPassword.length > 0;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
       {/* Background decoration */}
       <div className="fixed inset-0 -z-10 overflow-hidden">
         <div className="absolute -top-1/2 -right-1/2 w-full h-full rounded-full bg-primary/5 blur-3xl" />
         <div className="absolute -bottom-1/2 -left-1/2 w-full h-full rounded-full bg-accent/5 blur-3xl" />
       </div>
 
-      <div className="w-full max-w-md animate-fade-in">
+      <div className="w-full max-w-md animate-fade-in flex-1 flex flex-col justify-center">
         {/* Logo */}
         <div className="text-center mb-8">
           <img
-            src={nycologicLogo}
-            alt="NYClogic Ai"
+            src={branding.logo || nycologicLogo}
+            alt={`${branding.displayName} ${branding.aiSuffix}`}
             className="h-44 w-auto mx-auto mb-2"
           />
           <div className="flex items-center justify-center gap-3">
             <h1 className="text-5xl md:text-6xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Darker Grotesque', sans-serif" }}>
-              Nyclogic <span className="text-primary">Ai<sup className="text-xs align-super ml-0.5">™</sup></span>
+              {branding.displayName} <span className="text-primary">{branding.aiSuffix}<sup className="text-xs align-super ml-0.5">™</sup></span>
             </h1>
             <span className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-md border border-amber-500/30 animate-pulse">
               Beta
             </span>
           </div>
           <p className="text-muted-foreground mt-2">
-            Fast, structured diagnostics aligned to state standards
+            {branding.tagline}
           </p>
           <p className="text-sm text-muted-foreground/80 mt-1 italic">
-            Developed for urban minds by urban educators
+            {branding.secondaryTagline}
           </p>
         </div>
 
@@ -885,6 +888,11 @@ export default function Login() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Powered by badge - shown when using custom school branding */}
+      {isCustomBranding && (
+        <PoweredByBadge className="mt-8 mb-4" />
       )}
     </div>
   );
