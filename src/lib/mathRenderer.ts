@@ -617,6 +617,10 @@ export function sanitizeForPDF(text: string): string {
     [/Ø=Ü[¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿]?/g, ''],  // Corrupted emoji patterns
     [/Ã˜=Ã[^\s]*/g, ''],  // Another corruption pattern
     
+    // Pi corruption patterns in PDF text
+    [/Ã\s*\[\s*\]/g, 'π'],  // "Ã [ ]" pattern -> π
+    [/Ã\s+(?=inches|cm|meters|units|square|cubic)/gi, 'π '], // "Ã " before units -> π
+    
     // Common Â prefix corruption (UTF-8 BOM or encoding issue)
     [/Â\s*π/g, 'π'],
     [/Âπ/g, 'π'],
@@ -739,6 +743,9 @@ export function fixEncodingCorruption(text: string): string {
     [/2À/g, '2π'],
     [/À/g, 'π'],
     [/Ã€/g, 'π'],
+    [/Ã\s*\[\s*\]/g, 'π'],  // "Ã [ ]" pattern -> π
+    [/Ã\s+/g, 'π'],          // "Ã " with trailing space -> π
+    [/Ã(?=\s*inches|\s*cm|\s*meters|\s*units|\s*square|\s*cubic)/gi, 'π'], // Ã before units -> π
     [/ð/g, 'π'],
 
     // Subscript corruption patterns (w• -> w₁, w, -> w₂, wƒ -> w₃)
