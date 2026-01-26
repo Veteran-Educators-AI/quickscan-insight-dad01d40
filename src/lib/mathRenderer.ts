@@ -35,7 +35,7 @@ const latexCommands: Record<string, string> = {
   '\\geq': '≥',
   '\\ge': '≥',
   '\\approx': '≈',
-  '\\sim': '~',
+  '\\sim': '∼',
   '\\equiv': '≡',
   '\\cong': '≅',
   '\\pm': '±',
@@ -43,7 +43,7 @@ const latexCommands: Record<string, string> = {
   '\\times': '×',
   '\\div': '÷',
   '\\cdot': '·',
-  '\\ast': '*',
+  '\\ast': '∗',
   
   // Arrows (LaTeX)
   '\\rightarrow': '→',
@@ -137,7 +137,7 @@ const mathSymbols: Record<string, string> = {
   'perp': '⊥',
   'parallel': '∥',
   'congruent': '≅',
-  'similar': '~',
+  'similar': '∼',
   'triangle': '△',
   'circle': '○',
   'square': '□',
@@ -649,38 +649,8 @@ export function sanitizeForPDF(text: string): string {
     result = result.replace(pattern, replacement);
   }
   
-  // IMPORTANT: Keep Unicode math symbols that jsPDF can render correctly!
-  // These include: π, θ, √, ², ³, ≤, ≥, ±, °, ∞, α, β, γ, δ, etc.
-  // Only convert arrows and some geometry symbols that may not render well
-  const safeReplacements: [RegExp, string][] = [
-    // Arrows - convert to ASCII since they may not render consistently
-    [/→/g, '->'],
-    [/←/g, '<-'],
-    [/↔/g, '<->'],
-    [/⇒/g, '=>'],
-    
-    // Some less common geometry symbols
-    [/⊥/g, ' perp '],
-    [/∥/g, ' || '],
-    [/≅/g, ' = '],  // congruent
-    [/∠/g, 'angle '],
-    
-    // Set theory - less commonly needed
-    [/∴/g, 'therefore '],
-    [/∵/g, 'because '],
-    [/∈/g, ' in '],
-    [/⊂/g, ' subset '],
-    [/∪/g, ' union '],
-    [/∩/g, ' intersection '],
-    
-    // Prime symbols
-    [/′/g, "'"],
-    [/″/g, "''"],
-  ];
-  
-  for (const [pattern, replacement] of safeReplacements) {
-    result = result.replace(pattern, replacement);
-  }
+  // Keep Unicode math symbols as-is for accurate rendering.
+  // If a PDF font issue appears later, fix via font embedding instead of downgrading.
   
   // Clean up any double spaces that may have been introduced
   result = result.replace(/\s+/g, ' ').trim();
