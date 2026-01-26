@@ -258,33 +258,50 @@ export default function PresentationView() {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle navigation keys when typing in input fields
+      const activeElement = document.activeElement;
+      const isTyping = activeElement instanceof HTMLInputElement || 
+                       activeElement instanceof HTMLTextAreaElement ||
+                       activeElement?.getAttribute('contenteditable') === 'true';
+      
       switch (e.key) {
         case 'ArrowRight':
         case ' ':
-          e.preventDefault();
-          nextSlide();
+          // Only navigate if not typing in an input
+          if (!isTyping) {
+            e.preventDefault();
+            nextSlide();
+          }
           break;
         case 'ArrowLeft':
-          e.preventDefault();
-          prevSlide();
+          if (!isTyping) {
+            e.preventDefault();
+            prevSlide();
+          }
           break;
         case 'Escape':
           if (document.fullscreenElement) {
             document.exitFullscreen();
+          } else if (showEnhancePanel) {
+            setShowEnhancePanel(false);
           } else {
             navigate(-1);
           }
           break;
         case 'f':
-          toggleFullscreen();
+          if (!isTyping) {
+            toggleFullscreen();
+          }
           break;
         case 't':
         case 'T':
-          setShowSidebar(prev => !prev);
+          if (!isTyping) {
+            setShowSidebar(prev => !prev);
+          }
           break;
         case 'e':
         case 'E':
-          if (!editingField) {
+          if (!isTyping && !editingField) {
             toggleEditMode();
           }
           break;
@@ -293,7 +310,7 @@ export default function PresentationView() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentSlide, nextSlide, prevSlide, navigate]);
+  }, [currentSlide, nextSlide, prevSlide, navigate, showEnhancePanel]);
 
   const toggleFullscreen = async () => {
     if (!document.fullscreenElement) {
