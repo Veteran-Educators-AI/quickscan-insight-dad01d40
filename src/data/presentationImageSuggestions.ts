@@ -432,6 +432,47 @@ No text, numbers, or labels (the geometry should speak for itself). High-resolut
   },
 ];
 
+// Generate dynamic topic-specific suggestions when no pre-built suggestions match
+function generateTopicSpecificSuggestions(topic: string, slideTitle: string): ImageSuggestion[] {
+  // Clean up the topic and slide title
+  const cleanTopic = topic.replace(/\*\*/g, '').trim();
+  const cleanSlideTitle = slideTitle.replace(/\*\*/g, '').replace(/["']/g, '').trim();
+  
+  // Generate 3-4 dynamic suggestions based on the actual topic
+  const suggestions: ImageSuggestion[] = [
+    {
+      id: `dynamic-main-${Date.now()}`,
+      title: `${cleanTopic} - Key Concepts`,
+      category: cleanTopic,
+      prompt: `Create a detailed, educational illustration about ${cleanTopic}. Focus on the core concepts, processes, and ideas that are central to understanding this topic. Show the actual subject matter with accurate visual representations. Use vibrant, engaging colors. Professional quality suitable for classroom use. No text, labels, or words in the image.`,
+    },
+    {
+      id: `dynamic-visual-${Date.now()}`,
+      title: `${cleanTopic} - Visual Representation`,
+      category: cleanTopic,
+      prompt: `Create a vivid visual representation of ${cleanTopic}. Illustrate the main elements and their relationships. Show real-world applications or examples where applicable. Use clear, engaging imagery that helps students understand and remember the concept. Educational quality, no text or labels.`,
+    },
+    {
+      id: `dynamic-diagram-${Date.now()}`,
+      title: `${cleanTopic} - Process Diagram`,
+      category: cleanTopic,
+      prompt: `Create an educational diagram illustrating the key processes or steps involved in ${cleanTopic}. Show how different components relate to each other. Use clear visual flow and engaging colors. Make the concept easy to understand through visual organization. No text, arrows only for flow direction.`,
+    },
+  ];
+  
+  // Add a slide-specific suggestion if the slide title is different from the topic
+  if (cleanSlideTitle && cleanSlideTitle.toLowerCase() !== cleanTopic.toLowerCase()) {
+    suggestions.push({
+      id: `dynamic-slide-${Date.now()}`,
+      title: `${cleanSlideTitle}`,
+      category: cleanTopic,
+      prompt: `Create a detailed illustration specifically about "${cleanSlideTitle}" within the context of ${cleanTopic}. Focus on accurately depicting this specific aspect or concept. Educational quality with engaging visuals. No text or labels.`,
+    });
+  }
+  
+  return suggestions;
+}
+
 // Get suggestions based on subject and topic
 export function getSubjectSuggestions(
   subject: string,
@@ -475,19 +516,21 @@ export function getSubjectSuggestions(
     baseSuggestions = [...baseSuggestions, ...mathSuggestions];
   }
   
+  // Also check for finance/economics topics
+  if (lowerTopic.includes('money') || lowerTopic.includes('finance') || lowerTopic.includes('economics') || 
+      lowerTopic.includes('investment') || lowerTopic.includes('interest') || lowerTopic.includes('value')) {
+    // Generate dynamic suggestions for finance topics
+    return generateTopicSpecificSuggestions(topic, slideTitle);
+  }
+  
   // Remove duplicates
   const uniqueSuggestions = baseSuggestions.filter((s, i, arr) => 
     arr.findIndex(item => item.id === s.id) === i
   );
   
-  // If no matches, return a mix of all suggestions
+  // If no matches, generate dynamic topic-specific suggestions instead of random ones
   if (uniqueSuggestions.length === 0) {
-    return [
-      ...literatureSuggestions.slice(0, 2),
-      ...historySuggestions.slice(0, 2),
-      ...scienceSuggestions.slice(0, 2),
-      ...mathSuggestions.slice(0, 2),
-    ];
+    return generateTopicSpecificSuggestions(topic, slideTitle);
   }
   
   return uniqueSuggestions.slice(0, 8); // Limit to 8 suggestions
