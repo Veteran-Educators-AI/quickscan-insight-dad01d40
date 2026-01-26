@@ -8,10 +8,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Upload, Scan, Check, X, Trash2, Save, Image as ImageIcon, Shapes, Plus } from 'lucide-react';
+import { Loader2, Upload, Scan, Check, X, Trash2, Save, Image as ImageIcon, Shapes, Plus, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface ExtractedShape {
   id: string;
@@ -37,6 +41,10 @@ const SHAPE_TYPES = [
   { value: 'polygon', label: 'Other Polygon' },
   { value: 'parabola', label: 'Parabola' },
   { value: 'linear', label: 'Linear Graph' },
+  { value: 'quadratic', label: 'Quadratic Graph' },
+  { value: 'exponential', label: 'Exponential Graph' },
+  { value: 'coordinate_plane', label: 'Coordinate Plane' },
+  { value: 'number_line', label: 'Number Line' },
   { value: 'force_diagram', label: 'Force Diagram' },
   { value: 'circuit', label: 'Circuit' },
   { value: 'molecule', label: 'Molecule' },
@@ -56,24 +64,120 @@ export function RegentsShapeScanner({ open, onOpenChange }: RegentsShapeScannerP
   
   const [isScanning, setIsScanning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [pdfPages, setPdfPages] = useState<string[]>([]);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [pdfFileName, setPdfFileName] = useState('');
   const [sourceExam, setSourceExam] = useState('');
   const [questionNumber, setQuestionNumber] = useState<number | undefined>();
   const [subject, setSubject] = useState('geometry');
   const [extractedShapes, setExtractedShapes] = useState<ExtractedShape[]>([]);
   const [selectedShapeIndex, setSelectedShapeIndex] = useState<number | null>(null);
 
-  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  // Render a PDF page to an image
+  const renderPdfPage = async (pdf: pdfjsLib.PDFDocumentProxy, pageNum: number): Promise<string> => {
+    const page = await pdf.getPage(pageNum);
+    const scale = 2; // Higher scale for better quality
+    const viewport = page.getViewport({ scale });
+    
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d')!;
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    
+    await page.render({
+      canvasContext: context,
+      viewport: viewport,
+    }).promise;
+    
+    return canvas.toDataURL('image/png');
+  };
+
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setUploadedImage(event.target?.result as string);
-      setExtractedShapes([]);
-    };
-    reader.readAsDataURL(file);
-  }, []);
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    
+    if (isPdf) {
+      setIsLoadingPdf(true);
+      setPdfFileName(file.name);
+      
+      // Auto-detect exam info from filename
+      const filename = file.name.toLowerCase();
+      if (filename.includes('algebra') && filename.includes('1')) {
+        setSubject('algebra1');
+      } else if (filename.includes('algebra') && filename.includes('2')) {
+        setSubject('algebra2');
+      } else if (filename.includes('geometry')) {
+        setSubject('geometry');
+      }
+      
+      // Extract exam date from filename (e.g., 0126ExamAI.pdf -> January 2026)
+      const dateMatch = filename.match(/(\d{2})(\d{2})exam/i);
+      if (dateMatch) {
+        const month = parseInt(dateMatch[1]);
+        const year = 2000 + parseInt(dateMatch[2]);
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const examType = filename.includes('ai') ? 'Algebra 1' : filename.includes('aii') ? 'Algebra 2' : 'Geometry';
+        setSourceExam(`${monthNames[month - 1]} ${year} ${examType} Regents`);
+      }
+      
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const totalPages = pdf.numPages;
+        
+        toast({
+          title: 'Loading PDF',
+          description: `Rendering ${totalPages} pages...`,
+        });
+        
+        const pages: string[] = [];
+        for (let i = 1; i <= totalPages; i++) {
+          const pageImage = await renderPdfPage(pdf, i);
+          pages.push(pageImage);
+        }
+        
+        setPdfPages(pages);
+        setCurrentPageIndex(0);
+        setUploadedImage(pages[0]);
+        setExtractedShapes([]);
+        
+        toast({
+          title: 'PDF Loaded',
+          description: `${totalPages} pages ready to scan for shapes`,
+        });
+      } catch (error) {
+        console.error('PDF loading error:', error);
+        toast({
+          title: 'PDF Load Failed',
+          description: 'Could not load the PDF file. Try a different file.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoadingPdf(false);
+      }
+    } else {
+      // Handle regular image upload
+      setPdfPages([]);
+      setPdfFileName('');
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setUploadedImage(event.target?.result as string);
+        setExtractedShapes([]);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, [toast]);
+
+  const goToPage = (index: number) => {
+    if (index >= 0 && index < pdfPages.length) {
+      setCurrentPageIndex(index);
+      setUploadedImage(pdfPages[index]);
+    }
+  };
 
   const scanForShapes = async () => {
     if (!uploadedImage) return;
@@ -274,21 +378,63 @@ export function RegentsShapeScanner({ open, onOpenChange }: RegentsShapeScannerP
               </div>
             </div>
 
-            {/* Image Upload */}
+            {/* File Upload */}
             <div className="border-2 border-dashed rounded-lg p-4 text-center">
-              {uploadedImage ? (
+              {isLoadingPdf ? (
+                <div className="py-8">
+                  <Loader2 className="h-8 w-8 mx-auto text-primary animate-spin mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Loading PDF pages...
+                  </p>
+                </div>
+              ) : uploadedImage ? (
                 <div className="space-y-3">
+                  {/* PDF Page Navigation */}
+                  {pdfPages.length > 1 && (
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToPage(currentPageIndex - 1)}
+                        disabled={currentPageIndex === 0}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm font-medium">
+                        Page {currentPageIndex + 1} of {pdfPages.length}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToPage(currentPageIndex + 1)}
+                        disabled={currentPageIndex === pdfPages.length - 1}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                  
                   <img
                     src={uploadedImage}
                     alt="Uploaded exam"
                     className="max-h-48 mx-auto rounded border"
                   />
-                  <div className="flex gap-2 justify-center">
+                  
+                  {pdfFileName && (
+                    <Badge variant="secondary" className="text-xs">
+                      <FileText className="h-3 w-3 mr-1" />
+                      {pdfFileName}
+                    </Badge>
+                  )}
+                  
+                  <div className="flex gap-2 justify-center flex-wrap">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
                         setUploadedImage(null);
+                        setPdfPages([]);
+                        setPdfFileName('');
                         setExtractedShapes([]);
                       }}
                     >
@@ -305,7 +451,7 @@ export function RegentsShapeScanner({ open, onOpenChange }: RegentsShapeScannerP
                       ) : (
                         <Scan className="h-4 w-4 mr-1" />
                       )}
-                      Scan for Shapes
+                      Scan Page for Shapes
                     </Button>
                   </div>
                 </div>
@@ -313,17 +459,20 @@ export function RegentsShapeScanner({ open, onOpenChange }: RegentsShapeScannerP
                 <label className="cursor-pointer block">
                   <input
                     type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
+                    accept="image/*,.pdf,application/pdf"
+                    onChange={handleFileUpload}
                     className="hidden"
                   />
                   <div className="py-8">
-                    <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Upload className="h-8 w-8 text-muted-foreground" />
+                      <FileText className="h-8 w-8 text-muted-foreground" />
+                    </div>
                     <p className="text-sm text-muted-foreground">
-                      Upload a Regents exam image
+                      Upload a Regents exam image or PDF
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      PNG, JPG up to 10MB
+                      PNG, JPG, or PDF (e.g., JMAP exam archives)
                     </p>
                   </div>
                 </label>
