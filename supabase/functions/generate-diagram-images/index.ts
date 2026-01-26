@@ -2007,19 +2007,11 @@ Style: Simple line art, clean educational diagram suitable for projection.`
         }
       }
 
-      // STEP 3: Try AI SVG generation
+      // STEP 3: Skip AI generation for worksheets - it's too inaccurate for geometry
+      // Instead, rely on the Regents Shape Library database of scanned verified diagrams
       if (!imageUrl) {
-        if (useNanoBanana) {
-          // Use colored AI images if explicitly requested
-          console.log("Using Nano Banana for colored AI image...");
-          const result = await generateImageWithNanoBanana(q.imagePrompt);
-          imageUrl = result.imageUrl;
-          validation = result.validation;
-        } else {
-          // Use simple B&W AI SVG generation
-          console.log("Using simple B&W AI SVG generation...");
-          imageUrl = await generateSimpleSVGWithAI(q.imagePrompt);
-        }
+        console.log("No matching diagram found in Regents Shape Library. Skipping AI generation (disabled for accuracy).");
+        console.log("Tip: Import more diagrams from Regents PDFs to expand the library.");
       }
 
       // STEP 4: Use hardcoded fallback shapes as last resort
