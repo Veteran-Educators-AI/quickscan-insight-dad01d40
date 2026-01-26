@@ -1637,7 +1637,7 @@ export type Database = {
           source_image_url: string | null
           source_question_number: number | null
           subject: string
-          svg_data: string
+          svg_data: string | null
           tags: string[]
           teacher_id: string | null
           thumbnail_url: string | null
@@ -1657,7 +1657,7 @@ export type Database = {
           source_image_url?: string | null
           source_question_number?: number | null
           subject: string
-          svg_data: string
+          svg_data?: string | null
           tags?: string[]
           teacher_id?: string | null
           thumbnail_url?: string | null
@@ -1677,7 +1677,7 @@ export type Database = {
           source_image_url?: string | null
           source_question_number?: number | null
           subject?: string
-          svg_data?: string
+          svg_data?: string | null
           tags?: string[]
           teacher_id?: string | null
           thumbnail_url?: string | null
