@@ -15,33 +15,46 @@ interface ShapeRecord {
   subject: string;
   nys_standard: string | null;
   tags: string[];
+  vertices: unknown;
+  parameters: unknown;
 }
 
-async function generateSvgFromImage(
-  imageUrl: string,
+async function generateSvgFromDescription(
   shapeType: string,
   description: string,
-  subject: string
+  subject: string,
+  vertices?: unknown,
+  parameters?: unknown
 ): Promise<string | null> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
     throw new Error("LOVABLE_API_KEY not configured");
   }
 
-  const prompt = `You are a technical diagram vectorization expert. Convert this ${subject} diagram image into a clean, black-and-white SVG suitable for educational worksheets.
+  // Build context from available data
+  let context = `Shape type: ${shapeType}\nDescription: ${description || "Educational diagram"}\nSubject: ${subject}`;
+  
+  if (vertices) {
+    context += `\nVertices: ${JSON.stringify(vertices)}`;
+  }
+  if (parameters) {
+    context += `\nParameters: ${JSON.stringify(parameters)}`;
+  }
 
-Shape type: ${shapeType}
-Description: ${description || "Educational diagram"}
+  const prompt = `You are a technical diagram generator for educational worksheets. Create a clean, black-and-white SVG suitable for printing.
+
+${context}
 
 Requirements:
 1. Output ONLY valid SVG code, nothing else
 2. Use viewBox="0 0 300 300"
 3. Black strokes (#000) with stroke-width="2"
 4. White or transparent fill
-5. Include all vertex labels (A, B, C, etc.) as <text> elements
-6. Include any angle marks, right-angle symbols, or measurements shown
-7. Keep it simple and clean for printing
-8. No colors, gradients, or decorative elements
+5. Include all vertex labels (A, B, C, etc.) as <text> elements with font-size="14" and font-family="Arial"
+6. Include any angle marks, right-angle symbols, tick marks for congruent sides, or measurements mentioned
+7. Keep it simple and clean for printing - no colors, gradients, or decorative elements
+8. Center the shape in the viewBox
+9. For coordinate plane problems, draw axes with arrows and grid lines
 
 Return ONLY the SVG code starting with <svg and ending with </svg>.`;
 
@@ -53,15 +66,9 @@ Return ONLY the SVG code starting with <svg and ending with </svg>.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-flash-lite",
         messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              { type: "image_url", image_url: { url: imageUrl } },
-            ],
-          },
+          { role: "user", content: prompt },
         ],
       }),
     });
@@ -82,10 +89,14 @@ Return ONLY the SVG code starting with <svg and ending with </svg>.`;
       if (!svg.includes("viewBox")) {
         svg = svg.replace("<svg", '<svg viewBox="0 0 300 300"');
       }
+      // Ensure xmlns is set
+      if (!svg.includes("xmlns")) {
+        svg = svg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
       return svg;
     }
 
-    console.error("No valid SVG found in response");
+    console.error("No valid SVG found in response:", content.substring(0, 200));
     return null;
   } catch (error) {
     console.error("Error generating SVG:", error);
@@ -105,12 +116,11 @@ serve(async (req) => {
 
     const { batchSize = 10, shapeIds, dryRun = false } = await req.json();
 
-    // Query shapes that need SVG generation
+    // Query shapes that need SVG generation (no svg_data yet)
     let query = supabase
       .from("regents_shape_library")
-      .select("id, shape_type, description, source_image_url, thumbnail_url, subject, nys_standard, tags")
-      .is("svg_data", null)
-      .or("source_image_url.neq.null,thumbnail_url.neq.null");
+      .select("id, shape_type, description, source_image_url, thumbnail_url, subject, nys_standard, tags, vertices, parameters")
+      .is("svg_data", null);
 
     if (shapeIds && shapeIds.length > 0) {
       query = query.in("id", shapeIds);
@@ -138,14 +148,7 @@ serve(async (req) => {
     const results: { id: string; success: boolean; error?: string }[] = [];
 
     for (const shape of shapes as ShapeRecord[]) {
-      const imageUrl = shape.source_image_url || shape.thumbnail_url;
-      
-      if (!imageUrl) {
-        results.push({ id: shape.id, success: false, error: "No image URL" });
-        continue;
-      }
-
-      console.log(`Processing shape ${shape.id}: ${shape.shape_type}`);
+      console.log(`Processing shape ${shape.id}: ${shape.shape_type} - ${shape.description?.substring(0, 50)}`);
 
       if (dryRun) {
         results.push({ id: shape.id, success: true, error: "Dry run - no changes made" });
@@ -153,11 +156,12 @@ serve(async (req) => {
       }
 
       try {
-        const svgData = await generateSvgFromImage(
-          imageUrl,
+        const svgData = await generateSvgFromDescription(
           shape.shape_type,
           shape.description || "",
-          shape.subject
+          shape.subject,
+          shape.vertices,
+          shape.parameters
         );
 
         if (svgData) {
@@ -183,7 +187,7 @@ serve(async (req) => {
       }
 
       // Small delay to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
 
     const successCount = results.filter((r) => r.success).length;
@@ -193,8 +197,7 @@ serve(async (req) => {
     const { count: remaining } = await supabase
       .from("regents_shape_library")
       .select("id", { count: "exact", head: true })
-      .is("svg_data", null)
-      .or("source_image_url.neq.null,thumbnail_url.neq.null");
+      .is("svg_data", null);
 
     return new Response(
       JSON.stringify({

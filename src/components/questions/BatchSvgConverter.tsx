@@ -58,12 +58,11 @@ export function BatchSvgConverter({ open, onOpenChange }: BatchSvgConverterProps
         .select('id', { count: 'exact', head: true })
         .not('svg_data', 'is', null);
 
-      // Get shapes needing conversion (have image but no SVG)
+      // Get shapes needing conversion (no SVG data)
       const { data: needsWork, count: needsConversion } = await supabase
         .from('regents_shape_library')
         .select('id, shape_type, description, svg_data, thumbnail_url', { count: 'exact' })
         .is('svg_data', null)
-        .or('source_image_url.neq.null,thumbnail_url.neq.null')
         .limit(20);
 
       setStats({
