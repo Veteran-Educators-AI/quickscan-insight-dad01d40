@@ -89,10 +89,68 @@ export function QuestionPreviewPanel({
 }: QuestionPreviewPanelProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [warmUpQuestions, setWarmUpQuestions] = useState<PreviewQuestion[]>([]);
   const [mainQuestions, setMainQuestions] = useState<PreviewQuestion[]>([]);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<{ url: string; questionNumber: number } | null>(null);
+
+  // Generate diagram images for questions that have imagePrompts but no actual images yet
+  const generateDiagramImages = async (
+    questions: PreviewQuestion[], 
+    prefix: string
+  ): Promise<PreviewQuestion[]> => {
+    const questionsNeedingImages = questions.filter(q => q.imagePrompt && !q.imageUrl && !q.svg);
+    
+    if (questionsNeedingImages.length === 0) return questions;
+    
+    console.log(`Generating ${questionsNeedingImages.length} diagram images for ${prefix}...`);
+    setIsGeneratingImages(true);
+    
+    try {
+      // Process in batches of 3 to avoid rate limiting
+      const batchSize = 3;
+      const updatedQuestions = [...questions];
+      
+      for (let i = 0; i < questionsNeedingImages.length; i += batchSize) {
+        const batch = questionsNeedingImages.slice(i, i + batchSize);
+        
+        await Promise.all(
+          batch.map(async (question) => {
+            try {
+              const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+                body: {
+                  questions: [{
+                    questionNumber: question.questionNumber,
+                    imagePrompt: question.imagePrompt,
+                  }],
+                  useNanoBanana: useAIImages,
+                  useDeterministicSvg: !useAIImages,
+                },
+              });
+              
+              if (!error && data?.images?.[0]?.imageUrl) {
+                // Find and update the question in the array
+                const idx = updatedQuestions.findIndex(q => q.questionNumber === question.questionNumber);
+                if (idx !== -1) {
+                  updatedQuestions[idx] = {
+                    ...updatedQuestions[idx],
+                    imageUrl: data.images[0].imageUrl,
+                  };
+                }
+              }
+            } catch (err) {
+              console.error(`Error generating image for Q${question.questionNumber}:`, err);
+            }
+          })
+        );
+      }
+      
+      return updatedQuestions;
+    } finally {
+      setIsGeneratingImages(false);
+    }
+  };
 
   const loadPreview = async () => {
     if (selectedTopics.length === 0 && customTopics.length === 0) {
@@ -171,12 +229,35 @@ export function QuestionPreviewPanel({
 
       if (mainError) throw mainError;
 
-      setWarmUpQuestions(warmUp);
-      setMainQuestions(mainData?.questions || []);
+      let finalWarmUp = warmUp;
+      let finalMain = mainData?.questions || [];
 
+      // If geometry is enabled, generate the actual diagram images
+      if (includeGeometry) {
+        toast({
+          title: 'Generating diagrams...',
+          description: 'Creating geometric shapes for your questions.',
+        });
+        
+        // Generate images for both warm-up and main questions in parallel
+        const [updatedWarmUp, updatedMain] = await Promise.all([
+          warmUp.length > 0 ? generateDiagramImages(warmUp, 'warmup') : Promise.resolve(warmUp),
+          finalMain.length > 0 ? generateDiagramImages(finalMain, 'main') : Promise.resolve(finalMain),
+        ]);
+        
+        finalWarmUp = updatedWarmUp;
+        finalMain = updatedMain;
+      }
+
+      setWarmUpQuestions(finalWarmUp);
+      setMainQuestions(finalMain);
+
+      const imageCount = [...finalWarmUp, ...finalMain].filter(q => q.imageUrl || q.svg).length;
       toast({
         title: 'Preview loaded',
-        description: `Sample questions generated${includeGeometry ? ' with shapes' : ''}.`,
+        description: includeGeometry && imageCount > 0
+          ? `Generated ${imageCount} diagram${imageCount > 1 ? 's' : ''}.`
+          : 'Sample questions generated.',
       });
     } catch (error) {
       console.error('Error loading preview:', error);
@@ -303,16 +384,16 @@ export function QuestionPreviewPanel({
                 Load Preview
               </Button>
             </div>
-          ) : isLoading ? (
+          ) : isLoading || isGeneratingImages ? (
             <div className="flex flex-col items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary mb-2" />
               <p className="text-sm text-muted-foreground">
-                Generating preview{includeGeometry ? ' with shapes' : ''}...
+                {isGeneratingImages ? 'Generating diagrams...' : 'Generating preview...'}
               </p>
-              {includeGeometry && (
+              {(includeGeometry || isGeneratingImages) && (
                 <p className="text-xs text-blue-600 mt-1">
                   <Shapes className="h-3 w-3 inline mr-1" />
-                  Creating geometric diagrams...
+                  {isGeneratingImages ? 'Creating images with AI...' : 'Preparing geometric diagrams...'}
                 </p>
               )}
             </div>
