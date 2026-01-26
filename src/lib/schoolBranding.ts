@@ -14,10 +14,10 @@ export interface SchoolBranding {
   logo?: string;
   primaryColor: string; // HSL values for CSS variable override
   accentColor: string;
-  domain?: string; // Optional: auto-detect branding by domain
+  domains?: string[]; // Domains that trigger this branding
 }
 
-// Default NYClogic branding
+// Default NYClogic branding (the "Super Site")
 export const DEFAULT_BRANDING: SchoolBranding = {
   id: 'nyclogic',
   name: 'NYClogic',
@@ -28,6 +28,7 @@ export const DEFAULT_BRANDING: SchoolBranding = {
   logo: nycologicLogo,
   primaryColor: '358 82% 50%', // Red
   accentColor: '358 82% 50%',
+  domains: ['localhost', 'lovable.app', 'nyclogicai.com', 'nyclogic.ai'],
 };
 
 // School-specific brandings
@@ -42,26 +43,92 @@ export const SCHOOL_BRANDINGS: Record<string, SchoolBranding> = {
     logo: hillcrestLogo,
     primaryColor: '270 50% 50%', // Purple
     accentColor: '270 50% 50%',
-    domain: 'hillcrest',
+    domains: ['thescangeniusapp.com', 'hillcrest.nyclogicai.com'],
   },
 };
 
-// Get branding based on current context (could be domain, subdomain, or stored preference)
+// Storage key for manual school selection
+const SCHOOL_BRANDING_KEY = 'selected_school_branding';
+
+// Check if the user has seen the school selector
+const SCHOOL_SELECTOR_SEEN_KEY = 'school_selector_seen';
+
+// Detect branding based on current domain
+function detectBrandingByDomain(): SchoolBranding | null {
+  const hostname = window.location.hostname.toLowerCase();
+  
+  // Check school brandings first
+  for (const [, branding] of Object.entries(SCHOOL_BRANDINGS)) {
+    if (branding.domains?.some(domain => hostname.includes(domain))) {
+      return branding;
+    }
+  }
+  
+  // Check if it matches default domains
+  if (DEFAULT_BRANDING.domains?.some(domain => hostname.includes(domain))) {
+    return DEFAULT_BRANDING;
+  }
+  
+  return null;
+}
+
+// Get branding based on current context (domain or stored preference)
 export function getSchoolBranding(): SchoolBranding {
-  // For demo: Default to Hillcrest branding
-  // In production, this would be controlled by domain or admin settings
-  return SCHOOL_BRANDINGS.hillcrest;
+  // First, check domain-based detection
+  const domainBranding = detectBrandingByDomain();
+  
+  // If domain specifically maps to a school (not default), use that
+  if (domainBranding && domainBranding.id !== 'nyclogic') {
+    return domainBranding;
+  }
+  
+  // Check for manually selected branding
+  const storedBrandingId = localStorage.getItem(SCHOOL_BRANDING_KEY);
+  if (storedBrandingId && SCHOOL_BRANDINGS[storedBrandingId]) {
+    return SCHOOL_BRANDINGS[storedBrandingId];
+  }
+  
+  // Default to NYClogic Ai (the super site)
+  return DEFAULT_BRANDING;
+}
+
+// Check if the school selector should be shown
+export function shouldShowSchoolSelector(): boolean {
+  // If domain specifically maps to a school, don't show selector
+  const domainBranding = detectBrandingByDomain();
+  if (domainBranding && domainBranding.id !== 'nyclogic') {
+    return false;
+  }
+  
+  // Check if user has already selected a school or dismissed the selector
+  const hasSeen = localStorage.getItem(SCHOOL_SELECTOR_SEEN_KEY);
+  const hasSelected = localStorage.getItem(SCHOOL_BRANDING_KEY);
+  
+  return !hasSeen && !hasSelected;
+}
+
+// Mark that the user has seen/interacted with the school selector
+export function markSchoolSelectorSeen(): void {
+  localStorage.setItem(SCHOOL_SELECTOR_SEEN_KEY, 'true');
 }
 
 // Set school branding (for admin/demo purposes)
 export function setSchoolBranding(schoolId: string | null): void {
+  markSchoolSelectorSeen();
+  
   if (schoolId && SCHOOL_BRANDINGS[schoolId]) {
-    localStorage.setItem('school_branding', schoolId);
+    localStorage.setItem(SCHOOL_BRANDING_KEY, schoolId);
   } else {
-    localStorage.removeItem('school_branding');
+    localStorage.removeItem(SCHOOL_BRANDING_KEY);
   }
   // Reload to apply changes
-  window.location.reload();
+  window.location.href = '/login';
+}
+
+// Clear branding preference (to show selector again)
+export function clearSchoolBrandingPreference(): void {
+  localStorage.removeItem(SCHOOL_BRANDING_KEY);
+  localStorage.removeItem(SCHOOL_SELECTOR_SEEN_KEY);
 }
 
 // Apply branding colors to CSS variables
@@ -74,10 +141,16 @@ export function applyBrandingColors(branding: SchoolBranding): void {
   root.style.setProperty('--sidebar-ring', branding.primaryColor);
 }
 
-// Get the "Powered by" branding info
+// Get the "Powered by" branding info (always NYClogic Ai)
 export function getPoweredByBranding(): { logo: string; name: string } {
   return {
     logo: nycologicLogo,
     name: 'Nyclogic Ai',
   };
+}
+
+// Check if current branding is a school (not the super site)
+export function isSchoolBranding(): boolean {
+  const branding = getSchoolBranding();
+  return branding.id !== 'nyclogic';
 }

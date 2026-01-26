@@ -1,11 +1,17 @@
-import { getPoweredByBranding } from '@/lib/schoolBranding';
+import { getPoweredByBranding, isSchoolBranding } from '@/lib/schoolBranding';
 
 interface PoweredByBadgeProps {
   className?: string;
+  alwaysShow?: boolean;
 }
 
-export function PoweredByBadge({ className = '' }: PoweredByBadgeProps) {
+export function PoweredByBadge({ className = '', alwaysShow = false }: PoweredByBadgeProps) {
   const { logo, name } = getPoweredByBranding();
+  
+  // Only show badge for school-branded sites (or if alwaysShow is true)
+  if (!alwaysShow && !isSchoolBranding()) {
+    return null;
+  }
 
   return (
     <div className={`flex flex-col items-center gap-2 ${className}`}>
