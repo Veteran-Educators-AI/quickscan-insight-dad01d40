@@ -1005,6 +1005,102 @@ Return ONLY valid SVG code, no explanation.`;
   }
 }
 
+// Generate presentation-style SVG with colors (fast, clean, educational)
+async function generatePresentationSVG(prompt: string): Promise<string | null> {
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) {
+    console.error("LOVABLE_API_KEY not configured");
+    return null;
+  }
+
+  try {
+    console.log("Generating presentation SVG with fast model...");
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite", // Fastest model
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert at creating CLEAN, SIMPLE SVG illustrations for educational presentations.
+
+CRITICAL REQUIREMENTS:
+1. SIMPLE flat design - minimal detail, clean lines
+2. Use SOFT COLORS - pastel tones, muted palettes suitable for dark slide backgrounds
+3. viewBox="0 0 300 300" always
+4. stroke-width="2" for main elements
+5. NO text labels, NO words in the SVG
+6. NO shadows, gradients, or complex effects
+7. Keep SVG code minimal for fast loading
+8. Educational and professional appearance
+9. Icon/illustration style - single centered subject
+
+Example color palette: soft blues (#60A5FA, #3B82F6), soft greens (#4ADE80), soft yellows (#FCD34D), soft purples (#A78BFA)
+
+Return ONLY valid SVG code, nothing else.`,
+          },
+          {
+            role: "user",
+            content: `Create a SIMPLE, CLEAN SVG illustration for a presentation slide: ${prompt}
+
+Requirements:
+- Simple flat design with soft colors
+- Educational/professional style
+- Centered composition
+- No text or labels
+- Minimal detail, clean lines`,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 1500, // Small for speed
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Lovable AI error:", response.status, errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      return null;
+    }
+
+    // Extract SVG from the response
+    const svgMatch = content.match(/<svg[\s\S]*?<\/svg>/i);
+    if (svgMatch) {
+      let svgString = svgMatch[0];
+      
+      // Ensure viewBox is present
+      if (!svgString.includes('viewBox')) {
+        svgString = svgString.replace('<svg', '<svg viewBox="0 0 300 300"');
+      }
+      
+      // Ensure width and height are set
+      if (!svgString.includes('width=')) {
+        svgString = svgString.replace('<svg', '<svg width="300" height="300"');
+      }
+      
+      // Convert SVG to data URL
+      const base64Svg = btoa(unescape(encodeURIComponent(svgString)));
+      return `data:image/svg+xml;base64,${base64Svg}`;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error generating presentation SVG:", error);
+    return null;
+  }
+}
+
 // Generate SIMPLE black-and-white SVG diagram (fast, minimal detail, no colors)
 async function generateSimpleSVGWithAI(prompt: string): Promise<string | null> {
   // First, try deterministic generation for coordinate plane problems
@@ -1225,65 +1321,31 @@ serve(async (req) => {
     const body = await req.json();
 
     // Support presentation-style and clipart image generation
-    // This path uses the user's EXACT prompt without math/coordinate plane templating
+    // This path uses FAST SVG generation for all presentation art
     if (body.prompt && (body.style === "clipart" || body.style === "presentation")) {
-      console.log(`Generating ${body.style} image with Nano Banana Pro (google/gemini-3-pro-image-preview)...`);
+      console.log(`Generating ${body.style} image with SVG generator...`);
 
       const isPresentation = body.style === "presentation";
       const userPrompt = body.prompt;
       const topic = body.topic || "";
       const slideTitle = body.slideTitle || "";
 
-      // Build a prompt that STRICTLY follows the user's description
-      // No math templates, no coordinate planes - just what the teacher asked for
-      const presentationPrompt = isPresentation
-        ? `Create a high-quality educational illustration for a classroom presentation.
+      // Generate fast, clean SVG for presentation art
+      const svgPrompt = isPresentation
+        ? `Create a clean, simple educational illustration for: ${userPrompt}
+${topic ? `Topic: ${topic}` : ""}
+${slideTitle ? `Slide: ${slideTitle}` : ""}
 
-IMPORTANT: Generate EXACTLY what is described below. Do NOT add math elements, coordinate planes, graphs, or any content not explicitly requested.
+Style: Simple line art, clean educational diagram suitable for projection.`
+        : userPrompt;
 
-User's Description: "${userPrompt}"
-${topic ? `\nPresentation Topic: ${topic}` : ""}
-${slideTitle ? `\nSlide Title: ${slideTitle}` : ""}
+      // Use the fast simple SVG generator
+      let imageUrl = await generatePresentationSVG(svgPrompt);
 
-Image Style Requirements:
-- Ultra high resolution, sharp and detailed  
-- Vibrant, rich colors with good contrast for projection on dark backgrounds
-- Professional educational illustration quality
-- NO TEXT, NO LABELS, NO WORDS in the image whatsoever
-- Clean composition focused on the main subject described
-- Visually engaging for students
-- Photorealistic or high-quality digital illustration style
-- Match the subject matter exactly: if the user asks for books, create books; if they ask for Congress, create Congress imagery
-
-CRITICAL: The image MUST directly relate to the user's description. Do NOT default to mathematical diagrams.`
-        : `Generate a clean, simple clipart-style illustration.
-
-Subject: ${userPrompt}
-
-Requirements:
-- Simple flat vector-style illustration
-- Clean lines, minimal detail
-- Suitable for presentations and educational materials
-- Single object, centered composition
-- Professional and friendly style
-- NO TEXT or labels
-- Do NOT include math elements unless specifically requested`;
-
-      // Use Gemini Pro for presentation images (higher quality)
-      const imageResult = await generatePresentationImage(presentationPrompt);
-      let imageUrl = imageResult;
-
-      // If Pro fails, try the standard Nano Banana
+      // If SVG fails, try the simple B&W SVG generator
       if (!imageUrl) {
-        console.log("Pro model failed, trying standard Nano Banana...");
-        const result = await generateImageWithNanoBanana(presentationPrompt);
-        imageUrl = result.imageUrl;
-      }
-
-      // If Nano Banana fails, try SVG fallback (only for clipart style)
-      if (!imageUrl && !isPresentation) {
-        console.log("Nano Banana failed, trying SVG fallback...");
-        imageUrl = await generateSVGWithAI(body.prompt);
+        console.log("Presentation SVG failed, trying simple B&W SVG...");
+        imageUrl = await generateSimpleSVGWithAI(svgPrompt);
       }
 
       // Return imageUrl (null is acceptable - frontend should handle gracefully)
