@@ -101,13 +101,13 @@ export default function SharedWorksheet() {
 
       pdf.setFontSize(18);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(worksheet.title, pageWidth / 2, yPosition, { align: 'center' });
+      pdf.text(formatWorksheetTextForPdf(worksheet.title), pageWidth / 2, yPosition, { align: 'center' });
       yPosition += 10;
 
       if (worksheet.teacher_name) {
         pdf.setFontSize(12);
         pdf.setFont('helvetica', 'normal');
-        pdf.text(`Teacher: ${worksheet.teacher_name}`, pageWidth / 2, yPosition, { align: 'center' });
+        pdf.text(`Teacher: ${formatWorksheetTextForPdf(worksheet.teacher_name)}`, pageWidth / 2, yPosition, { align: 'center' });
         yPosition += 8;
       }
 
@@ -133,7 +133,7 @@ export default function SharedWorksheet() {
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(9);
         pdf.setTextColor(100);
-        pdf.text(`${question.topic} (${question.standard})`, margin + 5, yPosition);
+        pdf.text(formatWorksheetTextForPdf(`${question.topic} (${question.standard})`), margin + 5, yPosition);
         pdf.setTextColor(0);
         yPosition += 8;
 

@@ -2,6 +2,13 @@ import jsPDF from 'jspdf';
 import { Document, Paragraph, TextRun, ImageRun, AlignmentType, BorderStyle, HeadingLevel, Table, TableRow, TableCell, WidthType, Packer } from 'docx';
 import { BatchItem, AnalysisResult } from '@/hooks/useBatchAnalysis';
 import { saveAs } from 'file-saver';
+import { sanitizeForPDF } from '@/lib/mathRenderer';
+
+// Helper to sanitize text for PDF output (converts Unicode math symbols to ASCII)
+const pdfText = (text: string | undefined | null): string => {
+  if (!text) return '';
+  return sanitizeForPDF(text);
+};
 
 interface GradingReportOptions {
   items: BatchItem[];
@@ -245,7 +252,7 @@ export async function generateDetailedGradingPDF(options: GradingReportOptions):
       doc.setFont('helvetica', 'bold');
       doc.text('Topic:', margin, y);
       doc.setFont('helvetica', 'normal');
-      doc.text(result.problemIdentified, margin + 15, y);
+      doc.text(pdfText(result.problemIdentified), margin + 15, y);
       y += 8;
     }
 
@@ -258,7 +265,7 @@ export async function generateDetailedGradingPDF(options: GradingReportOptions):
       y += 6;
 
       doc.setFont('helvetica', 'normal');
-      const justificationLines = doc.splitTextToSize(result.gradeJustification, contentWidth - 5);
+      const justificationLines = doc.splitTextToSize(pdfText(result.gradeJustification), contentWidth - 5);
       justificationLines.slice(0, 6).forEach((line: string) => {
         if (y < pageHeight - 30) {
           doc.text(line, margin + 3, y);
@@ -280,13 +287,14 @@ export async function generateDetailedGradingPDF(options: GradingReportOptions):
 
       result.rubricScores.slice(0, 5).forEach((score, idx) => {
         if (y < pageHeight - 40) {
-          const scoreText = `${idx + 1}. ${score.criterion.slice(0, 60)}${score.criterion.length > 60 ? '...' : ''}: ${score.score}/${score.maxScore}`;
+          const criterionText = pdfText(score.criterion);
+          const scoreText = `${idx + 1}. ${criterionText.slice(0, 60)}${criterionText.length > 60 ? '...' : ''}: ${score.score}/${score.maxScore}`;
           doc.text(scoreText, margin + 3, y);
           y += 5;
 
           if (score.feedback) {
             doc.setTextColor(80);
-            const feedbackLines = doc.splitTextToSize(`   → ${score.feedback}`, contentWidth - 15);
+            const feedbackLines = doc.splitTextToSize(`   -> ${pdfText(score.feedback)}`, contentWidth - 15);
             feedbackLines.slice(0, 2).forEach((line: string) => {
               if (y < pageHeight - 40) {
                 doc.text(line, margin + 5, y);
@@ -314,7 +322,8 @@ export async function generateDetailedGradingPDF(options: GradingReportOptions):
 
       result.misconceptions.slice(0, 4).forEach((misconception, idx) => {
         if (y < pageHeight - 35) {
-          const miscText = `• ${misconception.slice(0, 80)}${misconception.length > 80 ? '...' : ''}`;
+          const miscContent = pdfText(misconception);
+          const miscText = `- ${miscContent.slice(0, 80)}${miscContent.length > 80 ? '...' : ''}`;
           doc.text(miscText, margin + 3, y);
           y += 5;
         }
@@ -331,7 +340,7 @@ export async function generateDetailedGradingPDF(options: GradingReportOptions):
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
-      const feedbackLines = doc.splitTextToSize(result.feedback, contentWidth - 5);
+      const feedbackLines = doc.splitTextToSize(pdfText(result.feedback), contentWidth - 5);
       feedbackLines.slice(0, 4).forEach((line: string) => {
         if (y < pageHeight - 35) {
           doc.text(line, margin + 3, y);
@@ -388,7 +397,7 @@ export async function generateDetailedGradingPDF(options: GradingReportOptions):
           doc.setFontSize(8);
           doc.setFont('helvetica', 'italic');
           doc.setTextColor(80);
-          const analysisLines = doc.splitTextToSize(`Analysis: ${result.approachAnalysis}`, contentWidth);
+          const analysisLines = doc.splitTextToSize(`Analysis: ${pdfText(result.approachAnalysis)}`, contentWidth);
           analysisLines.slice(0, 3).forEach((line: string) => {
             if (y < pageHeight - 10) {
               doc.text(line, margin, y);
@@ -424,7 +433,7 @@ export async function generateDetailedGradingPDF(options: GradingReportOptions):
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(80);
-      const ocrLines = doc.splitTextToSize(result.ocrText.slice(0, 500), contentWidth - 5);
+      const ocrLines = doc.splitTextToSize(pdfText(result.ocrText.slice(0, 500)), contentWidth - 5);
       ocrLines.slice(0, 8).forEach((line: string) => {
         if (y < pageHeight - 10) {
           doc.text(line, margin + 3, y);
