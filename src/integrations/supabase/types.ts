@@ -1624,6 +1624,77 @@ export type Database = {
           },
         ]
       }
+      regents_shape_library: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_verified: boolean | null
+          nys_standard: string | null
+          parameters: Json | null
+          shape_type: string
+          source_exam: string | null
+          source_image_url: string | null
+          source_question_number: number | null
+          subject: string
+          svg_data: string
+          tags: string[]
+          teacher_id: string | null
+          thumbnail_url: string | null
+          updated_at: string
+          usage_count: number | null
+          vertices: Json | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_verified?: boolean | null
+          nys_standard?: string | null
+          parameters?: Json | null
+          shape_type: string
+          source_exam?: string | null
+          source_image_url?: string | null
+          source_question_number?: number | null
+          subject: string
+          svg_data: string
+          tags?: string[]
+          teacher_id?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          usage_count?: number | null
+          vertices?: Json | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_verified?: boolean | null
+          nys_standard?: string | null
+          parameters?: Json | null
+          shape_type?: string
+          source_exam?: string | null
+          source_image_url?: string | null
+          source_question_number?: number | null
+          subject?: string
+          svg_data?: string
+          tags?: string[]
+          teacher_id?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          usage_count?: number | null
+          vertices?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regents_shape_library_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       result_comments: {
         Row: {
           attempt_id: string
