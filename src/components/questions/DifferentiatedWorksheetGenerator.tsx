@@ -4006,18 +4006,19 @@ QUALITY CHECK BEFORE FINISHING
             )}
 
             {/* Preview Content */}
-            <ScrollArea className="flex-1 p-4 bg-gray-200">
+            <div className="flex-1 overflow-auto p-4 bg-gray-200" style={{ maxHeight: 'calc(95vh - 180px)' }}>
               <div
                 ref={previewRef}
-                className="flex flex-col items-center"
+                className="flex flex-col items-center min-h-full"
                 style={{
                   transform: `scale(${previewZoom / 100})`,
                   transformOrigin: 'top center',
+                  width: `${100 / (previewZoom / 100)}%`,
                 }}
               >
                 {previewData.students.map((student, index) => renderStudentPreview(student, index))}
               </div>
-            </ScrollArea>
+            </div>
           </DialogContent>
         </Dialog>
       )}
