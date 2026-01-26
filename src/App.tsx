@@ -10,6 +10,7 @@ import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { DemoTour } from "@/components/onboarding/DemoTour";
 import { WhatsNewDialog } from "@/components/WhatsNewDialog";
 import { useMfaStatus } from "@/hooks/useMfaStatus";
+import { shouldShowSchoolSelector } from "@/lib/schoolBranding";
 
 import { useDeepLinks } from "./hooks/useDeepLinks";
 import Login from "./pages/Login";
@@ -41,6 +42,7 @@ import StudentLiveSession from "./pages/StudentLiveSession";
 import PresentationView from "./pages/PresentationView";
 import PresentationLibrary from "./pages/PresentationLibrary";
 import TeacherLibrary from "./pages/TeacherLibrary";
+import SchoolSelector from "./pages/SchoolSelector";
 import { BetaFeedbackButton } from "./components/BetaFeedbackButton";
 
 const queryClient = new QueryClient();
@@ -123,15 +125,19 @@ function AppRoutes() {
     );
   }
 
+  // Check if school selector should be shown for new visitors
+  const showSchoolSelector = !user && shouldShowSchoolSelector();
+
   return (
     <Routes>
+      <Route path="/select-school" element={<SchoolSelector />} />
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/mfa-challenge" element={user ? <MfaChallenge /> : <Navigate to="/login" replace />} />
       <Route path="/mfa-enroll" element={user ? <MfaEnroll /> : <Navigate to="/login" replace />} />
-      <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
+      <Route path="/" element={<Navigate to={user ? "/dashboard" : (showSchoolSelector ? "/select-school" : "/login")} replace />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/classes" element={<ProtectedRoute><Classes /></ProtectedRoute>} />
       <Route path="/classes/new" element={<ProtectedRoute><ClassNew /></ProtectedRoute>} />

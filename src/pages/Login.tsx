@@ -891,9 +891,22 @@ export default function Login() {
       )}
 
       {/* Powered by badge - shown when using custom school branding */}
-      {isCustomBranding && (
-        <PoweredByBadge className="mt-8 mb-4" />
-      )}
+      <PoweredByBadge className="mt-8 mb-4" />
+      
+      {/* Change school link */}
+      <div className="text-center mt-2">
+        <Link 
+          to="/select-school" 
+          className="text-xs text-muted-foreground hover:text-primary transition-colors"
+          onClick={() => {
+            // Clear stored preference so they can pick again
+            localStorage.removeItem('selected_school_branding');
+            localStorage.removeItem('school_selector_seen');
+          }}
+        >
+          Switch School / View All Sites
+        </Link>
+      </div>
     </div>
   );
 }

@@ -3,7 +3,8 @@ import {
   getSchoolBranding, 
   applyBrandingColors, 
   SchoolBranding,
-  DEFAULT_BRANDING 
+  DEFAULT_BRANDING,
+  isSchoolBranding
 } from '@/lib/schoolBranding';
 
 export function useSchoolBranding() {
@@ -13,7 +14,7 @@ export function useSchoolBranding() {
   useEffect(() => {
     const currentBranding = getSchoolBranding();
     setBranding(currentBranding);
-    setIsCustomBranding(currentBranding.id !== 'nyclogic');
+    setIsCustomBranding(isSchoolBranding());
     
     // Apply colors
     applyBrandingColors(currentBranding);
