@@ -1437,69 +1437,159 @@ export default function PresentationView() {
             ) : (
               // Content/Summary/Other slides
               <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 relative">
-                {/* Image placeholder area - fixed location for both placeholder and generated image */}
+                {/* Image placeholder area - fixed location, resizable */}
                 <motion.div
                   initial={{ opacity: 0, x: -40 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="flex-shrink-0"
+                  className="flex-shrink-0 relative"
                 >
-                  {slide.customImage?.url ? (
-                    // Generated image - fixed in placeholder location
-                    <div className="relative w-48 h-48 lg:w-72 lg:h-72 group">
-                      <img 
-                        src={slide.customImage.url} 
-                        alt="Slide image"
-                        className="w-full h-full object-contain rounded-2xl shadow-2xl"
-                        style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.5))' }}
-                        draggable={false}
-                      />
+                  {(() => {
+                    // Get current size from slide or use defaults
+                    const placeholderSize = slide.customImage?.size || { width: 288, height: 288 };
+                    const minSize = 120;
+                    const maxSize = 500;
+                    
+                    const handlePlaceholderResize = (corner: string) => (e: React.MouseEvent | React.TouchEvent) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       
-                      {/* Edit/Delete controls - visible on hover */}
-                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl bg-black/30 flex items-center justify-center gap-4">
-                        <button
-                          onClick={() => setShowImageGenerator(true)}
-                          className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-all hover:scale-110"
-                          title="Change image"
-                        >
-                          <ImagePlus className="w-6 h-6 text-white" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleImageGenerated({
-                              url: '',
-                              prompt: '',
-                              position: { x: 50, y: 50 },
-                              size: { width: 400, height: 300 },
-                              rotation: 0,
-                            });
-                          }}
-                          className="p-3 bg-red-500/80 hover:bg-red-500 rounded-full transition-all hover:scale-110"
-                          title="Remove image"
-                        >
-                          <X className="w-6 h-6 text-white" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // Clickable placeholder - opens image generator
-                    <button
-                      onClick={() => setShowImageGenerator(true)}
-                      className="w-48 h-48 lg:w-72 lg:h-72 flex flex-col items-center justify-center bg-white/5 hover:bg-white/10 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-transparent hover:border-white/20 group"
-                    >
-                      {IconComponent ? (
-                        <IconComponent className={cn("h-20 w-20 lg:h-24 lg:w-24 transition-transform group-hover:scale-110", colors.accent)} />
-                      ) : (
-                        <ImagePlus className={cn("h-20 w-20 lg:h-24 lg:w-24 transition-transform group-hover:scale-110", colors.accent)} />
-                      )}
-                      <span 
-                        className="mt-4 text-sm font-semibold tracking-wider uppercase opacity-0 group-hover:opacity-100 transition-opacity"
-                        style={{ color: colors.accentHex }}
+                      const startX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+                      const startY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+                      const startWidth = placeholderSize.width;
+                      const startHeight = placeholderSize.height;
+                      
+                      const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+                        const clientX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : moveEvent.clientX;
+                        const clientY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY;
+                        
+                        let deltaX = clientX - startX;
+                        let deltaY = clientY - startY;
+                        
+                        // Adjust deltas based on corner
+                        if (corner.includes('left')) deltaX = -deltaX;
+                        if (corner.includes('top')) deltaY = -deltaY;
+                        
+                        // Use the larger delta to maintain aspect ratio
+                        const delta = Math.max(deltaX, deltaY);
+                        
+                        const newWidth = Math.max(minSize, Math.min(maxSize, startWidth + delta));
+                        const newHeight = Math.max(minSize, Math.min(maxSize, startHeight + delta));
+                        
+                        // Update the slide with new size
+                        handleImageGenerated({
+                          url: slide.customImage?.url || '',
+                          prompt: slide.customImage?.prompt || '',
+                          position: slide.customImage?.position || { x: 50, y: 50 },
+                          size: { width: newWidth, height: newHeight },
+                          rotation: slide.customImage?.rotation || 0,
+                        });
+                      };
+                      
+                      const handleEnd = () => {
+                        document.removeEventListener('mousemove', handleMove);
+                        document.removeEventListener('mouseup', handleEnd);
+                        document.removeEventListener('touchmove', handleMove);
+                        document.removeEventListener('touchend', handleEnd);
+                      };
+                      
+                      document.addEventListener('mousemove', handleMove);
+                      document.addEventListener('mouseup', handleEnd);
+                      document.addEventListener('touchmove', handleMove, { passive: false });
+                      document.addEventListener('touchend', handleEnd);
+                    };
+                    
+                    return (
+                      <div 
+                        className="relative group"
+                        style={{ 
+                          width: `${placeholderSize.width}px`, 
+                          height: `${placeholderSize.height}px`,
+                        }}
                       >
-                        + Add Image
-                      </span>
-                    </button>
-                  )}
+                        {slide.customImage?.url ? (
+                          // Generated image - fixed in placeholder location
+                          <>
+                            <img 
+                              src={slide.customImage.url} 
+                              alt="Slide image"
+                              className="w-full h-full object-contain rounded-2xl shadow-2xl"
+                              style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.5))' }}
+                              draggable={false}
+                            />
+                            
+                            {/* Edit/Delete controls - visible on hover */}
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl bg-black/30 flex items-center justify-center gap-4">
+                              <button
+                                onClick={() => setShowImageGenerator(true)}
+                                className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-all hover:scale-110"
+                                title="Change image"
+                              >
+                                <ImagePlus className="w-6 h-6 text-white" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  handleImageGenerated({
+                                    url: '',
+                                    prompt: '',
+                                    position: { x: 50, y: 50 },
+                                    size: { width: 288, height: 288 },
+                                    rotation: 0,
+                                  });
+                                }}
+                                className="p-3 bg-red-500/80 hover:bg-red-500 rounded-full transition-all hover:scale-110"
+                                title="Remove image"
+                              >
+                                <X className="w-6 h-6 text-white" />
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          // Clickable placeholder - opens image generator
+                          <button
+                            onClick={() => setShowImageGenerator(true)}
+                            className="w-full h-full flex flex-col items-center justify-center bg-white/5 hover:bg-white/10 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-transparent hover:border-white/20"
+                          >
+                            {IconComponent ? (
+                              <IconComponent className={cn("h-20 w-20 lg:h-24 lg:w-24 transition-transform group-hover:scale-110", colors.accent)} />
+                            ) : (
+                              <ImagePlus className={cn("h-20 w-20 lg:h-24 lg:w-24 transition-transform group-hover:scale-110", colors.accent)} />
+                            )}
+                            <span 
+                              className="mt-4 text-sm font-semibold tracking-wider uppercase opacity-0 group-hover:opacity-100 transition-opacity"
+                              style={{ color: colors.accentHex }}
+                            >
+                              + Add Image
+                            </span>
+                          </button>
+                        )}
+                        
+                        {/* Resize handles - visible on hover */}
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div
+                            onMouseDown={handlePlaceholderResize('top-left')}
+                            onTouchStart={handlePlaceholderResize('top-left')}
+                            className="absolute -top-2 -left-2 w-4 h-4 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg z-20"
+                          />
+                          <div
+                            onMouseDown={handlePlaceholderResize('top-right')}
+                            onTouchStart={handlePlaceholderResize('top-right')}
+                            className="absolute -top-2 -right-2 w-4 h-4 bg-primary rounded-full cursor-nesw-resize hover:scale-125 transition-transform shadow-lg z-20"
+                          />
+                          <div
+                            onMouseDown={handlePlaceholderResize('bottom-left')}
+                            onTouchStart={handlePlaceholderResize('bottom-left')}
+                            className="absolute -bottom-2 -left-2 w-4 h-4 bg-primary rounded-full cursor-nesw-resize hover:scale-125 transition-transform shadow-lg z-20"
+                          />
+                          <div
+                            onMouseDown={handlePlaceholderResize('bottom-right')}
+                            onTouchStart={handlePlaceholderResize('bottom-right')}
+                            className="absolute -bottom-2 -right-2 w-4 h-4 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg z-20"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </motion.div>
 
                 {/* Content side */}
