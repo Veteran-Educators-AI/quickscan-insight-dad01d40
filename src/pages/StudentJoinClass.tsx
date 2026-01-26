@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import nyclogicLogo from '@/assets/nycologic-ai-logo.png';
 
 export default function StudentJoinClass() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -21,11 +22,24 @@ export default function StudentJoinClass() {
     className: string;
   } | null>(null);
 
+  // Pre-fill code from URL parameter (e.g., /student/join?code=ABC123)
+  useEffect(() => {
+    const codeFromUrl = searchParams.get('code');
+    if (codeFromUrl) {
+      setJoinCode(codeFromUrl.toUpperCase());
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate('/student/login');
+      // Preserve the code param when redirecting to login
+      const codeFromUrl = searchParams.get('code');
+      const redirectPath = codeFromUrl 
+        ? `/student/login?redirect=/student/join?code=${codeFromUrl}`
+        : '/student/login';
+      navigate(redirectPath);
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, searchParams]);
 
   useEffect(() => {
     // Check if student already has a class
