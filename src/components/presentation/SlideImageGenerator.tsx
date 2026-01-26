@@ -91,6 +91,7 @@ export function SlideImageGenerator({
   const [initialPinchDistance, setInitialPinchDistance] = useState(0);
   const [initialSize, setInitialSize] = useState({ width: 400, height: 300 });
   const [isDropping, setIsDropping] = useState(false);
+  const [pendingSuggestion, setPendingSuggestion] = useState<{ title: string; prompt: string } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -101,6 +102,24 @@ export function SlideImageGenerator({
     const subject = topic.split(' - ')[0] || topic;
     return getSubjectSuggestions(subject, topic, slideTitle);
   }, [topic, slideTitle]);
+
+  // Handle selecting a suggestion - show modification prompt first
+  const handleSelectSuggestion = (title: string, suggestionPrompt: string) => {
+    const fullPrompt = createTopicSpecificPrompt(suggestionPrompt, topic, slideTitle);
+    setPendingSuggestion({ title, prompt: fullPrompt });
+    setPrompt(fullPrompt);
+  };
+
+  // Confirm and generate from pending suggestion
+  const confirmAndGenerate = () => {
+    setPendingSuggestion(null);
+    generateImage();
+  };
+
+  // Cancel pending suggestion
+  const cancelPendingSuggestion = () => {
+    setPendingSuggestion(null);
+  };
 
   useEffect(() => {
     if (currentImage) {
@@ -370,7 +389,7 @@ export function SlideImageGenerator({
                   <TabsTrigger value="subjects" className="text-xs py-1.5">Subjects</TabsTrigger>
                 </TabsList>
 
-                {/* Topic-Specific Suggestions - NEW TAB */}
+                {/* Topic-Specific Suggestions - Click to preview/modify before generating */}
                 <TabsContent value="suggested" className="mt-3">
                   <ScrollArea className="h-[180px]">
                     <div className="space-y-2 pr-4">
@@ -382,20 +401,17 @@ export function SlideImageGenerator({
                             size="sm"
                             className={cn(
                               "w-full h-auto py-3 px-3 flex items-center justify-between text-left",
-                              "hover:bg-primary/10 hover:border-primary transition-colors"
+                              "hover:bg-primary/10 hover:border-primary transition-colors",
+                              pendingSuggestion?.title === suggestion.title && "border-primary bg-primary/10"
                             )}
-                            onClick={() => {
-                              const fullPrompt = createTopicSpecificPrompt(suggestion.prompt, topic, slideTitle);
-                              setPrompt(fullPrompt);
-                              toast.success(`"${suggestion.title}" prompt loaded!`);
-                            }}
+                            onClick={() => handleSelectSuggestion(suggestion.title, suggestion.prompt)}
                             disabled={isGenerating}
                           >
                             <div className="flex-1 min-w-0">
                               <div className="font-medium text-sm truncate">{suggestion.title}</div>
                               <div className="text-xs text-muted-foreground">{suggestion.category}</div>
                             </div>
-                            <Plus className="h-4 w-4 text-primary flex-shrink-0 ml-2" />
+                            <Sparkles className="h-4 w-4 text-primary flex-shrink-0 ml-2" />
                           </Button>
                         ))
                       ) : (
@@ -406,7 +422,7 @@ export function SlideImageGenerator({
                     </div>
                   </ScrollArea>
                   <p className="text-xs text-muted-foreground mt-2">
-                    ✨ Click any suggestion to load a detailed, topic-aligned prompt.
+                    ✨ Click a suggestion to preview - you can modify before generating.
                   </p>
                 </TabsContent>
 
@@ -426,9 +442,8 @@ export function SlideImageGenerator({
                                 "hover:bg-primary/10 hover:border-primary transition-colors"
                               )}
                               onClick={() => {
-                                const contextualPrompt = `${template.prompt} This illustration is specifically for a presentation about "${topic}" with the current slide titled "${slideTitle}". Ensure the imagery directly relates to the subject matter being taught.`;
-                                setPrompt(contextualPrompt);
-                                toast.success(`Template "${template.label}" applied!`);
+                                const contextualPrompt = `${template.prompt} This illustration is specifically for a presentation about "${topic}" with the current slide titled "${slideTitle}".`;
+                                handleSelectSuggestion(template.label, contextualPrompt);
                               }}
                               disabled={isGenerating}
                             >
@@ -445,50 +460,99 @@ export function SlideImageGenerator({
                 ))}
               </Tabs>
               <p className="text-xs text-muted-foreground">
-                Click a template to use it as your prompt, then generate or customize further.
+                Click a suggestion to preview - modify the prompt below if needed.
               </p>
             </div>
 
+            {/* Pending suggestion confirmation */}
+            {pendingSuggestion && (
+              <div className="p-4 border-2 border-primary rounded-lg bg-primary/5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  <span className="font-semibold text-primary">
+                    Selected: {pendingSuggestion.title}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Review and modify the prompt below, then click "Generate" when ready.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-3">
-              <Label className="text-base font-semibold">Describe Your Image</Label>
+              <Label className="text-base font-semibold flex items-center gap-2">
+                {pendingSuggestion ? (
+                  <>
+                    <Check className="h-4 w-4 text-primary" />
+                    Customize Your Prompt
+                  </>
+                ) : (
+                  'Describe Your Image'
+                )}
+              </Label>
               <Textarea
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  // Clear pending if user modifies
+                  if (pendingSuggestion && e.target.value !== pendingSuggestion.prompt) {
+                    setPendingSuggestion(null);
+                  }
+                }}
                 onKeyDown={(e) => {
                   // Allow all keys including spacebar - stop propagation to prevent parent handlers
                   e.stopPropagation();
                 }}
-                placeholder="Describe the image you want to generate in detail...
+                placeholder="Describe the image you want to generate...
 
-Example: A colorful diagram showing the water cycle with clouds, rain, rivers, and the ocean. Arrows showing evaporation and condensation. Bright, engaging colors suitable for students."
-                className="min-h-[120px] text-base leading-relaxed resize-none"
+Example: A simple diagram showing the water cycle with clouds, rain, and ocean."
+                className={cn(
+                  "min-h-[100px] text-base leading-relaxed resize-none",
+                  pendingSuggestion && "border-primary"
+                )}
                 autoComplete="off"
                 autoCorrect="off"
                 spellCheck="true"
               />
               <p className="text-sm text-muted-foreground">
-                💡 Tip: Use a template above or write your own custom prompt.
+                {pendingSuggestion 
+                  ? "✏️ Feel free to edit the prompt above before generating."
+                  : "💡 Select a topic suggestion above or write your own prompt."
+                }
               </p>
             </div>
 
-            <Button 
-              onClick={generateImage} 
-              disabled={isGenerating || !prompt.trim()}
-              className="w-full gap-2 h-12 text-base"
-              size="lg"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Generating Image...
-                </>
-              ) : (
-                <>
-                  <Wand2 className="h-5 w-5" />
-                  Generate Image
-                </>
+            <div className="flex gap-2">
+              {pendingSuggestion && (
+                <Button 
+                  variant="outline"
+                  onClick={cancelPendingSuggestion} 
+                  disabled={isGenerating}
+                  className="gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Cancel
+                </Button>
               )}
-            </Button>
+              <Button 
+                onClick={pendingSuggestion ? confirmAndGenerate : generateImage} 
+                disabled={isGenerating || !prompt.trim()}
+                className="flex-1 gap-2 h-12 text-base"
+                size="lg"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Creating SVG...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="h-5 w-5" />
+                    Generate Image
+                  </>
+                )}
+              </Button>
+            </div>
 
             {generatedUrl && (
               <div className="space-y-4 pt-4 border-t">
