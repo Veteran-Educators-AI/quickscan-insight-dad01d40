@@ -126,6 +126,89 @@ const SampleDifferentiation = () => (
   </div>
 );
 
+const SampleTopicSelection = () => (
+  <div className="mt-3 p-3 bg-cyan-50 dark:bg-cyan-950/30 rounded-lg border border-cyan-200 dark:border-cyan-800 text-left">
+    <div className="font-semibold text-cyan-700 dark:text-cyan-300 mb-2">📘 Choose Your Topic</div>
+    <div className="space-y-2 text-xs">
+      <div className="p-2 bg-white dark:bg-gray-800 rounded border flex items-center gap-2">
+        <div className="w-5 h-5 rounded bg-cyan-500 flex items-center justify-center text-white text-[10px]">✓</div>
+        <div>
+          <div className="font-medium">Triangle Congruence (G.CO.B.8)</div>
+          <div className="text-muted-foreground">SAS, ASA, SSS, AAS proofs</div>
+        </div>
+      </div>
+      <div className="p-2 bg-white dark:bg-gray-800 rounded border flex items-center gap-2 opacity-60">
+        <div className="w-5 h-5 rounded border flex items-center justify-center"></div>
+        <div>
+          <div className="font-medium">Parallel Lines & Transversals</div>
+          <div className="text-muted-foreground">Alternate, corresponding angles</div>
+        </div>
+      </div>
+    </div>
+    <div className="mt-2 text-xs text-cyan-600 dark:text-cyan-400">
+      💡 Select topic(s) to build your lesson around
+    </div>
+  </div>
+);
+
+const SampleDiagnostic = () => (
+  <div className="mt-3 p-3 bg-violet-50 dark:bg-violet-950/30 rounded-lg border border-violet-200 dark:border-violet-800 text-left">
+    <div className="font-semibold text-violet-700 dark:text-violet-300 mb-2">🎯 Quickstart Diagnostic</div>
+    <div className="text-xs space-y-2">
+      <p className="text-muted-foreground">Assess student readiness with a leveled diagnostic:</p>
+      <div className="grid grid-cols-3 gap-1">
+        <div className="p-1.5 bg-green-100 dark:bg-green-900/50 rounded text-center">
+          <div className="font-medium text-green-700 dark:text-green-300">Level A</div>
+          <div className="text-[10px] text-green-600">Basic</div>
+        </div>
+        <div className="p-1.5 bg-yellow-100 dark:bg-yellow-900/50 rounded text-center">
+          <div className="font-medium text-yellow-700 dark:text-yellow-300">Level C</div>
+          <div className="text-[10px] text-yellow-600">Standard</div>
+        </div>
+        <div className="p-1.5 bg-purple-100 dark:bg-purple-900/50 rounded text-center">
+          <div className="font-medium text-purple-700 dark:text-purple-300">Level F</div>
+          <div className="text-[10px] text-purple-600">Advanced</div>
+        </div>
+      </div>
+      <div className="p-2 bg-white dark:bg-gray-800 rounded border">
+        <div className="flex justify-between text-[11px]">
+          <span>Sofia Rodriguez</span>
+          <span className="text-orange-600">→ Recommended: Level B</span>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const SampleLessonPlan = () => (
+  <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800 text-left">
+    <div className="font-semibold text-amber-700 dark:text-amber-300 mb-2">📊 AI Lesson Plan</div>
+    <div className="text-xs space-y-2">
+      <div className="p-2 bg-white dark:bg-gray-800 rounded border">
+        <div className="font-medium">Triangle Congruence Lesson</div>
+        <div className="text-muted-foreground">45 min • G.CO.B.8</div>
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded bg-amber-500 text-white text-[10px] flex items-center justify-center">1</span>
+          <span>Warm-up: Review triangle properties</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded bg-amber-500 text-white text-[10px] flex items-center justify-center">2</span>
+          <span>Direct instruction: SAS theorem</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded bg-amber-500 text-white text-[10px] flex items-center justify-center">3</span>
+          <span>Guided practice & exit ticket</span>
+        </div>
+      </div>
+    </div>
+    <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+      ✨ Includes slides, speaker notes & worksheets
+    </div>
+  </div>
+);
+
 const SampleAIDetection = () => (
   <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800 text-left">
     <div className="flex items-center justify-between mb-2">
@@ -185,18 +268,19 @@ const tourSteps: Step[] = [
     target: 'body',
     placement: 'center',
     disableBeacon: true,
-    title: '👋 Welcome to NYCLogic Ai!',
+    title: '👋 Welcome to Your Teaching Workflow!',
     content: (
       <div className="text-left space-y-2">
-        <p>Let's take a quick tour to help you get started with grading student work efficiently.</p>
+        <p>Let's walk through a <strong>typical lesson workflow</strong> from start to finish.</p>
         <p className="text-sm text-muted-foreground">This will only take about 2 minutes and includes real examples.</p>
         <div className="mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
-          <div className="text-xs font-medium text-primary mb-1">What you'll learn:</div>
+          <div className="text-xs font-medium text-primary mb-1">Your Lesson Workflow:</div>
           <ul className="text-xs text-muted-foreground space-y-0.5">
-            <li>✓ Create classes and add students</li>
-            <li>✓ Build AI-powered worksheets</li>
-            <li>✓ Scan and grade work instantly</li>
-            <li>✓ Track progress with reports</li>
+            <li>1️⃣ Choose a topic to teach</li>
+            <li>2️⃣ Run a Quickstart Diagnostic</li>
+            <li>3️⃣ Create an AI Lesson Plan</li>
+            <li>4️⃣ Scan & grade student work</li>
+            <li>5️⃣ Push remediation to students</li>
           </ul>
         </div>
       </div>
@@ -204,12 +288,12 @@ const tourSteps: Step[] = [
   },
   {
     target: '[data-tour="nav-classes"]',
-    title: '📚 Classes',
+    title: '📚 Step 1: Set Up Your Class',
     content: (
       <div className="text-left space-y-2">
-        <p><strong>Create and manage your classes here.</strong></p>
+        <p><strong>First, create your class and add students.</strong></p>
         <p className="text-sm text-muted-foreground">
-          Add students manually or import via CSV. Each student gets a unique QR code.
+          Import via CSV, scan a roster screenshot, or let students self-enroll with a code.
         </p>
         <SampleClassCard />
       </div>
@@ -218,26 +302,54 @@ const tourSteps: Step[] = [
   },
   {
     target: '[data-tour="nav-questions"]',
-    title: '📝 Build Worksheets',
+    title: '📘 Step 2: Choose Your Topic',
     content: (
       <div className="text-left space-y-2">
-        <p><strong>Create standards-aligned assessments.</strong></p>
+        <p><strong>Browse the curriculum and select your lesson topic.</strong></p>
         <p className="text-sm text-muted-foreground">
-          Select topics, choose difficulty, and let AI generate questions with rubrics.
+          Standards-aligned topics organized by subject and unit. Pick one to build your lesson around.
         </p>
-        <SampleWorksheetCard />
+        <SampleTopicSelection />
       </div>
     ),
     disableBeacon: true,
   },
   {
     target: '[data-tour="nav-questions"]',
-    title: '🔀 Differentiated Forms (Anti-Copy)',
+    title: '🎯 Step 3: Quickstart Diagnostic',
     content: (
       <div className="text-left space-y-2">
-        <p><strong>Prevent copying with unique versions!</strong></p>
+        <p><strong>Assess where each student stands before teaching.</strong></p>
         <p className="text-sm text-muted-foreground">
-          Generate up to 10 different forms covering the same concepts. Students sitting together get different questions.
+          Generate a multi-level diagnostic that tests prerequisite skills (Levels A-F). Identify who needs scaffolding and who's ready for extension.
+        </p>
+        <SampleDiagnostic />
+      </div>
+    ),
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tour="create-lesson"]',
+    title: '📊 Step 4: Create Your Lesson Plan',
+    content: (
+      <div className="text-left space-y-2">
+        <p><strong>AI generates a complete lesson with slides!</strong></p>
+        <p className="text-sm text-muted-foreground">
+          Based on your topic, get a full lesson plan with objectives, slides, speaker notes, and recommended practice worksheets.
+        </p>
+        <SampleLessonPlan />
+      </div>
+    ),
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tour="nav-questions"]',
+    title: '🔀 Step 5: Differentiated Worksheets',
+    content: (
+      <div className="text-left space-y-2">
+        <p><strong>Generate practice worksheets at multiple levels.</strong></p>
+        <p className="text-sm text-muted-foreground">
+          Based on diagnostic results, give each student work at their level. Prevent copying with unique forms!
         </p>
         <SampleDifferentiation />
       </div>
@@ -246,12 +358,12 @@ const tourSteps: Step[] = [
   },
   {
     target: '[data-tour="nav-scan"]',
-    title: '📷 Scan & Grade Instantly',
+    title: '📷 Step 6: Scan & Grade Work',
     content: (
       <div className="text-left space-y-2">
         <p><strong>This is where the magic happens!</strong></p>
         <p className="text-sm text-muted-foreground">
-          Snap a photo → AI reads the QR code → Grades the work → Identifies misconceptions.
+          Scan using your scanner → AI reads the QR code → Grades the work → Identifies misconceptions.
         </p>
         <SampleScanResult />
       </div>
@@ -260,7 +372,7 @@ const tourSteps: Step[] = [
   },
   {
     target: '[data-tour="nav-reports"]',
-    title: '📊 Track Progress',
+    title: '📊 Step 7: Track Progress',
     content: (
       <div className="text-left space-y-2">
         <p><strong>Visualize student mastery at a glance.</strong></p>
@@ -273,31 +385,17 @@ const tourSteps: Step[] = [
     disableBeacon: true,
   },
   {
-    target: '[data-tour="nav-settings"]',
-    title: '🛡️ AI Detection',
-    content: (
-      <div className="text-left space-y-2">
-        <p><strong>Maintain academic integrity.</strong></p>
-        <p className="text-sm text-muted-foreground">
-          The system flags potentially AI-generated work for your review.
-        </p>
-        <SampleAIDetection />
-      </div>
-    ),
-    disableBeacon: true,
-  },
-  {
     target: '[data-tour="nav-reports"]',
-    title: '📲 Push Remediation to Student App',
+    title: '📲 Step 8: Push Remediation to Students',
     content: (
       <div className="text-left space-y-2">
-        <p><strong>Personalized practice sent directly to students!</strong></p>
+        <p><strong>Close the loop with personalized practice!</strong></p>
         <p className="text-sm text-muted-foreground">
-          Based on worksheet results, push standards-aligned remediation courses to the <strong>NYCLogic Scholar</strong> app. Students access it on their phones or computers for targeted practice.
+          Based on grading results, push targeted remediation to the <strong>NYCLogic Scholar</strong> app. Students practice on their own devices.
         </p>
         <SampleSisterAppPush />
         <div className="mt-2 p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded text-xs">
-          <strong>How it works:</strong> AI analyzes each student's weaknesses → Creates personalized learning paths → Students earn XP & coins as they master concepts!
+          <strong>The cycle continues:</strong> Diagnostic → Teach → Assess → Remediate → Repeat!
         </div>
       </div>
     ),
@@ -307,19 +405,20 @@ const tourSteps: Step[] = [
     target: 'body',
     placement: 'center',
     disableBeacon: true,
-    title: '🎉 You\'re Ready to Go!',
+    title: '🎉 You\'re Ready to Start Teaching!',
     content: (
       <div className="text-left space-y-3">
-        <p><strong>Your first steps:</strong></p>
+        <p><strong>Your complete workflow:</strong></p>
         <ol className="list-decimal list-inside space-y-1 text-sm">
-          <li><strong>Create a class</strong> with a few test students</li>
-          <li><strong>Build a worksheet</strong> on any topic</li>
-          <li><strong>Print it</strong> (includes QR codes)</li>
-          <li><strong>Scan</strong> a completed paper to see instant results</li>
+          <li><strong>Create a class</strong> and add students</li>
+          <li><strong>Pick a topic</strong> → Run a diagnostic</li>
+          <li><strong>Generate a lesson plan</strong> with AI</li>
+          <li><strong>Create worksheets</strong> → Teach → Grade</li>
+          <li><strong>Push remediation</strong> for struggling students</li>
         </ol>
         <div className="mt-3 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
           <p className="text-sm text-green-700 dark:text-green-300">
-            💡 <strong>Pro tip:</strong> Click the help button (bottom right) anytime to ask questions or restart this tour!
+            💡 <strong>Pro tip:</strong> Start with "Worksheets" → pick a topic → "Quickstart Diagnostic" to assess your class today!
           </p>
         </div>
       </div>
