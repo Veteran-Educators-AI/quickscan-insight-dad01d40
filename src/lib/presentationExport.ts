@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import { fixEncodingCorruption, sanitizeForPDF } from '@/lib/mathRenderer';
 import pptxgen from 'pptxgenjs';
 import type { NycologicPresentation, VisualTheme } from '@/components/presentation/NycologicPresents';
 
@@ -13,6 +14,8 @@ const themeColors: Record<string, { primary: string; secondary: string; bg: stri
 };
 
 const defaultColors = { primary: '#fbbf24', secondary: '#3b82f6', bg: '#1e293b' };
+
+const formatPdfText = (text: string) => sanitizeForPDF(fixEncodingCorruption(text));
 
 function getThemeColors(theme?: VisualTheme) {
   if (!theme?.id) return defaultColors;
@@ -60,7 +63,7 @@ export async function exportToPDF(presentation: NycologicPresentation): Promise<
     pdf.setFontSize(18);
     pdf.setTextColor(255, 255, 255);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(presentation.title, margin, 110);
+    pdf.text(formatPdfText(presentation.title), margin, 110);
 
     // Slide subtitle/tag
     let yPosition = 350;
@@ -68,7 +71,7 @@ export async function exportToPDF(presentation: NycologicPresentation): Promise<
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(28);
       pdf.setTextColor(colors.primary);
-      pdf.text(slide.subtitle.toUpperCase(), pageWidth / 2, yPosition, { align: 'center' });
+      pdf.text(formatPdfText(slide.subtitle).toUpperCase(), pageWidth / 2, yPosition, { align: 'center' });
       yPosition += 60;
     }
 
@@ -78,7 +81,7 @@ export async function exportToPDF(presentation: NycologicPresentation): Promise<
     pdf.setTextColor(255, 255, 255);
     
     // Word wrap for long titles
-    const titleLines = pdf.splitTextToSize(slide.title.replace(/\*\*/g, ''), pageWidth - margin * 2);
+    const titleLines = pdf.splitTextToSize(formatPdfText(slide.title.replace(/\*\*/g, '')), pageWidth - margin * 2);
     titleLines.forEach((line: string, idx: number) => {
       pdf.text(line, pageWidth / 2, yPosition + idx * 80, { align: 'center' });
     });
@@ -91,7 +94,7 @@ export async function exportToPDF(presentation: NycologicPresentation): Promise<
       pdf.setTextColor(200, 200, 200);
       
       slide.content.forEach((item, idx) => {
-        const contentLines = pdf.splitTextToSize(item, pageWidth - margin * 2);
+        const contentLines = pdf.splitTextToSize(formatPdfText(item), pageWidth - margin * 2);
         contentLines.forEach((line: string, lineIdx: number) => {
           if (yPosition + lineIdx * 45 < pageHeight - 200) {
             pdf.text(line, pageWidth / 2, yPosition + lineIdx * 45, { align: 'center' });
@@ -108,7 +111,7 @@ export async function exportToPDF(presentation: NycologicPresentation): Promise<
       pdf.setFontSize(32);
       pdf.setTextColor(255, 255, 255);
       
-      const questionLines = pdf.splitTextToSize(slide.question.prompt, pageWidth - margin * 2);
+      const questionLines = pdf.splitTextToSize(formatPdfText(slide.question.prompt), pageWidth - margin * 2);
       questionLines.forEach((line: string, idx: number) => {
         pdf.text(line, pageWidth / 2, yPosition + idx * 40, { align: 'center' });
       });
@@ -139,7 +142,7 @@ export async function exportToPDF(presentation: NycologicPresentation): Promise<
           // Option text
           pdf.setTextColor(255, 255, 255);
           pdf.setFont('helvetica', 'normal');
-          pdf.text(option, x + 40, y);
+          pdf.text(formatPdfText(option), x + 40, y);
         });
       }
     }
