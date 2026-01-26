@@ -533,96 +533,63 @@ export function sanitizeForPDF(text: string): string {
   let result = text;
   
   // CRITICAL FIX: First check for and fix ampersand-interleaved text pattern
-  // Pattern like "&l&n& &r&i&g&h&t& &t&r&i&a&n&g&l&e&" should become "In a right triangle"
-  // This happens when text is corrupted during encoding
   if (result.includes('&') && /&[a-zA-Z]&/.test(result)) {
-    // Remove all ampersands that appear between single characters
     result = result.replace(/&([a-zA-Z])(?=&|$|\s)/g, '$1');
     result = result.replace(/^&([a-zA-Z])/g, '$1');
-    // Also handle remaining stray ampersands
     result = result.replace(/&+/g, ' ');
     result = result.replace(/\s+/g, ' ').trim();
   }
   
   // First, remove or replace emoji characters that cause corruption in PDF
-  // These emojis render as garbled text like "Ø=Ü¡" in jsPDF
   const emojiReplacements: [RegExp, string][] = [
-    // Common emojis used in worksheets - replace with text or simple symbols
-    [/📋/g, ''],          // clipboard - remove
-    [/💡/g, '->'],        // lightbulb -> arrow for hints
-    [/✨/g, '*'],         // sparkles
-    [/📝/g, ''],          // memo/pencil
-    [/🎉/g, ''],          // party popper
-    [/✓/g, 'v'],          // checkmark
-    [/✗/g, 'x'],          // x mark
-    [/★/g, '*'],          // star
-    [/☆/g, '*'],          // white star
-    [/•/g, '-'],          // bullet
-    [/○/g, 'o'],          // circle
-    [/●/g, '*'],          // filled circle
-    [/□/g, '[ ]'],        // empty square
-    [/■/g, '[x]'],        // filled square
-    [/▢/g, '[ ]'],        // white square
-    [/△/g, 'triangle '],  // triangle
-    [/▲/g, 'triangle '],  // filled triangle
-    [/◯/g, 'O'],          // large circle
-    // Remove any other emoji characters (Unicode emoji ranges)
-    [/[\u{1F300}-\u{1F9FF}]/gu, ''],  // Miscellaneous Symbols and Pictographs, Emoticons, etc.
-    [/[\u{2600}-\u{26FF}]/gu, ''],    // Miscellaneous Symbols
-    [/[\u{2700}-\u{27BF}]/gu, ''],    // Dingbats
-    [/[\u{FE00}-\u{FE0F}]/gu, ''],    // Variation Selectors
-    [/[\u{1F000}-\u{1F02F}]/gu, ''],  // Mahjong Tiles
-    [/[\u{1F0A0}-\u{1F0FF}]/gu, ''],  // Playing Cards
+    [/📋/g, ''],
+    [/💡/g, '->'],
+    [/✨/g, '*'],
+    [/📝/g, ''],
+    [/🎉/g, ''],
+    [/✓/g, 'v'],
+    [/✗/g, 'x'],
+    [/★/g, '*'],
+    [/☆/g, '*'],
+    [/•/g, '-'],
+    [/○/g, 'o'],
+    [/●/g, '*'],
+    [/□/g, '[ ]'],
+    [/■/g, '[x]'],
+    [/▢/g, '[ ]'],
+    [/△/g, 'triangle '],
+    [/▲/g, 'triangle '],
+    [/◯/g, 'O'],
+    [/[\u{1F300}-\u{1F9FF}]/gu, ''],
+    [/[\u{2600}-\u{26FF}]/gu, ''],
+    [/[\u{2700}-\u{27BF}]/gu, ''],
+    [/[\u{FE00}-\u{FE0F}]/gu, ''],
+    [/[\u{1F000}-\u{1F02F}]/gu, ''],
+    [/[\u{1F0A0}-\u{1F0FF}]/gu, ''],
   ];
   
   for (const [pattern, replacement] of emojiReplacements) {
     result = result.replace(pattern, replacement);
   }
   
-  // Fix any existing encoding corruption patterns (mojibake)
-  // These patterns occur when UTF-8 text is incorrectly decoded as Latin-1
-  const mojibakePatterns: [RegExp, string][] = [
-    // Greek letters mojibake - convert to proper Unicode symbols
-    [/Ï€/g, 'π'],        // π
-    [/Î¸/g, 'θ'],        // θ
-    [/Î±/g, 'α'],        // α
-    [/Î²/g, 'β'],        // β
-    [/Î³/g, 'γ'],        // γ
-    [/Î"/g, 'Δ'],        // Δ
-    [/Î´/g, 'δ'],        // δ
-    [/Ïˆ/g, 'ψ'],        // ψ
-    [/Ï†/g, 'φ'],        // φ
-    [/Î£/g, 'Σ'],        // Σ
-    [/Ïƒ/g, 'σ'],        // σ
-    [/Î©/g, 'Ω'],        // Ω
-    [/Ï‰/g, 'ω'],        // ω
-    [/Î»/g, 'λ'],        // λ
-    [/Î¼/g, 'μ'],        // μ
+  // CRITICAL: Fix common PDF corruption patterns - Â followed by symbols/quotes
+  // These are the patterns seen in the user's screenshots
+  const pdfCorruptionPatterns: [RegExp, string][] = [
+    // "Â "H" pattern -> π (pi symbol that got corrupted)
+    [/Â\s*"H/gi, 'π'],
+    [/Â\s*"\s*H/gi, 'π'],
+    [/Â\s*"\s*\[\s*\]/gi, 'π'],
+    [/Â\s*\[\s*\]/gi, 'π'],
     
-    // Math operators mojibake - convert to proper Unicode symbols
-    [/â‰¤/g, '≤'],       // ≤
-    [/â‰¥/g, '≥'],       // ≥
-    [/â‰ /g, '≠'],       // ≠
-    [/â†'/g, '→'],       // →
-    [/âˆš/g, '√'],       // √
-    [/âˆž/g, '∞'],       // ∞
-    [/Ã—/g, '×'],        // ×
-    [/Ã·/g, '÷'],        // ÷
-    [/â€"/g, '-'],       // em dash
-    [/â€™/g, "'"],       // right single quote
-    [/â€œ/g, '"'],       // left double quote
-    [/â€/g, '"'],        // right double quote
+    // Handle the pattern "Â [ ]" which should be π
+    [/Ã\s*\[\s*\]/g, 'π'],
+    [/Â\s*(?:\[\s*\]|□|�)/g, 'π'],
     
-    // Common corrupt patterns that appear as "Ø=Ü" (corrupted emoji)
-    [/Ø=Ü[¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿]?/g, ''],  // Corrupted emoji patterns
-    [/Ã˜=Ã[^\s]*/g, ''],  // Another corruption pattern
+    // Common pi corruption when followed by units
+    [/Ã\s+(?=inches|cm|meters|units|square|cubic)/gi, 'π '],
+    [/Â\s+(?=inches|cm|meters|units|square|cubic)/gi, 'π '],
     
-    // Pi corruption patterns in PDF text
-    [/Ã\s*\[\s*\]/g, 'π'],  // "Ã [ ]" pattern -> π
-    [/Â\s*(?:\[\s*\]|□|�)/g, 'π'], // "Â [ ]" or placeholder square -> π
-    [/Ã\s+(?=inches|cm|meters|units|square|cubic)/gi, 'π '], // "Ã " before units -> π
-    
-    // Common Â prefix corruption (UTF-8 BOM or encoding issue)
+    // Standalone Â before numbers or spaces - likely corrupted pi
     [/Â\s*π/g, 'π'],
     [/Âπ/g, 'π'],
     [/πÂ/g, 'π'],
@@ -636,44 +603,69 @@ export function sanitizeForPDF(text: string): string {
     [/Â±/g, '±'],
     [/Â·/g, '·'],
     
-    // NOTE: Ampersand-interleaved text is now handled at the beginning of this function
+    // Greek letters mojibake
+    [/Ï€/g, 'π'],
+    [/Î¸/g, 'θ'],
+    [/Î±/g, 'α'],
+    [/Î²/g, 'β'],
+    [/Î³/g, 'γ'],
+    [/Î"/g, 'Δ'],
+    [/Î´/g, 'δ'],
+    [/Ïˆ/g, 'ψ'],
+    [/Ï†/g, 'φ'],
+    [/Î£/g, 'Σ'],
+    [/Ïƒ/g, 'σ'],
+    [/Î©/g, 'Ω'],
+    [/Ï‰/g, 'ω'],
+    [/Î»/g, 'λ'],
+    [/Î¼/g, 'μ'],
+    
+    // Math operators mojibake
+    [/â‰¤/g, '≤'],
+    [/â‰¥/g, '≥'],
+    [/â‰ /g, '≠'],
+    [/â†'/g, '→'],
+    [/âˆš/g, '√'],
+    [/âˆž/g, '∞'],
+    [/Ã—/g, '×'],
+    [/Ã·/g, '÷'],
+    [/â€"/g, '-'],
+    [/â€™/g, "'"],
+    [/â€œ/g, '"'],
+    [/â€/g, '"'],
+    
+    // Corrupted emoji patterns
+    [/Ø=Ü[¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿]?/g, ''],
+    [/Ã˜=Ã[^\s]*/g, ''],
     
     // Clean up remaining stray Â characters
     [/Â(?=\d)/g, ''],
     [/(\d)Â\s/g, '$1 '],
     [/Â\s+/g, ' '],
     [/\s+Â/g, ' '],
+    [/Â(?![a-zA-Z0-9])/g, ''],
   ];
   
-  for (const [pattern, replacement] of mojibakePatterns) {
+  for (const [pattern, replacement] of pdfCorruptionPatterns) {
     result = result.replace(pattern, replacement);
   }
   
-  // IMPORTANT: Keep Unicode math symbols that jsPDF can render correctly!
-  // These include: π, θ, √, ², ³, ≤, ≥, ±, °, ∞, α, β, γ, δ, etc.
-  // Only convert arrows and some geometry symbols that may not render well
+  // Convert Unicode symbols that don't render well in PDF to ASCII equivalents
   const safeReplacements: [RegExp, string][] = [
-    // Arrows - convert to ASCII since they may not render consistently
     [/→/g, '->'],
     [/←/g, '<-'],
     [/↔/g, '<->'],
     [/⇒/g, '=>'],
-    
-    // Some less common geometry symbols
     [/⊥/g, ' perp '],
     [/∥/g, ' || '],
-    [/≅/g, ' = '],  // congruent
+    [/≅/g, ' = '],
     [/∠/g, 'angle '],
-    
-    // Set theory - less commonly needed
     [/∴/g, 'therefore '],
     [/∵/g, 'because '],
     [/∈/g, ' in '],
     [/⊂/g, ' subset '],
     [/∪/g, ' union '],
     [/∩/g, ' intersection '],
-    
-    // Prime symbols
     [/′/g, "'"],
     [/″/g, "''"],
   ];
@@ -682,7 +674,18 @@ export function sanitizeForPDF(text: string): string {
     result = result.replace(pattern, replacement);
   }
   
-  // Clean up any double spaces that may have been introduced
+  // Final cleanup: Remove any remaining unusual characters that may cause issues
+  // Keep: letters, numbers, common punctuation, and safe math symbols
+  result = result.replace(/[^\x20-\x7E\u00B0\u00B2\u00B3\u00BD\u00BC\u00BE\u00D7\u00F7\u03B1-\u03C9\u03A0-\u03A9\u221A\u221E\u2264\u2265\u2260\u00B1\u00B7\u2248\u00B9]/g, (char) => {
+    // Only remove if it's in a problematic range, otherwise keep
+    const code = char.charCodeAt(0);
+    if (code >= 0x80 && code <= 0xFF && ![0xB0, 0xB1, 0xB2, 0xB3, 0xB7, 0xB9, 0xBC, 0xBD, 0xBE, 0xD7, 0xF7].includes(code)) {
+      return ''; // Remove Latin-1 supplement characters that aren't math symbols
+    }
+    return char;
+  });
+  
+  // Clean up any double spaces
   result = result.replace(/\s+/g, ' ').trim();
   
   return result;
