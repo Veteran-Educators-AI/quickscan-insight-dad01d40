@@ -105,24 +105,25 @@ interface SavedWorksheet {
   is_shared: boolean;
 }
 
-// Convert SVG to PNG data URL for embedding in documents
-const svgToPngDataUrl = async (svgString: string, width: number = 200, height: number = 200): Promise<string> => {
+// Convert SVG (string, data URL, or HTTP URL) to PNG data URL for embedding in documents
+const svgToPngDataUrl = async (svgInput: string, width: number = 200, height: number = 200): Promise<string> => {
   return new Promise((resolve, reject) => {
-    if (!svgString) {
-      reject(new Error('No SVG string provided'));
+    if (!svgInput) {
+      reject(new Error('No SVG input provided'));
       return;
     }
     
-    // If it's already a data URL or HTTP URL, return it
-    if (svgString.startsWith('data:image/png') || svgString.startsWith('http')) {
-      resolve(svgString);
+    // If it's already a PNG data URL, return it as-is
+    if (svgInput.startsWith('data:image/png') || svgInput.startsWith('data:image/jpeg')) {
+      resolve(svgInput);
       return;
     }
     
-    // Create an image from the SVG
+    // Create an image element
     const img = new Image();
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
+    img.crossOrigin = 'anonymous';
+    
+    let objectUrl: string | null = null;
     
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -132,22 +133,41 @@ const svgToPngDataUrl = async (svgString: string, width: number = 200, height: n
       if (ctx) {
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
+        // Scale image to fit while maintaining aspect ratio
+        const scale = Math.min(width / img.width, height / img.height);
+        const x = (width - img.width * scale) / 2;
+        const y = (height - img.height * scale) / 2;
+        ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
         const pngDataUrl = canvas.toDataURL('image/png');
-        URL.revokeObjectURL(url);
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
         resolve(pngDataUrl);
       } else {
-        URL.revokeObjectURL(url);
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
         reject(new Error('Could not get canvas context'));
       }
     };
     
     img.onerror = () => {
-      URL.revokeObjectURL(url);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
       reject(new Error('Failed to load SVG image'));
     };
     
-    img.src = url;
+    // Handle different input types
+    if (svgInput.startsWith('data:image/svg+xml')) {
+      // SVG data URL - use directly
+      img.src = svgInput;
+    } else if (svgInput.startsWith('http://') || svgInput.startsWith('https://')) {
+      // HTTP URL - use directly (could be SVG or other image)
+      img.src = svgInput;
+    } else if (svgInput.startsWith('<svg') || svgInput.includes('xmlns')) {
+      // Raw SVG string - convert to blob URL
+      const svgBlob = new Blob([svgInput], { type: 'image/svg+xml;charset=utf-8' });
+      objectUrl = URL.createObjectURL(svgBlob);
+      img.src = objectUrl;
+    } else {
+      // Unknown format, try using as-is
+      img.src = svgInput;
+    }
   });
 };
 
@@ -1970,9 +1990,25 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         // Add image/diagram if available (imageUrl, svg, or generate from imagePrompt)
         if (question.imageUrl || question.svg || question.imagePrompt) {
           try {
-            let imageData = question.imageUrl || '';
+            let imageData = '';
             
-            // Convert SVG to PNG if only SVG is available
+            // Priority 1: Use imageUrl if available
+            if (question.imageUrl) {
+              // Check if it's an SVG URL that needs conversion to PNG for Word compatibility
+              if (question.imageUrl.includes('svg') || question.imageUrl.startsWith('data:image/svg')) {
+                try {
+                  imageData = await svgToPngDataUrl(question.imageUrl, 300, 300);
+                } catch (svgErr) {
+                  console.error('Error converting SVG URL to PNG for Word:', svgErr);
+                  // Fall back to trying the URL directly
+                  imageData = question.imageUrl;
+                }
+              } else {
+                imageData = question.imageUrl;
+              }
+            }
+            
+            // Priority 2: Convert SVG string to PNG if available
             if (!imageData && question.svg) {
               try {
                 imageData = await svgToPngDataUrl(question.svg, 300, 300);
@@ -1981,7 +2017,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               }
             }
             
-            // If still no image but we have an imagePrompt, generate on-demand
+            // Priority 3: Generate from imagePrompt on-demand
             if (!imageData && question.imagePrompt) {
               try {
                 const { data: genData } = await supabase.functions.invoke('generate-diagram-images', {
@@ -1991,7 +2027,15 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     preferDeterministicSVG: true,
                   },
                 });
-                imageData = genData?.results?.[0]?.imageUrl || '';
+                const generatedUrl = genData?.results?.[0]?.imageUrl || '';
+                // Convert generated SVG to PNG if needed
+                if (generatedUrl) {
+                  if (generatedUrl.includes('svg') || generatedUrl.startsWith('data:image/svg')) {
+                    imageData = await svgToPngDataUrl(generatedUrl, 300, 300);
+                  } else {
+                    imageData = generatedUrl;
+                  }
+                }
               } catch (genError) {
                 console.error('Error generating diagram on-demand for Word:', genError);
               }
