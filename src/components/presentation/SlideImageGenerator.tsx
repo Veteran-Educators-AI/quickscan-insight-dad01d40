@@ -20,6 +20,17 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSubjectSuggestions, createTopicSpecificPrompt, type ImageSuggestion } from '@/data/presentationImageSuggestions';
 
+// Generate a rich, topic-focused description instead of presentation meta-language
+function generateDefaultTopicPrompt(slideTitle: string, topic: string): string {
+  const cleanTitle = slideTitle.replace(/\*\*/g, '').replace(/["']/g, '');
+  
+  return `Create a detailed, educational illustration about ${cleanTitle} in the context of ${topic}. 
+
+Focus on accurately depicting the actual subject matter - the processes, structures, concepts, or ideas that students need to understand. For scientific topics, show the real biological, chemical, or physical phenomena. For historical topics, depict the authentic setting, people, and events. For literary themes, visualize the metaphors, emotions, and symbolic content.
+
+Use vibrant, engaging colors appropriate to the subject. The illustration should be scientifically, historically, or thematically accurate. Professional quality suitable for classroom use. Clean composition with a clear focal point. No text, labels, or words in the image.`;
+}
+
 // Template categories and items
 const imageTemplates = {
   diagrams: [
@@ -79,7 +90,7 @@ export function SlideImageGenerator({
 }: SlideImageGeneratorProps) {
   const [prompt, setPrompt] = useState(
     currentImage?.prompt || 
-    `Educational illustration for "${slideTitle}" about ${topic}. Clean, modern, professional style.`
+    generateDefaultTopicPrompt(slideTitle, topic)
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(currentImage?.url || null);
@@ -134,7 +145,7 @@ export function SlideImageGenerator({
   // Reset prompt when slide changes
   useEffect(() => {
     if (!currentImage) {
-      setPrompt(`Educational illustration for "${slideTitle}" about ${topic}. Clean, modern, professional style.`);
+      setPrompt(generateDefaultTopicPrompt(slideTitle, topic));
     }
   }, [slideTitle, topic, currentImage]);
 
