@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown, Cloud, CloudOff, Library, ImagePlus, Radio, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown, Cloud, CloudOff, Library, ImagePlus, Radio, Users, Wand2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -93,6 +93,11 @@ export default function PresentationView() {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   
+  // Image enhancement states
+  const [showEnhancePanel, setShowEnhancePanel] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [customEnhancement, setCustomEnhancement] = useState('');
+  
   // Touch gesture states
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -157,6 +162,87 @@ export default function PresentationView() {
     accentHex: presentation?.visualTheme?.accentHex || baseColors.accentHex,
   };
   const IconComponent = slide?.icon ? slideIcons[slide.icon] : null;
+
+  // Enhancement suggestions based on topic
+  const getEnhancementSuggestions = useCallback(() => {
+    const topic = presentation?.topic?.toLowerCase() || '';
+    const slideTitle = slide?.title?.toLowerCase() || '';
+    
+    const baseSuggestions = [
+      'Add more detail and depth',
+      'Make colors more vibrant',
+      'Add subtle lighting effects',
+      'Make it more 3D and realistic',
+    ];
+    
+    // Topic-specific suggestions
+    if (topic.includes('math') || topic.includes('geometry') || slideTitle.includes('triangle') || slideTitle.includes('equation')) {
+      return [
+        'Add grid lines in background',
+        'Add measurement marks',
+        'Add coordinate axes',
+        'Add angle indicators',
+        ...baseSuggestions.slice(0, 2),
+      ];
+    }
+    if (topic.includes('science') || topic.includes('biology') || topic.includes('chemistry')) {
+      return [
+        'Add molecular details',
+        'Add scientific notation',
+        'Add laboratory equipment',
+        'Add cellular structures',
+        ...baseSuggestions.slice(0, 2),
+      ];
+    }
+    if (topic.includes('history') || topic.includes('social')) {
+      return [
+        'Add historical texture',
+        'Add map elements',
+        'Add period-appropriate details',
+        'Add vintage styling',
+        ...baseSuggestions.slice(0, 2),
+      ];
+    }
+    
+    return baseSuggestions;
+  }, [presentation?.topic, slide?.title]);
+
+  // Handle image enhancement
+  const handleEnhanceImage = async (enhancement: string) => {
+    if (!slide?.customImage?.url || !enhancement.trim()) return;
+    
+    setIsEnhancing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+        body: {
+          action: 'enhance',
+          imageUrl: slide.customImage.url,
+          enhancement: enhancement,
+        },
+      });
+
+      if (error) throw error;
+      
+      if (data?.imageUrl) {
+        // Update the slide with enhanced image
+        handleImageGenerated({
+          ...slide.customImage,
+          url: data.imageUrl,
+          prompt: `${slide.customImage.prompt || ''} + ${enhancement}`,
+        });
+        toast.success('Image enhanced!');
+        setShowEnhancePanel(false);
+        setCustomEnhancement('');
+      } else {
+        throw new Error('No enhanced image returned');
+      }
+    } catch (error) {
+      console.error('Error enhancing image:', error);
+      toast.error('Failed to enhance image. Please try again.');
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
 
   const goToSlide = useCallback((index: number) => {
     if (index >= 0 && index < totalSlides) {
@@ -1528,30 +1614,96 @@ export default function PresentationView() {
                               draggable={false}
                             />
                             
-                            {/* Edit/Delete controls - visible on hover */}
-                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl bg-black/30 flex items-center justify-center gap-4">
-                              <button
-                                onClick={() => setShowImageGenerator(true)}
-                                className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-all hover:scale-110"
-                                title="Change image"
-                              >
-                                <ImagePlus className="w-6 h-6 text-white" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  handleImageGenerated({
-                                    url: '',
-                                    prompt: '',
-                                    position: { x: 50, y: 50 },
-                                    size: { width: 288, height: 288 },
-                                    rotation: 0,
-                                  });
-                                }}
-                                className="p-3 bg-red-500/80 hover:bg-red-500 rounded-full transition-all hover:scale-110"
-                                title="Remove image"
-                              >
-                                <X className="w-6 h-6 text-white" />
-                              </button>
+                            {/* Image controls - visible on hover */}
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl">
+                              {/* Top buttons row */}
+                              <div className="absolute top-2 right-2 flex gap-2">
+                                <button
+                                  onClick={() => setShowImageGenerator(true)}
+                                  className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all hover:scale-110 backdrop-blur-sm"
+                                  title="Replace image"
+                                >
+                                  <ImagePlus className="w-5 h-5 text-white" />
+                                </button>
+                                <button
+                                  onClick={() => setShowEnhancePanel(!showEnhancePanel)}
+                                  className={cn(
+                                    "p-2 rounded-full transition-all hover:scale-110 backdrop-blur-sm",
+                                    showEnhancePanel ? "bg-amber-500 text-black" : "bg-white/20 hover:bg-white/30 text-white"
+                                  )}
+                                  title="Enhance image"
+                                >
+                                  <Wand2 className="w-5 h-5" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    handleImageGenerated({
+                                      url: '',
+                                      prompt: '',
+                                      position: { x: 50, y: 50 },
+                                      size: { width: 288, height: 288 },
+                                      rotation: 0,
+                                    });
+                                    setShowEnhancePanel(false);
+                                  }}
+                                  className="p-2 bg-red-500/80 hover:bg-red-500 rounded-full transition-all hover:scale-110 backdrop-blur-sm"
+                                  title="Remove image"
+                                >
+                                  <X className="w-5 h-5 text-white" />
+                                </button>
+                              </div>
+                              
+                              {/* Enhancement panel - slides out below image */}
+                              <AnimatePresence>
+                                {showEnhancePanel && (
+                                  <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    className="absolute -bottom-4 left-0 right-0 translate-y-full p-3 bg-black/80 backdrop-blur-md rounded-xl border border-white/20 z-30"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="text-xs text-white/70 mb-2 font-medium">Quick Enhancements:</div>
+                                    <div className="flex flex-wrap gap-1.5 mb-3">
+                                      {getEnhancementSuggestions().slice(0, 4).map((suggestion, idx) => (
+                                        <button
+                                          key={idx}
+                                          onClick={() => handleEnhanceImage(suggestion)}
+                                          disabled={isEnhancing}
+                                          className="px-2 py-1 text-xs bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors disabled:opacity-50"
+                                        >
+                                          {suggestion}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        value={customEnhancement}
+                                        onChange={(e) => setCustomEnhancement(e.target.value)}
+                                        placeholder="Custom enhancement..."
+                                        className="flex-1 px-3 py-1.5 text-sm bg-white/10 border border-white/20 rounded-lg text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-white/30"
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' && customEnhancement.trim()) {
+                                            handleEnhanceImage(customEnhancement);
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        onClick={() => customEnhancement.trim() && handleEnhanceImage(customEnhancement)}
+                                        disabled={isEnhancing || !customEnhancement.trim()}
+                                        className="p-1.5 bg-amber-500 hover:bg-amber-400 text-black rounded-lg transition-colors disabled:opacity-50"
+                                      >
+                                        {isEnhancing ? (
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                          <Send className="w-4 h-4" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
                             </div>
                           </>
                         ) : (
