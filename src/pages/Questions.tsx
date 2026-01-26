@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy, Brain, AlertTriangle, GraduationCap, Shapes } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy, Brain, AlertTriangle, GraduationCap, Shapes, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +26,7 @@ import { DiagnosticGapsDialog } from '@/components/reports/DiagnosticGapsSummary
 import { EnglishLiteratureSuggestions } from '@/components/questions/EnglishLiteratureSuggestions';
 import { SubjectLessonSuggestions } from '@/components/questions/SubjectLessonSuggestions';
 import { RegentsShapeScanner } from '@/components/questions/RegentsShapeScanner';
+import { BatchSvgConverter } from '@/components/questions/BatchSvgConverter';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Questions() {
@@ -47,6 +48,7 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
   const [showAdaptiveGenerator, setShowAdaptiveGenerator] = useState(false);
   const [showTrainAI, setShowTrainAI] = useState(false);
   const [showShapeScanner, setShowShapeScanner] = useState(false);
+  const [showBatchConverter, setShowBatchConverter] = useState(false);
   const [sampleRefresh, setSampleRefresh] = useState(0);
 
   // Get selected topics as array for passing to generator
@@ -482,6 +484,14 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                 <Shapes className="h-4 w-4 mr-2" />
                 Shape Library
               </Button>
+              <Button 
+                onClick={() => setShowBatchConverter(true)}
+                variant="outline"
+                className="border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Convert SVGs
+              </Button>
               <DiagnosticGapsDialog />
             </TooltipProvider>
           </div>
@@ -901,6 +911,12 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
       <RegentsShapeScanner 
         open={showShapeScanner} 
         onOpenChange={setShowShapeScanner} 
+      />
+
+      {/* Batch SVG Converter */}
+      <BatchSvgConverter
+        open={showBatchConverter}
+        onOpenChange={setShowBatchConverter}
       />
     </AppLayout>
   );
