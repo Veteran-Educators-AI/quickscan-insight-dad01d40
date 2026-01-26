@@ -46,6 +46,18 @@ const FALLBACK_SHAPES: Record<string, (params?: any) => string> = {
     <polyline points="54,234 66,234 66,246" stroke="#000000" stroke-width="1" fill="none"/>
   </svg>`,
 
+  // Basic triangle (non-right)
+  triangle: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <polygon points="150,50 50,250 250,250" stroke="#000000" stroke-width="2" fill="none"/>
+    <circle cx="150" cy="50" r="4" fill="#000000"/>
+    <circle cx="50" cy="250" r="4" fill="#000000"/>
+    <circle cx="250" cy="250" r="4" fill="#000000"/>
+    <text x="145" y="40" font-family="Arial" font-size="12" font-weight="bold">A</text>
+    <text x="30" y="265" font-family="Arial" font-size="12" font-weight="bold">B</text>
+    <text x="255" y="265" font-family="Arial" font-size="12" font-weight="bold">C</text>
+  </svg>`,
+
   // Basic quadrilateral/rectangle  
   rectangle: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
@@ -80,6 +92,34 @@ const FALLBACK_SHAPES: Record<string, (params?: any) => string> = {
     </g>
   </svg>`,
 
+  // Parallelogram
+  parallelogram: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <polygon points="80,200 130,80 220,80 170,200" stroke="#000000" stroke-width="2" fill="none"/>
+    <circle cx="80" cy="200" r="4" fill="#000000"/>
+    <circle cx="130" cy="80" r="4" fill="#000000"/>
+    <circle cx="220" cy="80" r="4" fill="#000000"/>
+    <circle cx="170" cy="200" r="4" fill="#000000"/>
+    <text x="60" y="215" font-family="Arial" font-size="12" font-weight="bold">A</text>
+    <text x="125" y="70" font-family="Arial" font-size="12" font-weight="bold">B</text>
+    <text x="225" y="70" font-family="Arial" font-size="12" font-weight="bold">C</text>
+    <text x="175" y="215" font-family="Arial" font-size="12" font-weight="bold">D</text>
+  </svg>`,
+
+  // Trapezoid
+  trapezoid: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <polygon points="60,200 100,80 200,80 240,200" stroke="#000000" stroke-width="2" fill="none"/>
+    <circle cx="60" cy="200" r="4" fill="#000000"/>
+    <circle cx="100" cy="80" r="4" fill="#000000"/>
+    <circle cx="200" cy="80" r="4" fill="#000000"/>
+    <circle cx="240" cy="200" r="4" fill="#000000"/>
+    <text x="40" y="215" font-family="Arial" font-size="12" font-weight="bold">A</text>
+    <text x="95" y="70" font-family="Arial" font-size="12" font-weight="bold">B</text>
+    <text x="205" y="70" font-family="Arial" font-size="12" font-weight="bold">C</text>
+    <text x="245" y="215" font-family="Arial" font-size="12" font-weight="bold">D</text>
+  </svg>`,
+
   // Circle on coordinate plane
   circle: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
@@ -106,6 +146,143 @@ const FALLBACK_SHAPES: Record<string, (params?: any) => string> = {
     </g>
     <line x1="150" y1="150" x2="222" y2="150" stroke="#000000" stroke-width="1.5" stroke-dasharray="4,2"/>
     <text x="180" y="145" font-family="Arial" font-size="10">r = 3</text>
+  </svg>`,
+
+  // Simple circle (no coordinate plane)
+  simple_circle: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <circle cx="150" cy="150" r="100" stroke="#000000" stroke-width="2" fill="none"/>
+    <circle cx="150" cy="150" r="4" fill="#000000"/>
+    <line x1="150" y1="150" x2="250" y2="150" stroke="#000000" stroke-width="1.5" stroke-dasharray="4,2"/>
+    <text x="150" y="140" font-family="Arial" font-size="12" text-anchor="middle" font-weight="bold">O</text>
+    <text x="200" y="140" font-family="Arial" font-size="11">r</text>
+  </svg>`,
+
+  // Arc / Semicircle
+  arc: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <path d="M 50 200 A 100 100 0 0 1 250 200" stroke="#000000" stroke-width="2" fill="none"/>
+    <line x1="50" y1="200" x2="250" y2="200" stroke="#000000" stroke-width="2"/>
+    <circle cx="50" cy="200" r="4" fill="#000000"/>
+    <circle cx="250" cy="200" r="4" fill="#000000"/>
+    <circle cx="150" cy="200" r="4" fill="#000000"/>
+    <text x="35" y="215" font-family="Arial" font-size="12" font-weight="bold">A</text>
+    <text x="255" y="215" font-family="Arial" font-size="12" font-weight="bold">B</text>
+    <text x="145" y="215" font-family="Arial" font-size="12" font-weight="bold">O</text>
+  </svg>`,
+
+  // Inscribed angle / chord
+  chord: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <circle cx="150" cy="150" r="100" stroke="#000000" stroke-width="2" fill="none"/>
+    <line x1="75" y1="215" x2="225" y2="215" stroke="#000000" stroke-width="2"/>
+    <circle cx="75" cy="215" r="4" fill="#000000"/>
+    <circle cx="225" cy="215" r="4" fill="#000000"/>
+    <circle cx="150" cy="150" r="4" fill="#000000"/>
+    <text x="55" y="230" font-family="Arial" font-size="12" font-weight="bold">A</text>
+    <text x="230" y="230" font-family="Arial" font-size="12" font-weight="bold">B</text>
+    <text x="155" y="145" font-family="Arial" font-size="12" font-weight="bold">O</text>
+  </svg>`,
+
+  // Tangent line
+  tangent: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <circle cx="150" cy="150" r="80" stroke="#000000" stroke-width="2" fill="none"/>
+    <line x1="230" y1="50" x2="230" y2="250" stroke="#000000" stroke-width="2"/>
+    <line x1="150" y1="150" x2="230" y2="150" stroke="#000000" stroke-width="1.5" stroke-dasharray="4,2"/>
+    <circle cx="150" cy="150" r="4" fill="#000000"/>
+    <circle cx="230" cy="150" r="4" fill="#000000"/>
+    <text x="135" y="140" font-family="Arial" font-size="12" font-weight="bold">O</text>
+    <text x="235" y="155" font-family="Arial" font-size="12" font-weight="bold">P</text>
+    <polyline points="218,150 218,162 230,162" stroke="#000000" stroke-width="1" fill="none"/>
+  </svg>`,
+
+  // 3D Rectangular Prism
+  prism: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <!-- Front face -->
+    <rect x="60" y="100" width="120" height="100" stroke="#000000" stroke-width="2" fill="none"/>
+    <!-- Back face (offset) -->
+    <rect x="100" y="60" width="120" height="100" stroke="#000000" stroke-width="2" fill="none"/>
+    <!-- Connecting edges -->
+    <line x1="60" y1="100" x2="100" y2="60" stroke="#000000" stroke-width="2"/>
+    <line x1="180" y1="100" x2="220" y2="60" stroke="#000000" stroke-width="2"/>
+    <line x1="60" y1="200" x2="100" y2="160" stroke="#000000" stroke-width="2"/>
+    <line x1="180" y1="200" x2="220" y2="160" stroke="#000000" stroke-width="2"/>
+    <!-- Labels -->
+    <text x="110" y="230" font-family="Arial" font-size="11">length</text>
+    <text x="185" y="155" font-family="Arial" font-size="11">height</text>
+    <text x="225" y="110" font-family="Arial" font-size="11">width</text>
+  </svg>`,
+
+  // Cylinder
+  cylinder: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <!-- Top ellipse -->
+    <ellipse cx="150" cy="70" rx="70" ry="25" stroke="#000000" stroke-width="2" fill="none"/>
+    <!-- Bottom ellipse -->
+    <ellipse cx="150" cy="230" rx="70" ry="25" stroke="#000000" stroke-width="2" fill="none"/>
+    <!-- Side lines -->
+    <line x1="80" y1="70" x2="80" y2="230" stroke="#000000" stroke-width="2"/>
+    <line x1="220" y1="70" x2="220" y2="230" stroke="#000000" stroke-width="2"/>
+    <!-- Height label -->
+    <line x1="240" y1="70" x2="240" y2="230" stroke="#000000" stroke-width="1" stroke-dasharray="4,2"/>
+    <text x="245" y="155" font-family="Arial" font-size="11">h</text>
+    <!-- Radius label -->
+    <line x1="150" y1="230" x2="220" y2="230" stroke="#000000" stroke-width="1" stroke-dasharray="4,2"/>
+    <text x="180" y="245" font-family="Arial" font-size="11">r</text>
+  </svg>`,
+
+  // Cone
+  cone: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <!-- Apex -->
+    <circle cx="150" cy="50" r="4" fill="#000000"/>
+    <!-- Base ellipse -->
+    <ellipse cx="150" cy="250" rx="80" ry="25" stroke="#000000" stroke-width="2" fill="none"/>
+    <!-- Slant edges -->
+    <line x1="150" y1="50" x2="70" y2="250" stroke="#000000" stroke-width="2"/>
+    <line x1="150" y1="50" x2="230" y2="250" stroke="#000000" stroke-width="2"/>
+    <!-- Height (dashed) -->
+    <line x1="150" y1="50" x2="150" y2="250" stroke="#000000" stroke-width="1" stroke-dasharray="4,2"/>
+    <text x="155" y="155" font-family="Arial" font-size="11">h</text>
+    <!-- Radius -->
+    <line x1="150" y1="250" x2="230" y2="250" stroke="#000000" stroke-width="1" stroke-dasharray="4,2"/>
+    <text x="185" y="265" font-family="Arial" font-size="11">r</text>
+  </svg>`,
+
+  // Pyramid
+  pyramid: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <!-- Apex -->
+    <circle cx="150" cy="50" r="4" fill="#000000"/>
+    <!-- Base (square) -->
+    <polygon points="60,220 150,270 240,220 150,170" stroke="#000000" stroke-width="2" fill="none"/>
+    <!-- Edges to apex -->
+    <line x1="150" y1="50" x2="60" y2="220" stroke="#000000" stroke-width="2"/>
+    <line x1="150" y1="50" x2="240" y2="220" stroke="#000000" stroke-width="2"/>
+    <line x1="150" y1="50" x2="150" y2="170" stroke="#000000" stroke-width="2"/>
+    <line x1="150" y1="50" x2="150" y2="270" stroke="#000000" stroke-width="2" stroke-dasharray="4,2"/>
+    <!-- Height (dashed) -->
+    <line x1="150" y1="50" x2="150" y2="220" stroke="#000000" stroke-width="1" stroke-dasharray="4,2"/>
+    <text x="155" y="140" font-family="Arial" font-size="11">h</text>
+  </svg>`,
+
+  // Sphere
+  sphere: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <!-- Main circle -->
+    <circle cx="150" cy="150" r="100" stroke="#000000" stroke-width="2" fill="none"/>
+    <!-- Equator ellipse -->
+    <ellipse cx="150" cy="150" rx="100" ry="30" stroke="#000000" stroke-width="1" stroke-dasharray="4,2" fill="none"/>
+    <!-- Vertical half-ellipse (front) -->
+    <path d="M 150 50 A 30 100 0 0 1 150 250" stroke="#000000" stroke-width="1" stroke-dasharray="4,2" fill="none"/>
+    <!-- Center -->
+    <circle cx="150" cy="150" r="4" fill="#000000"/>
+    <text x="160" y="145" font-family="Arial" font-size="12" font-weight="bold">O</text>
+    <!-- Radius -->
+    <line x1="150" y1="150" x2="250" y2="150" stroke="#000000" stroke-width="1.5"/>
+    <text x="200" y="140" font-family="Arial" font-size="11">r</text>
   </svg>`,
 
   // Parabola (for Algebra)
@@ -216,15 +393,55 @@ const FALLBACK_SHAPES: Record<string, (params?: any) => string> = {
 function matchFallbackShape(prompt: string): string | null {
   const lowerPrompt = prompt.toLowerCase();
   
-  // Geometry shapes
+  // Geometry shapes - check specific cases first
   if (lowerPrompt.includes('right triangle') || (lowerPrompt.includes('triangle') && lowerPrompt.includes('right'))) {
     return 'right_triangle';
+  }
+  if (lowerPrompt.includes('triangle') && !lowerPrompt.includes('right')) {
+    return 'triangle';
+  }
+  if (lowerPrompt.includes('parallelogram') || lowerPrompt.includes('rhombus')) {
+    return 'parallelogram';
+  }
+  if (lowerPrompt.includes('trapezoid') || lowerPrompt.includes('trapezium')) {
+    return 'trapezoid';
   }
   if (lowerPrompt.includes('rectangle') || lowerPrompt.includes('quadrilateral') || lowerPrompt.includes('square')) {
     return 'rectangle';
   }
-  if (lowerPrompt.includes('circle') && !lowerPrompt.includes('circuit')) {
+  
+  // Circular shapes
+  if (lowerPrompt.includes('tangent')) {
+    return 'tangent';
+  }
+  if (lowerPrompt.includes('chord') || lowerPrompt.includes('inscribed')) {
+    return 'chord';
+  }
+  if (lowerPrompt.includes('arc') || lowerPrompt.includes('semicircle')) {
+    return 'arc';
+  }
+  if (lowerPrompt.includes('circle') && (lowerPrompt.includes('coordinate') || lowerPrompt.includes('plane'))) {
     return 'circle';
+  }
+  if (lowerPrompt.includes('circle') && !lowerPrompt.includes('circuit')) {
+    return 'simple_circle';
+  }
+  
+  // 3D Solids
+  if (lowerPrompt.includes('sphere')) {
+    return 'sphere';
+  }
+  if (lowerPrompt.includes('cylinder')) {
+    return 'cylinder';
+  }
+  if (lowerPrompt.includes('cone')) {
+    return 'cone';
+  }
+  if (lowerPrompt.includes('pyramid')) {
+    return 'pyramid';
+  }
+  if (lowerPrompt.includes('prism') || lowerPrompt.includes('rectangular solid') || lowerPrompt.includes('box') || lowerPrompt.includes('cuboid')) {
+    return 'prism';
   }
   
   // Algebra
@@ -675,7 +892,7 @@ STYLE REQUIREMENTS:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
+        model: "google/gemini-2.5-flash-image", // Correct model name for image generation
         messages: [
           {
             role: "user",
