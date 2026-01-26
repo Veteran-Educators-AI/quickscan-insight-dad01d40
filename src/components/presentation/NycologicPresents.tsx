@@ -609,28 +609,38 @@ export function NycologicPresents({
                 /* Clickable placeholder - opens image generator */
                 <button
                   onClick={() => setShowImageGenerator(true)}
-                  className="group relative p-6 rounded-2xl border-2 border-dashed border-white/20 hover:border-white/40 transition-all duration-300 hover:bg-white/5"
+                  className="group relative p-8 rounded-2xl border-2 border-dashed border-white/30 hover:border-white/60 transition-all duration-300 hover:bg-white/10 cursor-pointer min-w-[200px] min-h-[180px]"
                   style={{
-                    background: `linear-gradient(135deg, ${themeGlow.replace('0.4', '0.08')}, transparent)`,
+                    background: `linear-gradient(135deg, ${themeGlow.replace('0.4', '0.15')}, ${themeGlow.replace('0.4', '0.05')})`,
                   }}
                 >
-                  <div className="flex flex-col items-center gap-3">
-                    {IconComponent ? (
-                      <IconComponent 
-                        className="h-12 w-12 md:h-16 md:w-16 transition-transform group-hover:scale-110" 
-                        style={{ color: colors.accentHex, opacity: 0.6 }}
-                      />
-                    ) : (
-                      <ImageIcon 
-                        className="h-12 w-12 md:h-16 md:w-16 transition-transform group-hover:scale-110" 
-                        style={{ color: colors.accentHex, opacity: 0.6 }}
-                      />
-                    )}
+                  <div className="flex flex-col items-center gap-4">
+                    <div 
+                      className="p-4 rounded-full transition-all duration-300 group-hover:scale-110"
+                      style={{ 
+                        background: `linear-gradient(135deg, ${colors.accentHex}30, ${colors.accentHex}10)`,
+                      }}
+                    >
+                      {IconComponent ? (
+                        <IconComponent 
+                          className="h-10 w-10 md:h-14 md:w-14" 
+                          style={{ color: colors.accentHex, opacity: 0.8 }}
+                        />
+                      ) : (
+                        <ImageIcon 
+                          className="h-10 w-10 md:h-14 md:w-14" 
+                          style={{ color: colors.accentHex, opacity: 0.8 }}
+                        />
+                      )}
+                    </div>
                     <span 
-                      className="text-xs font-medium tracking-wider uppercase opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="text-sm font-semibold tracking-wider uppercase transition-all duration-300 group-hover:tracking-widest"
                       style={{ color: colors.accentHex }}
                     >
-                      Click to add image
+                      + Add Image
+                    </span>
+                    <span className="text-xs text-white/50 group-hover:text-white/70 transition-colors">
+                      Click to generate or upload
                     </span>
                   </div>
                 </button>
