@@ -15,6 +15,7 @@ import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { useAuth } from '@/lib/auth';
 import { useFeatureTracking } from '@/hooks/useFeatureTracking';
 import jsPDF from 'jspdf';
+import { fixEncodingCorruption, sanitizeForPDF } from '@/lib/mathRenderer';
 import pptxgen from 'pptxgenjs';
 import { StudentHandoutDialog, type HandoutOptions } from './StudentHandoutDialog';
 import { SlideClipartPicker, getClipartSvg, getClipartPosition, getClipartLibrary, type SlideClipart } from './SlideClipartPicker';
@@ -427,6 +428,8 @@ export function LessonPlanGenerator({
     }
   };
 
+  const formatPdfText = (text: string) => sanitizeForPDF(fixEncodingCorruption(text));
+
   const downloadAsPDF = () => {
     if (!lessonPlan) return;
 
@@ -439,15 +442,15 @@ export function LessonPlanGenerator({
     // Title page
     pdf.setFontSize(24);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(lessonPlan.title, pageWidth / 2, yPosition + 20, { align: 'center' });
+    pdf.text(formatPdfText(lessonPlan.title), pageWidth / 2, yPosition + 20, { align: 'center' });
     
     pdf.setFontSize(14);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`Standard: ${lessonPlan.standard}`, pageWidth / 2, yPosition + 35, { align: 'center' });
-    pdf.text(`Duration: ${lessonPlan.duration}`, pageWidth / 2, yPosition + 45, { align: 'center' });
+    pdf.text(formatPdfText(`Standard: ${lessonPlan.standard}`), pageWidth / 2, yPosition + 35, { align: 'center' });
+    pdf.text(formatPdfText(`Duration: ${lessonPlan.duration}`), pageWidth / 2, yPosition + 45, { align: 'center' });
     
     pdf.setFontSize(12);
-    const objectiveLines = pdf.splitTextToSize(`Objective: ${lessonPlan.objective}`, contentWidth);
+    const objectiveLines = pdf.splitTextToSize(formatPdfText(`Objective: ${lessonPlan.objective}`), contentWidth);
     pdf.text(objectiveLines, margin, yPosition + 60);
 
     // Slides
@@ -458,13 +461,13 @@ export function LessonPlanGenerator({
       // Slide header
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'italic');
-      pdf.text(`Slide ${slide.slideNumber}`, margin, yPosition);
+      pdf.text(formatPdfText(`Slide ${slide.slideNumber}`), margin, yPosition);
       
       // Slide title
       pdf.setFontSize(18);
       pdf.setFont('helvetica', 'bold');
       yPosition += 15;
-      pdf.text(slide.title, margin, yPosition);
+      pdf.text(formatPdfText(slide.title), margin, yPosition);
 
       // Content
       pdf.setFontSize(12);
@@ -472,7 +475,7 @@ export function LessonPlanGenerator({
       yPosition += 15;
 
       slide.content.forEach((item) => {
-        const lines = pdf.splitTextToSize(`• ${item}`, contentWidth);
+        const lines = pdf.splitTextToSize(formatPdfText(`• ${item}`), contentWidth);
         if (yPosition + lines.length * 7 > pdf.internal.pageSize.getHeight() - margin) {
           pdf.addPage();
           yPosition = margin;
@@ -488,7 +491,7 @@ export function LessonPlanGenerator({
         pdf.setFont('helvetica', 'italic');
         pdf.text('Speaker Notes:', margin, yPosition);
         yPosition += 7;
-        const noteLines = pdf.splitTextToSize(slide.speakerNotes, contentWidth);
+        const noteLines = pdf.splitTextToSize(formatPdfText(slide.speakerNotes), contentWidth);
         pdf.text(noteLines, margin, yPosition);
       }
     });
@@ -504,10 +507,14 @@ export function LessonPlanGenerator({
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'normal');
     lessonPlan.recommendedWorksheets.forEach((worksheet, index) => {
-      pdf.text(`${index + 1}. ${worksheet.topicName}`, margin, yPosition);
+      pdf.text(formatPdfText(`${index + 1}. ${worksheet.topicName}`), margin, yPosition);
       yPosition += 7;
       pdf.setFont('helvetica', 'italic');
-      pdf.text(`   Standard: ${worksheet.standard} | Difficulty: ${worksheet.difficulty}`, margin, yPosition);
+      pdf.text(
+        formatPdfText(`   Standard: ${worksheet.standard} | Difficulty: ${worksheet.difficulty}`),
+        margin,
+        yPosition
+      );
       pdf.setFont('helvetica', 'normal');
       yPosition += 12;
     });

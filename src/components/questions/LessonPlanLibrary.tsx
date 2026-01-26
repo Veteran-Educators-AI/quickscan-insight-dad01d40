@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
 import jsPDF from 'jspdf';
+import { fixEncodingCorruption, sanitizeForPDF } from '@/lib/mathRenderer';
 import pptxgen from 'pptxgenjs';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { format } from 'date-fns';
@@ -242,6 +243,8 @@ export function LessonPlanLibrary({ open, onOpenChange, onSelectPlan }: LessonPl
     toast({ title: 'PowerPoint downloaded' });
   };
 
+  const formatPdfText = (text: string) => sanitizeForPDF(fixEncodingCorruption(text));
+
   const downloadAsPDF = (plan: SavedLessonPlan) => {
     const pdf = new jsPDF();
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -251,15 +254,15 @@ export function LessonPlanLibrary({ open, onOpenChange, onSelectPlan }: LessonPl
 
     pdf.setFontSize(24);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(plan.title, pageWidth / 2, yPosition + 20, { align: 'center' });
+    pdf.text(formatPdfText(plan.title), pageWidth / 2, yPosition + 20, { align: 'center' });
     
     pdf.setFontSize(14);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`Standard: ${plan.standard}`, pageWidth / 2, yPosition + 35, { align: 'center' });
-    pdf.text(`Duration: ${plan.duration}`, pageWidth / 2, yPosition + 45, { align: 'center' });
+    pdf.text(formatPdfText(`Standard: ${plan.standard}`), pageWidth / 2, yPosition + 35, { align: 'center' });
+    pdf.text(formatPdfText(`Duration: ${plan.duration}`), pageWidth / 2, yPosition + 45, { align: 'center' });
     
     pdf.setFontSize(12);
-    const objectiveLines = pdf.splitTextToSize(`Objective: ${plan.objective}`, contentWidth);
+    const objectiveLines = pdf.splitTextToSize(formatPdfText(`Objective: ${plan.objective}`), contentWidth);
     pdf.text(objectiveLines, margin, yPosition + 60);
 
     plan.slides.forEach((slide) => {
@@ -268,19 +271,19 @@ export function LessonPlanLibrary({ open, onOpenChange, onSelectPlan }: LessonPl
 
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'italic');
-      pdf.text(`Slide ${slide.slideNumber}`, margin, yPosition);
+      pdf.text(formatPdfText(`Slide ${slide.slideNumber}`), margin, yPosition);
       
       pdf.setFontSize(18);
       pdf.setFont('helvetica', 'bold');
       yPosition += 15;
-      pdf.text(slide.title, margin, yPosition);
+      pdf.text(formatPdfText(slide.title), margin, yPosition);
 
       pdf.setFontSize(12);
       pdf.setFont('helvetica', 'normal');
       yPosition += 15;
 
       slide.content.forEach((item) => {
-        const lines = pdf.splitTextToSize(`• ${item}`, contentWidth);
+        const lines = pdf.splitTextToSize(formatPdfText(`• ${item}`), contentWidth);
         if (yPosition + lines.length * 7 > pdf.internal.pageSize.getHeight() - margin) {
           pdf.addPage();
           yPosition = margin;
@@ -295,7 +298,7 @@ export function LessonPlanLibrary({ open, onOpenChange, onSelectPlan }: LessonPl
         pdf.setFont('helvetica', 'italic');
         pdf.text('Speaker Notes:', margin, yPosition);
         yPosition += 7;
-        const noteLines = pdf.splitTextToSize(slide.speakerNotes, contentWidth);
+        const noteLines = pdf.splitTextToSize(formatPdfText(slide.speakerNotes), contentWidth);
         pdf.text(noteLines, margin, yPosition);
       }
     });

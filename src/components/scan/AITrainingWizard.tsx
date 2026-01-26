@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
+import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { 
@@ -312,6 +313,8 @@ export function AITrainingWizard({ open, onOpenChange, onTrainingComplete }: AIT
     }
   };
 
+  const formatPdfText = (text: string) => sanitizeForPDF(fixEncodingCorruption(text));
+  const formatPdfMathText = (text: string) => sanitizeForPDF(renderMathText(fixEncodingCorruption(text)));
   const trainingProgress = Math.min(100, ((existingTrainingSamples + teacherAnswers.length) / MIN_TRAINING_SAMPLES) * 100);
   const isFullyTrained = existingTrainingSamples >= MIN_TRAINING_SAMPLES;
 
@@ -379,15 +382,19 @@ export function AITrainingWizard({ open, onOpenChange, onTrainingComplete }: AIT
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 100, 100);
-      doc.text(`Topic: ${question.topic}`, marginLeft, yPosition);
+      doc.text(formatPdfText(`Topic: ${question.topic}`), marginLeft, yPosition);
       yPosition += 4;
-      doc.text(`Standard: ${question.standard} | Difficulty: ${question.difficulty}`, marginLeft, yPosition);
+      doc.text(
+        formatPdfText(`Standard: ${question.standard} | Difficulty: ${question.difficulty}`),
+        marginLeft,
+        yPosition
+      );
       yPosition += 6;
 
       // Question text
       doc.setFontSize(10);
       doc.setTextColor(0, 0, 0);
-      const questionLines = doc.splitTextToSize(question.question, contentWidth);
+      const questionLines = doc.splitTextToSize(formatPdfMathText(question.question), contentWidth);
       questionLines.forEach((line: string) => {
         if (yPosition > pageHeight - marginBottom - 20) {
           doc.addPage();

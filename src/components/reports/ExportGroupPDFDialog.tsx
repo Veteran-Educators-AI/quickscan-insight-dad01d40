@@ -11,6 +11,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
+import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
+
+const formatPdfMathText = (text: string) => sanitizeForPDF(renderMathText(fixEncodingCorruption(text)));
 
 // Generate QR code as PNG data URL for PDF embedding
 const generateQRCodeDataUrl = (studentId: string, worksheetId: string, size: number = 100): Promise<string> => {
@@ -385,7 +388,8 @@ export function ExportGroupPDFDialog({
             pdf.setFontSize(10); // Slightly smaller for better fit
             pdf.setFont('helvetica', 'normal');
             // Use 85% of content width to prevent text overflow
-            const textLines = pdf.splitTextToSize(question.prompt_text, contentWidth * 0.85);
+            const sanitizedPrompt = formatPdfMathText(question.prompt_text);
+            const textLines = pdf.splitTextToSize(sanitizedPrompt, contentWidth * 0.85);
             textLines.forEach((line: string) => {
               pdf.text(line, margin + 5, yPosition);
               yPosition += 4.5;
