@@ -1295,8 +1295,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         // Question text - wrap long text, sanitize for PDF to fix encoding issues
         pdf.setFontSize(10); // Slightly smaller for better fit
         const sanitizedQuestion = sanitizeForPDF(renderMathText(fixEncodingCorruption(question.question)));
-        // Use 85% of content width to prevent text overflow
-        const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth * 0.85);
+        // Use 90% of content width to prevent text overflow
+        const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth * 0.9);
         
         lines.forEach((line: string) => {
           if (yPosition > pageHeight - 40) {

@@ -566,6 +566,7 @@ export function sanitizeForPDF(text: string): string {
     [/[\u{FE00}-\u{FE0F}]/gu, ''],
     [/[\u{1F000}-\u{1F02F}]/gu, ''],
     [/[\u{1F0A0}-\u{1F0FF}]/gu, ''],
+    [/\u00AD/g, ''], // Remove soft hyphens
   ];
   
   for (const [pattern, replacement] of emojiReplacements) {
@@ -585,9 +586,14 @@ export function sanitizeForPDF(text: string): string {
     [/Ã\s*\[\s*\]/g, 'π'],
     [/Â\s*(?:\[\s*\]|□|�)/g, 'π'],
     
+    // Handle "A [ ]" pattern (Latin A)
+    [/A\s*\[\s*\]/g, 'π'],
+    [/A\s*"\s*\[\s*\]/g, 'π'],
+
     // Common pi corruption when followed by units
     [/Ã\s+(?=inches|cm|meters|units|square|cubic)/gi, 'π '],
     [/Â\s+(?=inches|cm|meters|units|square|cubic)/gi, 'π '],
+    [/A\s+(?=inches|cm|meters|units|square|cubic)/gi, 'π '],
     
     // Standalone Â before numbers or spaces - likely corrupted pi
     [/Â\s*π/g, 'π'],
@@ -748,6 +754,9 @@ export function fixEncodingCorruption(text: string): string {
     [/À/g, 'π'],
     [/Ã€/g, 'π'],
     [/Ã\s*\[\s*\]/g, 'π'],  // "Ã [ ]" pattern -> π
+    [/Â\s*(?:\[\s*\]|□|)/g, 'π'], // "Â [ ]" or placeholder square -> π
+    [/A\s*\[\s*\]/g, 'π'],  // "A [ ]" pattern -> π
+    [/A\s*"\s*\[\s*\]/g, 'π'],
     [/Â\s*(?:\[\s*\]|□|�)/g, 'π'], // "Â [ ]" or placeholder square -> π
     [/Ã\s+/g, 'π'],          // "Ã " with trailing space -> π
     [/Ã(?=\s*inches|\s*cm|\s*meters|\s*units|\s*square|\s*cubic)/gi, 'π'], // Ã before units -> π
