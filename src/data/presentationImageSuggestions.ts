@@ -11,23 +11,34 @@ export interface ImageSuggestion {
   category: string;
 }
 
-// Helper to create rich prompts that incorporate the topic and slide title
-// Now generates a pure topic description without presentation meta-language
+// Helper to create rich prompts that are highly specific to the topic
+// Generates precise educational prompts that reference the exact concept
 export function createTopicSpecificPrompt(
   basePrompt: string,
   topic: string,
   slideTitle: string
 ): string {
   // Clean up the slide title to extract the core concept
-  const cleanTitle = slideTitle.replace(/\*\*/g, '').replace(/["']/g, '');
+  const cleanTitle = slideTitle.replace(/\*\*/g, '').replace(/["']/g, '').trim();
+  const cleanTopic = topic.replace(/\*\*/g, '').trim();
   
-  return `${basePrompt}
+  // If the base prompt is already detailed (over 200 chars), use it as is with minor context
+  if (basePrompt.length > 200) {
+    return basePrompt;
+  }
+  
+  // Build a precise, topic-specific prompt
+  return `Create a detailed, accurate educational illustration specifically about ${cleanTitle}.
 
-Create a vivid, detailed illustration about ${cleanTitle} within the context of ${topic}. Focus entirely on representing the subject matter itself - the concepts, processes, structures, or ideas involved. Show the actual content that students need to understand.
+${basePrompt}
 
-For example, if the topic is about cell division, show the actual biological process with chromosomes, spindle fibers, and cell membranes. If it's about a historical event, depict the scene, people, and setting. If it's a literary theme, visualize the metaphors and emotional content.
+This illustration is for a lesson on ${cleanTopic}. Focus precisely on depicting ${cleanTitle} - show the actual mathematical/scientific structures, relationships, or concepts involved. 
 
-The image should be educational and scientifically/historically/thematically accurate. Use vibrant, engaging colors appropriate to the subject. Professional quality suitable for classroom use with high school students. No text, labels, or words in the image. High resolution with clear focal point.`;
+For geometry topics: show the exact shapes, angles, and proportional relationships. Mark right angles with small squares. Use clear visual distinction between different parts.
+
+For trigonometry topics: clearly show angle relationships, side lengths, and ratio concepts through visual composition.
+
+Use vibrant, engaging colors with clear visual hierarchy. Professional quality suitable for classroom projection. Clean composition with a single focal point. No text, labels, numbers, or annotations in the image - let the visual geometry communicate the concept.`;
 }
 
 // English Literature & ELA suggestions
@@ -377,6 +388,104 @@ No text, labels, or arrows (direction should be implied through the imagery itse
 // Math suggestions
 export const mathSuggestions: ImageSuggestion[] = [
   {
+    id: 'math-right-triangle-basics',
+    title: 'Right Triangle - Labeled Parts',
+    category: 'Trigonometry',
+    prompt: `Create a crystal-clear educational illustration of a right triangle showing its fundamental parts. The triangle should be large and prominent, with the right angle clearly marked with a small square symbol in the corner.
+
+The three sides should be visually distinct: the two legs (the sides that form the right angle) and the hypotenuse (the longest side, opposite the right angle). Use different but harmonious colors or line weights to distinguish between legs and hypotenuse.
+
+Show the right angle vertex clearly with the traditional small square. The other two angles (the acute angles) should be visible. Position the triangle so all three vertices are easily visible.
+
+Include subtle visual cues showing the relationship between the parts: perhaps the legs meeting at a perfect 90-degree angle with grid lines suggesting perpendicularity, or the hypotenuse stretching across with emphasis on it being the longest side.
+
+The setting should be clean and mathematical - perhaps on a subtle grid background, or with geometric construction marks visible. The style should be precise, educational, and visually appealing. Think of a high-quality geometry textbook diagram rendered as beautiful art.
+
+Colors should be clean and distinct: perhaps a deep blue for one leg, a rich green for the other leg, and gold or red for the hypotenuse. The background should be neutral (cream, light gray, or subtle blue) to let the triangle stand out.
+
+Professional quality suitable for mathematics classroom. No text, labels, or annotations - the geometry speaks for itself.`,
+  },
+  {
+    id: 'math-trig-ratios-triangle',
+    title: 'Trigonometric Ratios in Right Triangle',
+    category: 'Trigonometry',
+    prompt: `Create an educational illustration specifically showing how the three main trigonometric ratios (sine, cosine, tangent) relate to the sides of a right triangle. This image should make the SOH-CAH-TOA relationships immediately visual and memorable.
+
+Feature a large, clearly drawn right triangle with the right angle marked with a small square. From one of the acute angles (the reference angle), show the relationship to the three sides:
+- The side opposite to the reference angle (opposite side)
+- The side adjacent to the reference angle (adjacent side)  
+- The hypotenuse (the side opposite the right angle)
+
+Use distinct visual treatment for each side relationship: perhaps color coding where opposite is rendered in warm red/orange, adjacent in cool blue/green, and hypotenuse in gold/purple. The reference angle should be highlighted with a small arc.
+
+The composition should allow viewers to immediately see which side is which relative to the chosen angle. Perhaps include subtle visual groupings that suggest the ratio relationships.
+
+Consider showing the same triangle from slightly different perspectives or with visual emphasis patterns that help students remember the relationships. The geometry should be precise and accurate.
+
+Background should be clean and mathematical. Style should be crisp, educational, and visually engaging. Think of turning a mathematical concept into memorable visual art.
+
+Professional classroom quality. No text, numbers, letters, or labels - pure geometric illustration.`,
+  },
+  {
+    id: 'math-right-triangle-real-world',
+    title: 'Right Triangles in Real Life',
+    category: 'Trigonometry',
+    prompt: `Create an engaging illustration showing right triangles appearing in real-world contexts. Help students see that right triangles are everywhere in the physical world around them.
+
+Feature multiple scenarios where right triangles naturally occur: 
+- A ladder leaning against a wall (ladder = hypotenuse, wall = vertical leg, ground = horizontal leg)
+- A person's shadow creating a triangle with their height and the sun's rays
+- A ramp or wheelchair access slope showing the rise over run relationship
+- A building or flagpole with its height measured using similar triangles
+- A airplane's flight path creating a right triangle with altitude and ground distance
+
+Each scenario should clearly show the right angle (at the base of the wall, at the ground level, etc.) and the three sides of the right triangle. Use visual emphasis to highlight the triangular relationships.
+
+The style should be semi-realistic but with clear geometric overlays that emphasize the right triangle structure within each real-world scene. Perhaps use a subtle glow or color overlay on the triangle edges.
+
+Color palette should be warm and inviting while maintaining mathematical clarity. The scenes should look like the real world but with the hidden geometry revealed.
+
+Professional educational quality. Show multiple scenarios in one cohesive composition. No text, measurements, or labels.`,
+  },
+  {
+    id: 'math-special-right-triangles',
+    title: 'Special Right Triangles (45-45-90 & 30-60-90)',
+    category: 'Trigonometry',
+    prompt: `Create a beautiful, memorable illustration featuring the two special right triangles that appear frequently in mathematics: the 45-45-90 triangle (isosceles right triangle) and the 30-60-90 triangle.
+
+Show both triangles side by side or in an elegant composition. For the 45-45-90 triangle, emphasize its symmetry - the two equal legs forming the right angle, with the hypotenuse stretching diagonally. Perhaps show it inscribed in or derived from a square.
+
+For the 30-60-90 triangle, show its distinctive proportions - the shorter leg, the longer leg, and the hypotenuse. Perhaps show it derived from an equilateral triangle bisected down the middle, revealing its origin.
+
+Use visual patterns to suggest the special proportional relationships in each triangle. Perhaps use similar sized decorative elements or geometric patterns that hint at the 1:1:√2 relationship of the 45-45-90 or the 1:√3:2 relationship of the 30-60-90.
+
+The composition should be balanced and aesthetically pleasing, perhaps with the two triangles as the main subjects in an artistic arrangement. Mark all right angles with small squares.
+
+Color coding should help distinguish the triangles while maintaining visual harmony. Perhaps cool colors for one and warm colors for the other.
+
+Background should be clean and elegant. Style should be mathematically precise yet artistically beautiful. Professional classroom quality. No text, numbers, or labels.`,
+  },
+  {
+    id: 'math-pythagorean-visual-proof',
+    title: 'Pythagorean Theorem - Visual Proof',
+    category: 'Geometry',
+    prompt: `Create an elegant, clear illustration that visually demonstrates the Pythagorean theorem (a² + b² = c²) - the fundamental relationship between the sides of a right triangle.
+
+The central composition should feature a right triangle with squares constructed on each of its three sides. The square on one leg has area a², the square on the other leg has area b², and the square on the hypotenuse has area c².
+
+The key visual proof should show that the combined areas of the two smaller squares exactly equals the area of the largest square (on the hypotenuse). Consider using a color-coded or puzzle-piece approach where pieces from the smaller squares can visually be seen to fill the larger square.
+
+Perhaps show the classic visual proof with the two smaller squares divided into geometric pieces that rearrange to fill the c² square exactly. Use distinct colors for the different regions to make the relationship clear.
+
+Include the triangle itself prominently with the right angle clearly marked with a small square. The three squares should be attached to their respective sides.
+
+Multiple instances at different scales or orientations could reinforce that this works for any right triangle. Perhaps show a few different right triangles (including classic 3-4-5) each with their squares.
+
+The artistic style should be clean, precise, and mathematically beautiful. Colors should be harmonious but distinct enough to show the proof clearly.
+
+No text, numbers, or labels - let the visual geometry speak. High-resolution, suitable for geometry classroom.`,
+  },
+  {
     id: 'math-golden-ratio',
     title: 'Golden Ratio in Nature & Art',
     category: 'Geometry',
@@ -384,51 +493,35 @@ export const mathSuggestions: ImageSuggestion[] = [
 
 The composition should artfully combine multiple manifestations of the golden ratio in a cohesive design. The golden spiral should be a central organizing element - that elegant logarithmic spiral that appears in nautilus shells, hurricane formations, and galaxies.
 
-Nature should be well represented: a nautilus shell cross-section showing the classic spiral chambers, sunflower seed heads displaying the Fibonacci spiraling pattern, pinecone scales arranged in their characteristic pattern, fern fronds unfurling in fractal spirals, the spiral of a galaxy suggesting cosmic proportions, perhaps a hurricane satellite view.
+Nature should be well represented: a nautilus shell cross-section showing the classic spiral chambers, sunflower seed heads displaying the Fibonacci spiraling pattern, pinecone scales arranged in their characteristic pattern, fern fronds unfurling in fractal spirals.
 
-Art and architecture references should be included: the proportions of the Parthenon, Leonardo da Vinci's Vitruvian Man, the spiral composition in famous paintings, the proportions of the human face, perhaps classical sculpture incorporating ideal proportions.
+Art and architecture references should be included: the proportions of the Parthenon, Leonardo da Vinci's Vitruvian Man, the spiral composition in famous paintings, the proportions of the human face.
 
-Mathematical representations should be woven throughout: the golden rectangle with its inscribed spiral, the relationship to Fibonacci numbers (1, 1, 2, 3, 5, 8, 13...) suggested perhaps through sized elements, the geometric construction of the golden ratio, perhaps fractal patterns that demonstrate the self-similarity inherent in phi.
+Mathematical representations should be woven throughout: the golden rectangle with its inscribed spiral, the relationship to Fibonacci numbers suggested through sized elements.
 
-The composition itself should be designed using golden ratio proportions - meta-reinforcing the concept through the very structure of the illustration. Elements should be positioned according to golden section divisions of the canvas.
+The color palette should be harmonious and sophisticated - perhaps using a natural palette of ocean blues, shell creams, and organic greens.
 
-Human applications might be suggested: product design, typography, musical instrument proportions, architectural facades - showing how designers consciously employ these proportions for aesthetic effect.
+The artistic style should blend scientific precision with artistic elegance. This is a celebration of the mathematics underlying beauty.
 
-The color palette should be harmonious and sophisticated - perhaps using colors related by golden proportions themselves, or a natural palette of ocean blues, shell creams, and organic greens that reflects the natural origins of these patterns.
-
-The artistic style should blend scientific precision with artistic elegance. This is a celebration of the mathematics underlying beauty, and the beauty underlying mathematics. The illustration should feel like discovering a secret pattern that connects all things.
-
-The overall mood should inspire wonder at the mathematical harmony underlying nature and art, helping students see that mathematics is not abstract but deeply embedded in the fabric of reality.
-
-No text, numbers, or labels. High-resolution, suitable for mathematics classroom and cross-curricular discussions.`,
+No text, numbers, or labels. High-resolution, suitable for mathematics classroom.`,
   },
   {
-    id: 'math-pythagorean',
-    title: 'Pythagorean Theorem Visualization',
-    category: 'Geometry',
-    prompt: `Create an elegant, clear illustration that visually proves and explains the Pythagorean theorem (a² + b² = c²), the fundamental relationship between the sides of a right triangle. This educational image should make this crucial geometric concept immediately understandable and memorable.
+    id: 'math-unit-circle-trig',
+    title: 'Unit Circle for Trigonometry',
+    category: 'Trigonometry',
+    prompt: `Create a visually elegant illustration of the unit circle as used in trigonometry. Show a circle with radius 1 centered at the origin, with clear emphasis on how the circle relates to sine and cosine values.
 
-The central composition should feature a right triangle with sides clearly distinguished - perhaps using different colors for the two legs (a and b) and the hypotenuse (c). The triangle should be rendered at an angle that allows all three squares to be visible.
+Feature the unit circle prominently with subtle grid lines suggesting the coordinate plane. Show several angles originating from the center, with their corresponding points on the circle. The relationship between the angle and the x-coordinate (cosine) and y-coordinate (sine) should be visually emphasized.
 
-The key visual proof should show squares constructed on each side of the triangle: a square of area a² on one leg, a square of area b² on the other leg, and a square of area c² on the hypotenuse. The visual relationship between these areas should be the core message - that the two smaller squares' combined area exactly equals the area of the largest square.
+Perhaps show a few key angle positions around the circle with visual emphasis on the horizontal and vertical distances from the center to the point on the circle. Use color to distinguish between the sine component (vertical) and cosine component (horizontal).
 
-To make the proof intuitive, consider showing the classic visual demonstration where the two smaller squares can be divided into pieces that exactly fill the larger square. Perhaps use color coding to show how regions from the a² and b² squares combine to fill the c² square.
+Include the four quadrants clearly visible. Perhaps show reference lines for the key angles (0°, 30°, 45°, 60°, 90° positions) as points or small markers on the circle.
 
-Include multiple instances of the theorem at different scales or orientations, showing that the relationship holds regardless of the specific triangle dimensions (as long as it's a right triangle). Perhaps show triangles of different proportions, including the famous 3-4-5 and 5-12-13 right triangles.
+A right triangle inscribed in the unit circle for one of the angles would help connect the unit circle to basic right triangle trigonometry.
 
-Add visual interest through dimensional treatment - perhaps render the squares as three-dimensional blocks, or show the construction on a beautiful geometric surface. The right angle should be clearly marked with the traditional square symbol.
+The style should be mathematically precise yet visually beautiful - think of elegant mathematical art. Clean background with subtle grid. Harmonious color scheme.
 
-Real-world applications might be subtly suggested in the background or borders: surveying equipment, architectural drawings, navigation charts, ladder-against-wall scenarios, television screen diagonals - helping students see the practical importance of this ancient theorem.
-
-A subtle nod to history might be included: Greek architectural elements suggesting Pythagoras's era, perhaps patterns reminiscent of ancient mathematical manuscripts or geometric floor mosaics from antiquity.
-
-The color palette should be clean and mathematical: perhaps primary colors for the three regions to make the relationship clear, set against a neutral background that doesn't distract from the geometric relationships.
-
-The artistic style should be clean and precise, befitting mathematical content, while remaining visually interesting. Think of beautiful mathematical visualization rather than dry textbook diagram.
-
-The overall effect should make students see why this theorem is true, not just memorize that it is true.
-
-No text, numbers, or labels (the geometry should speak for itself). High-resolution, suitable for geometry classroom instruction.`,
+No text, numbers, degree markers, or labels. High-resolution, classroom quality.`,
   },
 ];
 
@@ -437,40 +530,75 @@ function generateTopicSpecificSuggestions(topic: string, slideTitle: string): Im
   // Clean up the topic and slide title
   const cleanTopic = topic.replace(/\*\*/g, '').trim();
   const cleanSlideTitle = slideTitle.replace(/\*\*/g, '').replace(/["']/g, '').trim();
+  const combined = `${cleanTopic} ${cleanSlideTitle}`.toLowerCase();
   
-  // Generate 3-4 dynamic suggestions based on the actual topic
-  const suggestions: ImageSuggestion[] = [
+  // Detect topic type for more specific prompts
+  const isRightTriangle = /right\s*triangle|right\s*angle/i.test(combined);
+  const isTrigonometry = /trig|sine|cosine|tangent|ratio/i.test(combined);
+  const isGeometry = /geometry|triangle|angle|polygon|circle/i.test(combined);
+  
+  // Generate topic-specific suggestions based on detected type
+  if (isRightTriangle || isTrigonometry) {
+    return [
+      {
+        id: `dynamic-right-tri-${Date.now()}`,
+        title: `${cleanTopic} - Right Triangle Diagram`,
+        category: cleanTopic,
+        prompt: `Create a precise educational illustration of a right triangle for ${cleanTopic}. Show a clearly drawn right triangle with the 90-degree angle marked with a small square. The three sides should be visually distinct. Use clean mathematical styling. No text or labels.`,
+      },
+      {
+        id: `dynamic-trig-sides-${Date.now()}`,
+        title: `${cleanTopic} - Triangle Sides Relationship`,
+        category: cleanTopic,
+        prompt: `Create an educational illustration showing the relationship between sides of a right triangle in ${cleanTopic}. Color-code the opposite, adjacent, and hypotenuse sides relative to an angle. Clean, mathematical style. No text or labels.`,
+      },
+      {
+        id: `dynamic-real-world-${Date.now()}`,
+        title: `${cleanTopic} - Real World Application`,
+        category: cleanTopic,
+        prompt: `Create an illustration showing ${cleanTopic} applied in a real-world scenario: a ladder against a wall, a building's shadow, or a ramp. Highlight the right triangle relationship within the scene. Educational quality. No text.`,
+      },
+    ];
+  }
+  
+  if (isGeometry) {
+    return [
+      {
+        id: `dynamic-geo-main-${Date.now()}`,
+        title: `${cleanTopic} - Key Shapes`,
+        category: cleanTopic,
+        prompt: `Create an educational geometry illustration for ${cleanTopic}. Show accurate geometric shapes with proper angle markings. Use clear visual hierarchy and distinct colors. Mathematical precision. No text or labels.`,
+      },
+      {
+        id: `dynamic-geo-props-${Date.now()}`,
+        title: `${cleanTopic} - Properties`,
+        category: cleanTopic,
+        prompt: `Create an illustration highlighting the key properties of ${cleanTopic}. Show angles, sides, and relationships clearly. Use color coding for different elements. Clean mathematical style. No text.`,
+      },
+    ];
+  }
+  
+  // Default suggestions for other topics
+  return [
     {
       id: `dynamic-main-${Date.now()}`,
       title: `${cleanTopic} - Key Concepts`,
       category: cleanTopic,
-      prompt: `Create a detailed, educational illustration about ${cleanTopic}. Focus on the core concepts, processes, and ideas that are central to understanding this topic. Show the actual subject matter with accurate visual representations. Use vibrant, engaging colors. Professional quality suitable for classroom use. No text, labels, or words in the image.`,
+      prompt: `Create a detailed, educational illustration specifically about ${cleanTopic}. Focus on the core concepts, processes, and ideas that are central to understanding this topic. Show the actual subject matter with accurate visual representations. Use vibrant, engaging colors. Professional quality. No text, labels, or words.`,
     },
     {
       id: `dynamic-visual-${Date.now()}`,
       title: `${cleanTopic} - Visual Representation`,
       category: cleanTopic,
-      prompt: `Create a vivid visual representation of ${cleanTopic}. Illustrate the main elements and their relationships. Show real-world applications or examples where applicable. Use clear, engaging imagery that helps students understand and remember the concept. Educational quality, no text or labels.`,
+      prompt: `Create a vivid visual representation of ${cleanTopic}. Illustrate the main elements and their relationships. Show real-world applications or examples where applicable. Educational quality. No text or labels.`,
     },
-    {
-      id: `dynamic-diagram-${Date.now()}`,
-      title: `${cleanTopic} - Process Diagram`,
-      category: cleanTopic,
-      prompt: `Create an educational diagram illustrating the key processes or steps involved in ${cleanTopic}. Show how different components relate to each other. Use clear visual flow and engaging colors. Make the concept easy to understand through visual organization. No text, arrows only for flow direction.`,
-    },
-  ];
-  
-  // Add a slide-specific suggestion if the slide title is different from the topic
-  if (cleanSlideTitle && cleanSlideTitle.toLowerCase() !== cleanTopic.toLowerCase()) {
-    suggestions.push({
+    ...(cleanSlideTitle && cleanSlideTitle.toLowerCase() !== cleanTopic.toLowerCase() ? [{
       id: `dynamic-slide-${Date.now()}`,
       title: `${cleanSlideTitle}`,
       category: cleanTopic,
-      prompt: `Create a detailed illustration specifically about "${cleanSlideTitle}" within the context of ${cleanTopic}. Focus on accurately depicting this specific aspect or concept. Educational quality with engaging visuals. No text or labels.`,
-    });
-  }
-  
-  return suggestions;
+      prompt: `Create a detailed illustration specifically about "${cleanSlideTitle}" within the context of ${cleanTopic}. Focus on accurately depicting this specific aspect or concept. Educational quality. No text or labels.`,
+    }] : []),
+  ];
 }
 
 // Get suggestions based on subject and topic
@@ -481,8 +609,29 @@ export function getSubjectSuggestions(
 ): ImageSuggestion[] {
   const lowerSubject = subject.toLowerCase();
   const lowerTopic = topic.toLowerCase();
+  const lowerSlideTitle = slideTitle.toLowerCase();
+  const combined = `${lowerSubject} ${lowerTopic} ${lowerSlideTitle}`;
   
   let baseSuggestions: ImageSuggestion[] = [];
+  
+  // Check for specific trigonometry/right triangle topics FIRST for best matches
+  const isRightTriangle = /right\s*triangle|right\s*angle/i.test(combined);
+  const isTrigonometry = /trig|sine|cosine|tangent|soh.*cah.*toa|ratio/i.test(combined);
+  
+  if (isRightTriangle || isTrigonometry) {
+    // Filter to only trigonometry-relevant suggestions
+    baseSuggestions = mathSuggestions.filter(s => 
+      s.category === 'Trigonometry' || 
+      s.id.includes('right-triangle') || 
+      s.id.includes('trig') ||
+      s.id.includes('pythagorean')
+    );
+    
+    // If we have good matches, return them immediately
+    if (baseSuggestions.length >= 3) {
+      return baseSuggestions.slice(0, 8);
+    }
+  }
   
   // Match based on subject
   if (lowerSubject.includes('english') || lowerSubject.includes('ela') || lowerSubject.includes('literature')) {
@@ -512,7 +661,7 @@ export function getSubjectSuggestions(
   if (lowerTopic.includes('cell') || lowerTopic.includes('dna') || lowerTopic.includes('biology') || lowerTopic.includes('solar') || lowerTopic.includes('water cycle')) {
     baseSuggestions = [...baseSuggestions, ...scienceSuggestions];
   }
-  if (lowerTopic.includes('theorem') || lowerTopic.includes('ratio') || lowerTopic.includes('geometry') || lowerTopic.includes('pythagorean')) {
+  if (lowerTopic.includes('theorem') || lowerTopic.includes('ratio') || lowerTopic.includes('geometry') || lowerTopic.includes('pythagorean') || lowerTopic.includes('triangle')) {
     baseSuggestions = [...baseSuggestions, ...mathSuggestions];
   }
   

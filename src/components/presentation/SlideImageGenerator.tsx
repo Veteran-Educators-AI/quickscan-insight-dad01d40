@@ -20,15 +20,43 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSubjectSuggestions, createTopicSpecificPrompt, type ImageSuggestion } from '@/data/presentationImageSuggestions';
 
-// Generate a rich, topic-focused description instead of presentation meta-language
+// Generate a precise, topic-focused description without generic presentation meta-language
 function generateDefaultTopicPrompt(slideTitle: string, topic: string): string {
-  const cleanTitle = slideTitle.replace(/\*\*/g, '').replace(/["']/g, '');
+  const cleanTitle = slideTitle.replace(/\*\*/g, '').replace(/["']/g, '').trim();
+  const cleanTopic = topic.replace(/\*\*/g, '').trim();
   
-  return `Create a detailed, educational illustration about ${cleanTitle} in the context of ${topic}. 
+  // Extract specific concepts from the title and topic
+  const isTrigonometry = /trig|sine|cosine|tangent|soh|cah|toa|ratio/i.test(cleanTopic + cleanTitle);
+  const isRightTriangle = /right\s*triangle|right\s*angle|90\s*degree/i.test(cleanTopic + cleanTitle);
+  const isGeometry = /geometry|triangle|angle|polygon|circle|square|theorem/i.test(cleanTopic + cleanTitle);
+  
+  // Build specific prompts based on detected topic type
+  if (isRightTriangle || isTrigonometry) {
+    return `Create a precise educational illustration about ${cleanTitle} for a lesson on ${cleanTopic}.
 
-Focus on accurately depicting the actual subject matter - the processes, structures, concepts, or ideas that students need to understand. For scientific topics, show the real biological, chemical, or physical phenomena. For historical topics, depict the authentic setting, people, and events. For literary themes, visualize the metaphors, emotions, and symbolic content.
+Show a clearly drawn right triangle with the 90-degree angle marked with a small square symbol. The three sides (two legs and the hypotenuse) should be visually distinct using different colors or line weights.
 
-Use vibrant, engaging colors appropriate to the subject. The illustration should be scientifically, historically, or thematically accurate. Professional quality suitable for classroom use. Clean composition with a clear focal point. No text, labels, or words in the image.`;
+${isTrigonometry ? 'Emphasize the relationship between the angle and the three sides: opposite, adjacent, and hypotenuse. Use color coding to help identify which side is which relative to the reference angle.' : 'Show the fundamental structure of the right triangle with clear emphasis on the right angle and the proportional relationships between sides.'}
+
+Use clean, mathematical styling on a subtle grid or neutral background. Colors should be distinct and harmonious: perhaps blues, greens, and gold/red accents. Professional classroom quality. No text, labels, numbers, or annotations - pure visual geometry.`;
+  }
+  
+  if (isGeometry) {
+    return `Create a clear, educational illustration about ${cleanTitle} in the context of ${cleanTopic}.
+
+Show accurate geometric shapes and relationships. Use precise lines and clear visual hierarchy. Mark important angles with appropriate symbols (small squares for right angles, arcs for other angles).
+
+The composition should be mathematically accurate and visually appealing. Use distinct colors to differentiate between different elements. Clean background with subtle grid if appropriate.
+
+Professional quality suitable for classroom use. No text, labels, or annotations - let the geometry speak visually.`;
+  }
+  
+  // Default for other topics - still specific
+  return `Create a detailed educational illustration specifically about ${cleanTitle}.
+
+Focus on accurately depicting the core concept, structure, or process that defines ${cleanTitle} within ${cleanTopic}. Show the actual subject matter that students need to understand - the real phenomena, relationships, or ideas involved.
+
+Use vibrant, engaging colors appropriate to the subject. The illustration should be accurate and educational. Professional quality suitable for classroom projection. Clean composition with a clear focal point. No text, labels, or annotations in the image.`;
 }
 
 // Template categories and items
