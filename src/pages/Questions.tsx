@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy, Brain, AlertTriangle, GraduationCap, Shapes, RefreshCw } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy, GraduationCap, Shapes, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +22,6 @@ import { MasteryChallengeGenerator } from '@/components/questions/MasteryChallen
 import { TrainingFormGenerator } from '@/components/scan/TrainingFormGenerator';
 import { TeacherAnswerSampleUploader } from '@/components/scan/TeacherAnswerSampleUploader';
 import { TeacherAnswerSampleList } from '@/components/scan/TeacherAnswerSampleList';
-import { DiagnosticGapsDialog } from '@/components/reports/DiagnosticGapsSummary';
 import { EnglishLiteratureSuggestions } from '@/components/questions/EnglishLiteratureSuggestions';
 import { SubjectLessonSuggestions } from '@/components/questions/SubjectLessonSuggestions';
 import { RegentsShapeScanner } from '@/components/questions/RegentsShapeScanner';
@@ -454,13 +453,6 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                 )}
               </Button>
               <Button 
-                onClick={() => setShowAdaptiveGenerator(true)}
-                className="bg-purple-600 hover:bg-purple-700"
-              >
-                <Brain className="h-4 w-4 mr-2" />
-                Adaptive Worksheets
-              </Button>
-              <Button 
                 onClick={() => setShowMasteryChallenge(true)}
                 variant="outline"
                 className="border-amber-300 text-amber-700 hover:bg-amber-50"
@@ -492,7 +484,6 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Convert SVGs
               </Button>
-              <DiagnosticGapsDialog />
             </TooltipProvider>
           </div>
         </div>
@@ -812,6 +803,7 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                 selectedQuestions={worksheetQuestions}
                 onRemoveQuestion={removeFromWorksheet}
                 onClearAll={clearWorksheet}
+                onOpenAdaptiveGenerator={() => setShowAdaptiveGenerator(true)}
               />
             </div>
           </div>

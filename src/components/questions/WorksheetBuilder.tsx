@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock, NotebookPen, Scissors, FileType } from 'lucide-react';
+import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock, NotebookPen, Scissors, FileType, Brain } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -329,9 +329,10 @@ interface WorksheetBuilderProps {
   selectedQuestions: WorksheetQuestion[];
   onRemoveQuestion: (id: string) => void;
   onClearAll: () => void;
+  onOpenAdaptiveGenerator?: () => void;
 }
 
-export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearAll }: WorksheetBuilderProps) {
+export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearAll, onOpenAdaptiveGenerator }: WorksheetBuilderProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { trackFeature } = useFeatureTracking();
@@ -2337,12 +2338,23 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           <p className="text-sm text-muted-foreground max-w-xs mb-4">
             Select topics from the list to add them to your worksheet. Click the + button next to any topic.
           </p>
-          {savedWorksheets.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => setShowSavedWorksheets(true)}>
-              <FolderOpen className="h-4 w-4 mr-2" />
-              Load Saved ({savedWorksheets.length})
-            </Button>
-          )}
+          <div className="flex flex-col gap-2">
+            {onOpenAdaptiveGenerator && (
+              <Button 
+                onClick={onOpenAdaptiveGenerator}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                <Brain className="h-4 w-4 mr-2" />
+                Adaptive Worksheets
+              </Button>
+            )}
+            {savedWorksheets.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setShowSavedWorksheets(true)}>
+                <FolderOpen className="h-4 w-4 mr-2" />
+                Load Saved ({savedWorksheets.length})
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     );
