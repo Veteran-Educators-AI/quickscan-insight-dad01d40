@@ -85,6 +85,9 @@ export function parseDeepLink(url: string, config: DeepLinkConfig = DEFAULT_CONF
         '/reports',
         '/settings',
         '/login',
+        '/student/join',
+        '/student/login',
+        '/student/dashboard',
       ];
 
       // Check if it's a valid route or starts with a valid route prefix
