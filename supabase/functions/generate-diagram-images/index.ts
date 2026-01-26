@@ -1,10 +1,331 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HARDCODED FALLBACK SHAPES - Used when AI generation fails
+// These are pre-built SVG templates for common geometry shapes
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const FALLBACK_SHAPES: Record<string, (params?: any) => string> = {
+  // Basic right triangle
+  right_triangle: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <g stroke="#e0e0e0" stroke-width="1">
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="${30 + i * 24}" y1="30" x2="${30 + i * 24}" y2="270"/>`).join('\n      ')}
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="30" y1="${270 - i * 24}" x2="270" y2="${270 - i * 24}"/>`).join('\n      ')}
+    </g>
+    <g stroke="#000000" stroke-width="2">
+      <line x1="25" y1="270" x2="280" y2="270"/>
+      <polygon points="280,270 272,266 272,274" fill="#000000"/>
+      <line x1="30" y1="275" x2="30" y2="20"/>
+      <polygon points="30,20 26,28 34,28" fill="#000000"/>
+    </g>
+    <g font-family="Arial" font-size="11" fill="#000000">
+      <text x="275" y="285" font-style="italic">x</text>
+      <text x="20" y="18" font-style="italic">y</text>
+      ${Array.from({ length: 11 }, (_, i) => `<text x="${30 + i * 24}" y="285" text-anchor="middle">${i}</text>`).join('\n      ')}
+      ${Array.from({ length: 10 }, (_, i) => `<text x="22" y="${270 - (i + 1) * 24 + 4}" text-anchor="end">${i + 1}</text>`).join('\n      ')}
+    </g>
+    <g stroke="#000000" stroke-width="2" fill="none">
+      <polygon points="54,246 54,150 150,246"/>
+    </g>
+    <g fill="#000000" font-family="Arial" font-size="12" font-weight="bold">
+      <circle cx="54" cy="246" r="4"/>
+      <text x="35" y="260">A(1,1)</text>
+      <circle cx="54" cy="150" r="4"/>
+      <text x="35" y="145">B(1,5)</text>
+      <circle cx="150" cy="246" r="4"/>
+      <text x="155" y="260">C(5,1)</text>
+    </g>
+    <polyline points="54,234 66,234 66,246" stroke="#000000" stroke-width="1" fill="none"/>
+  </svg>`,
+
+  // Basic quadrilateral/rectangle  
+  rectangle: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <g stroke="#e0e0e0" stroke-width="1">
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="${30 + i * 24}" y1="30" x2="${30 + i * 24}" y2="270"/>`).join('\n      ')}
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="30" y1="${270 - i * 24}" x2="270" y2="${270 - i * 24}"/>`).join('\n      ')}
+    </g>
+    <g stroke="#000000" stroke-width="2">
+      <line x1="25" y1="270" x2="280" y2="270"/>
+      <polygon points="280,270 272,266 272,274" fill="#000000"/>
+      <line x1="30" y1="275" x2="30" y2="20"/>
+      <polygon points="30,20 26,28 34,28" fill="#000000"/>
+    </g>
+    <g font-family="Arial" font-size="11" fill="#000000">
+      <text x="275" y="285" font-style="italic">x</text>
+      <text x="20" y="18" font-style="italic">y</text>
+      ${Array.from({ length: 11 }, (_, i) => `<text x="${30 + i * 24}" y="285" text-anchor="middle">${i}</text>`).join('\n      ')}
+      ${Array.from({ length: 10 }, (_, i) => `<text x="22" y="${270 - (i + 1) * 24 + 4}" text-anchor="end">${i + 1}</text>`).join('\n      ')}
+    </g>
+    <g stroke="#000000" stroke-width="2" fill="none">
+      <polygon points="54,222 54,126 198,126 198,222"/>
+    </g>
+    <g fill="#000000" font-family="Arial" font-size="12" font-weight="bold">
+      <circle cx="54" cy="222" r="4"/>
+      <text x="35" y="240">A(1,2)</text>
+      <circle cx="54" cy="126" r="4"/>
+      <text x="35" y="120">B(1,6)</text>
+      <circle cx="198" cy="126" r="4"/>
+      <text x="200" y="120">C(7,6)</text>
+      <circle cx="198" cy="222" r="4"/>
+      <text x="200" y="240">D(7,2)</text>
+    </g>
+  </svg>`,
+
+  // Circle on coordinate plane
+  circle: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <g stroke="#e0e0e0" stroke-width="1">
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="${30 + i * 24}" y1="30" x2="${30 + i * 24}" y2="270"/>`).join('\n      ')}
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="30" y1="${270 - i * 24}" x2="270" y2="${270 - i * 24}"/>`).join('\n      ')}
+    </g>
+    <g stroke="#000000" stroke-width="2">
+      <line x1="25" y1="270" x2="280" y2="270"/>
+      <polygon points="280,270 272,266 272,274" fill="#000000"/>
+      <line x1="30" y1="275" x2="30" y2="20"/>
+      <polygon points="30,20 26,28 34,28" fill="#000000"/>
+    </g>
+    <g font-family="Arial" font-size="11" fill="#000000">
+      <text x="275" y="285" font-style="italic">x</text>
+      <text x="20" y="18" font-style="italic">y</text>
+      ${Array.from({ length: 11 }, (_, i) => `<text x="${30 + i * 24}" y="285" text-anchor="middle">${i}</text>`).join('\n      ')}
+      ${Array.from({ length: 10 }, (_, i) => `<text x="22" y="${270 - (i + 1) * 24 + 4}" text-anchor="end">${i + 1}</text>`).join('\n      ')}
+    </g>
+    <circle cx="150" cy="150" r="72" stroke="#000000" stroke-width="2" fill="none"/>
+    <g fill="#000000" font-family="Arial" font-size="12" font-weight="bold">
+      <circle cx="150" cy="150" r="4"/>
+      <text x="160" y="145">C(5,5)</text>
+    </g>
+    <line x1="150" y1="150" x2="222" y2="150" stroke="#000000" stroke-width="1.5" stroke-dasharray="4,2"/>
+    <text x="180" y="145" font-family="Arial" font-size="10">r = 3</text>
+  </svg>`,
+
+  // Parabola (for Algebra)
+  parabola: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <g stroke="#e0e0e0" stroke-width="1">
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="${30 + i * 24}" y1="30" x2="${30 + i * 24}" y2="270"/>`).join('\n      ')}
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="30" y1="${270 - i * 24}" x2="270" y2="${270 - i * 24}"/>`).join('\n      ')}
+    </g>
+    <g stroke="#000000" stroke-width="2">
+      <line x1="25" y1="270" x2="280" y2="270"/>
+      <polygon points="280,270 272,266 272,274" fill="#000000"/>
+      <line x1="30" y1="275" x2="30" y2="20"/>
+      <polygon points="30,20 26,28 34,28" fill="#000000"/>
+    </g>
+    <g font-family="Arial" font-size="11" fill="#000000">
+      <text x="275" y="285" font-style="italic">x</text>
+      <text x="20" y="18" font-style="italic">y</text>
+      ${Array.from({ length: 11 }, (_, i) => `<text x="${30 + i * 24}" y="285" text-anchor="middle">${i}</text>`).join('\n      ')}
+      ${Array.from({ length: 10 }, (_, i) => `<text x="22" y="${270 - (i + 1) * 24 + 4}" text-anchor="end">${i + 1}</text>`).join('\n      ')}
+    </g>
+    <path d="M 54 54 Q 150 270 246 54" stroke="#000000" stroke-width="2" fill="none"/>
+    <g fill="#000000" font-family="Arial" font-size="12" font-weight="bold">
+      <circle cx="150" cy="246" r="4"/>
+      <text x="155" y="260">V(5,1)</text>
+    </g>
+  </svg>`,
+
+  // Linear function graph
+  linear: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <g stroke="#e0e0e0" stroke-width="1">
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="${30 + i * 24}" y1="30" x2="${30 + i * 24}" y2="270"/>`).join('\n      ')}
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="30" y1="${270 - i * 24}" x2="270" y2="${270 - i * 24}"/>`).join('\n      ')}
+    </g>
+    <g stroke="#000000" stroke-width="2">
+      <line x1="25" y1="270" x2="280" y2="270"/>
+      <polygon points="280,270 272,266 272,274" fill="#000000"/>
+      <line x1="30" y1="275" x2="30" y2="20"/>
+      <polygon points="30,20 26,28 34,28" fill="#000000"/>
+    </g>
+    <g font-family="Arial" font-size="11" fill="#000000">
+      <text x="275" y="285" font-style="italic">x</text>
+      <text x="20" y="18" font-style="italic">y</text>
+      ${Array.from({ length: 11 }, (_, i) => `<text x="${30 + i * 24}" y="285" text-anchor="middle">${i}</text>`).join('\n      ')}
+      ${Array.from({ length: 10 }, (_, i) => `<text x="22" y="${270 - (i + 1) * 24 + 4}" text-anchor="end">${i + 1}</text>`).join('\n      ')}
+    </g>
+    <line x1="30" y1="246" x2="270" y2="54" stroke="#000000" stroke-width="2"/>
+    <g fill="#000000" font-family="Arial" font-size="12" font-weight="bold">
+      <circle cx="30" cy="246" r="4"/>
+      <text x="40" y="250">(0,1)</text>
+      <circle cx="150" cy="150" r="4"/>
+      <text x="155" y="145">(5,5)</text>
+    </g>
+  </svg>`,
+
+  // Force diagram (Physics)
+  force_diagram: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <rect x="100" y="120" width="100" height="60" stroke="#000000" stroke-width="2" fill="none" rx="2"/>
+    <text x="150" y="155" font-family="Arial" font-size="14" text-anchor="middle">m</text>
+    <line x1="150" y1="120" x2="150" y2="50" stroke="#000000" stroke-width="2"/>
+    <polygon points="150,50 145,60 155,60" fill="#000000"/>
+    <text x="160" y="70" font-family="Arial" font-size="12">F_N</text>
+    <line x1="150" y1="180" x2="150" y2="250" stroke="#000000" stroke-width="2"/>
+    <polygon points="150,250 145,240 155,240" fill="#000000"/>
+    <text x="160" y="230" font-family="Arial" font-size="12">F_g</text>
+    <line x1="100" y1="150" x2="40" y2="150" stroke="#000000" stroke-width="2"/>
+    <polygon points="40,150 50,145 50,155" fill="#000000"/>
+    <text x="55" y="140" font-family="Arial" font-size="12">F_f</text>
+    <line x1="200" y1="150" x2="270" y2="150" stroke="#000000" stroke-width="2"/>
+    <polygon points="270,150 260,145 260,155" fill="#000000"/>
+    <text x="235" y="140" font-family="Arial" font-size="12">F_a</text>
+  </svg>`,
+
+  // Simple circuit (Physics)
+  simple_circuit: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <line x1="50" y1="100" x2="50" y2="200" stroke="#000000" stroke-width="2"/>
+    <line x1="50" y1="200" x2="250" y2="200" stroke="#000000" stroke-width="2"/>
+    <line x1="250" y1="200" x2="250" y2="100" stroke="#000000" stroke-width="2"/>
+    <line x1="250" y1="100" x2="50" y2="100" stroke="#000000" stroke-width="2"/>
+    <line x1="30" y1="145" x2="30" y2="155" stroke="#000000" stroke-width="2"/>
+    <line x1="40" y1="140" x2="40" y2="160" stroke="#000000" stroke-width="2"/>
+    <line x1="30" y1="150" x2="50" y2="150" stroke="#000000" stroke-width="2"/>
+    <path d="M 120 100 L 130 90 L 140 110 L 150 90 L 160 110 L 170 90 L 180 100" stroke="#000000" stroke-width="2" fill="none"/>
+    <text x="150" y="80" font-family="Arial" font-size="12" text-anchor="middle">R</text>
+    <circle cx="150" cy="200" r="15" stroke="#000000" stroke-width="2" fill="none"/>
+    <text x="150" y="205" font-family="Arial" font-size="12" text-anchor="middle">A</text>
+  </svg>`,
+
+  // Molecule structure (Chemistry)
+  molecule: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <line x1="80" y1="150" x2="130" y2="150" stroke="#000000" stroke-width="2"/>
+    <line x1="170" y1="150" x2="220" y2="150" stroke="#000000" stroke-width="2"/>
+    <circle cx="60" cy="150" r="20" stroke="#000000" stroke-width="2" fill="none"/>
+    <text x="60" y="155" font-family="Arial" font-size="14" text-anchor="middle" font-weight="bold">H</text>
+    <circle cx="150" cy="150" r="25" stroke="#000000" stroke-width="2" fill="none"/>
+    <text x="150" y="155" font-family="Arial" font-size="14" text-anchor="middle" font-weight="bold">O</text>
+    <circle cx="240" cy="150" r="20" stroke="#000000" stroke-width="2" fill="none"/>
+    <text x="240" y="155" font-family="Arial" font-size="14" text-anchor="middle" font-weight="bold">H</text>
+    <text x="150" y="250" font-family="Arial" font-size="16" text-anchor="middle">H₂O</text>
+  </svg>`
+};
+
+// Match prompt to a fallback shape
+function matchFallbackShape(prompt: string): string | null {
+  const lowerPrompt = prompt.toLowerCase();
+  
+  // Geometry shapes
+  if (lowerPrompt.includes('right triangle') || (lowerPrompt.includes('triangle') && lowerPrompt.includes('right'))) {
+    return 'right_triangle';
+  }
+  if (lowerPrompt.includes('rectangle') || lowerPrompt.includes('quadrilateral') || lowerPrompt.includes('square')) {
+    return 'rectangle';
+  }
+  if (lowerPrompt.includes('circle') && !lowerPrompt.includes('circuit')) {
+    return 'circle';
+  }
+  
+  // Algebra
+  if (lowerPrompt.includes('parabola') || lowerPrompt.includes('quadratic')) {
+    return 'parabola';
+  }
+  if (lowerPrompt.includes('linear') || lowerPrompt.includes('line graph') || lowerPrompt.includes('slope')) {
+    return 'linear';
+  }
+  
+  // Physics
+  if (lowerPrompt.includes('force') || lowerPrompt.includes('free body')) {
+    return 'force_diagram';
+  }
+  if (lowerPrompt.includes('circuit') || lowerPrompt.includes('resistor')) {
+    return 'simple_circuit';
+  }
+  
+  // Chemistry
+  if (lowerPrompt.includes('molecule') || lowerPrompt.includes('h2o') || lowerPrompt.includes('water')) {
+    return 'molecule';
+  }
+  
+  return null;
+}
+
+// Get fallback shape SVG as data URL
+function getFallbackShape(prompt: string): string | null {
+  const shapeKey = matchFallbackShape(prompt);
+  if (shapeKey && FALLBACK_SHAPES[shapeKey]) {
+    const svg = FALLBACK_SHAPES[shapeKey]();
+    const base64Svg = btoa(unescape(encodeURIComponent(svg)));
+    return `data:image/svg+xml;base64,${base64Svg}`;
+  }
+  return null;
+}
+
+// Query the Regents Shape Library for matching shapes
+async function queryShapeLibrary(prompt: string, subject: string): Promise<string | null> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  if (!supabaseUrl || !supabaseKey) {
+    return null;
+  }
+  
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const lowerPrompt = prompt.toLowerCase();
+    
+    // Detect shape type from prompt
+    let shapeType = 'polygon';
+    if (lowerPrompt.includes('triangle')) shapeType = 'triangle';
+    else if (lowerPrompt.includes('rectangle') || lowerPrompt.includes('quadrilateral')) shapeType = 'quadrilateral';
+    else if (lowerPrompt.includes('circle')) shapeType = 'circle';
+    else if (lowerPrompt.includes('parabola')) shapeType = 'parabola';
+    else if (lowerPrompt.includes('linear') || lowerPrompt.includes('line')) shapeType = 'linear';
+    else if (lowerPrompt.includes('force') || lowerPrompt.includes('free body')) shapeType = 'force_diagram';
+    else if (lowerPrompt.includes('circuit')) shapeType = 'circuit';
+    else if (lowerPrompt.includes('molecule')) shapeType = 'molecule';
+    
+    // Query the library for matching verified shapes
+    const { data, error } = await supabase
+      .from('regents_shape_library')
+      .select('id, svg_data, vertices, parameters, usage_count')
+      .eq('is_verified', true)
+      .eq('shape_type', shapeType)
+      .ilike('subject', `%${subject}%`)
+      .order('usage_count', { ascending: false })
+      .limit(1);
+    
+    if (error || !data || data.length === 0) {
+      console.log(`No matching shape in library for ${shapeType}/${subject}`);
+      return null;
+    }
+    
+    const shape = data[0] as { id: string; svg_data: string; vertices: unknown; parameters: unknown; usage_count: number };
+    
+    // Increment usage count (fire and forget)
+    supabase
+      .from('regents_shape_library')
+      .update({ usage_count: (shape.usage_count || 0) + 1 })
+      .eq('id', shape.id)
+      .then(() => {});
+    
+    console.log(`Found matching shape in library: ${shapeType}`);
+    
+    // If the SVG data is already a data URL, return it
+    const svgData = shape.svg_data;
+    if (svgData.startsWith('data:')) {
+      return svgData;
+    }
+    
+    // Convert raw SVG to data URL
+    const base64Svg = btoa(unescape(encodeURIComponent(svgData)));
+    return `data:image/svg+xml;base64,${base64Svg}`;
+  } catch (err) {
+    console.error("Error querying shape library:", err);
+    return null;
+  }
+}
 
 interface QuestionWithPrompt {
   questionNumber: number;
@@ -1409,27 +1730,49 @@ Style: Simple line art, clean educational diagram suitable for projection.`
 
       let imageUrl: string | null = null;
       let validation: ValidationResult | null = null;
+      const subject = detectSubjectArea(q.imagePrompt);
 
-      // DEFAULT: Always try fast deterministic SVG first (black & white, simple)
-      if (shouldUseSimpleSVG || preferDeterministicSVG) {
+      // STEP 1: Try Regents Shape Library first (fastest, most accurate)
+      console.log("Checking Regents Shape Library...");
+      imageUrl = await queryShapeLibrary(q.imagePrompt, subject);
+      if (imageUrl) {
+        console.log("Found matching shape in library!");
+        validation = { isValid: true, issues: [], shouldRetry: false };
+      }
+
+      // STEP 2: Try deterministic SVG generation (for coordinate plane problems)
+      if (!imageUrl && (shouldUseSimpleSVG || preferDeterministicSVG)) {
         console.log("Using fast deterministic SVG generator (B&W, simple)...");
         imageUrl = generateDeterministicCoordinatePlaneSVG(q.imagePrompt);
         if (imageUrl) {
           console.log("Deterministic SVG generated successfully");
           validation = { isValid: true, issues: [], shouldRetry: false };
+        }
+      }
+
+      // STEP 3: Try AI SVG generation
+      if (!imageUrl) {
+        if (useNanoBanana) {
+          // Use colored AI images if explicitly requested
+          console.log("Using Nano Banana for colored AI image...");
+          const result = await generateImageWithNanoBanana(q.imagePrompt);
+          imageUrl = result.imageUrl;
+          validation = result.validation;
         } else {
-          // Fall back to simple B&W AI SVG generation
-          console.log("Deterministic failed (no coordinates), using simple B&W AI SVG...");
+          // Use simple B&W AI SVG generation
+          console.log("Using simple B&W AI SVG generation...");
           imageUrl = await generateSimpleSVGWithAI(q.imagePrompt);
         }
-      } else if (useNanoBanana) {
-        // Only use colored AI images if explicitly requested
-        const result = await generateImageWithNanoBanana(q.imagePrompt);
-        imageUrl = result.imageUrl;
-        validation = result.validation;
-      } else {
-        // Fallback: simple SVG generation
-        imageUrl = await generateSimpleSVGWithAI(q.imagePrompt);
+      }
+
+      // STEP 4: Use hardcoded fallback shapes as last resort
+      if (!imageUrl) {
+        console.log("AI generation failed, trying hardcoded fallback shapes...");
+        imageUrl = getFallbackShape(q.imagePrompt);
+        if (imageUrl) {
+          console.log("Using hardcoded fallback shape");
+          validation = { isValid: true, issues: ['Used fallback shape'], shouldRetry: false };
+        }
       }
 
       results.push({

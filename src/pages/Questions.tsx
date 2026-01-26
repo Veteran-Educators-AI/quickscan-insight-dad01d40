@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy, Brain, AlertTriangle, GraduationCap } from 'lucide-react';
+import { Search, BookOpen, ExternalLink, Plus, ChevronDown, ChevronRight, Check, Sparkles, ClipboardCheck, X, Presentation, Library, Trophy, Brain, AlertTriangle, GraduationCap, Shapes } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +25,7 @@ import { TeacherAnswerSampleList } from '@/components/scan/TeacherAnswerSampleLi
 import { DiagnosticGapsDialog } from '@/components/reports/DiagnosticGapsSummary';
 import { EnglishLiteratureSuggestions } from '@/components/questions/EnglishLiteratureSuggestions';
 import { SubjectLessonSuggestions } from '@/components/questions/SubjectLessonSuggestions';
+import { RegentsShapeScanner } from '@/components/questions/RegentsShapeScanner';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Questions() {
@@ -45,6 +46,7 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
   const [showMasteryChallenge, setShowMasteryChallenge] = useState(false);
   const [showAdaptiveGenerator, setShowAdaptiveGenerator] = useState(false);
   const [showTrainAI, setShowTrainAI] = useState(false);
+  const [showShapeScanner, setShowShapeScanner] = useState(false);
   const [sampleRefresh, setSampleRefresh] = useState(0);
 
   // Get selected topics as array for passing to generator
@@ -472,6 +474,14 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                 <GraduationCap className="h-4 w-4 mr-2" />
                 AI Training
               </Button>
+              <Button 
+                onClick={() => setShowShapeScanner(true)}
+                variant="outline"
+                className="border-blue-300 text-blue-700 hover:bg-blue-50"
+              >
+                <Shapes className="h-4 w-4 mr-2" />
+                Shape Library
+              </Button>
               <DiagnosticGapsDialog />
             </TooltipProvider>
           </div>
@@ -886,6 +896,12 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
           </Tabs>
         </DialogContent>
       </Dialog>
+
+      {/* Regents Shape Scanner */}
+      <RegentsShapeScanner 
+        open={showShapeScanner} 
+        onOpenChange={setShowShapeScanner} 
+      />
     </AppLayout>
   );
 }
