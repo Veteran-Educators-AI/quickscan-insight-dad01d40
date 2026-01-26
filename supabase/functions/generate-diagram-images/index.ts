@@ -275,33 +275,72 @@ async function queryShapeLibrary(prompt: string, subject: string): Promise<strin
     const supabase = createClient(supabaseUrl, supabaseKey);
     const lowerPrompt = prompt.toLowerCase();
     
-    // Detect shape type from prompt
+    // Detect shape type from prompt - expanded keyword matching
     let shapeType = 'polygon';
     if (lowerPrompt.includes('triangle')) shapeType = 'triangle';
-    else if (lowerPrompt.includes('rectangle') || lowerPrompt.includes('quadrilateral')) shapeType = 'quadrilateral';
-    else if (lowerPrompt.includes('circle')) shapeType = 'circle';
-    else if (lowerPrompt.includes('parabola')) shapeType = 'parabola';
-    else if (lowerPrompt.includes('linear') || lowerPrompt.includes('line')) shapeType = 'linear';
+    else if (lowerPrompt.includes('parallelogram') || lowerPrompt.includes('rhombus') || 
+             lowerPrompt.includes('rectangle') || lowerPrompt.includes('quadrilateral') ||
+             lowerPrompt.includes('trapezoid') || lowerPrompt.includes('square')) shapeType = 'quadrilateral';
+    else if (lowerPrompt.includes('circle') || lowerPrompt.includes('arc') || lowerPrompt.includes('chord') ||
+             lowerPrompt.includes('tangent') || lowerPrompt.includes('secant')) shapeType = 'circle';
+    else if (lowerPrompt.includes('parabola') || lowerPrompt.includes('quadratic')) shapeType = 'parabola';
+    else if (lowerPrompt.includes('linear') || lowerPrompt.includes('line') || lowerPrompt.includes('slope')) shapeType = 'linear';
     else if (lowerPrompt.includes('force') || lowerPrompt.includes('free body')) shapeType = 'force_diagram';
     else if (lowerPrompt.includes('circuit')) shapeType = 'circuit';
     else if (lowerPrompt.includes('molecule')) shapeType = 'molecule';
+    else if (lowerPrompt.includes('prism') || lowerPrompt.includes('cylinder') || 
+             lowerPrompt.includes('pyramid') || lowerPrompt.includes('cone') || 
+             lowerPrompt.includes('sphere')) shapeType = 'polygon'; // 3D solids
     
-    // Query the library for matching verified shapes
+    // Query the library for matching verified shapes - also search by description/tags
     const { data, error } = await supabase
       .from('regents_shape_library')
-      .select('id, svg_data, vertices, parameters, usage_count')
+      .select('id, svg_data, vertices, parameters, usage_count, description, tags')
       .eq('is_verified', true)
       .eq('shape_type', shapeType)
       .ilike('subject', `%${subject}%`)
       .order('usage_count', { ascending: false })
-      .limit(1);
+      .limit(5);
     
     if (error || !data || data.length === 0) {
       console.log(`No matching shape in library for ${shapeType}/${subject}`);
       return null;
     }
     
-    const shape = data[0] as { id: string; svg_data: string; vertices: unknown; parameters: unknown; usage_count: number };
+    // Find best match by checking description/tags against the prompt
+    let bestMatch = data[0];
+    const promptKeywords = lowerPrompt.split(/\s+/).filter(w => w.length > 3);
+    let bestScore = 0;
+    
+    for (const shape of data) {
+      const shapeWithMeta = shape as { id: string; svg_data: string | null; vertices: unknown; parameters: unknown; usage_count: number; description: string; tags: string[] };
+      const desc = (shapeWithMeta.description || '').toLowerCase();
+      const tags = (shapeWithMeta.tags || []).join(' ').toLowerCase();
+      const combined = desc + ' ' + tags;
+      
+      let score = 0;
+      for (const keyword of promptKeywords) {
+        if (combined.includes(keyword)) score++;
+      }
+      
+      // Prioritize shapes with actual SVG data
+      if (shapeWithMeta.svg_data) score += 10;
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = shape;
+      }
+    }
+    
+    const shape = bestMatch as { id: string; svg_data: string | null; vertices: unknown; parameters: unknown; usage_count: number; description: string };
+    
+    // Check if svg_data exists
+    if (!shape.svg_data) {
+      console.log(`Shape found in library but has no SVG data: ${shape.description}`);
+      // Return null to fall through to other generation methods
+      // The shape description can be used by AI generation as context
+      return null;
+    }
     
     // Increment usage count (fire and forget)
     supabase
@@ -310,10 +349,11 @@ async function queryShapeLibrary(prompt: string, subject: string): Promise<strin
       .eq('id', shape.id)
       .then(() => {});
     
-    console.log(`Found matching shape in library: ${shapeType}`);
+    console.log(`Found matching shape in library with SVG: ${shapeType}`);
+    
+    const svgData = shape.svg_data;
     
     // If the SVG data is already a data URL, return it
-    const svgData = shape.svg_data;
     if (svgData.startsWith('data:')) {
       return svgData;
     }
