@@ -1005,7 +1005,117 @@ Return ONLY valid SVG code, no explanation.`;
   }
 }
 
-// Generate SVG diagram using standard AI model (fallback if deterministic fails)
+// Generate SIMPLE black-and-white SVG diagram (fast, minimal detail, no colors)
+async function generateSimpleSVGWithAI(prompt: string): Promise<string | null> {
+  // First, try deterministic generation for coordinate plane problems
+  const isCoordinatePlane = prompt.toLowerCase().includes("coordinate") || prompt.match(/[A-Z]\s*\(\d+,\s*\d+\)/);
+
+  if (isCoordinatePlane) {
+    console.log("Using deterministic SVG generator for coordinate plane...");
+    const deterministicSvg = generateDeterministicCoordinatePlaneSVG(prompt);
+    if (deterministicSvg) {
+      console.log("Deterministic SVG generated successfully");
+      return deterministicSvg;
+    }
+  }
+
+  // Fall back to AI generation with SIMPLE B&W style
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) {
+    console.error("LOVABLE_API_KEY not configured");
+    return null;
+  }
+
+  try {
+    const subject = detectSubjectArea(prompt);
+    console.log(`Generating simple B&W SVG for subject: ${subject}`);
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite", // Faster, cheaper model
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert at creating SIMPLE black-and-white SVG line diagrams for educational worksheets.
+
+CRITICAL REQUIREMENTS:
+1. BLACK AND WHITE ONLY - No colors, no fills, just black strokes on white background
+2. MINIMAL DETAIL - Simple line art only, like a textbook diagram
+3. FAST GENERATION - Keep SVG code minimal and clean
+4. viewBox="0 0 300 300" always
+5. stroke="#000000" stroke-width="2" for all lines
+6. NO shadows, gradients, or complex effects
+7. NO filled shapes - use fill="none" or fill="#ffffff"
+8. Labels in simple black text, always horizontal
+
+Return ONLY valid SVG code, nothing else.`,
+          },
+          {
+            role: "user",
+            content: `Create a SIMPLE black-and-white line diagram for: ${prompt}
+
+Requirements:
+- Black lines on white background ONLY
+- Simple line art, no shading or colors
+- Minimal detail, clear and clean
+- Educational textbook style
+- All text labels horizontal`,
+          },
+        ],
+        temperature: 0.2,
+        max_tokens: 1500, // Smaller for speed
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Lovable AI error:", response.status, errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      return null;
+    }
+
+    // Extract SVG from the response
+    const svgMatch = content.match(/<svg[\s\S]*?<\/svg>/i);
+    if (svgMatch) {
+      let svgString = svgMatch[0];
+      
+      // Ensure viewBox is present
+      if (!svgString.includes('viewBox')) {
+        svgString = svgString.replace('<svg', '<svg viewBox="0 0 300 300"');
+      }
+      
+      // Ensure width and height are set
+      if (!svgString.includes('width=')) {
+        svgString = svgString.replace('<svg', '<svg width="300" height="300"');
+      }
+      
+      // Force black and white by removing any color fills
+      svgString = svgString.replace(/fill="(?!none|#fff|#ffffff|white)[^"]*"/gi, 'fill="none"');
+      
+      // Convert SVG to data URL
+      const base64Svg = btoa(unescape(encodeURIComponent(svgString)));
+      return `data:image/svg+xml;base64,${base64Svg}`;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error generating simple SVG with AI:", error);
+    return null;
+  }
+}
+
+
 async function generateSVGWithAI(prompt: string): Promise<string | null> {
   // First, try deterministic generation for coordinate plane problems
   const isCoordinatePlane = prompt.toLowerCase().includes("coordinate") || prompt.match(/[A-Z]\s*\(\d+,\s*\d+\)/);
@@ -1184,10 +1294,13 @@ Requirements:
     }
 
     // Existing batch question image generation
-    const { questions, useNanoBanana, preferDeterministicSVG } = body as {
+    // DEFAULT: Use fast, simple black-and-white SVG generation
+    // Only use AI images if explicitly requested with useNanoBanana=true
+    const { questions, useNanoBanana, preferDeterministicSVG, useSimpleSVG } = body as {
       questions: QuestionWithPrompt[];
       useNanoBanana?: boolean;
       preferDeterministicSVG?: boolean;
+      useSimpleSVG?: boolean; // New: force simple B&W SVG
     };
 
     if (!questions || questions.length === 0) {
@@ -1197,8 +1310,11 @@ Requirements:
       });
     }
 
+    // Default to simple SVG generation (fast, B&W, minimal detail)
+    const shouldUseSimpleSVG = useSimpleSVG !== false && !useNanoBanana;
+    
     console.log(
-      `Starting image generation for ${questions.length} questions (Nano Banana: ${useNanoBanana}, Deterministic: ${preferDeterministicSVG})...`,
+      `Starting image generation for ${questions.length} questions (Simple SVG: ${shouldUseSimpleSVG}, Nano Banana: ${useNanoBanana})...`,
     );
 
     const results: { questionNumber: number; imageUrl: string | null; validation?: ValidationResult | null }[] = [];
@@ -1209,26 +1325,26 @@ Requirements:
       let imageUrl: string | null = null;
       let validation: ValidationResult | null = null;
 
-      // If preferDeterministicSVG is enabled, always try deterministic first
-      if (preferDeterministicSVG) {
-        console.log("Using deterministic SVG generator (user preference)...");
+      // DEFAULT: Always try fast deterministic SVG first (black & white, simple)
+      if (shouldUseSimpleSVG || preferDeterministicSVG) {
+        console.log("Using fast deterministic SVG generator (B&W, simple)...");
         imageUrl = generateDeterministicCoordinatePlaneSVG(q.imagePrompt);
         if (imageUrl) {
           console.log("Deterministic SVG generated successfully");
           validation = { isValid: true, issues: [], shouldRetry: false };
         } else {
-          // Fall back to standard SVG generation if deterministic fails (no coordinates found)
-          console.log("Deterministic failed (no coordinates), falling back to SVG AI...");
-          imageUrl = await generateSVGWithAI(q.imagePrompt);
+          // Fall back to simple B&W AI SVG generation
+          console.log("Deterministic failed (no coordinates), using simple B&W AI SVG...");
+          imageUrl = await generateSimpleSVGWithAI(q.imagePrompt);
         }
       } else if (useNanoBanana) {
-        // Use Nano Banana for realistic image generation with validation
+        // Only use colored AI images if explicitly requested
         const result = await generateImageWithNanoBanana(q.imagePrompt);
         imageUrl = result.imageUrl;
         validation = result.validation;
       } else {
-        // Use standard SVG generation
-        imageUrl = await generateSVGWithAI(q.imagePrompt);
+        // Fallback: simple SVG generation
+        imageUrl = await generateSimpleSVGWithAI(q.imagePrompt);
       }
 
       results.push({
