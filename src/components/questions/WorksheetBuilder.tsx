@@ -3257,22 +3257,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   const contentWidth = pageWidth - marginLeft - marginRight;
                   let yPosition = marginTop;
                   
-                  // Helper function to clean text for PDF (fix encoding issues)
+                  // Helper function to clean text for PDF - use sanitizeForPDF to convert all 
+                  // Unicode symbols to ASCII equivalents that jsPDF can reliably render
                   const cleanTextForPDF = (text: string): string => {
-                    let cleaned = fixEncodingCorruption(text);
-                    // Additional cleanup for PDF rendering
-                    cleaned = cleaned
-                      .replace(/\u03B8/g, 'θ') // theta
-                      .replace(/\u03C0/g, 'π') // pi
-                      .replace(/\u221A/g, '√') // sqrt
-                      .replace(/\u00B2/g, '²') // superscript 2
-                      .replace(/\u00B3/g, '³') // superscript 3
-                      .replace(/\u2264/g, '≤') // less than or equal
-                      .replace(/\u2265/g, '≥') // greater than or equal
-                      .replace(/\u00B0/g, '°') // degree
-                      .replace(/\u2220/g, '∠') // angle
-                      .replace(/\u00B1/g, '±'); // plus minus
-                    return cleaned;
+                    return sanitizeForPDF(renderMathText(fixEncodingCorruption(text)));
                   };
                   
                   // Helper to check page break

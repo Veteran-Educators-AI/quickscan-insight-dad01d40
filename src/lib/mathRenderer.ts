@@ -523,9 +523,11 @@ export function parseMathText(text: string): Array<{ type: 'text' | 'math'; cont
 }
 
 /**
- * Sanitizes text for PDF rendering while preserving Unicode math symbols
- * jsPDF CAN render Unicode math symbols (π, θ, √, ², ≤, ≥) with Helvetica font
- * This function removes problematic characters like emojis while keeping math symbols
+ * Sanitizes text for PDF rendering by converting ALL Unicode math symbols to ASCII equivalents.
+ * jsPDF's default Helvetica font has LIMITED Unicode support, so we convert everything to
+ * ASCII text that renders reliably across all systems.
+ * 
+ * This ensures math problems display correctly without "Â [ ]" corruption or missing symbols.
  */
 export function sanitizeForPDF(text: string): string {
   if (!text) return '';
@@ -557,8 +559,8 @@ export function sanitizeForPDF(text: string): string {
     [/□/g, '[ ]'],
     [/■/g, '[x]'],
     [/▢/g, '[ ]'],
-    [/△/g, 'triangle '],
-    [/▲/g, 'triangle '],
+    [/△/g, 'triangle'],
+    [/▲/g, 'triangle'],
     [/◯/g, 'O'],
     [/[\u{1F300}-\u{1F9FF}]/gu, ''],
     [/[\u{2600}-\u{26FF}]/gu, ''],
@@ -573,62 +575,65 @@ export function sanitizeForPDF(text: string): string {
   }
   
   // CRITICAL: Fix common PDF corruption patterns - Â followed by symbols/quotes
-  // These are the patterns seen in the user's screenshots
+  // These patterns appear when Unicode is incorrectly encoded
   const pdfCorruptionPatterns: [RegExp, string][] = [
-    // "Â "H" pattern -> π (pi symbol that got corrupted)
-    [/Â\s*"H/gi, 'π'],
-    [/Â\s*"\s*H/gi, 'π'],
-    [/Â\s*"\s*\[\s*\]/gi, 'π'],
-    [/Â\s*\[\s*\]/gi, 'π'],
+    // "Â "H" pattern -> pi (pi symbol that got corrupted)
+    [/Â\s*"H/gi, 'pi'],
+    [/Â\s*"\s*H/gi, 'pi'],
+    [/Â\s*"\s*\[\s*\]/gi, 'pi'],
+    [/Â\s*\[\s*\]/gi, 'pi'],
     
-    // Handle the pattern "Â [ ]" which should be π
-    [/Ã\s*\[\s*\]/g, 'π'],
-    [/Â\s*(?:\[\s*\]|□|�)/g, 'π'],
+    // Handle the pattern "Â [ ]" which should be pi
+    [/Ã\s*\[\s*\]/g, 'pi'],
+    [/Â\s*(?:\[\s*\]|□|�)/g, 'pi'],
     
     // Common pi corruption when followed by units
-    [/Ã\s+(?=inches|cm|meters|units|square|cubic)/gi, 'π '],
-    [/Â\s+(?=inches|cm|meters|units|square|cubic)/gi, 'π '],
+    [/Ã\s+(?=inches|cm|meters|units|square|cubic)/gi, 'pi '],
+    [/Â\s+(?=inches|cm|meters|units|square|cubic)/gi, 'pi '],
     
-    // Standalone Â before numbers or spaces - likely corrupted pi
-    [/Â\s*π/g, 'π'],
-    [/Âπ/g, 'π'],
-    [/πÂ/g, 'π'],
-    [/Â°/g, '°'],
-    [/°Â/g, '°'],
-    [/Â²/g, '²'],
-    [/Â³/g, '³'],
-    [/Â½/g, '½'],
-    [/Â¼/g, '¼'],
-    [/Â¾/g, '¾'],
-    [/Â±/g, '±'],
-    [/Â·/g, '·'],
+    // Standalone Â before pi or numbers - likely corrupted pi
+    [/Â\s*π/g, 'pi'],
+    [/Âπ/g, 'pi'],
+    [/πÂ/g, 'pi'],
     
-    // Greek letters mojibake
-    [/Ï€/g, 'π'],
-    [/Î¸/g, 'θ'],
-    [/Î±/g, 'α'],
-    [/Î²/g, 'β'],
-    [/Î³/g, 'γ'],
-    [/Î"/g, 'Δ'],
-    [/Î´/g, 'δ'],
-    [/Ïˆ/g, 'ψ'],
-    [/Ï†/g, 'φ'],
-    [/Î£/g, 'Σ'],
-    [/Ïƒ/g, 'σ'],
-    [/Î©/g, 'Ω'],
-    [/Ï‰/g, 'ω'],
-    [/Î»/g, 'λ'],
-    [/Î¼/g, 'μ'],
+    // Fix corrupted degree, superscripts, fractions with Â prefix
+    [/Â°/g, ' degrees'],
+    [/°Â/g, ' degrees'],
+    [/Â²/g, '^2'],
+    [/Â³/g, '^3'],
+    [/Â¹/g, '^1'],
+    [/Â½/g, '1/2'],
+    [/Â¼/g, '1/4'],
+    [/Â¾/g, '3/4'],
+    [/Â±/g, '+/-'],
+    [/Â·/g, '*'],
     
-    // Math operators mojibake
-    [/â‰¤/g, '≤'],
-    [/â‰¥/g, '≥'],
-    [/â‰ /g, '≠'],
-    [/â†'/g, '→'],
-    [/âˆš/g, '√'],
-    [/âˆž/g, '∞'],
-    [/Ã—/g, '×'],
-    [/Ã·/g, '÷'],
+    // Greek letters mojibake - convert to text
+    [/Ï€/g, 'pi'],
+    [/Î¸/g, 'theta'],
+    [/Î±/g, 'alpha'],
+    [/Î²/g, 'beta'],
+    [/Î³/g, 'gamma'],
+    [/Î"/g, 'Delta'],
+    [/Î´/g, 'delta'],
+    [/Ïˆ/g, 'psi'],
+    [/Ï†/g, 'phi'],
+    [/Î£/g, 'Sigma'],
+    [/Ïƒ/g, 'sigma'],
+    [/Î©/g, 'Omega'],
+    [/Ï‰/g, 'omega'],
+    [/Î»/g, 'lambda'],
+    [/Î¼/g, 'mu'],
+    
+    // Math operators mojibake - convert to ASCII
+    [/â‰¤/g, '<='],
+    [/â‰¥/g, '>='],
+    [/â‰ /g, '!='],
+    [/â†'/g, '->'],
+    [/âˆš/g, 'sqrt'],
+    [/âˆž/g, 'infinity'],
+    [/Ã—/g, 'x'],
+    [/Ã·/g, '/'],
     [/â€"/g, '-'],
     [/â€™/g, "'"],
     [/â€œ/g, '"'],
@@ -638,54 +643,181 @@ export function sanitizeForPDF(text: string): string {
     [/Ø=Ü[¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿]?/g, ''],
     [/Ã˜=Ã[^\s]*/g, ''],
     
-    // Clean up remaining stray Â characters
+    // Clean up remaining stray Â and Ã characters
     [/Â(?=\d)/g, ''],
     [/(\d)Â\s/g, '$1 '],
     [/Â\s+/g, ' '],
     [/\s+Â/g, ' '],
     [/Â(?![a-zA-Z0-9])/g, ''],
+    [/Ã(?![a-zA-Z0-9])/g, ''],
   ];
   
   for (const [pattern, replacement] of pdfCorruptionPatterns) {
     result = result.replace(pattern, replacement);
   }
   
-  // Convert Unicode symbols that don't render well in PDF to ASCII equivalents
-  const safeReplacements: [RegExp, string][] = [
+  // Convert ALL Unicode math symbols to ASCII equivalents for reliable PDF rendering
+  // Order matters: longer patterns first to avoid partial replacements
+  const unicodeToAscii: [RegExp, string][] = [
+    // Greek letters - convert to spelled-out names
+    [/π/g, 'pi'],
+    [/θ/g, 'theta'],
+    [/α/g, 'alpha'],
+    [/β/g, 'beta'],
+    [/γ/g, 'gamma'],
+    [/δ/g, 'delta'],
+    [/Δ/g, 'Delta'],
+    [/ε/g, 'epsilon'],
+    [/σ/g, 'sigma'],
+    [/Σ/g, 'Sigma'],
+    [/ω/g, 'omega'],
+    [/Ω/g, 'Omega'],
+    [/φ/g, 'phi'],
+    [/Φ/g, 'Phi'],
+    [/ψ/g, 'psi'],
+    [/λ/g, 'lambda'],
+    [/μ/g, 'mu'],
+    [/ρ/g, 'rho'],
+    [/τ/g, 'tau'],
+    
+    // Math operators and relations
+    [/≤/g, '<='],
+    [/≥/g, '>='],
+    [/≠/g, '!='],
+    [/≈/g, '~='],
+    [/≡/g, '==='],
+    [/±/g, '+/-'],
+    [/∓/g, '-/+'],
+    [/×/g, 'x'],
+    [/÷/g, '/'],
+    [/·/g, '*'],
+    [/√/g, 'sqrt'],
+    [/∞/g, 'infinity'],
+    
+    // Arrows
     [/→/g, '->'],
     [/←/g, '<-'],
     [/↔/g, '<->'],
     [/⇒/g, '=>'],
-    [/⊥/g, ' perp '],
-    [/∥/g, ' || '],
-    [/≅/g, ' = '],
-    [/∠/g, 'angle '],
-    [/∴/g, 'therefore '],
-    [/∵/g, 'because '],
-    [/∈/g, ' in '],
-    [/⊂/g, ' subset '],
-    [/∪/g, ' union '],
-    [/∩/g, ' intersection '],
+    [/⇐/g, '<='],
+    [/⇔/g, '<=>'],
+    
+    // Geometry symbols
+    [/∠/g, 'angle'],
+    [/⊥/g, 'perp'],
+    [/∥/g, '||'],
+    [/≅/g, '~='],
+    [/°/g, ' degrees'],
+    
+    // Set theory
+    [/∈/g, 'in'],
+    [/∉/g, 'not in'],
+    [/⊂/g, 'subset'],
+    [/⊆/g, 'subset='],
+    [/⊃/g, 'superset'],
+    [/∪/g, 'union'],
+    [/∩/g, 'intersection'],
+    [/∅/g, 'empty set'],
+    [/∀/g, 'for all'],
+    [/∃/g, 'exists'],
+    
+    // Calculus
+    [/∂/g, 'd'],
+    [/∇/g, 'nabla'],
+    [/∫/g, 'integral'],
+    [/∏/g, 'product'],
+    
+    // Logic and misc
+    [/∴/g, 'therefore'],
+    [/∵/g, 'because'],
+    [/…/g, '...'],
+    [/⋯/g, '...'],
     [/′/g, "'"],
     [/″/g, "''"],
+    
+    // Superscript numbers - convert to ^n format
+    [/⁰/g, '^0'],
+    [/¹/g, '^1'],
+    [/²/g, '^2'],
+    [/³/g, '^3'],
+    [/⁴/g, '^4'],
+    [/⁵/g, '^5'],
+    [/⁶/g, '^6'],
+    [/⁷/g, '^7'],
+    [/⁸/g, '^8'],
+    [/⁹/g, '^9'],
+    [/⁺/g, '^+'],
+    [/⁻/g, '^-'],
+    [/⁼/g, '^='],
+    [/⁽/g, '^('],
+    [/⁾/g, '^)'],
+    [/ⁿ/g, '^n'],
+    [/ˣ/g, '^x'],
+    [/ʸ/g, '^y'],
+    
+    // Subscript numbers - convert to _n format
+    [/₀/g, '_0'],
+    [/₁/g, '_1'],
+    [/₂/g, '_2'],
+    [/₃/g, '_3'],
+    [/₄/g, '_4'],
+    [/₅/g, '_5'],
+    [/₆/g, '_6'],
+    [/₇/g, '_7'],
+    [/₈/g, '_8'],
+    [/₉/g, '_9'],
+    [/₊/g, '_+'],
+    [/₋/g, '_-'],
+    [/₌/g, '_='],
+    [/₍/g, '_('],
+    [/₎/g, '_)'],
+    [/ₐ/g, '_a'],
+    [/ₑ/g, '_e'],
+    [/ᵢ/g, '_i'],
+    [/ₙ/g, '_n'],
+    [/ₓ/g, '_x'],
+    [/ᵧ/g, '_y'],
+    
+    // Unicode fractions - convert to a/b format
+    [/½/g, '1/2'],
+    [/⅓/g, '1/3'],
+    [/⅔/g, '2/3'],
+    [/¼/g, '1/4'],
+    [/¾/g, '3/4'],
+    [/⅕/g, '1/5'],
+    [/⅖/g, '2/5'],
+    [/⅗/g, '3/5'],
+    [/⅘/g, '4/5'],
+    [/⅙/g, '1/6'],
+    [/⅚/g, '5/6'],
+    [/⅛/g, '1/8'],
+    [/⅜/g, '3/8'],
+    [/⅝/g, '5/8'],
+    [/⅞/g, '7/8'],
   ];
   
-  for (const [pattern, replacement] of safeReplacements) {
+  for (const [pattern, replacement] of unicodeToAscii) {
     result = result.replace(pattern, replacement);
   }
   
-  // Final cleanup: Remove any remaining unusual characters that may cause issues
-  // Keep: letters, numbers, common punctuation, and safe math symbols
-  result = result.replace(/[^\x20-\x7E\u00B0\u00B2\u00B3\u00BD\u00BC\u00BE\u00D7\u00F7\u03B1-\u03C9\u03A0-\u03A9\u221A\u221E\u2264\u2265\u2260\u00B1\u00B7\u2248\u00B9]/g, (char) => {
-    // Only remove if it's in a problematic range, otherwise keep
-    const code = char.charCodeAt(0);
-    if (code >= 0x80 && code <= 0xFF && ![0xB0, 0xB1, 0xB2, 0xB3, 0xB7, 0xB9, 0xBC, 0xBD, 0xBE, 0xD7, 0xF7].includes(code)) {
-      return ''; // Remove Latin-1 supplement characters that aren't math symbols
-    }
-    return char;
-  });
+  // Clean up spacing around converted symbols
+  // Fix patterns like "2pi" -> "2 pi" and "pipounds" -> "pi pounds"
+  result = result.replace(/(\d)(pi|theta|alpha|beta|gamma|delta|sigma|omega|phi|lambda|mu|rho|tau)(?=\s|$|[^a-zA-Z])/gi, '$1 $2');
+  result = result.replace(/(pi|theta|alpha|beta|gamma|delta|sigma|omega|phi|lambda|mu|rho|tau)([a-zA-Z])/gi, '$1 $2');
   
-  // Clean up any double spaces
+  // Fix spacing around "degrees" and other units
+  result = result.replace(/(\d)\s*degrees/gi, '$1 degrees');
+  result = result.replace(/degrees([a-zA-Z])/gi, 'degrees $1');
+  
+  // Clean consecutive operators and fix spacing
+  result = result.replace(/\^\s*\^/g, '^');
+  result = result.replace(/_\s*_/g, '_');
+  
+  // Final cleanup: Remove any remaining problematic characters
+  // Keep only ASCII printable characters (0x20-0x7E)
+  result = result.replace(/[^\x20-\x7E]/g, '');
+  
+  // Clean up multiple spaces and trim
   result = result.replace(/\s+/g, ' ').trim();
   
   return result;
