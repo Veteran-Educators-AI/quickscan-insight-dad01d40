@@ -34,6 +34,8 @@ import MfaEnroll from "./pages/MfaEnroll";
 import NotFound from "./pages/NotFound";
 import StudentLogin from "./pages/StudentLogin";
 import StudentJoinClass from "./pages/StudentJoinClass";
+import StudentQuickJoin from "./pages/StudentQuickJoin";
+import StudentMagicCallback from "./pages/StudentMagicCallback";
 import StudentDashboard from "./pages/StudentDashboard";
 import StudentLiveSession from "./pages/StudentLiveSession";
 import PresentationView from "./pages/PresentationView";
@@ -150,6 +152,8 @@ function AppRoutes() {
       {/* Student routes */}
       <Route path="/student/login" element={<StudentLogin />} />
       <Route path="/student/join" element={<StudentJoinClass />} />
+      <Route path="/student/quick-join" element={<StudentQuickJoin />} />
+      <Route path="/student/magic-callback" element={<StudentMagicCallback />} />
       <Route path="/student/dashboard" element={<StudentDashboard />} />
       <Route path="/student/live" element={<StudentLiveSession />} />
       {/* Presentation routes */}

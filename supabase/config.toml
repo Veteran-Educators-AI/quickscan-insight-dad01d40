@@ -114,3 +114,9 @@ verify_jwt = false
 
 [functions.translate]
 verify_jwt = false
+
+[functions.send-student-magic-link]
+verify_jwt = false
+
+[functions.verify-student-magic-link]
+verify_jwt = false
