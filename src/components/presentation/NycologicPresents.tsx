@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Edit3, Check, Play, X, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, Maximize2, Minimize2, Volume2, VolumeX, Download, FileText, Presentation } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit3, Check, Play, X, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, Maximize2, Minimize2, Volume2, VolumeX, Download, FileText, Presentation, Image as ImageIcon, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { exportToPDF, exportToPPTX } from '@/lib/presentationExport';
 import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
+import { SlideImageGenerator, GeneratedImageData } from './SlideImageGenerator';
 
 export interface SlideImage {
   url: string;
@@ -138,6 +139,7 @@ export function NycologicPresents({
   const [isMuted, setIsMuted] = useState(false);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [showImageGenerator, setShowImageGenerator] = useState(false);
 
   const slide = presentation.slides[currentSlide];
   const totalSlides = presentation.slides.length;
@@ -245,6 +247,29 @@ export function NycologicPresents({
     setSelectedOption(index);
     // Auto-show answer after selection
     setTimeout(() => setShowAnswer(true), 500);
+  };
+
+  // Handle image generated from SlideImageGenerator
+  const handleSlideImageGenerated = (imageData: GeneratedImageData) => {
+    const updatedSlides = [...presentation.slides];
+    updatedSlides[currentSlide] = {
+      ...updatedSlides[currentSlide],
+      image: {
+        url: imageData.url,
+        prompt: imageData.prompt,
+        position: imageData.position,
+        size: imageData.size,
+        rotation: imageData.rotation,
+      },
+    };
+    const updatedPresentation = { ...presentation, slides: updatedSlides };
+    setPresentation(updatedPresentation);
+    onSave?.(updatedPresentation);
+    setShowImageGenerator(false);
+    toast({
+      title: 'Image added!',
+      description: 'Your slide image has been generated and applied.',
+    });
   };
 
   const handleExportPDF = async () => {
@@ -517,20 +542,119 @@ export function NycologicPresents({
             transition={{ duration: 0.4, ease: "easeOut" }}
             className="w-full h-full flex flex-col items-center justify-center text-center"
           >
-            {/* Icon - subtle */}
-            {IconComponent && (
-              <motion.div 
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.1 }}
-                className="mx-auto mb-6"
-              >
+            {/* Slide Image or Clickable Placeholder */}
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="mx-auto mb-6"
+            >
+              {slide.image?.url ? (
+                /* Seamlessly blended slide image */
+                <div 
+                  className="relative cursor-pointer group"
+                  onClick={() => isEditable && setShowImageGenerator(true)}
+                  title={isEditable ? "Click to edit image" : undefined}
+                >
+                  <div 
+                    className="relative overflow-hidden rounded-2xl"
+                    style={{
+                      width: Math.min(slide.image.size?.width || 300, 400),
+                      height: Math.min(slide.image.size?.height || 225, 300),
+                    }}
+                  >
+                    {/* Gradient overlay for seamless blending - top */}
+                    <div 
+                      className="absolute inset-x-0 top-0 h-12 z-10 pointer-events-none"
+                      style={{
+                        background: `linear-gradient(to bottom, ${backgroundStyle.includes('linear-gradient') ? 
+                          backgroundStyle.match(/,\s*([^,]+)\s+0%/)?.[1] || 'rgba(15, 23, 42, 0.9)' : 
+                          'rgba(15, 23, 42, 0.9)'}, transparent)`
+                      }}
+                    />
+                    {/* Gradient overlay for seamless blending - bottom */}
+                    <div 
+                      className="absolute inset-x-0 bottom-0 h-12 z-10 pointer-events-none"
+                      style={{
+                        background: `linear-gradient(to top, ${backgroundStyle.includes('linear-gradient') ? 
+                          backgroundStyle.match(/,\s*([^,]+)\s+100%/)?.[1] || 'rgba(15, 23, 42, 0.9)' : 
+                          'rgba(15, 23, 42, 0.9)'}, transparent)`
+                      }}
+                    />
+                    {/* Gradient overlay for seamless blending - left */}
+                    <div 
+                      className="absolute inset-y-0 left-0 w-12 z-10 pointer-events-none"
+                      style={{
+                        background: `linear-gradient(to right, ${backgroundStyle.includes('linear-gradient') ? 
+                          backgroundStyle.match(/,\s*([^,]+)\s+0%/)?.[1] || 'rgba(15, 23, 42, 0.9)' : 
+                          'rgba(15, 23, 42, 0.9)'}, transparent)`
+                      }}
+                    />
+                    {/* Gradient overlay for seamless blending - right */}
+                    <div 
+                      className="absolute inset-y-0 right-0 w-12 z-10 pointer-events-none"
+                      style={{
+                        background: `linear-gradient(to left, ${backgroundStyle.includes('linear-gradient') ? 
+                          backgroundStyle.match(/,\s*([^,]+)\s+100%/)?.[1] || 'rgba(15, 23, 42, 0.9)' : 
+                          'rgba(15, 23, 42, 0.9)'}, transparent)`
+                      }}
+                    />
+                    {/* The actual image */}
+                    <img 
+                      src={slide.image.url} 
+                      alt="" 
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      style={{
+                        transform: `rotate(${slide.image.rotation || 0}deg)`,
+                      }}
+                    />
+                    {/* Edit overlay on hover */}
+                    {isEditable && (
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20">
+                        <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                          <Wand2 className="h-6 w-6 text-white" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : isEditable ? (
+                /* Clickable placeholder - opens image generator */
+                <button
+                  onClick={() => setShowImageGenerator(true)}
+                  className="group relative p-6 rounded-2xl border-2 border-dashed border-white/20 hover:border-white/40 transition-all duration-300 hover:bg-white/5"
+                  style={{
+                    background: `linear-gradient(135deg, ${themeGlow.replace('0.4', '0.08')}, transparent)`,
+                  }}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    {IconComponent ? (
+                      <IconComponent 
+                        className="h-12 w-12 md:h-16 md:w-16 transition-transform group-hover:scale-110" 
+                        style={{ color: colors.accentHex, opacity: 0.6 }}
+                      />
+                    ) : (
+                      <ImageIcon 
+                        className="h-12 w-12 md:h-16 md:w-16 transition-transform group-hover:scale-110" 
+                        style={{ color: colors.accentHex, opacity: 0.6 }}
+                      />
+                    )}
+                    <span 
+                      className="text-xs font-medium tracking-wider uppercase opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ color: colors.accentHex }}
+                    >
+                      Click to add image
+                    </span>
+                  </div>
+                </button>
+              ) : IconComponent ? (
+                /* Non-editable icon fallback */
                 <IconComponent 
                   className="h-10 w-10 md:h-12 md:w-12" 
                   style={{ color: colors.accentHex, opacity: 0.8 }}
                 />
-              </motion.div>
-            )}
+              ) : null}
+            </motion.div>
 
             {/* Subtitle tag */}
             {slide.subtitle && (
@@ -785,6 +909,24 @@ export function NycologicPresents({
           ← → to navigate • F for fullscreen • ESC to exit
         </p>
       </motion.footer>
+
+      {/* Slide Image Generator Dialog */}
+      {isEditable && (
+        <SlideImageGenerator
+          open={showImageGenerator}
+          onOpenChange={setShowImageGenerator}
+          onImageGenerated={handleSlideImageGenerated}
+          currentImage={slide.image ? {
+            url: slide.image.url,
+            prompt: slide.image.prompt,
+            position: slide.image.position,
+            size: slide.image.size,
+            rotation: slide.image.rotation,
+          } : null}
+          slideTitle={slide.title}
+          topic={presentation.topic}
+        />
+      )}
     </div>
   );
 }
