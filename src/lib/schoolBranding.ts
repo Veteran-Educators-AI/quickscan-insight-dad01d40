@@ -1,7 +1,7 @@
 // School branding configuration for white-labeling
 // This allows schools to customize the platform appearance
 
-import hillcrestLogo from '@/assets/hillcrest-logo.jpg';
+import hillcrestLogo from '@/assets/hillcrest-logo.png';
 import nycologicLogo from '@/assets/nycologic-brain-logo.png';
 
 export interface SchoolBranding {
