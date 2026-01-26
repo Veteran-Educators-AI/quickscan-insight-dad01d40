@@ -1437,118 +1437,52 @@ export default function PresentationView() {
             ) : (
               // Content/Summary/Other slides
               <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 relative">
-                {/* Custom Generated Image - interactive for on-the-fly adjustments */}
-                {slide.customImage?.url && (
-                  <motion.div
-                    ref={imageContainerRef}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    style={{
-                      position: 'absolute',
-                      left: `${slide.customImage.position.x}%`,
-                      top: `${slide.customImage.position.y}%`,
-                      transform: `translate(-50%, -50%) rotate(${slide.customImage.rotation}deg)`,
-                      width: `${slide.customImage.size.width}px`,
-                      height: `${slide.customImage.size.height}px`,
-                      zIndex: 10,
-                    }}
-                    className={cn(
-                      "cursor-move group",
-                      isDraggingImage && "ring-4 ring-primary/50",
-                      isRotatingImage && "ring-4 ring-amber-400/50"
-                    )}
-                    onMouseDown={handleImageDragStart}
-                    onTouchStart={handleImageDragStart}
-                  >
-                    <img 
-                      src={slide.customImage.url} 
-                      alt="Slide image"
-                      className="w-full h-full object-contain rounded-2xl shadow-2xl pointer-events-none select-none"
-                      style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.5))' }}
-                      draggable={false}
-                    />
-                    
-                    {/* Image controls - visible on hover */}
-                    <div className={cn(
-                      "transition-opacity",
-                      (isDraggingImage || isResizingImage || isRotatingImage) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                    )}>
-                      {/* Corner resize handles */}
-                      <div
-                        onMouseDown={handleResizeStart('top-left')}
-                        onTouchStart={handleResizeStart('top-left')}
-                        className="absolute -top-2 -left-2 w-5 h-5 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg"
-                      />
-                      <div
-                        onMouseDown={handleResizeStart('top-right')}
-                        onTouchStart={handleResizeStart('top-right')}
-                        className="absolute -top-2 -right-2 w-5 h-5 bg-primary rounded-full cursor-nesw-resize hover:scale-125 transition-transform shadow-lg"
-                      />
-                      <div
-                        onMouseDown={handleResizeStart('bottom-left')}
-                        onTouchStart={handleResizeStart('bottom-left')}
-                        className="absolute -bottom-2 -left-2 w-5 h-5 bg-primary rounded-full cursor-nesw-resize hover:scale-125 transition-transform shadow-lg"
-                      />
-                      <div
-                        onMouseDown={handleResizeStart('bottom-right')}
-                        onTouchStart={handleResizeStart('bottom-right')}
-                        className="absolute -bottom-2 -right-2 w-5 h-5 bg-primary rounded-full cursor-nwse-resize hover:scale-125 transition-transform shadow-lg"
+                {/* Image placeholder area - fixed location for both placeholder and generated image */}
+                <motion.div
+                  initial={{ opacity: 0, x: -40 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="flex-shrink-0"
+                >
+                  {slide.customImage?.url ? (
+                    // Generated image - fixed in placeholder location
+                    <div className="relative w-48 h-48 lg:w-72 lg:h-72 group">
+                      <img 
+                        src={slide.customImage.url} 
+                        alt="Slide image"
+                        className="w-full h-full object-contain rounded-2xl shadow-2xl"
+                        style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.5))' }}
+                        draggable={false}
                       />
                       
-                      {/* Rotation handle */}
-                      <div className="absolute left-1/2 -translate-x-1/2 -top-12 flex flex-col items-center">
-                        <div className="w-0.5 h-6 bg-amber-400/60" />
-                        <div
-                          onMouseDown={handleRotationStart}
-                          onTouchStart={handleRotationStart}
-                          className={cn(
-                            "w-7 h-7 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg transition-all hover:scale-110",
-                            isRotatingImage ? "bg-amber-500 scale-125" : "bg-amber-400"
-                          )}
-                          title="Drag to rotate"
+                      {/* Edit/Delete controls - visible on hover */}
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl bg-black/30 flex items-center justify-center gap-4">
+                        <button
+                          onClick={() => setShowImageGenerator(true)}
+                          className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-all hover:scale-110"
+                          title="Change image"
                         >
-                          <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <path d="M21 12a9 9 0 11-6.219-8.56" />
-                            <path d="M21 3v5h-5" />
-                          </svg>
-                        </div>
+                          <ImagePlus className="w-6 h-6 text-white" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleImageGenerated({
+                              url: '',
+                              prompt: '',
+                              position: { x: 50, y: 50 },
+                              size: { width: 400, height: 300 },
+                              rotation: 0,
+                            });
+                          }}
+                          className="p-3 bg-red-500/80 hover:bg-red-500 rounded-full transition-all hover:scale-110"
+                          title="Remove image"
+                        >
+                          <X className="w-6 h-6 text-white" />
+                        </button>
                       </div>
-                      
-                      {/* Delete button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleImageGenerated({
-                            url: '',
-                            prompt: '',
-                            position: { x: 50, y: 50 },
-                            size: { width: 400, height: 300 },
-                            rotation: 0,
-                          });
-                        }}
-                        className="absolute -top-2 right-8 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center cursor-pointer hover:scale-125 hover:bg-red-600 transition-all shadow-lg"
-                        title="Remove image"
-                      >
-                        <X className="w-3.5 h-3.5 text-white" />
-                      </button>
-                      
-                      {isRotatingImage && (
-                        <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-sm font-bold px-3 py-1 rounded-full shadow-lg">
-                          {slide.customImage?.rotation}°
-                        </div>
-                      )}
                     </div>
-                  </motion.div>
-                )}
-
-                {/* Clickable image placeholder - opens image generator */}
-                {!slide.customImage?.url && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -40 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="flex-shrink-0"
-                  >
+                  ) : (
+                    // Clickable placeholder - opens image generator
                     <button
                       onClick={() => setShowImageGenerator(true)}
                       className="w-48 h-48 lg:w-72 lg:h-72 flex flex-col items-center justify-center bg-white/5 hover:bg-white/10 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-transparent hover:border-white/20 group"
@@ -1565,8 +1499,8 @@ export default function PresentationView() {
                         + Add Image
                       </span>
                     </button>
-                  </motion.div>
-                )}
+                  )}
+                </motion.div>
 
                 {/* Content side */}
                 <div className="flex-1 space-y-6 text-center lg:text-left">
