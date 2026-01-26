@@ -5,7 +5,7 @@ import {
   RotateCcw, Check, Trash2, GripVertical, Maximize2, Minimize2,
   LayoutGrid, PieChart, BarChart3, GitBranch, Layers, Target,
   Lightbulb, Workflow, Users, BookOpen, Beaker, Globe, Calculator,
-  Atom, Brain, Clock, Sparkles, Plus
+  Atom, Brain, Clock, Sparkles, Plus, Upload
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,8 +90,10 @@ export function SlideImageGenerator({
   const [isPinching, setIsPinching] = useState(false);
   const [initialPinchDistance, setInitialPinchDistance] = useState(0);
   const [initialSize, setInitialSize] = useState({ width: 400, height: 300 });
+  const [isDropping, setIsDropping] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get topic-specific image suggestions
   const topicSuggestions = useMemo(() => {
@@ -116,6 +118,64 @@ export function SlideImageGenerator({
       setPrompt(`Educational illustration for "${slideTitle}" about ${topic}. Clean, modern, professional style.`);
     }
   }, [slideTitle, topic, currentImage]);
+
+  // Handle file upload (drag-drop or file picker)
+  const handleFileUpload = useCallback((file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file (JPEG or PNG)');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image must be less than 10MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setGeneratedUrl(dataUrl);
+      setPrompt(`Custom uploaded image: ${file.name}`);
+      toast.success('Image uploaded successfully!');
+    };
+    reader.onerror = () => {
+      toast.error('Failed to read image file');
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  // Drag and drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDropping(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDropping(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDropping(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  }, [handleFileUpload]);
+
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+    // Reset input so same file can be selected again
+    e.target.value = '';
+  }, [handleFileUpload]);
 
   const generateImage = async () => {
     if (!prompt.trim()) {
@@ -500,15 +560,33 @@ Example: A colorful diagram showing the water cycle with clouds, rain, rivers, a
 
           {/* Right: Large Preview */}
           <div className="space-y-3">
-            <Label className="text-base font-semibold flex items-center gap-2">
-              <Maximize2 className="h-4 w-4" />
-              Preview
-              {generatedUrl && (
-                <span className="text-sm font-normal text-muted-foreground ml-2">
-                  (Drag to move • Scroll to zoom • Pinch on touch devices)
-                </span>
-              )}
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Maximize2 className="h-4 w-4" />
+                Preview
+                {generatedUrl && (
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    (Drag to move • Scroll to zoom)
+                  </span>
+                )}
+              </Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                Upload Image
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/jpg"
+                onChange={handleFileInputChange}
+                className="hidden"
+              />
+            </div>
             <div
               ref={containerRef}
               onMouseMove={handleMouseMove}
@@ -518,13 +596,28 @@ Example: A colorful diagram showing the water cycle with clouds, rain, rivers, a
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
               className={cn(
-                "relative bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-xl overflow-hidden border-2 touch-none",
+                "relative bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-xl overflow-hidden border-2 touch-none transition-colors",
                 "min-h-[400px] lg:min-h-[500px]",
+                isDropping ? "border-primary border-dashed bg-primary/10" : 
                 isDragging ? "border-primary cursor-grabbing" : "border-muted-foreground/30 cursor-default"
               )}
               style={{ aspectRatio: '16/10' }}
             >
+              {/* Drop overlay */}
+              {isDropping && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-primary/20 backdrop-blur-sm">
+                  <div className="text-center">
+                    <Upload className="h-16 w-16 text-primary mx-auto mb-4 animate-bounce" />
+                    <p className="text-white text-lg font-medium">Drop your image here</p>
+                    <p className="text-white/60 text-sm">JPEG or PNG supported</p>
+                  </div>
+                </div>
+              )}
+
               {/* Slide content preview */}
               <div className="absolute inset-0 p-8 flex flex-col items-center justify-start pointer-events-none">
                 <h3 className="text-white/20 text-2xl font-bold text-center mt-4">
@@ -564,13 +657,18 @@ Example: A colorful diagram showing the water cycle with clouds, rain, rivers, a
                 </motion.div>
               )}
 
-              {/* Empty state */}
-              {!generatedUrl && !isGenerating && (
+              {/* Empty state with drag-drop hint */}
+              {!generatedUrl && !isGenerating && !isDropping && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center text-white/40 p-8">
-                    <Image className="h-20 w-20 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg mb-2">No image generated yet</p>
-                    <p className="text-sm">Describe your image and click "Generate Image"</p>
+                    <div className="flex items-center justify-center gap-4 mb-4">
+                      <Image className="h-16 w-16 opacity-50" />
+                      <span className="text-2xl opacity-30">or</span>
+                      <Upload className="h-16 w-16 opacity-50" />
+                    </div>
+                    <p className="text-lg mb-2">Generate or upload an image</p>
+                    <p className="text-sm">Describe your image and click "Generate", or drag & drop your own artwork</p>
+                    <p className="text-xs mt-2 text-white/30">Supports JPEG and PNG</p>
                   </div>
                 </div>
               )}
