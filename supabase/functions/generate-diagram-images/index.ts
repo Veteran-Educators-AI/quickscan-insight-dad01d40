@@ -1321,31 +1321,54 @@ serve(async (req) => {
     const body = await req.json();
 
     // Support presentation-style and clipart image generation
-    // This path uses FAST SVG generation for all presentation art
+    // Presentations use REAL PNG/JPEG image generation (not SVG) for better compatibility
     if (body.prompt && (body.style === "clipart" || body.style === "presentation")) {
-      console.log(`Generating ${body.style} image with SVG generator...`);
+      console.log(`Generating ${body.style} image...`);
 
       const isPresentation = body.style === "presentation";
       const userPrompt = body.prompt;
       const topic = body.topic || "";
       const slideTitle = body.slideTitle || "";
 
-      // Generate fast, clean SVG for presentation art
-      const svgPrompt = isPresentation
-        ? `Create a clean, simple educational illustration for: ${userPrompt}
+      let imageUrl: string | null = null;
+
+      // For presentations, use the high-quality PNG/JPEG image generator
+      // This produces actual images that work everywhere (PowerPoint, Word, etc.)
+      if (isPresentation) {
+        console.log("Using Nano Banana Pro for PNG presentation image...");
+        
+        // Build a rich prompt for the image generator
+        const imagePrompt = `${userPrompt}
+
+${topic ? `Context: This is for a presentation about "${topic}".` : ""}
+${slideTitle ? `This image is for a slide titled "${slideTitle}".` : ""}
+
+Create a high-quality, professional educational illustration. Vibrant colors, clean design, suitable for classroom projection. No text, labels, or words in the image.`;
+
+        imageUrl = await generatePresentationImage(imagePrompt);
+        
+        if (imageUrl) {
+          console.log("Successfully generated PNG presentation image");
+        }
+      }
+
+      // Fallback to SVG only for clipart style or if PNG fails
+      if (!imageUrl) {
+        console.log("Using SVG fallback...");
+        const svgPrompt = isPresentation
+          ? `Create a clean, simple educational illustration for: ${userPrompt}
 ${topic ? `Topic: ${topic}` : ""}
 ${slideTitle ? `Slide: ${slideTitle}` : ""}
 
 Style: Simple line art, clean educational diagram suitable for projection.`
-        : userPrompt;
+          : userPrompt;
 
-      // Use the fast simple SVG generator
-      let imageUrl = await generatePresentationSVG(svgPrompt);
+        imageUrl = await generatePresentationSVG(svgPrompt);
 
-      // If SVG fails, try the simple B&W SVG generator
-      if (!imageUrl) {
-        console.log("Presentation SVG failed, trying simple B&W SVG...");
-        imageUrl = await generateSimpleSVGWithAI(svgPrompt);
+        if (!imageUrl) {
+          console.log("SVG failed, trying simple B&W SVG...");
+          imageUrl = await generateSimpleSVGWithAI(svgPrompt);
+        }
       }
 
       // Return imageUrl (null is acceptable - frontend should handle gracefully)
