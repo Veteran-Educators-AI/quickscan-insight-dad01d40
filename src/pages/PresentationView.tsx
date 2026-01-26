@@ -1508,13 +1508,23 @@ export default function PresentationView() {
                         }}
                       >
                         {slide.customImage?.url ? (
-                          // Generated image - fixed in placeholder location
+                          // Generated image - with seamless blending effects
                           <>
+                            {/* Soft glow backdrop for seamless integration */}
+                            <div 
+                              className="absolute inset-0 rounded-2xl blur-3xl opacity-40"
+                              style={{ 
+                                background: `radial-gradient(circle, ${colors.accentHex}40 0%, transparent 70%)`,
+                              }}
+                            />
                             <img 
                               src={slide.customImage.url} 
                               alt="Slide image"
-                              className="w-full h-full object-contain rounded-2xl shadow-2xl"
-                              style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.5))' }}
+                              className="relative w-full h-full object-contain rounded-2xl"
+                              style={{ 
+                                filter: 'drop-shadow(0 10px 30px rgba(0,0,0,0.3))',
+                                mixBlendMode: 'normal',
+                              }}
                               draggable={false}
                             />
                             

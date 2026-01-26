@@ -1915,13 +1915,21 @@ serve(async (req) => {
       if (isPresentation) {
         console.log("Using Nano Banana Pro for PNG presentation image...");
         
-        // Build a rich prompt for the image generator
+        // Build a rich prompt for the image generator - request transparent/seamless backgrounds
         const imagePrompt = `${userPrompt}
 
 ${topic ? `Context: This is for a presentation about "${topic}".` : ""}
 ${slideTitle ? `This image is for a slide titled "${slideTitle}".` : ""}
 
-Create a high-quality, professional educational illustration. Vibrant colors, clean design, suitable for classroom projection. No text, labels, or words in the image.`;
+CRITICAL STYLE REQUIREMENTS:
+- Create a high-quality, professional educational illustration
+- Use a TRANSPARENT or GRADIENT background that blends seamlessly with colorful slide backgrounds
+- DO NOT use a solid white, black, or single-color background
+- The subject should appear to float or blend naturally into any background
+- If background is needed, use soft gradients that fade to transparency at the edges
+- Vibrant colors, clean design, suitable for classroom projection
+- No text, labels, or words in the image
+- Think "sticker style" - the main subject should be clearly visible but blend into any colored backdrop`;
 
         imageUrl = await generatePresentationImage(imagePrompt);
         
