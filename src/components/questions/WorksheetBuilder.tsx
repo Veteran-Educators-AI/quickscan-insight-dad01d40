@@ -105,6 +105,79 @@ interface SavedWorksheet {
   is_shared: boolean;
 }
 
+// Convert SVG to PNG data URL for embedding in documents
+const svgToPngDataUrl = async (svgString: string, width: number = 200, height: number = 200): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (!svgString) {
+      reject(new Error('No SVG string provided'));
+      return;
+    }
+    
+    // If it's already a data URL or HTTP URL, return it
+    if (svgString.startsWith('data:image/png') || svgString.startsWith('http')) {
+      resolve(svgString);
+      return;
+    }
+    
+    // Create an image from the SVG
+    const img = new Image();
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        const pngDataUrl = canvas.toDataURL('image/png');
+        URL.revokeObjectURL(url);
+        resolve(pngDataUrl);
+      } else {
+        URL.revokeObjectURL(url);
+        reject(new Error('Could not get canvas context'));
+      }
+    };
+    
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load SVG image'));
+    };
+    
+    img.src = url;
+  });
+};
+
+// Helper function to fetch image as ArrayBuffer for Word document embedding
+const fetchImageAsArrayBuffer = async (imageUrl: string): Promise<ArrayBuffer | null> => {
+  try {
+    // Handle data URLs directly
+    if (imageUrl.startsWith('data:')) {
+      const base64Data = imageUrl.split(',')[1];
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+    
+    // Fetch external URL
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      console.error('Failed to fetch image:', response.statusText);
+      return null;
+    }
+    return await response.arrayBuffer();
+  } catch (error) {
+    console.error('Error fetching image as ArrayBuffer:', error);
+    return null;
+  }
+};
+
 // Page Break Indicator Component - shows where pages will split when printing
 const PageBreakIndicators = ({
   contentRef,
@@ -1893,6 +1966,100 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             spacing: { after: 150 },
           })
         );
+
+        // Add image/diagram if available (imageUrl, svg, or generate from imagePrompt)
+        if (question.imageUrl || question.svg || question.imagePrompt) {
+          try {
+            let imageData = question.imageUrl || '';
+            
+            // Convert SVG to PNG if only SVG is available
+            if (!imageData && question.svg) {
+              try {
+                imageData = await svgToPngDataUrl(question.svg, 300, 300);
+              } catch (svgErr) {
+                console.error('Error converting SVG to PNG for Word:', svgErr);
+              }
+            }
+            
+            // If still no image but we have an imagePrompt, generate on-demand
+            if (!imageData && question.imagePrompt) {
+              try {
+                const { data: genData } = await supabase.functions.invoke('generate-diagram-images', {
+                  body: {
+                    questions: [{ questionNumber: question.questionNumber, imagePrompt: question.imagePrompt }],
+                    useNanoBanana: true,
+                    preferDeterministicSVG: true,
+                  },
+                });
+                imageData = genData?.results?.[0]?.imageUrl || '';
+              } catch (genError) {
+                console.error('Error generating diagram on-demand for Word:', genError);
+              }
+            }
+            
+            // Embed the image if we have data
+            if (imageData) {
+              const imageBuffer = await fetchImageAsArrayBuffer(imageData);
+              if (imageBuffer) {
+                // Add diagram label
+                children.push(
+                  new Paragraph({
+                    children: [
+                      new TextRun({ text: '📐 Diagram', size: 16, color: '2563EB', italics: true }),
+                    ],
+                    spacing: { before: 50, after: 50 },
+                  })
+                );
+                
+                // Add the image - using user-configured size
+                const imageSizePx = Math.round(imageSize * 0.75); // Scale appropriately for Word
+                children.push(
+                  new Paragraph({
+                    children: [
+                      new ImageRun({
+                        data: imageBuffer,
+                        transformation: {
+                          width: imageSizePx,
+                          height: imageSizePx,
+                        },
+                        type: 'png',
+                      }),
+                    ],
+                    spacing: { before: 50, after: 100 },
+                  })
+                );
+              }
+            }
+          } catch (imgError) {
+            console.error('Error adding image to Word document:', imgError);
+          }
+        }
+
+        // Add clipart if available
+        if (question.clipartUrl) {
+          try {
+            const clipartBuffer = await fetchImageAsArrayBuffer(question.clipartUrl);
+            if (clipartBuffer) {
+              children.push(
+                new Paragraph({
+                  children: [
+                    new ImageRun({
+                      data: clipartBuffer,
+                      transformation: {
+                        width: 60,
+                        height: 60,
+                      },
+                      type: 'png',
+                    }),
+                  ],
+                  spacing: { before: 50, after: 50 },
+                })
+              );
+            }
+          } catch (clipartError) {
+            console.error('Error adding clipart to Word document:', clipartError);
+          }
+        }
 
         // Work area box (simplified for Word)
         if (showAnswerLines) {
