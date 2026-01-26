@@ -25,6 +25,8 @@ import { cn } from '@/lib/utils';
 import nycologicHeadLogo from '@/assets/nycologic-head-logo.png';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { HelpBot } from '@/components/HelpBot';
+import { useSchoolBranding } from '@/hooks/useSchoolBranding';
+import { getPoweredByBranding } from '@/lib/schoolBranding';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -46,6 +48,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const { revealRealNames, toggleRevealNames, remainingSeconds } = useStudentNames();
+  const { branding, isCustomBranding } = useSchoolBranding();
+  const poweredBy = getPoweredByBranding();
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -65,13 +69,23 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="container flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/dashboard" className="flex items-center gap-2">
-            <img 
-              src={nycologicHeadLogo} 
-              alt="NYClogic Ai" 
-              className="h-9 w-auto drop-shadow-[0_0_8px_rgba(220,38,38,0.3)] transition-transform duration-200 hover:scale-110"
-            />
-            <span className="font-display text-lg font-semibold text-foreground">
-              Nyclogic <span className="text-primary">Ai<sup className="text-[8px] align-super ml-0.5">™</sup></span>
+            {/* Logo stack: School logo in front, company logo as backdrop */}
+            <div className="relative flex items-center justify-center">
+              {isCustomBranding && (
+                <img 
+                  src={poweredBy.logo} 
+                  alt="Nyclogic Ai" 
+                  className="absolute h-12 w-auto opacity-15 -left-1 top-1/2 -translate-y-1/2"
+                />
+              )}
+              <img 
+                src={isCustomBranding ? branding.logo : nycologicHeadLogo} 
+                alt={isCustomBranding ? branding.name : "NYClogic Ai"} 
+                className="relative h-10 w-auto drop-shadow-[0_0_8px_rgba(139,92,246,0.3)] transition-transform duration-200 hover:scale-110 z-10"
+              />
+            </div>
+            <span className="font-display text-lg font-semibold text-foreground" style={{ fontFamily: "'Darker Grotesque', sans-serif" }}>
+              {branding.displayName} <span className="text-primary">{branding.aiSuffix}<sup className="text-[8px] align-super ml-0.5">™</sup></span>
             </span>
             <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded border border-amber-500/30">
               Beta
