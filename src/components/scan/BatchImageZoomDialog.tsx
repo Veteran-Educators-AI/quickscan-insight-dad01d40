@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, Move, AlertTriangle, MapPin, Check, X, Save, Brain, Loader2, Pencil } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, Move, AlertTriangle, MapPin, Check, X, Save, Brain, Loader2, Pencil, PenTool } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -18,6 +18,9 @@ import {
 import { ImageErrorOverlay, ErrorRegion } from './ImageErrorOverlay';
 import { extractErrorRegions } from './MisconceptionComparison';
 import { useMisconceptionFeedback, MisconceptionDecision } from '@/hooks/useMisconceptionFeedback';
+import { useAnnotations } from '@/hooks/useAnnotations';
+import { AnnotationToolbar } from './AnnotationToolbar';
+import { AnnotationCanvas } from './AnnotationCanvas';
 import { cn } from '@/lib/utils';
 
 interface BatchImageZoomDialogProps {
@@ -58,6 +61,7 @@ export function BatchImageZoomDialog({
   const [showAnnotations, setShowAnnotations] = useState(true);
   const [isEditingRegions, setIsEditingRegions] = useState(false);
   const [customRegions, setCustomRegions] = useState<Record<number, Partial<ErrorRegion>>>({});
+  const [isAnnotating, setIsAnnotating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -70,6 +74,24 @@ export function BatchImageZoomDialog({
     isSaving,
     hasDecisions,
   } = useMisconceptionFeedback();
+
+  // Annotation system
+  const {
+    annotations,
+    selectedId: selectedAnnotationId,
+    activeTool,
+    activeColor,
+    canUndo,
+    setSelectedId: setSelectedAnnotationId,
+    setActiveTool,
+    setActiveColor,
+    addAnnotation,
+    updateAnnotation,
+    deleteAnnotation,
+    undo: undoAnnotation,
+    clearAll: clearAllAnnotations,
+    resetAnnotations,
+  } = useAnnotations();
 
   // Extract error regions from misconceptions and merge with custom positions
   const baseErrorRegions = extractErrorRegions(misconceptions);
@@ -93,7 +115,9 @@ export function BatchImageZoomDialog({
     resetDecisions();
     setCustomRegions({});
     setIsEditingRegions(false);
-  }, [imageUrl, resetDecisions]);
+    setIsAnnotating(false);
+    resetAnnotations();
+  }, [imageUrl, resetDecisions, resetAnnotations]);
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 5));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.25));
@@ -138,6 +162,15 @@ export function BatchImageZoomDialog({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Don't process shortcuts if annotating (let annotation canvas handle them)
+    if (isAnnotating) {
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        undoAnnotation();
+      }
+      return;
+    }
+    
     if (e.key === 'ArrowLeft' && onNavigate && paperIndex > 0) {
       onNavigate('prev');
     } else if (e.key === 'ArrowRight' && onNavigate && paperIndex < totalPapers - 1) {
@@ -242,6 +275,36 @@ export function BatchImageZoomDialog({
             )}
           </DialogTitle>
           <div className="flex items-center gap-1">
+            {/* Annotate button - always available */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isAnnotating ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setIsAnnotating(!isAnnotating);
+                      if (!isAnnotating) {
+                        setIsEditingRegions(false);
+                      }
+                    }}
+                    className={cn(
+                      "h-7 px-2 gap-1",
+                      isAnnotating && "bg-primary"
+                    )}
+                  >
+                    <PenTool className="h-3 w-3" />
+                    {isAnnotating ? 'Done' : 'Annotate'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isAnnotating 
+                    ? 'Exit annotation mode' 
+                    : 'Mark mistakes on the paper'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             {/* Toggle annotations and edit mode */}
             {hasMisconceptions && (
               <div className="flex items-center gap-1 mr-2">
@@ -323,24 +386,40 @@ export function BatchImageZoomDialog({
           </div>
         </DialogHeader>
 
+        {/* Annotation toolbar - shown when annotating */}
+        {isAnnotating && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50">
+            <AnnotationToolbar
+              activeTool={activeTool}
+              activeColor={activeColor}
+              onToolChange={setActiveTool}
+              onColorChange={setActiveColor}
+              onUndo={undoAnnotation}
+              onClearAll={clearAllAnnotations}
+              canUndo={canUndo}
+              annotationCount={annotations.length}
+            />
+          </div>
+        )}
+
         <div className="flex h-[70vh]">
           {/* Main image area */}
           <div
             ref={containerRef}
             className={cn(
               "relative overflow-hidden bg-muted/30 flex-1",
-              zoom > 1 ? 'cursor-grab' : 'cursor-zoom-in',
-              isPanning && 'cursor-grabbing'
+              isAnnotating ? 'cursor-crosshair' : zoom > 1 ? 'cursor-grab' : 'cursor-zoom-in',
+              isPanning && !isAnnotating && 'cursor-grabbing'
             )}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onWheel={handleWheel}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onClick={() => {
+            onMouseDown={isAnnotating ? undefined : handleMouseDown}
+            onMouseMove={isAnnotating ? undefined : handleMouseMove}
+            onMouseUp={isAnnotating ? undefined : handleMouseUp}
+            onMouseLeave={isAnnotating ? undefined : handleMouseUp}
+            onWheel={isAnnotating ? undefined : handleWheel}
+            onTouchStart={isAnnotating ? undefined : handleTouchStart}
+            onTouchMove={isAnnotating ? undefined : handleTouchMove}
+            onTouchEnd={isAnnotating ? undefined : handleTouchEnd}
+            onClick={isAnnotating ? undefined : () => {
               if (zoom === 1) handleZoomIn();
             }}
           >
@@ -364,7 +443,7 @@ export function BatchImageZoomDialog({
                 />
                 
                 {/* Error region overlay */}
-                {showAnnotations && hasAnnotatableErrors && (
+                {showAnnotations && hasAnnotatableErrors && !isAnnotating && (
                   <ImageErrorOverlay
                     errorRegions={errorRegions}
                     highlightedError={highlightedError}
@@ -376,19 +455,59 @@ export function BatchImageZoomDialog({
                     isEditing={isEditingRegions}
                   />
                 )}
+
+                {/* Teacher annotation canvas */}
+                {isAnnotating && (
+                  <AnnotationCanvas
+                    annotations={annotations}
+                    activeTool={activeTool}
+                    activeColor={activeColor}
+                    onAnnotationAdd={addAnnotation}
+                    onAnnotationUpdate={updateAnnotation}
+                    onAnnotationDelete={deleteAnnotation}
+                    selectedId={selectedAnnotationId}
+                    onSelect={setSelectedAnnotationId}
+                    disabled={false}
+                  />
+                )}
+
+                {/* Show annotations even when not in annotation mode */}
+                {!isAnnotating && annotations.length > 0 && (
+                  <AnnotationCanvas
+                    annotations={annotations}
+                    activeTool="select"
+                    activeColor={activeColor}
+                    onAnnotationAdd={addAnnotation}
+                    onAnnotationUpdate={updateAnnotation}
+                    onAnnotationDelete={deleteAnnotation}
+                    selectedId={null}
+                    onSelect={() => {}}
+                    disabled={true}
+                  />
+                )}
               </div>
             </div>
 
             {/* Zoom hint overlay */}
-            {zoom === 1 && !hasMisconceptions && (
+            {zoom === 1 && !hasMisconceptions && !isAnnotating && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs text-muted-foreground flex items-center gap-2">
                 <Move className="h-3 w-3" />
                 Click or scroll to zoom • Drag to pan when zoomed
               </div>
             )}
 
+            {/* Annotation mode hint */}
+            {isAnnotating && annotations.length === 0 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/90 backdrop-blur-sm px-3 py-2 rounded-lg text-xs flex items-center gap-3 border shadow-lg">
+                <PenTool className="h-4 w-4 text-primary" />
+                <span className="text-muted-foreground">
+                  Draw on the paper to mark mistakes • Use toolbar to change tools & colors
+                </span>
+              </div>
+            )}
+
             {/* Annotation legend when showing errors */}
-            {showAnnotations && hasAnnotatableErrors && zoom === 1 && (
+            {showAnnotations && hasAnnotatableErrors && zoom === 1 && !isAnnotating && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/90 backdrop-blur-sm px-3 py-2 rounded-lg text-xs flex items-center gap-3 border shadow-lg">
                 <div className="flex items-center gap-1.5">
                   <div className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-500/20" />
@@ -408,7 +527,7 @@ export function BatchImageZoomDialog({
           </div>
 
           {/* Sidebar - Misconceptions list with confirm/dismiss */}
-          {hasMisconceptions && showAnnotations && (
+          {hasMisconceptions && showAnnotations && !isAnnotating && (
             <div className="w-80 border-l bg-background flex flex-col">
               <div className="p-3 border-b bg-muted/30">
                 <div className="flex items-center justify-between mb-2">
