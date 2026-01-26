@@ -280,8 +280,12 @@ export function ExportGroupPDFDialog({
       const pdf = new jsPDF('p', 'mm', 'letter');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 15;
-      const contentWidth = pageWidth - 2 * margin;
+      // Use proper margins: 19mm (0.75 inch) for left/right, 15mm for top/bottom
+      const marginLeft = 19;
+      const marginRight = 19;
+      const marginTop = 15;
+      const marginBottom = 15;
+      const contentWidth = pageWidth - marginLeft - marginRight;
 
       for (let i = 0; i < selectedStudentsList.length; i++) {
         const student = selectedStudentsList[i];
@@ -295,17 +299,17 @@ export function ExportGroupPDFDialog({
           pdf.addPage();
         }
 
-        let yPosition = margin;
+        let yPosition = marginTop;
 
         // Header
         pdf.setFontSize(18);
         pdf.setFont('helvetica', 'bold');
-        pdf.text(`Remediation - ${groupLabel}`, margin, yPosition);
+        pdf.text(`Remediation - ${groupLabel}`, marginLeft, yPosition);
         yPosition += 8;
 
         pdf.setFontSize(12);
         pdf.setFont('helvetica', 'normal');
-        pdf.text(`Name: ${student.studentName}`, margin, yPosition);
+        pdf.text(`Name: ${student.studentName}`, marginLeft, yPosition);
         
         // Add small QR code next to student name
         try {
@@ -313,24 +317,24 @@ export function ExportGroupPDFDialog({
           const qrDataUrl = await generateQRCodeDataUrl(student.studentId, worksheetId, 80);
           const qrSize = 12; // smaller QR for header
           const nameWidth = pdf.getTextWidth(`Name: ${student.studentName}`);
-          pdf.addImage(qrDataUrl, 'PNG', margin + nameWidth + 3, yPosition - 8, qrSize, qrSize);
+          pdf.addImage(qrDataUrl, 'PNG', marginLeft + nameWidth + 3, yPosition - 8, qrSize, qrSize);
         } catch (qrError) {
           console.error('Error generating header QR code:', qrError);
         }
         
         yPosition += 6;
-        pdf.text(`Performance: ${student.overallMastery}%`, margin, yPosition);
+        pdf.text(`Performance: ${student.overallMastery}%`, marginLeft, yPosition);
         yPosition += 6;
 
         // Date line
-        pdf.text('Date: _______________', pageWidth - margin - 50, yPosition - 12);
-        pdf.text('Period: ____________', pageWidth - margin - 50, yPosition - 6);
+        pdf.text('Date: _______________', pageWidth - marginRight - 50, yPosition - 12);
+        pdf.text('Period: ____________', pageWidth - marginRight - 50, yPosition - 6);
 
         // Divider
         yPosition += 4;
         pdf.setDrawColor(0);
         pdf.setLineWidth(0.5);
-        pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+        pdf.line(marginLeft, yPosition, pageWidth - marginRight, yPosition);
         yPosition += 8;
 
         // Personalized weak topics for this student
@@ -347,7 +351,7 @@ export function ExportGroupPDFDialog({
           if (studentWeakTopicNames.length > 0) {
             pdf.setFontSize(10);
             pdf.setFont('helvetica', 'italic');
-            pdf.text(`Focus areas: ${studentWeakTopicNames.join(', ')}`, margin, yPosition);
+            pdf.text(`Focus areas: ${studentWeakTopicNames.join(', ')}`, marginLeft, yPosition);
             yPosition += 8;
           }
         }
@@ -357,28 +361,28 @@ export function ExportGroupPDFDialog({
           const question = studentQuestions[qIdx];
 
           // Check if we need a new page
-          if (yPosition > pageHeight - 60) {
+          if (yPosition > pageHeight - marginBottom - 60) {
             pdf.addPage();
-            yPosition = margin;
+            yPosition = marginTop;
           }
 
           // Question number
           pdf.setFontSize(12);
           pdf.setFont('helvetica', 'bold');
-          pdf.text(`${qIdx + 1}.`, margin, yPosition);
+          pdf.text(`${qIdx + 1}.`, marginLeft, yPosition);
 
           // Topic badge
           if (question.topicName) {
             pdf.setFontSize(8);
             pdf.setFont('helvetica', 'italic');
-            pdf.text(`[${question.topicName}]`, margin + 10, yPosition);
+            pdf.text(`[${question.topicName}]`, marginLeft + 10, yPosition);
           }
 
           // JMAP ID if available
           if (question.jmap_id) {
             pdf.setFontSize(8);
             pdf.setFont('helvetica', 'normal');
-            pdf.text(`(${question.jmap_id})`, pageWidth - margin - 20, yPosition);
+            pdf.text(`(${question.jmap_id})`, pageWidth - marginRight - 20, yPosition);
           }
 
           yPosition += 6;
@@ -387,12 +391,21 @@ export function ExportGroupPDFDialog({
           if (question.prompt_text) {
             pdf.setFontSize(10); // Slightly smaller for better fit
             pdf.setFont('helvetica', 'normal');
-            // Use 85% of content width to prevent text overflow
+            // Apply encoding fix and sanitization before PDF rendering
             const sanitizedPrompt = formatPdfMathText(question.prompt_text);
-            const textLines = pdf.splitTextToSize(sanitizedPrompt, contentWidth * 0.85);
+            // Use 90% of content width for proper text wrapping
+            const maxTextWidth = contentWidth * 0.9;
+            const textLines = pdf.splitTextToSize(sanitizedPrompt, maxTextWidth);
             textLines.forEach((line: string) => {
-              pdf.text(line, margin + 5, yPosition);
-              yPosition += 4.5;
+              // Additional cleanup for any remaining encoding issues
+              const cleanLine = line
+                .replace(/Â\s*"H/gi, 'π')
+                .replace(/Â\s*\[\s*\]/gi, 'π')
+                .replace(/Â(?=\s|$)/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+              pdf.text(cleanLine, marginLeft + 8, yPosition);
+              yPosition += 5;
             });
             pdf.setFontSize(11); // Reset
           }
@@ -403,11 +416,11 @@ export function ExportGroupPDFDialog({
           const boxHeight = 35;
           pdf.setDrawColor(180);
           pdf.setLineWidth(0.3);
-          pdf.rect(margin, yPosition, contentWidth, boxHeight);
+          pdf.rect(marginLeft, yPosition, contentWidth, boxHeight);
           
           pdf.setFontSize(8);
           pdf.setTextColor(150);
-          pdf.text('Show your work:', margin + 3, yPosition + 5);
+          pdf.text('Show your work:', marginLeft + 3, yPosition + 5);
           pdf.setTextColor(0);
 
           yPosition += boxHeight + 10;
@@ -418,8 +431,8 @@ export function ExportGroupPDFDialog({
         pdf.setTextColor(150);
         pdf.text(
           `${student.studentName} | ${groupLabel} | Page ${i + 1} of ${selectedStudentsList.length}`,
-          margin,
-          pageHeight - 10
+          marginLeft,
+          pageHeight - marginBottom
         );
         pdf.setTextColor(0);
       }
