@@ -12,16 +12,22 @@ export interface ImageSuggestion {
 }
 
 // Helper to create rich prompts that incorporate the topic and slide title
+// Now generates a pure topic description without presentation meta-language
 export function createTopicSpecificPrompt(
   basePrompt: string,
   topic: string,
   slideTitle: string
 ): string {
+  // Clean up the slide title to extract the core concept
+  const cleanTitle = slideTitle.replace(/\*\*/g, '').replace(/["']/g, '');
+  
   return `${basePrompt}
 
-This illustration is specifically for a presentation about "${topic}" with the current slide titled "${slideTitle}". The imagery should directly support and enhance the educational content being presented. Ensure the visual style matches the academic subject matter and is appropriate for classroom use with high school students. The image should be thought-provoking and help students understand the concept being taught.
+Create a vivid, detailed illustration about ${cleanTitle} within the context of ${topic}. Focus entirely on representing the subject matter itself - the concepts, processes, structures, or ideas involved. Show the actual content that students need to understand.
 
-Technical specifications: High resolution, 16:10 aspect ratio optimized for presentation slides, no text or labels in the image, professional educational illustration style, clean composition with clear focal point, appropriate color palette for the subject matter.`;
+For example, if the topic is about cell division, show the actual biological process with chromosomes, spindle fibers, and cell membranes. If it's about a historical event, depict the scene, people, and setting. If it's a literary theme, visualize the metaphors and emotional content.
+
+The image should be educational and scientifically/historically/thematically accurate. Use vibrant, engaging colors appropriate to the subject. Professional quality suitable for classroom use with high school students. No text, labels, or words in the image. High resolution with clear focal point.`;
 }
 
 // English Literature & ELA suggestions
