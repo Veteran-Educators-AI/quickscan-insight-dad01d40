@@ -1185,7 +1185,47 @@ export default function PresentationView() {
                   </motion.div>
                 )}
                 
-                {/* Slides are content-focused - images are added on-the-fly by presenter */}
+                {/* Clickable placeholder when no image - opens image generator */}
+                {!slide.customImage?.url && (
+                  <button
+                    onClick={() => setShowImageGenerator(true)}
+                    className="absolute left-8 top-1/2 -translate-y-1/2 group p-8 rounded-2xl border-2 border-dashed border-white/30 hover:border-white/60 transition-all duration-300 hover:bg-white/10 cursor-pointer min-w-[200px] min-h-[180px] z-10"
+                    style={{
+                      background: `linear-gradient(135deg, ${colors.accentHex}20, ${colors.accentHex}08)`,
+                    }}
+                  >
+                    <div className="flex flex-col items-center gap-4">
+                      <div 
+                        className="p-4 rounded-full transition-all duration-300 group-hover:scale-110"
+                        style={{ 
+                          background: `linear-gradient(135deg, ${colors.accentHex}40, ${colors.accentHex}15)`,
+                        }}
+                      >
+                        {IconComponent ? (
+                          <IconComponent 
+                            className="h-10 w-10 md:h-14 md:w-14" 
+                            style={{ color: colors.accentHex, opacity: 0.8 }}
+                          />
+                        ) : (
+                          <ImagePlus 
+                            className="h-10 w-10 md:h-14 md:w-14" 
+                            style={{ color: colors.accentHex, opacity: 0.8 }}
+                          />
+                        )}
+                      </div>
+                      <span 
+                        className="text-sm font-semibold tracking-wider uppercase transition-all duration-300 group-hover:tracking-widest"
+                        style={{ color: colors.accentHex }}
+                      >
+                        + Add Image
+                      </span>
+                      <span className="text-xs text-white/50 group-hover:text-white/70 transition-colors">
+                        Click to generate or upload
+                      </span>
+                    </div>
+                  </button>
+                )}
+
 
                 <motion.h1
                   initial={{ opacity: 0, y: 30 }}
