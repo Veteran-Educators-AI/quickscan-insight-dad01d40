@@ -146,48 +146,95 @@ const svgToDataUri = (svg: string): string => {
 };
 
 // Convert SVG to PNG data URL for PDF embedding
-const svgToPngDataUrl = async (svgString: string, width: number = 200, height: number = 200): Promise<string> => {
+const svgToPngDataUrl = async (svgInput: string, width: number = 200, height: number = 200): Promise<string> => {
   return new Promise((resolve, reject) => {
-    if (!svgString) {
-      reject(new Error('No SVG string provided'));
+    if (!svgInput) {
+      reject(new Error('No SVG input provided'));
       return;
     }
     
-    // If it's already a data URL or HTTP URL, return it
-    if (svgString.startsWith('data:image/png') || svgString.startsWith('http')) {
-      resolve(svgString);
+    // If it's already a PNG or JPEG data URL, return it as-is
+    if (svgInput.startsWith('data:image/png') || svgInput.startsWith('data:image/jpeg')) {
+      resolve(svgInput);
       return;
     }
     
-    // Create an image from the SVG
+    // Create an image element
     const img = new Image();
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
+    img.crossOrigin = 'anonymous';
+    
+    let objectUrl: string | null = null;
+    
+    // Set a timeout to prevent hanging
+    const timeoutId = setTimeout(() => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      reject(new Error('Image load timeout'));
+    }, 10000);
     
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-        const pngDataUrl = canvas.toDataURL('image/png');
-        URL.revokeObjectURL(url);
-        resolve(pngDataUrl);
-      } else {
-        URL.revokeObjectURL(url);
-        reject(new Error('Could not get canvas context'));
+      clearTimeout(timeoutId);
+      try {
+        const canvas = document.createElement('canvas');
+        const naturalWidth = img.naturalWidth || img.width || width;
+        const naturalHeight = img.naturalHeight || img.height || height;
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = 'white';
+          ctx.fillRect(0, 0, width, height);
+          
+          // Scale image to fit while maintaining aspect ratio
+          const scale = Math.min(width / naturalWidth, height / naturalHeight);
+          const scaledWidth = naturalWidth * scale;
+          const scaledHeight = naturalHeight * scale;
+          const x = (width - scaledWidth) / 2;
+          const y = (height - scaledHeight) / 2;
+          
+          ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
+          const pngDataUrl = canvas.toDataURL('image/png', 1.0);
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          resolve(pngDataUrl);
+        } else {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          reject(new Error('Could not get canvas context'));
+        }
+      } catch (err) {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        reject(err);
       }
     };
     
     img.onerror = () => {
-      URL.revokeObjectURL(url);
+      clearTimeout(timeoutId);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
       reject(new Error('Failed to load SVG'));
     };
     
-    img.src = url;
+    // Handle different input types
+    if (svgInput.startsWith('data:image/svg+xml')) {
+      // SVG data URL - use directly
+      img.src = svgInput;
+    } else if (svgInput.startsWith('http://') || svgInput.startsWith('https://')) {
+      // HTTP URL - try to load and convert via canvas
+      img.src = svgInput;
+    } else if (svgInput.startsWith('<svg') || svgInput.includes('xmlns') || svgInput.includes('<svg')) {
+      // Raw SVG string - create blob URL
+      let svgContent = svgInput.trim();
+      if (!svgContent.startsWith('<?xml')) {
+        svgContent = '<?xml version="1.0" encoding="UTF-8"?>' + svgContent;
+      }
+      if (!svgContent.includes('xmlns=')) {
+        svgContent = svgContent.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
+      const svgBlob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+      objectUrl = URL.createObjectURL(svgBlob);
+      img.src = objectUrl;
+    } else {
+      // Unknown format, try using as-is
+      img.src = svgInput;
+    }
   });
 };
 
@@ -901,25 +948,76 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             
             if (finalShapeUrl || ((q.imageUrl || q.svg) && includeGeometry)) {
               try {
-                let imageData = finalShapeUrl || q.imageUrl || '';
-                if (!imageData && q.svg && !q.imageUrl) {
+                let imageData = '';
+                
+                // Priority 1: Use pre-generated shape URL
+                if (finalShapeUrl) {
+                  // Check if it's SVG that needs conversion
+                  const isSvg = finalShapeUrl.startsWith('data:image/svg') || 
+                               finalShapeUrl.startsWith('<svg') || 
+                               finalShapeUrl.includes('xmlns="http://www.w3.org/2000/svg"');
+                  if (isSvg) {
+                    imageData = await svgToPngDataUrl(finalShapeUrl, 200, 200);
+                  } else {
+                    imageData = finalShapeUrl;
+                  }
+                }
+                
+                // Priority 2: Use existing imageUrl
+                if (!imageData && q.imageUrl && includeGeometry) {
+                  const isSvg = q.imageUrl.startsWith('data:image/svg') || 
+                               q.imageUrl.startsWith('<svg');
+                  if (isSvg) {
+                    imageData = await svgToPngDataUrl(q.imageUrl, 200, 200);
+                  } else if (q.imageUrl.startsWith('data:image/png') || q.imageUrl.startsWith('data:image/jpeg')) {
+                    imageData = q.imageUrl;
+                  } else {
+                    // External URL - convert via canvas
+                    try {
+                      imageData = await svgToPngDataUrl(q.imageUrl, 200, 200);
+                    } catch {
+                      imageData = q.imageUrl;
+                    }
+                  }
+                }
+                
+                // Priority 3: Convert raw SVG string
+                if (!imageData && q.svg && !q.imageUrl && includeGeometry) {
                   imageData = await svgToPngDataUrl(q.svg, 200, 200);
                 }
-                // If still no image but we have an imagePrompt, generate on-demand
+                
+                // Priority 4: Generate from imagePrompt on-demand
                 if (!imageData && q.imagePrompt && includeGeometry) {
                   try {
-                    const { data: genData } = await supabase.functions.invoke('generate-diagram-images', {
+                    console.log('Generating diagram for Word doc:', q.imagePrompt.substring(0, 50));
+                    const { data: genData, error: genError } = await supabase.functions.invoke('generate-diagram-images', {
                       body: {
                         questions: [{ questionNumber: 1, imagePrompt: q.imagePrompt }],
-                        useNanoBanana: useAIImages,
+                        useNanoBanana: false, // Use simple B&W SVG for worksheets
                         preferDeterministicSVG: preferDeterministicSVG,
                       },
                     });
-                    imageData = genData?.results?.[0]?.imageUrl || '';
+                    
+                    if (genError) {
+                      console.error('Edge function error:', genError);
+                    } else {
+                      const generatedUrl = genData?.results?.[0]?.imageUrl || '';
+                      if (generatedUrl) {
+                        // Always convert to PNG for Word compatibility
+                        const isGenSvg = generatedUrl.startsWith('data:image/svg') || 
+                                        generatedUrl.startsWith('<svg');
+                        if (isGenSvg) {
+                          imageData = await svgToPngDataUrl(generatedUrl, 200, 200);
+                        } else {
+                          imageData = generatedUrl;
+                        }
+                      }
+                    }
                   } catch (genError) {
                     console.error('Error generating shape on-demand for Word:', genError);
                   }
                 }
+                
                 if (imageData) {
                   const imageBuffer = await fetchImageAsArrayBuffer(imageData);
                   if (imageBuffer) {
