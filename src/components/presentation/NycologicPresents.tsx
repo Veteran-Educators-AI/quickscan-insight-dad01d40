@@ -122,6 +122,15 @@ const themeGlowColors: Record<string, string> = {
   'candy-pop': 'rgba(244, 114, 182, 0.4)',
 };
 
+// Helper to convert markdown bold markers to styled highlights
+const formatBoldText = (text: string, accentColor: string): string => {
+  if (!text) return '';
+  // Replace **text** with styled span, handling any whitespace variations
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, `<span style="color: ${accentColor}">$1</span>`)
+    .replace(/\*\*/g, ''); // Remove any remaining unpaired ** markers
+};
+
 export function NycologicPresents({ 
   presentation: initialPresentation, 
   onClose,
@@ -675,10 +684,7 @@ export function NycologicPresents({
                     onClick={() => isEditing && setEditingField('subtitle')}
                     className={isEditing ? 'cursor-text hover:underline' : ''}
                     dangerouslySetInnerHTML={{ 
-                      __html: slide.subtitle.replace(
-                        /\*\*(.*?)\*\*/g, 
-                        `<span style="color: ${colors.accentHex}">$1</span>`
-                      )
+                      __html: formatBoldText(slide.subtitle, colors.accentHex)
                     }}
                   />
                 )}
@@ -706,10 +712,7 @@ export function NycologicPresents({
                   onClick={() => isEditing && setEditingField('title')}
                   className={isEditing ? 'cursor-text hover:underline' : ''}
                   dangerouslySetInnerHTML={{ 
-                    __html: slide.title.replace(
-                      /\*\*(.*?)\*\*/g, 
-                      `<span style="color: ${colors.accentHex}">$1</span>`
-                    )
+                    __html: formatBoldText(slide.title, colors.accentHex)
                   }}
                 />
               )}
@@ -753,10 +756,7 @@ export function NycologicPresents({
                           isEditing ? 'cursor-text hover:text-white' : ''
                         )}
                         dangerouslySetInnerHTML={{ 
-                          __html: item.replace(
-                            /\*\*(.*?)\*\*/g, 
-                            `<span style="color: ${colors.accentHex}">$1</span>`
-                          )
+                          __html: formatBoldText(item, colors.accentHex)
                         }}
                       />
                     )}
@@ -777,10 +777,7 @@ export function NycologicPresents({
                   <p 
                     className="text-2xl md:text-3xl text-white font-medium leading-relaxed"
                     dangerouslySetInnerHTML={{ 
-                      __html: slide.question.prompt.replace(
-                        /\*\*(.*?)\*\*/g, 
-                        `<span style="color: ${colors.accentHex}">$1</span>`
-                      )
+                      __html: formatBoldText(slide.question.prompt, colors.accentHex)
                     }}
                   />
                 </div>
