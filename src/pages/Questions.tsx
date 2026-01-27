@@ -592,6 +592,22 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                         description: `Added ${questions.length} questions to your worksheet`,
                       });
                     }}
+                    onSelectLesson={(lesson) => {
+                      // Create topic from pacing calendar lesson
+                      setSelectedLessonTopic({
+                        topicName: lesson.lessonName,
+                        standard: lesson.standards[0] || '',
+                        subject: lesson.subject,
+                      });
+                      // Use midnight theme for Geometry
+                      const theme = PRESENTATION_THEMES.find(t => t.id === 'midnight') || PRESENTATION_THEMES[0];
+                      setSelectedTheme(theme);
+                      setShowLessonGenerator(true);
+                      toast({
+                        title: 'Drafting Lesson Plan',
+                        description: `Creating presentation for "${lesson.lessonName}" (Unit ${lesson.unitNumber})`,
+                      });
+                    }}
                   />
                 )}
               </>

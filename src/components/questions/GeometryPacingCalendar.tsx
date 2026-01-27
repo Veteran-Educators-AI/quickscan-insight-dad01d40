@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, ChevronDown, ChevronRight, BookOpen, Target, Clock, FileText } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronRight, BookOpen, Target, Clock, FileText, Presentation } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,11 +7,20 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { GEOMETRY_PACING_CALENDAR, type PacingUnit } from '@/data/geometryPacingCalendar';
 
-interface GeometryPacingCalendarProps {
-  onSelectUnit?: (unit: PacingUnit) => void;
+export interface LessonDraft {
+  lessonName: string;
+  unitTitle: string;
+  unitNumber: number;
+  standards: string[];
+  subject: string;
 }
 
-export function GeometryPacingCalendar({ onSelectUnit }: GeometryPacingCalendarProps) {
+interface GeometryPacingCalendarProps {
+  onSelectUnit?: (unit: PacingUnit) => void;
+  onSelectLesson?: (lesson: LessonDraft) => void;
+}
+
+export function GeometryPacingCalendar({ onSelectUnit, onSelectLesson }: GeometryPacingCalendarProps) {
   const [expandedUnits, setExpandedUnits] = useState<Set<number>>(new Set());
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(true);
 
@@ -25,6 +34,18 @@ export function GeometryPacingCalendar({ onSelectUnit }: GeometryPacingCalendarP
       }
       return next;
     });
+  };
+
+  const handleLessonClick = (lesson: string, unit: PacingUnit) => {
+    if (onSelectLesson) {
+      onSelectLesson({
+        lessonName: lesson,
+        unitTitle: unit.title,
+        unitNumber: unit.unitNumber,
+        standards: unit.standards,
+        subject: 'Geometry',
+      });
+    }
   };
 
   // Filter out omitted units for display
@@ -101,11 +122,23 @@ export function GeometryPacingCalendar({ onSelectUnit }: GeometryPacingCalendarP
                           <h5 className="font-medium text-xs text-muted-foreground mb-2 flex items-center gap-1">
                             <BookOpen className="h-3 w-3" />
                             Lessons
+                            {onSelectLesson && (
+                              <span className="ml-1 text-indigo-500">(click to draft)</span>
+                            )}
                           </h5>
                           <ul className="space-y-1">
                             {unit.lessons.map((lesson, idx) => (
-                              <li key={idx} className="text-xs text-foreground/80 pl-2 border-l-2 border-indigo-200 dark:border-indigo-700">
-                                {lesson}
+                              <li 
+                                key={idx} 
+                                className={`text-xs text-foreground/80 pl-2 border-l-2 border-indigo-200 dark:border-indigo-700 flex items-center justify-between group ${
+                                  onSelectLesson ? 'cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-r py-1 pr-2 -mr-2' : ''
+                                }`}
+                                onClick={() => handleLessonClick(lesson, unit)}
+                              >
+                                <span>{lesson}</span>
+                                {onSelectLesson && (
+                                  <Presentation className="h-3 w-3 text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                )}
                               </li>
                             ))}
                           </ul>
