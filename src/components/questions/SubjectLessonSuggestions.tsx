@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ChevronRight, Clock, Target, Sparkles, Brain, FileText, BookOpen, Calculator, Atom, Globe, Scale, DollarSign, Dna, Mountain } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ interface SubjectLessonSuggestionsProps {
   subject: string;
   subjectId: string;
   categories: TopicCategory[];
+  searchQuery?: string;
   onSelectTopic?: (topic: JMAPTopic, category: TopicCategory) => void;
   onGenerateQuestions?: (questions: GeneratedQuestion[]) => void;
 }
@@ -97,6 +98,7 @@ export function SubjectLessonSuggestions({
   subject,
   subjectId,
   categories,
+  searchQuery = '',
   onSelectTopic,
   onGenerateQuestions,
 }: SubjectLessonSuggestionsProps) {
@@ -109,6 +111,39 @@ export function SubjectLessonSuggestions({
   const colors = SUBJECT_COLORS[subjectId] || SUBJECT_COLORS.algebra1;
   const icon = SUBJECT_ICONS[subjectId] || <BookOpen className="h-5 w-5" />;
 
+  // Filter categories and topics based on search query
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) return categories;
+    
+    const lowerQuery = searchQuery.toLowerCase();
+    
+    return categories
+      .map(category => {
+        // Check if category name matches
+        const categoryMatches = category.category.toLowerCase().includes(lowerQuery);
+        
+        // Filter topics within this category
+        const filteredTopics = category.topics.filter(topic =>
+          topic.name.toLowerCase().includes(lowerQuery) ||
+          topic.standard.toLowerCase().includes(lowerQuery) ||
+          categoryMatches
+        );
+        
+        // Return category with filtered topics if any match
+        if (filteredTopics.length > 0) {
+          return { ...category, topics: filteredTopics };
+        }
+        return null;
+      })
+      .filter((cat): cat is TopicCategory => cat !== null);
+  }, [categories, searchQuery]);
+
+  // Auto-expand categories when searching
+  useEffect(() => {
+    if (searchQuery.trim() && filteredCategories.length > 0) {
+      setExpandedCategories(new Set(filteredCategories.map(c => c.category)));
+    }
+  }, [searchQuery, filteredCategories]);
   const toggleCategory = (categoryName: string) => {
     setExpandedCategories(prev => {
       const next = new Set(prev);
@@ -145,6 +180,11 @@ export function SubjectLessonSuggestions({
           <div className="flex items-center gap-2">
             <div className={colors.text}>{icon}</div>
             <CardTitle className="text-lg">{subject} Lesson Suggestions</CardTitle>
+            {searchQuery.trim() && (
+              <Badge variant="secondary" className="ml-auto">
+                {filteredCategories.reduce((acc, c) => acc + c.topics.length, 0)} results
+              </Badge>
+            )}
           </div>
           <CardDescription>
             Topic-based lessons with question generation for {subject}
@@ -152,8 +192,14 @@ export function SubjectLessonSuggestions({
         </CardHeader>
         <CardContent className="pt-4">
         <ScrollArea className="h-[500px] pr-2">
+          {filteredCategories.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>No lessons match "{searchQuery}"</p>
+            </div>
+          ) : (
           <div className="space-y-3">
-            {categories.map((category) => {
+            {filteredCategories.map((category) => {
               const isExpanded = expandedCategories.has(category.category);
               const topicCount = category.topics.length;
 
@@ -268,6 +314,7 @@ export function SubjectLessonSuggestions({
               );
             })}
           </div>
+          )}
         </ScrollArea>
       </CardContent>
 

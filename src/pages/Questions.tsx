@@ -502,12 +502,13 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
               />
             </div>
 
-            {/* Subject Lesson Suggestions - Show for all subjects when not searching */}
-            {!searchQuery.trim() && currentSubject && (
+            {/* Subject Lesson Suggestions - Always show, with filtering when searching */}
+            {currentSubject && (
               <>
                 {/* English Literature has its own specialized component */}
                 {selectedSubject === 'english' ? (
                   <EnglishLiteratureSuggestions 
+                    searchQuery={searchQuery}
                     onSelectLesson={(lesson) => {
                       setSelectedLessonTopic({
                         topicName: lesson.title,
@@ -544,6 +545,7 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
                     subject={currentSubject.name}
                     subjectId={currentSubject.id}
                     categories={currentSubject.categories}
+                    searchQuery={searchQuery}
                     onSelectTopic={(topic, category) => {
                       setSelectedLessonTopic({
                         topicName: topic.name,
