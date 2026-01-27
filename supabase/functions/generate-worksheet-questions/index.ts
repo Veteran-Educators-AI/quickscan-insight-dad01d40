@@ -1133,46 +1133,76 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         [/tan²\s*,/g, 'tan²θ'],
         
         // ============================================================
-        // SUBSCRIPT CORRUPTION PATTERNS
-        // w• should be w₁, w, should be w₂, wƒ should be w₃, etc.
+        // CRITICAL FIX: Remove spurious _2, _n patterns in wrong places
+        // These appear when AI generates corrupted text like "cm_2", "water_2"
         // ============================================================
         
-        // Subscript 1 corruption (• bullet often replaces ₁)
-        [/([a-zA-Z])•/g, '$1₁'],           // w• -> w₁
-        [/([a-zA-Z])â€¢/g, '$1₁'],          // mojibake bullet
-        [/([a-zA-Z])\u2022/g, '$1₁'],       // unicode bullet
-        [/([a-zA-Z])·/g, '$1₁'],            // middle dot
-        [/([a-zA-Z])¹/g, '$1₁'],            // superscript 1 -> subscript 1
+        // Remove _2, _n etc from WORDS (not single letters) - these are corruption
+        // Patterns like "meters_2", "capacity_2", "First_2", "water_2" should be cleaned
+        [/(\w{2,})_2\b/g, '$1'],           // words ending in _2 -> remove
+        [/(\w{2,})_1\b/g, '$1'],           // words ending in _1 -> remove  
+        [/(\w{2,})_3\b/g, '$1'],           // words ending in _3 -> remove
+        [/(\w{2,})_n\b/gi, '$1'],          // words ending in _n -> remove
+        [/(\w{2,})_0\b/g, '$1'],           // words ending in _0 -> remove
         
-        // Subscript 2 corruption (, comma often replaces ₂)
-        [/([a-zA-Z]),\s*(?=and|or|\+|-|=|is|the|that|when|if)/gi, '$1₂ '],  // w, and -> w₂ and
-        [/([a-zA-Z]),(?=\s+[a-zA-Z])/g, '$1₂'],   // w, w -> w₂ w
-        [/([a-zA-Z])²(?=\s+and|\s+or)/gi, '$1₂'], // w² and -> w₂ and (context-aware)
+        // Fix split words (space corruption) - "formu la" -> "formula", "calcu late" -> "calculate"
+        [/\bformu\s+la\b/gi, 'formula'],
+        [/\bfirst\s*_?\s*2?\s*,?\s*calculate\b/gi, 'First, calculate'],
+        [/\bcalcu\s+late\b/gi, 'calculate'],
+        [/\brect\s+angle\b/gi, 'rectangle'],
+        [/\bcy\s+linder\b/gi, 'cylinder'],
+        [/\bcylin\s+drical\b/gi, 'cylindrical'],
+        [/\bpris\s+m\b/gi, 'prism'],
+        [/\bvol\s+ume\b/gi, 'volume'],
+        [/\bca\s+pacity\b/gi, 'capacity'],
+        [/\bra\s+dius\b/gi, 'radius'],
+        [/\bdia\s+meter\b/gi, 'diameter'],
+        [/\bheig\s+ht\b/gi, 'height'],
+        [/\bwid\s+th\b/gi, 'width'],
+        [/\blen\s+gth\b/gi, 'length'],
+        [/\bcir\s+cle\b/gi, 'circle'],
+        [/\bsqu\s+are\b/gi, 'square'],
+        [/\btri\s+angle\b/gi, 'triangle'],
+        [/\bperi\s+meter\b/gi, 'perimeter'],
+        [/\bare\s+a\b/gi, 'area'],
+        [/\bsur\s+face\b/gi, 'surface'],
+        [/\bcub\s+ic\b/gi, 'cubic'],
+        [/\bme\s+ters?\b/gi, 'meter$1'],
+        [/\bwa\s+ter\b/gi, 'water'],
         
-        // Subscript 3 corruption (ƒ often replaces ₃ or f)
-        [/([a-zA-Z])ƒ/g, '$1₃'],            // wƒ -> w₃ (or could be wf)
-        [/([a-zA-Z])Æ'/g, '$1₃'],           // mojibake for ƒ
+        // Remove orphaned _2 at word boundaries that didn't get caught
+        [/\s_2\s/g, ' '],
+        [/\s_1\s/g, ' '],
+        [/\s_n\s/gi, ' '],
         
-        // Direct subscript number patterns
-        [/_1\b/g, '₁'],
-        [/_2\b/g, '₂'],
-        [/_3\b/g, '₃'],
-        [/_4\b/g, '₄'],
-        [/_5\b/g, '₅'],
-        [/_n\b/gi, 'ₙ'],
-        [/_0\b/g, '₀'],
+        // ============================================================
+        // SUBSCRIPT CORRUPTION PATTERNS - ONLY for single letter variables
+        // w• should be w₁, etc. - these are VALID subscripts for variables
+        // ============================================================
         
-        // Common variable subscript patterns
-        [/x_1/gi, 'x₁'],
-        [/x_2/gi, 'x₂'],
-        [/y_1/gi, 'y₁'],
-        [/y_2/gi, 'y₂'],
-        [/a_1/gi, 'a₁'],
-        [/a_2/gi, 'a₂'],
-        [/a_n/gi, 'aₙ'],
-        [/w_1/gi, 'w₁'],
-        [/w_2/gi, 'w₂'],
-        [/w_3/gi, 'w₃'],
+        // Subscript 1 corruption (• bullet often replaces ₁) - ONLY for single letters
+        [/\b([a-zA-Z])•/g, '$1₁'],           // w• -> w₁
+        [/\b([a-zA-Z])â€¢/g, '$1₁'],          // mojibake bullet
+        [/\b([a-zA-Z])\u2022/g, '$1₁'],       // unicode bullet
+        [/\b([a-zA-Z])·(?=\s|$|[,;.])/g, '$1₁'],  // middle dot at word boundary
+        [/\b([a-zA-Z])¹(?=\s|$|[,;.])/g, '$1₁'],  // superscript 1 -> subscript 1
+        
+        // Subscript 2 corruption - only in specific variable contexts
+        // NOT general "_2" patterns which are handled above
+        [/\b([a-zA-Z])²(?=\s+and|\s+or)/gi, '$1₂'], // w² and -> w₂ and (context-aware)
+        
+        // Subscript 3 corruption (ƒ often replaces ₃ or f) - ONLY single letters
+        [/\b([a-zA-Z])ƒ/g, '$1₃'],            // wƒ -> w₃
+        [/\b([a-zA-Z])Æ'/g, '$1₃'],           // mojibake for ƒ
+        
+        // Direct subscript patterns - ONLY after single letters (variables like x₁, y₂)
+        [/\b([a-zA-Z])_1\b/g, '$1₁'],
+        [/\b([a-zA-Z])_2\b/g, '$1₂'],
+        [/\b([a-zA-Z])_3\b/g, '$1₃'],
+        [/\b([a-zA-Z])_4\b/g, '$1₄'],
+        [/\b([a-zA-Z])_5\b/g, '$1₅'],
+        [/\b([a-zA-Z])_n\b/gi, '$1ₙ'],
+        [/\b([a-zA-Z])_0\b/g, '$1₀'],
       ];
       
       for (const [pattern, replacement] of mojibakePatterns) {
