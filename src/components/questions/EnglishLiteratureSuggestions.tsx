@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { BookOpen, ChevronRight, Clock, Target, Sparkles, GraduationCap, Brain, Lightbulb, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,12 +18,14 @@ import {
 import { EnglishWorksheetGeneratorDialog, type GeneratedEnglishQuestion } from './EnglishWorksheetGeneratorDialog';
 
 interface EnglishLiteratureSuggestionsProps {
+  searchQuery?: string;
   onSelectLesson?: (lesson: LessonSuggestion) => void;
   onGenerateWorksheet?: (textId: string, questions: TextQuestion[]) => void;
   onGenerateAIQuestions?: (questions: GeneratedEnglishQuestion[]) => void;
 }
 
 export function EnglishLiteratureSuggestions({ 
+  searchQuery = '',
   onSelectLesson, 
   onGenerateWorksheet,
   onGenerateAIQuestions,
@@ -34,6 +36,31 @@ export function EnglishLiteratureSuggestions({
   const [showWorksheetGenerator, setShowWorksheetGenerator] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<LessonSuggestion | null>(null);
   const [preselectedLevel, setPreselectedLevel] = useState<'comprehension' | 'analysis' | 'higher-order' | undefined>(undefined);
+
+  // Filter texts based on search query
+  const filteredTexts = useMemo(() => {
+    if (!searchQuery.trim()) return LITERARY_TEXTS;
+    
+    const lowerQuery = searchQuery.toLowerCase();
+    
+    return LITERARY_TEXTS.filter(text =>
+      text.title.toLowerCase().includes(lowerQuery) ||
+      text.author.toLowerCase().includes(lowerQuery) ||
+      text.genre.toLowerCase().includes(lowerQuery) ||
+      text.themes.some(theme => theme.toLowerCase().includes(lowerQuery)) ||
+      getLessonsByText(text.id).some(lesson => 
+        lesson.title.toLowerCase().includes(lowerQuery) ||
+        lesson.description.toLowerCase().includes(lowerQuery)
+      )
+    );
+  }, [searchQuery]);
+
+  // Auto-expand texts when searching
+  useEffect(() => {
+    if (searchQuery.trim() && filteredTexts.length > 0) {
+      setExpandedTexts(new Set(filteredTexts.map(t => t.id)));
+    }
+  }, [searchQuery, filteredTexts]);
 
   const toggleText = (textId: string) => {
     setExpandedTexts(prev => {
@@ -79,13 +106,23 @@ export function EnglishLiteratureSuggestions({
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-primary" />
           <CardTitle className="text-lg">Literature Lesson Suggestions</CardTitle>
+          {searchQuery.trim() && (
+            <Badge variant="secondary" className="ml-auto">
+              {filteredTexts.length} results
+            </Badge>
+          )}
         </div>
         <CardDescription>
           Pre-built lessons and questions for core literary texts
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {LITERARY_TEXTS.map((text) => {
+        {filteredTexts.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p>No texts match "{searchQuery}"</p>
+          </div>
+        ) : filteredTexts.map((text) => {
           const colors = getColorClasses(text.coverColor);
           const lessons = getLessonsByText(text.id);
           const questions = TEXT_QUESTIONS[text.id] || [];
