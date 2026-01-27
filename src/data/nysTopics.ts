@@ -1028,6 +1028,57 @@ export const FINANCIAL_MATH_TOPICS: TopicCategory[] = [
     ],
   },
   {
+    category: 'HOME OWNERSHIP',
+    topics: [
+      { name: 'Additional Costs: Fees', standard: 'FIN.10.1', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Additional Costs: Escrow', standard: 'FIN.10.2', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Total Housing Payments', standard: 'FIN.10.3', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Paying Off a Mortgage', standard: 'FIN.10.4', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+      { name: 'Home Ownership Wrap-Up', standard: 'FIN.10.5', url: 'https://www.ngpf.org/curriculum/managing-money/' },
+    ],
+  },
+  {
+    category: 'INSURANCE AND RETIREMENT',
+    topics: [
+      { name: 'Car Insurance Premiums', standard: 'FIN.11.1', url: 'https://www.ngpf.org/curriculum/insurance/' },
+      { name: 'Suggested Premium', standard: 'FIN.11.2', url: 'https://www.ngpf.org/curriculum/insurance/' },
+      { name: 'Property and Renters Insurance', standard: 'FIN.11.3', url: 'https://www.ngpf.org/curriculum/insurance/' },
+      { name: 'Life Insurance', standard: 'FIN.11.4', url: 'https://www.ngpf.org/curriculum/insurance/' },
+      { name: 'Calculating Life Insurance Premiums', standard: 'FIN.11.5', url: 'https://www.ngpf.org/curriculum/insurance/' },
+      { name: 'Retirement Accounts', standard: 'FIN.11.6', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Insurance and Retirement Wrap-Up', standard: 'FIN.11.7', url: 'https://www.ngpf.org/curriculum/insurance/' },
+    ],
+  },
+  {
+    category: 'INVESTMENTS',
+    topics: [
+      { name: 'CDs (Certificates of Deposit)', standard: 'FIN.12.1', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Annuities', standard: 'FIN.12.2', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Bonds', standard: 'FIN.12.3', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Stocks', standard: 'FIN.12.4', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'The Stock Market', standard: 'FIN.12.5', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Prediction', standard: 'FIN.12.6', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Periodic Investment', standard: 'FIN.12.7', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Retirement and Periodic Investment', standard: 'FIN.12.8', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Individual Net Worth', standard: 'FIN.12.9', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Investments Wrap-Up', standard: 'FIN.12.10', url: 'https://www.ngpf.org/curriculum/investing/' },
+    ],
+  },
+  {
+    category: 'BUSINESS',
+    topics: [
+      { name: 'Cost and Revenue Functions', standard: 'FIN.13.1', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Profit', standard: 'FIN.13.2', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Solving Systems of Equations', standard: 'FIN.13.3', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Matrices', standard: 'FIN.13.4', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Factors Affecting Business', standard: 'FIN.13.5', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Maximizing Revenue or Minimizing Cost', standard: 'FIN.13.6', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Running a Business', standard: 'FIN.13.7', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Storage, Inventory, and Other Business Concerns', standard: 'FIN.13.8', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+      { name: 'Business Wrap-Up', standard: 'FIN.13.9', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
+    ],
+  },
+  {
     category: 'ECONOMIC INDICATORS',
     topics: [
       { name: 'GDP Calculation', standard: 'NYS.ECON.1', url: 'https://www.nysed.gov/curriculum-instruction/social-studies-learning-standards' },
