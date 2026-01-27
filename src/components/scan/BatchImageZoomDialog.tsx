@@ -119,8 +119,8 @@ export function BatchImageZoomDialog({
     resetAnnotations();
   }, [imageUrl, resetDecisions, resetAnnotations]);
 
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 5));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.25));
+  const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.02, 5));
+  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.02, 0.25));
   const handleRotate = () => setRotation(prev => (prev + 90) % 360);
   
   const resetView = () => {
