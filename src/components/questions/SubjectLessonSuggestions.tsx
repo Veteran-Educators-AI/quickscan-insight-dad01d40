@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { type TopicCategory, type JMAPTopic } from '@/data/nysTopics';
 import { SubjectWorksheetGeneratorDialog, type GeneratedQuestion } from './SubjectWorksheetGeneratorDialog';
 import { FORMULA_REFERENCE } from '@/data/formulaReference';
+import { GeometryPacingCalendar } from './GeometryPacingCalendar';
 
 interface SubjectLessonSuggestionsProps {
   subject: string;
@@ -133,17 +134,23 @@ export function SubjectLessonSuggestions({
   };
 
   return (
-    <Card className={`border-2 ${colors.border}`}>
-      <CardHeader className={`pb-3 ${colors.bg}`}>
-        <div className="flex items-center gap-2">
-          <div className={colors.text}>{icon}</div>
-          <CardTitle className="text-lg">{subject} Lesson Suggestions</CardTitle>
-        </div>
-        <CardDescription>
-          Topic-based lessons with question generation for {subject}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-4">
+    <>
+      {/* Show Pacing Calendar for Geometry */}
+      {subjectId === 'geometry' && (
+        <GeometryPacingCalendar />
+      )}
+      
+      <Card className={`border-2 ${colors.border}`}>
+        <CardHeader className={`pb-3 ${colors.bg}`}>
+          <div className="flex items-center gap-2">
+            <div className={colors.text}>{icon}</div>
+            <CardTitle className="text-lg">{subject} Lesson Suggestions</CardTitle>
+          </div>
+          <CardDescription>
+            Topic-based lessons with question generation for {subject}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-4">
         <ScrollArea className="h-[500px] pr-2">
           <div className="space-y-3">
             {categories.map((category) => {
@@ -280,5 +287,6 @@ export function SubjectLessonSuggestions({
         />
       )}
     </Card>
+    </>
   );
 }
