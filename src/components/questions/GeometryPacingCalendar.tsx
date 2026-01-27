@@ -38,9 +38,9 @@ export function GeometryPacingCalendar({ onSelectUnit }: GeometryPacingCalendarP
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                <CardTitle className="text-lg">2025-2026 Geometry Pacing Calendar</CardTitle>
+                <CardTitle className="text-lg">NYC Solves: Geometry Pacing Calendar</CardTitle>
                 <Badge variant="secondary" className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
-                  MGS21/MGS22
+                  Illustrative Mathematics
                 </Badge>
               </div>
               {isCalendarExpanded ? (
@@ -74,11 +74,16 @@ export function GeometryPacingCalendar({ onSelectUnit }: GeometryPacingCalendarP
                               </div>
                               <div>
                                 <h4 className="font-medium text-sm">{unit.title}</h4>
-                                <div className="flex items-center gap-2 mt-1">
+                                <div className="flex items-center gap-2 mt-1 flex-wrap">
                                   <Badge variant="outline" className="text-xs">
                                     <Clock className="h-2.5 w-2.5 mr-1" />
                                     {unit.dateRange}
                                   </Badge>
+                                  {unit.estimatedDays && (
+                                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                                      ~{unit.estimatedDays} days
+                                    </Badge>
+                                  )}
                                   <Badge variant="secondary" className="text-xs">
                                     {unit.lessons.length} lessons
                                   </Badge>
@@ -168,7 +173,7 @@ export function GeometryPacingCalendar({ onSelectUnit }: GeometryPacingCalendarP
             <div className="mt-4 pt-3 border-t text-xs text-muted-foreground">
               <p className="flex items-center gap-1">
                 <BookOpen className="h-3 w-3" />
-                Resources: Big Ideas Math (NY Edition) & JMAP Regents
+                NYC Solves: Illustrative Mathematics Curriculum & JMAP Regents Resources
               </p>
             </div>
           </CardContent>
