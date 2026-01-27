@@ -1,32 +1,55 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { 
-  Upload, Loader2, RotateCcw, RotateCw, ArrowUp, ArrowDown, 
-  Trash2, Check, Layers, FileImage, Wand2, GripVertical,
-  ZoomIn, ZoomOut, Eye, FolderOpen, RefreshCw, Settings2, Cloud,
-  Zap, Pause, Play, Usb, ChevronLeft, ChevronRight, Search, X
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-import { resizeImage, blobToBase64, applyPhotocopyFilter } from '@/lib/imageUtils';
-import { pdfToImages, isPdfFile } from '@/lib/pdfUtils';
-import { GoogleDriveImport } from './GoogleDriveImport';
-import { GoogleDriveAutoSyncConfig } from './GoogleDriveAutoSyncConfig';
-import { HotFolderAlert } from './HotFolderAlert';
-import { WebUSBScannerPanel } from './WebUSBScannerPanel';
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import {
+  Upload,
+  Loader2,
+  RotateCcw,
+  RotateCw,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+  Check,
+  Layers,
+  FileImage,
+  Wand2,
+  GripVertical,
+  ZoomIn,
+  ZoomOut,
+  Eye,
+  FolderOpen,
+  RefreshCw,
+  Settings2,
+  Cloud,
+  Zap,
+  Pause,
+  Play,
+  Usb,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { resizeImage, blobToBase64, applyPhotocopyFilter } from "@/lib/imageUtils";
+import { pdfToImages, isPdfFile } from "@/lib/pdfUtils";
+import { GoogleDriveImport } from "./GoogleDriveImport";
+import { GoogleDriveAutoSyncConfig } from "./GoogleDriveAutoSyncConfig";
+import { HotFolderAlert } from "./HotFolderAlert";
+import { WebUSBScannerPanel } from "./WebUSBScannerPanel";
 
-import { useGoogleDriveAutoSync, SyncedFile } from '@/hooks/useGoogleDriveAutoSync';
-import { playNotificationSound, isSoundEnabled } from '@/lib/notificationSound';
+import { useGoogleDriveAutoSync, SyncedFile } from "@/hooks/useGoogleDriveAutoSync";
+import { playNotificationSound, isSoundEnabled } from "@/lib/notificationSound";
 
 interface ScanPage {
   id: string;
@@ -37,7 +60,7 @@ interface ScanPage {
   filename: string;
   autoRotated: boolean;
   isProcessing: boolean;
-  detectedOrientation?: 'portrait' | 'landscape' | 'unknown';
+  detectedOrientation?: "portrait" | "landscape" | "unknown";
 }
 
 interface ScannerImportModeProps {
@@ -46,18 +69,20 @@ interface ScannerImportModeProps {
 }
 
 // Detect text orientation using canvas analysis
-const detectTextOrientation = async (imageDataUrl: string): Promise<{ 
-  suggestedRotation: number; 
+const detectTextOrientation = async (
+  imageDataUrl: string,
+): Promise<{
+  suggestedRotation: number;
   confidence: number;
-  orientation: 'portrait' | 'landscape' | 'unknown';
+  orientation: "portrait" | "landscape" | "unknown";
 }> => {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
       if (!ctx) {
-        resolve({ suggestedRotation: 0, confidence: 0, orientation: 'unknown' });
+        resolve({ suggestedRotation: 0, confidence: 0, orientation: "unknown" });
         return;
       }
 
@@ -86,17 +111,24 @@ const detectTextOrientation = async (imageDataUrl: string): Promise<{
       for (let y = 1; y < height - 1; y++) {
         for (let x = 1; x < width - 1; x++) {
           const idx = y * width + x;
-          
+
           // Horizontal Sobel (detects horizontal lines - text lines)
-          const gx = 
-            -gray[(y-1) * width + (x-1)] + gray[(y-1) * width + (x+1)] +
-            -2 * gray[y * width + (x-1)] + 2 * gray[y * width + (x+1)] +
-            -gray[(y+1) * width + (x-1)] + gray[(y+1) * width + (x+1)];
-          
+          const gx =
+            -gray[(y - 1) * width + (x - 1)] +
+            gray[(y - 1) * width + (x + 1)] +
+            -2 * gray[y * width + (x - 1)] +
+            2 * gray[y * width + (x + 1)] +
+            -gray[(y + 1) * width + (x - 1)] +
+            gray[(y + 1) * width + (x + 1)];
+
           // Vertical Sobel
-          const gy = 
-            -gray[(y-1) * width + (x-1)] - 2 * gray[(y-1) * width + x] - gray[(y-1) * width + (x+1)] +
-            gray[(y+1) * width + (x-1)] + 2 * gray[(y+1) * width + x] + gray[(y+1) * width + (x+1)];
+          const gy =
+            -gray[(y - 1) * width + (x - 1)] -
+            2 * gray[(y - 1) * width + x] -
+            gray[(y - 1) * width + (x + 1)] +
+            gray[(y + 1) * width + (x - 1)] +
+            2 * gray[(y + 1) * width + x] +
+            gray[(y + 1) * width + (x + 1)];
 
           horizontalEdges += Math.abs(gy);
           verticalEdges += Math.abs(gx);
@@ -105,19 +137,19 @@ const detectTextOrientation = async (imageDataUrl: string): Promise<{
 
       // Text typically has more horizontal structure (lines of text)
       const ratio = horizontalEdges / (verticalEdges + 1);
-      
+
       // Determine aspect ratio
       const aspectRatio = img.width / img.height;
-      
-      let orientation: 'portrait' | 'landscape' | 'unknown' = 'unknown';
+
+      let orientation: "portrait" | "landscape" | "unknown" = "unknown";
       let suggestedRotation = 0;
       let confidence = 0;
 
       // Standard document is portrait (taller than wide)
       if (aspectRatio > 1.2) {
         // Image is landscape - might need rotation
-        orientation = 'landscape';
-        
+        orientation = "landscape";
+
         // If strong horizontal text lines in landscape mode, it's rotated
         if (ratio > 1.3) {
           suggestedRotation = 90;
@@ -128,22 +160,22 @@ const detectTextOrientation = async (imageDataUrl: string): Promise<{
         }
       } else if (aspectRatio < 0.8) {
         // Portrait orientation - usually correct
-        orientation = 'portrait';
+        orientation = "portrait";
         confidence = 0.8;
-        
+
         // Check if upside down (harder to detect)
         // For now, assume correct if portrait
         suggestedRotation = 0;
       } else {
         // Near square - harder to determine
-        orientation = 'unknown';
+        orientation = "unknown";
         confidence = 0.3;
       }
 
       resolve({ suggestedRotation, confidence, orientation });
     };
     img.onerror = () => {
-      resolve({ suggestedRotation: 0, confidence: 0, orientation: 'unknown' });
+      resolve({ suggestedRotation: 0, confidence: 0, orientation: "unknown" });
     };
     img.src = imageDataUrl;
   });
@@ -159,10 +191,10 @@ const rotateImage = (imageDataUrl: string, degrees: number): Promise<string> => 
 
     const img = new Image();
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
       if (!ctx) {
-        reject(new Error('Could not get canvas context'));
+        reject(new Error("Could not get canvas context"));
         return;
       }
 
@@ -179,7 +211,7 @@ const rotateImage = (imageDataUrl: string, degrees: number): Promise<string> => 
       ctx.rotate((degrees * Math.PI) / 180);
       ctx.drawImage(img, -img.width / 2, -img.height / 2);
 
-      resolve(canvas.toDataURL('image/jpeg', 0.92));
+      resolve(canvas.toDataURL("image/jpeg", 0.92));
     };
     img.onerror = reject;
     img.src = imageDataUrl;
@@ -192,11 +224,11 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const [processProgress, setProcessProgress] = useState(0);
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewSearchQuery, setPreviewSearchQuery] = useState('');
+  const [previewSearchQuery, setPreviewSearchQuery] = useState("");
   const [driveImportOpen, setDriveImportOpen] = useState(false);
   const [autoSyncConfigOpen, setAutoSyncConfigOpen] = useState(false);
   const [showUSBScanner, setShowUSBScanner] = useState(false);
-  
+
   const [settings, setSettings] = useState({
     autoRotate: true,
     applyPhotocopyFilter: true,
@@ -206,9 +238,9 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const [folderWatchSupported, setFolderWatchSupported] = useState(false);
   const [watchingFolder, setWatchingFolder] = useState(false);
   const [folderHandle, setFolderHandle] = useState<FileSystemDirectoryHandle | null>(null);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Google Drive Auto-Sync
   const {
     config: autoSyncConfig,
@@ -229,55 +261,54 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
 
   // Check if File System Access API is available
   useEffect(() => {
-    setFolderWatchSupported('showDirectoryPicker' in window);
+    setFolderWatchSupported("showDirectoryPicker" in window);
   }, []);
 
-  const processImage = useCallback(async (
-    file: File,
-    index: number,
-    total: number
-  ): Promise<ScanPage> => {
-    const id = `page-${Date.now()}-${index}`;
-    
-    // Read file
-    const resizedBlob = await resizeImage(file);
-    let dataUrl = await blobToBase64(resizedBlob);
-    
-    // Apply photocopy filter if enabled
-    if (settings.applyPhotocopyFilter) {
-      dataUrl = await applyPhotocopyFilter(dataUrl);
-    }
-    
-    let rotation = 0;
-    let autoRotated = false;
-    let detectedOrientation: 'portrait' | 'landscape' | 'unknown' = 'unknown';
-    
-    // Auto-detect and fix rotation if enabled
-    if (settings.autoRotate) {
-      const orientationResult = await detectTextOrientation(dataUrl);
-      detectedOrientation = orientationResult.orientation;
-      
-      if (orientationResult.suggestedRotation !== 0 && orientationResult.confidence > 0.6) {
-        dataUrl = await rotateImage(dataUrl, orientationResult.suggestedRotation);
-        rotation = orientationResult.suggestedRotation;
-        autoRotated = true;
+  const processImage = useCallback(
+    async (file: File, index: number, total: number): Promise<ScanPage> => {
+      const id = `page-${Date.now()}-${index}`;
+
+      // Read file
+      const resizedBlob = await resizeImage(file);
+      let dataUrl = await blobToBase64(resizedBlob);
+
+      // Apply photocopy filter if enabled
+      if (settings.applyPhotocopyFilter) {
+        dataUrl = await applyPhotocopyFilter(dataUrl);
       }
-    }
-    
-    setProcessProgress(((index + 1) / total) * 100);
-    
-    return {
-      id,
-      originalDataUrl: dataUrl,
-      processedDataUrl: dataUrl,
-      rotation,
-      order: index + 1,
-      filename: file.name,
-      autoRotated,
-      isProcessing: false,
-      detectedOrientation,
-    };
-  }, [settings.applyPhotocopyFilter, settings.autoRotate]);
+
+      let rotation = 0;
+      let autoRotated = false;
+      let detectedOrientation: "portrait" | "landscape" | "unknown" = "unknown";
+
+      // Auto-detect and fix rotation if enabled
+      if (settings.autoRotate) {
+        const orientationResult = await detectTextOrientation(dataUrl);
+        detectedOrientation = orientationResult.orientation;
+
+        if (orientationResult.suggestedRotation !== 0 && orientationResult.confidence > 0.6) {
+          dataUrl = await rotateImage(dataUrl, orientationResult.suggestedRotation);
+          rotation = orientationResult.suggestedRotation;
+          autoRotated = true;
+        }
+      }
+
+      setProcessProgress(((index + 1) / total) * 100);
+
+      return {
+        id,
+        originalDataUrl: dataUrl,
+        processedDataUrl: dataUrl,
+        rotation,
+        order: index + 1,
+        filename: file.name,
+        autoRotated,
+        isProcessing: false,
+        detectedOrientation,
+      };
+    },
+    [settings.applyPhotocopyFilter, settings.autoRotate],
+  );
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -285,20 +316,20 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
 
     setIsProcessing(true);
     setProcessProgress(0);
-    
+
     const fileArray = Array.from(files);
-    
+
     // Sort files by name for natural ordering
     if (settings.autoOrder) {
       fileArray.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
     }
-    
+
     toast.info(`Processing ${fileArray.length} file(s)...`);
-    
+
     try {
       const newPages: ScanPage[] = [];
       let totalItems = 0;
-      
+
       // First pass: count total items (including PDF pages)
       for (const file of fileArray) {
         if (isPdfFile(file)) {
@@ -308,32 +339,40 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
           totalItems += 1;
         }
       }
-      
+
       let processedCount = 0;
-      
+
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
-        
+
         if (isPdfFile(file)) {
           // Convert PDF to images
           toast.info(`Converting PDF: ${file.name}...`);
           try {
             const pdfImages = await pdfToImages(file);
+
+            if (pdfImages.length === 0) {
+              toast.error(`PDF has no pages: ${file.name}`);
+              continue;
+            }
+
             for (let pageIdx = 0; pageIdx < pdfImages.length; pageIdx++) {
               // Create a mock file from the PDF page image for processing
               const pageDataUrl = pdfImages[pageIdx];
               const page = await processImageFromDataUrl(
-                pageDataUrl, 
+                pageDataUrl,
                 `${file.name}-page${pageIdx + 1}`,
-                processedCount, 
-                totalItems + pdfImages.length - 1
+                processedCount,
+                totalItems + pdfImages.length - 1,
               );
               newPages.push(page);
               processedCount++;
             }
-          } catch (pdfErr) {
-            console.error('Error processing PDF:', pdfErr);
-            toast.error(`Failed to process PDF: ${file.name}`);
+            toast.success(`Converted ${pdfImages.length} pages from ${file.name}`);
+          } catch (pdfErr: unknown) {
+            console.error("Error processing PDF:", pdfErr);
+            const errorMessage = pdfErr instanceof Error ? pdfErr.message : "Unknown error";
+            toast.error(`Failed to process PDF: ${file.name}. ${errorMessage}`);
           }
         } else {
           const page = await processImage(file, processedCount, totalItems);
@@ -341,126 +380,130 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
           processedCount++;
         }
       }
-      
+
       // Append to existing pages
-      setPages(prev => {
+      setPages((prev) => {
         const existingCount = prev.length;
-        return [
-          ...prev,
-          ...newPages.map((p, i) => ({ ...p, order: existingCount + i + 1 }))
-        ];
+        return [...prev, ...newPages.map((p, i) => ({ ...p, order: existingCount + i + 1 }))];
       });
-      
-      const autoRotatedCount = newPages.filter(p => p.autoRotated).length;
-      toast.success(`Added ${newPages.length} pages${autoRotatedCount > 0 ? ` (${autoRotatedCount} auto-rotated)` : ''}`);
-    } catch (error) {
-      console.error('Error processing files:', error);
-      toast.error('Error processing some files');
+
+      if (newPages.length > 0) {
+        const autoRotatedCount = newPages.filter((p) => p.autoRotated).length;
+        toast.success(
+          `Added ${newPages.length} page${newPages.length > 1 ? "s" : ""}${autoRotatedCount > 0 ? ` (${autoRotatedCount} auto-rotated)` : ""}`,
+        );
+
+        // Play sound notification if enabled
+        if (isSoundEnabled()) {
+          playNotificationSound();
+        }
+      } else {
+        toast.warning("No pages were added. Check console for errors.");
+      }
+    } catch (error: unknown) {
+      console.error("Error processing files:", error);
+      toast.error(`Error processing files: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsProcessing(false);
       setProcessProgress(0);
-      e.target.value = '';
+      e.target.value = "";
     }
   };
 
   // Helper to process an image from data URL (for PDF pages)
-  const processImageFromDataUrl = useCallback(async (
-    dataUrl: string,
-    filename: string,
-    index: number,
-    total: number
-  ): Promise<ScanPage> => {
-    const id = `page-${Date.now()}-${index}`;
-    
-    let processedDataUrl = dataUrl;
-    
-    // Apply photocopy filter if enabled
-    if (settings.applyPhotocopyFilter) {
-      processedDataUrl = await applyPhotocopyFilter(processedDataUrl);
-    }
-    
-    let rotation = 0;
-    let autoRotated = false;
-    let detectedOrientation: 'portrait' | 'landscape' | 'unknown' = 'unknown';
-    
-    // Auto-detect and fix rotation if enabled
-    if (settings.autoRotate) {
-      const orientationResult = await detectTextOrientation(processedDataUrl);
-      detectedOrientation = orientationResult.orientation;
-      
-      if (orientationResult.suggestedRotation !== 0 && orientationResult.confidence > 0.6) {
-        processedDataUrl = await rotateImage(processedDataUrl, orientationResult.suggestedRotation);
-        rotation = orientationResult.suggestedRotation;
-        autoRotated = true;
-      }
-    }
-    
-    setProcessProgress(((index + 1) / total) * 100);
-    
-    return {
-      id,
-      originalDataUrl: dataUrl,
-      processedDataUrl,
-      rotation,
-      order: index + 1,
-      filename,
-      autoRotated,
-      isProcessing: false,
-      detectedOrientation,
-    };
-  }, [settings.applyPhotocopyFilter, settings.autoRotate]);
+  const processImageFromDataUrl = useCallback(
+    async (dataUrl: string, filename: string, index: number, total: number): Promise<ScanPage> => {
+      const id = `page-${Date.now()}-${index}`;
 
-  const handleRotatePage = async (pageId: string, direction: 'cw' | 'ccw') => {
-    const page = pages.find(p => p.id === pageId);
+      let processedDataUrl = dataUrl;
+
+      // Apply photocopy filter if enabled
+      if (settings.applyPhotocopyFilter) {
+        processedDataUrl = await applyPhotocopyFilter(processedDataUrl);
+      }
+
+      let rotation = 0;
+      let autoRotated = false;
+      let detectedOrientation: "portrait" | "landscape" | "unknown" = "unknown";
+
+      // Auto-detect and fix rotation if enabled
+      if (settings.autoRotate) {
+        const orientationResult = await detectTextOrientation(processedDataUrl);
+        detectedOrientation = orientationResult.orientation;
+
+        if (orientationResult.suggestedRotation !== 0 && orientationResult.confidence > 0.6) {
+          processedDataUrl = await rotateImage(processedDataUrl, orientationResult.suggestedRotation);
+          rotation = orientationResult.suggestedRotation;
+          autoRotated = true;
+        }
+      }
+
+      setProcessProgress(((index + 1) / total) * 100);
+
+      return {
+        id,
+        originalDataUrl: dataUrl,
+        processedDataUrl,
+        rotation,
+        order: index + 1,
+        filename,
+        autoRotated,
+        isProcessing: false,
+        detectedOrientation,
+      };
+    },
+    [settings.applyPhotocopyFilter, settings.autoRotate],
+  );
+
+  const handleRotatePage = async (pageId: string, direction: "cw" | "ccw") => {
+    const page = pages.find((p) => p.id === pageId);
     if (!page) return;
 
-    setPages(prev => prev.map(p => 
-      p.id === pageId ? { ...p, isProcessing: true } : p
-    ));
+    setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isProcessing: true } : p)));
 
-    const rotationDelta = direction === 'cw' ? 90 : -90;
-    const newRotation = ((page.rotation + rotationDelta) % 360 + 360) % 360;
-    
+    const rotationDelta = direction === "cw" ? 90 : -90;
+    const newRotation = (((page.rotation + rotationDelta) % 360) + 360) % 360;
+
     try {
       // Rotate from original
       const rotatedUrl = await rotateImage(page.originalDataUrl, newRotation);
-      
-      setPages(prev => prev.map(p => 
-        p.id === pageId 
-          ? { ...p, rotation: newRotation, processedDataUrl: rotatedUrl, isProcessing: false, autoRotated: false }
-          : p
-      ));
+
+      setPages((prev) =>
+        prev.map((p) =>
+          p.id === pageId
+            ? { ...p, rotation: newRotation, processedDataUrl: rotatedUrl, isProcessing: false, autoRotated: false }
+            : p,
+        ),
+      );
     } catch (error) {
-      console.error('Error rotating:', error);
-      toast.error('Failed to rotate page');
-      setPages(prev => prev.map(p => 
-        p.id === pageId ? { ...p, isProcessing: false } : p
-      ));
+      console.error("Error rotating:", error);
+      toast.error("Failed to rotate page");
+      setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, isProcessing: false } : p)));
     }
   };
 
-  const handleReorderPage = (pageId: string, direction: 'up' | 'down') => {
-    setPages(prev => {
-      const index = prev.findIndex(p => p.id === pageId);
+  const handleReorderPage = (pageId: string, direction: "up" | "down") => {
+    setPages((prev) => {
+      const index = prev.findIndex((p) => p.id === pageId);
       if (index === -1) return prev;
-      
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
+
+      const newIndex = direction === "up" ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= prev.length) return prev;
-      
+
       const newPages = [...prev];
       [newPages[index], newPages[newIndex]] = [newPages[newIndex], newPages[index]];
-      
+
       // Update order numbers
       return newPages.map((p, i) => ({ ...p, order: i + 1 }));
     });
   };
 
   const handleDeletePage = (pageId: string) => {
-    setPages(prev => {
-      const filtered = prev.filter(p => p.id !== pageId);
+    setPages((prev) => {
+      const filtered = prev.filter((p) => p.id !== pageId);
       return filtered.map((p, i) => ({ ...p, order: i + 1 }));
     });
-    toast.success('Page removed');
+    toast.success("Page removed");
   };
 
   const handleDragStart = (pageId: string) => {
@@ -470,17 +513,17 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const handleDragOver = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
     if (!draggedId || draggedId === targetId) return;
-    
-    setPages(prev => {
-      const dragIndex = prev.findIndex(p => p.id === draggedId);
-      const targetIndex = prev.findIndex(p => p.id === targetId);
-      
+
+    setPages((prev) => {
+      const dragIndex = prev.findIndex((p) => p.id === draggedId);
+      const targetIndex = prev.findIndex((p) => p.id === targetId);
+
       if (dragIndex === -1 || targetIndex === -1) return prev;
-      
+
       const newPages = [...prev];
       const [dragged] = newPages.splice(dragIndex, 1);
       newPages.splice(targetIndex, 0, dragged);
-      
+
       return newPages.map((p, i) => ({ ...p, order: i + 1 }));
     });
   };
@@ -491,7 +534,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
 
   const handleStartFolderWatch = async () => {
     if (!folderWatchSupported) {
-      toast.error('Folder watching not supported in this browser');
+      toast.error("Folder watching not supported in this browser");
       return;
     }
 
@@ -499,44 +542,44 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
       const handle = await (window as any).showDirectoryPicker();
       setFolderHandle(handle);
       setWatchingFolder(true);
-      toast.success('Watching folder for new scans. Drop files into the folder to import.');
-      
+      toast.success("Watching folder for new scans. Drop files into the folder to import.");
+
       // Initial scan of folder
       await scanFolder(handle);
     } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        toast.error('Could not access folder');
+      if (error.name !== "AbortError") {
+        toast.error("Could not access folder");
       }
     }
   };
 
   const scanFolder = async (handle: FileSystemDirectoryHandle) => {
-    const existingNames = new Set(pages.map(p => p.filename));
+    const existingNames = new Set(pages.map((p) => p.filename));
     const newFiles: File[] = [];
-    
+
     for await (const entry of (handle as any).values()) {
-      if (entry.kind === 'file' && !existingNames.has(entry.name)) {
+      if (entry.kind === "file" && !existingNames.has(entry.name)) {
         const file = await entry.getFile();
-        if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+        if (file.type.startsWith("image/") || file.type === "application/pdf") {
           newFiles.push(file);
         }
       }
     }
-    
+
     if (newFiles.length > 0) {
       setIsProcessing(true);
       setProcessProgress(0);
-      
+
       // Sort by name
       newFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-      
+
       const processedPages: ScanPage[] = [];
       for (let i = 0; i < newFiles.length; i++) {
         const page = await processImage(newFiles[i], pages.length + i, newFiles.length);
         processedPages.push(page);
       }
-      
-      setPages(prev => [...prev, ...processedPages]);
+
+      setPages((prev) => [...prev, ...processedPages]);
       setIsProcessing(false);
       toast.success(`Added ${newFiles.length} new scans from folder`);
     }
@@ -551,28 +594,28 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const handleStopFolderWatch = () => {
     setFolderHandle(null);
     setWatchingFolder(false);
-    toast.info('Stopped watching folder');
+    toast.info("Stopped watching folder");
   };
 
   // Handle files imported from Google Drive
   const handleDriveFilesImported = async (driveFiles: { blob: Blob; name: string }[]) => {
     setDriveImportOpen(false);
-    
+
     if (driveFiles.length === 0) return;
-    
+
     setIsProcessing(true);
     setProcessProgress(0);
-    
+
     // Sort files by name for natural ordering
     if (settings.autoOrder) {
       driveFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
     }
-    
+
     toast.info(`Processing ${driveFiles.length} scanned pages from Drive...`);
-    
+
     try {
       const newPages: ScanPage[] = [];
-      
+
       for (let i = 0; i < driveFiles.length; i++) {
         const { blob, name } = driveFiles[i];
         // Convert blob to File for consistent processing
@@ -580,21 +623,20 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
         const page = await processImage(file, i, driveFiles.length);
         newPages.push(page);
       }
-      
+
       // Append to existing pages
-      setPages(prev => {
+      setPages((prev) => {
         const existingCount = prev.length;
-        return [
-          ...prev,
-          ...newPages.map((p, i) => ({ ...p, order: existingCount + i + 1 }))
-        ];
+        return [...prev, ...newPages.map((p, i) => ({ ...p, order: existingCount + i + 1 }))];
       });
-      
-      const autoRotatedCount = newPages.filter(p => p.autoRotated).length;
-      toast.success(`Added ${newPages.length} pages from Drive${autoRotatedCount > 0 ? ` (${autoRotatedCount} auto-rotated)` : ''}`);
+
+      const autoRotatedCount = newPages.filter((p) => p.autoRotated).length;
+      toast.success(
+        `Added ${newPages.length} pages from Drive${autoRotatedCount > 0 ? ` (${autoRotatedCount} auto-rotated)` : ""}`,
+      );
     } catch (error) {
-      console.error('Error processing Drive files:', error);
-      toast.error('Error processing some files');
+      console.error("Error processing Drive files:", error);
+      toast.error("Error processing some files");
     } finally {
       setIsProcessing(false);
       setProcessProgress(0);
@@ -602,55 +644,57 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   };
 
   // Handle auto-synced files from Google Drive
-  const handleAutoSyncFiles = useCallback(async (syncedFiles: SyncedFile[]) => {
-    if (syncedFiles.length === 0) return;
-    
-    // Show hot folder alert and play sound
-    setHotFolderNewFiles(prev => prev + syncedFiles.length);
-    setShowHotFolderAlert(true);
-    
-    if (isSoundEnabled()) {
-      playNotificationSound('success');
-    }
-    
-    setIsProcessing(true);
-    setProcessProgress(0);
-    
-    toast.info(`Auto-importing ${syncedFiles.length} new scans from Drive...`);
-    
-    try {
-      const newPages: ScanPage[] = [];
-      
-      // Sort by name
-      const sortedFiles = settings.autoOrder 
-        ? [...syncedFiles].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
-        : syncedFiles;
-      
-      for (let i = 0; i < sortedFiles.length; i++) {
-        const { blob, name } = sortedFiles[i];
-        const file = new File([blob], name, { type: blob.type });
-        const page = await processImage(file, i, sortedFiles.length);
-        newPages.push(page);
+  const handleAutoSyncFiles = useCallback(
+    async (syncedFiles: SyncedFile[]) => {
+      if (syncedFiles.length === 0) return;
+
+      // Show hot folder alert and play sound
+      setHotFolderNewFiles((prev) => prev + syncedFiles.length);
+      setShowHotFolderAlert(true);
+
+      if (isSoundEnabled()) {
+        playNotificationSound("success");
       }
-      
-      setPages(prev => {
-        const existingCount = prev.length;
-        return [
-          ...prev,
-          ...newPages.map((p, i) => ({ ...p, order: existingCount + i + 1 }))
-        ];
-      });
-      
-      const autoRotatedCount = newPages.filter(p => p.autoRotated).length;
-      toast.success(`Auto-imported ${newPages.length} pages${autoRotatedCount > 0 ? ` (${autoRotatedCount} auto-rotated)` : ''}`);
-    } catch (error) {
-      console.error('Error processing auto-sync files:', error);
-      toast.error('Error processing auto-synced files');
-    } finally {
-      setIsProcessing(false);
+
+      setIsProcessing(true);
       setProcessProgress(0);
-    }
-  }, [settings.autoOrder, processImage]);
+
+      toast.info(`Auto-importing ${syncedFiles.length} new scans from Drive...`);
+
+      try {
+        const newPages: ScanPage[] = [];
+
+        // Sort by name
+        const sortedFiles = settings.autoOrder
+          ? [...syncedFiles].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+          : syncedFiles;
+
+        for (let i = 0; i < sortedFiles.length; i++) {
+          const { blob, name } = sortedFiles[i];
+          const file = new File([blob], name, { type: blob.type });
+          const page = await processImage(file, i, sortedFiles.length);
+          newPages.push(page);
+        }
+
+        setPages((prev) => {
+          const existingCount = prev.length;
+          return [...prev, ...newPages.map((p, i) => ({ ...p, order: existingCount + i + 1 }))];
+        });
+
+        const autoRotatedCount = newPages.filter((p) => p.autoRotated).length;
+        toast.success(
+          `Auto-imported ${newPages.length} pages${autoRotatedCount > 0 ? ` (${autoRotatedCount} auto-rotated)` : ""}`,
+        );
+      } catch (error) {
+        console.error("Error processing auto-sync files:", error);
+        toast.error("Error processing auto-synced files");
+      } finally {
+        setIsProcessing(false);
+        setProcessProgress(0);
+      }
+    },
+    [settings.autoOrder, processImage],
+  );
 
   // Handle auto-sync folder configuration
   const handleConfigureAutoSync = (folderId: string, folderName: string, intervalSeconds: number) => {
@@ -674,51 +718,51 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   };
 
   // Handle images scanned via WebUSB scanner
-  const handleUSBScannedImages = useCallback(async (imageUrls: string[]) => {
-    if (imageUrls.length === 0) return;
-    
-    setIsProcessing(true);
-    setProcessProgress(0);
-    
-    try {
-      const newPages: ScanPage[] = [];
-      
-      for (let i = 0; i < imageUrls.length; i++) {
-        const response = await fetch(imageUrls[i]);
-        const blob = await response.blob();
-        const file = new File([blob], `usb-scan-${Date.now()}-${i + 1}.png`, { type: blob.type });
-        const page = await processImage(file, i, imageUrls.length);
-        newPages.push(page);
-      }
-      
-      setPages(prev => {
-        const existingCount = prev.length;
-        return [
-          ...prev,
-          ...newPages.map((p, i) => ({ ...p, order: existingCount + i + 1 }))
-        ];
-      });
-      
-      toast.success(`Added ${newPages.length} pages from USB scanner`);
-    } catch (error) {
-      console.error('Error processing USB scanned images:', error);
-      toast.error('Error processing scanned images');
-    } finally {
-      setIsProcessing(false);
+  const handleUSBScannedImages = useCallback(
+    async (imageUrls: string[]) => {
+      if (imageUrls.length === 0) return;
+
+      setIsProcessing(true);
       setProcessProgress(0);
-    }
-  }, [processImage]);
+
+      try {
+        const newPages: ScanPage[] = [];
+
+        for (let i = 0; i < imageUrls.length; i++) {
+          const response = await fetch(imageUrls[i]);
+          const blob = await response.blob();
+          const file = new File([blob], `usb-scan-${Date.now()}-${i + 1}.png`, { type: blob.type });
+          const page = await processImage(file, i, imageUrls.length);
+          newPages.push(page);
+        }
+
+        setPages((prev) => {
+          const existingCount = prev.length;
+          return [...prev, ...newPages.map((p, i) => ({ ...p, order: existingCount + i + 1 }))];
+        });
+
+        toast.success(`Added ${newPages.length} pages from USB scanner`);
+      } catch (error) {
+        console.error("Error processing USB scanned images:", error);
+        toast.error("Error processing scanned images");
+      } finally {
+        setIsProcessing(false);
+        setProcessProgress(0);
+      }
+    },
+    [processImage],
+  );
 
   const handleConfirmPages = () => {
     if (pages.length === 0) {
-      toast.error('No pages to process');
+      toast.error("No pages to process");
       return;
     }
-    
+
     const orderedPages = [...pages]
       .sort((a, b) => a.order - b.order)
-      .map(p => ({ dataUrl: p.processedDataUrl, order: p.order, filename: p.filename }));
-    
+      .map((p) => ({ dataUrl: p.processedDataUrl, order: p.order, filename: p.filename }));
+
     onPagesReady(orderedPages);
     toast.success(`${pages.length} pages ready for analysis`);
   };
@@ -726,84 +770,86 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
   const openPreview = (pageId: string) => {
     setSelectedPage(pageId);
     setPreviewOpen(true);
-    setPreviewSearchQuery('');
+    setPreviewSearchQuery("");
   };
 
-  const selectedPageData = pages.find(p => p.id === selectedPage);
-  const selectedPageIndex = pages.findIndex(p => p.id === selectedPage);
+  const selectedPageData = pages.find((p) => p.id === selectedPage);
+  const selectedPageIndex = pages.findIndex((p) => p.id === selectedPage);
 
   // Filter pages by search query (matches filename)
   const filteredPages = useMemo(() => {
     if (!previewSearchQuery.trim()) return pages;
     const query = previewSearchQuery.toLowerCase().trim();
-    return pages.filter(p => 
-      p.filename.toLowerCase().includes(query) ||
-      `page ${p.order}`.toLowerCase().includes(query)
+    return pages.filter(
+      (p) => p.filename.toLowerCase().includes(query) || `page ${p.order}`.toLowerCase().includes(query),
     );
   }, [pages, previewSearchQuery]);
 
   // Navigation functions for preview dialog
-  const navigatePreview = useCallback((direction: 'prev' | 'next') => {
-    const listToUse = previewSearchQuery.trim() ? filteredPages : pages;
-    const currentIdx = listToUse.findIndex(p => p.id === selectedPage);
-    if (currentIdx === -1) return;
-    
-    const newIdx = direction === 'prev' ? currentIdx - 1 : currentIdx + 1;
-    if (newIdx >= 0 && newIdx < listToUse.length) {
-      setSelectedPage(listToUse[newIdx].id);
-    }
-  }, [selectedPage, pages, filteredPages, previewSearchQuery]);
+  const navigatePreview = useCallback(
+    (direction: "prev" | "next") => {
+      const listToUse = previewSearchQuery.trim() ? filteredPages : pages;
+      const currentIdx = listToUse.findIndex((p) => p.id === selectedPage);
+      if (currentIdx === -1) return;
+
+      const newIdx = direction === "prev" ? currentIdx - 1 : currentIdx + 1;
+      if (newIdx >= 0 && newIdx < listToUse.length) {
+        setSelectedPage(listToUse[newIdx].id);
+      }
+    },
+    [selectedPage, pages, filteredPages, previewSearchQuery],
+  );
 
   const canNavigatePrev = useMemo(() => {
     const listToUse = previewSearchQuery.trim() ? filteredPages : pages;
-    const currentIdx = listToUse.findIndex(p => p.id === selectedPage);
+    const currentIdx = listToUse.findIndex((p) => p.id === selectedPage);
     return currentIdx > 0;
   }, [selectedPage, pages, filteredPages, previewSearchQuery]);
 
   const canNavigateNext = useMemo(() => {
     const listToUse = previewSearchQuery.trim() ? filteredPages : pages;
-    const currentIdx = listToUse.findIndex(p => p.id === selectedPage);
+    const currentIdx = listToUse.findIndex((p) => p.id === selectedPage);
     return currentIdx < listToUse.length - 1;
   }, [selectedPage, pages, filteredPages, previewSearchQuery]);
 
   // Parse worksheet name from filename (removes extension, page numbers, cleans up)
   const parseWorksheetName = useCallback((filename: string): string => {
-    if (!filename) return '';
+    if (!filename) return "";
     // Remove file extension
-    let name = filename.replace(/\.[^/.]+$/, '');
+    let name = filename.replace(/\.[^/.]+$/, "");
     // Remove page numbers like _0001, _0002, (1), (2), -page1, etc.
-    name = name.replace(/[_\-\s]*(page\s*)?\d{1,4}$/i, '');
-    name = name.replace(/\(\d+\)$/, '');
-    name = name.replace(/_+$/, '');
+    name = name.replace(/[_\-\s]*(page\s*)?\d{1,4}$/i, "");
+    name = name.replace(/\(\d+\)$/, "");
+    name = name.replace(/_+$/, "");
     // Replace underscores with spaces
-    name = name.replace(/_/g, ' ');
+    name = name.replace(/_/g, " ");
     // Clean up multiple spaces
-    name = name.replace(/\s+/g, ' ').trim();
+    name = name.replace(/\s+/g, " ").trim();
     return name || filename;
   }, []);
 
   const worksheetName = useMemo(() => {
-    if (!selectedPageData?.filename) return '';
+    if (!selectedPageData?.filename) return "";
     return parseWorksheetName(selectedPageData.filename);
   }, [selectedPageData?.filename, parseWorksheetName]);
 
   // Keyboard navigation for preview dialog
   useEffect(() => {
     if (!previewOpen) return;
-    
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't navigate if user is typing in search
       if (e.target instanceof HTMLInputElement) return;
-      
-      if (e.key === 'ArrowLeft' && canNavigatePrev) {
-        navigatePreview('prev');
-      } else if (e.key === 'ArrowRight' && canNavigateNext) {
-        navigatePreview('next');
+
+      if (e.key === "ArrowLeft" && canNavigatePrev) {
+        navigatePreview("prev");
+      } else if (e.key === "ArrowRight" && canNavigateNext) {
+        navigatePreview("next");
       }
     };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [previewOpen, canNavigatePrev, canNavigateNext, navigatePreview]);
 
   return (
@@ -851,25 +897,31 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               <Switch
                 id="auto-rotate"
                 checked={settings.autoRotate}
-                onCheckedChange={(checked) => setSettings(s => ({ ...s, autoRotate: checked }))}
+                onCheckedChange={(checked) => setSettings((s) => ({ ...s, autoRotate: checked }))}
               />
-              <Label htmlFor="auto-rotate" className="text-sm">Auto-rotate</Label>
+              <Label htmlFor="auto-rotate" className="text-sm">
+                Auto-rotate
+              </Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch
                 id="photocopy-filter"
                 checked={settings.applyPhotocopyFilter}
-                onCheckedChange={(checked) => setSettings(s => ({ ...s, applyPhotocopyFilter: checked }))}
+                onCheckedChange={(checked) => setSettings((s) => ({ ...s, applyPhotocopyFilter: checked }))}
               />
-              <Label htmlFor="photocopy-filter" className="text-sm">Photocopy filter</Label>
+              <Label htmlFor="photocopy-filter" className="text-sm">
+                Photocopy filter
+              </Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch
                 id="auto-order"
                 checked={settings.autoOrder}
-                onCheckedChange={(checked) => setSettings(s => ({ ...s, autoOrder: checked }))}
+                onCheckedChange={(checked) => setSettings((s) => ({ ...s, autoOrder: checked }))}
               />
-              <Label htmlFor="auto-order" className="text-sm">Sort by filename</Label>
+              <Label htmlFor="auto-order" className="text-sm">
+                Sort by filename
+              </Label>
             </div>
           </div>
 
@@ -883,10 +935,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               className="hidden"
               onChange={handleFileSelect}
             />
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isProcessing}
-            >
+            <Button onClick={() => fileInputRef.current?.click()} disabled={isProcessing}>
               <Upload className="h-4 w-4 mr-2" />
               Import Scans
             </Button>
@@ -901,11 +950,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               USB Scanner
             </Button>
 
-            <Button
-              variant="outline"
-              onClick={() => setDriveImportOpen(true)}
-              disabled={isProcessing}
-            >
+            <Button variant="outline" onClick={() => setDriveImportOpen(true)} disabled={isProcessing}>
               <Cloud className="h-4 w-4 mr-2" />
               Google Drive
             </Button>
@@ -925,44 +970,29 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                 ) : (
                   <Play className="h-4 w-4 mr-2" />
                 )}
-                {isAutoSyncActive ? 'Syncing...' : 'Start Sync'}
+                {isAutoSyncActive ? "Syncing..." : "Start Sync"}
               </Button>
             ) : (
-              <Button
-                variant="outline"
-                onClick={() => setAutoSyncConfigOpen(true)}
-                disabled={isProcessing}
-              >
+              <Button variant="outline" onClick={() => setAutoSyncConfigOpen(true)} disabled={isProcessing}>
                 <Zap className="h-4 w-4 mr-2" />
                 Auto-Sync
               </Button>
             )}
-            
+
             {folderWatchSupported && (
               <>
                 {!watchingFolder ? (
-                  <Button
-                    variant="outline"
-                    onClick={handleStartFolderWatch}
-                    disabled={isProcessing}
-                  >
+                  <Button variant="outline" onClick={handleStartFolderWatch} disabled={isProcessing}>
                     <FolderOpen className="h-4 w-4 mr-2" />
                     Watch Folder
                   </Button>
                 ) : (
                   <>
-                    <Button
-                      variant="outline"
-                      onClick={handleRefreshFolder}
-                      disabled={isProcessing}
-                    >
+                    <Button variant="outline" onClick={handleRefreshFolder} disabled={isProcessing}>
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Refresh
                     </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={handleStopFolderWatch}
-                    >
+                    <Button variant="ghost" onClick={handleStopFolderWatch}>
                       Stop Watching
                     </Button>
                   </>
@@ -972,45 +1002,30 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
           </div>
 
           {/* WebUSB Scanner Panel */}
-          {showUSBScanner && (
-            <WebUSBScannerPanel
-              onImagesScanned={handleUSBScannedImages}
-              className="mt-2"
-            />
-          )}
-
+          {showUSBScanner && <WebUSBScannerPanel onImagesScanned={handleUSBScannedImages} className="mt-2" />}
 
           {/* Auto-Sync Status */}
           {autoSyncConfig?.folderId && (
-            <div className={cn(
-              "flex items-center justify-between text-sm p-2 rounded",
-              isAutoSyncActive ? "bg-green-500/10" : "bg-muted/50"
-            )}>
+            <div
+              className={cn(
+                "flex items-center justify-between text-sm p-2 rounded",
+                isAutoSyncActive ? "bg-green-500/10" : "bg-muted/50",
+              )}
+            >
               <div className="flex items-center gap-2">
                 <Zap className={cn("h-4 w-4", isAutoSyncActive ? "text-green-600" : "text-muted-foreground")} />
                 <span>
                   Auto-sync: <strong>{autoSyncConfig.folderName}</strong>
                   {lastSyncTime && (
-                    <span className="text-muted-foreground ml-2">
-                      (Last: {lastSyncTime.toLocaleTimeString()})
-                    </span>
+                    <span className="text-muted-foreground ml-2">(Last: {lastSyncTime.toLocaleTimeString()})</span>
                   )}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={manualSync}
-                  disabled={isSyncing}
-                >
+                <Button variant="ghost" size="sm" onClick={manualSync} disabled={isSyncing}>
                   <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setAutoSyncConfigOpen(true)}
-                >
+                <Button variant="ghost" size="sm" onClick={() => setAutoSyncConfigOpen(true)}>
                   <Settings2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -1049,7 +1064,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                     className={cn(
                       "relative group border rounded-lg overflow-hidden bg-card transition-all",
                       draggedId === page.id && "opacity-50",
-                      page.isProcessing && "pointer-events-none opacity-70"
+                      page.isProcessing && "pointer-events-none opacity-70",
                     )}
                   >
                     {/* Drag Handle */}
@@ -1077,10 +1092,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                     )}
 
                     {/* Image */}
-                    <div 
-                      className="aspect-[3/4] cursor-pointer"
-                      onClick={() => openPreview(page.id)}
-                    >
+                    <div className="aspect-[3/4] cursor-pointer" onClick={() => openPreview(page.id)}>
                       <img
                         src={page.processedDataUrl}
                         alt={`Page ${page.order}`}
@@ -1101,7 +1113,10 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7"
-                            onClick={(e) => { e.stopPropagation(); handleRotatePage(page.id, 'ccw'); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRotatePage(page.id, "ccw");
+                            }}
                             disabled={page.isProcessing}
                           >
                             <RotateCcw className="h-3.5 w-3.5" />
@@ -1110,7 +1125,10 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7"
-                            onClick={(e) => { e.stopPropagation(); handleRotatePage(page.id, 'cw'); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRotatePage(page.id, "cw");
+                            }}
                             disabled={page.isProcessing}
                           >
                             <RotateCw className="h-3.5 w-3.5" />
@@ -1121,7 +1139,10 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7"
-                            onClick={(e) => { e.stopPropagation(); handleReorderPage(page.id, 'up'); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReorderPage(page.id, "up");
+                            }}
                             disabled={page.order === 1}
                           >
                             <ArrowUp className="h-3.5 w-3.5" />
@@ -1130,7 +1151,10 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7"
-                            onClick={(e) => { e.stopPropagation(); handleReorderPage(page.id, 'down'); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReorderPage(page.id, "down");
+                            }}
                             disabled={page.order === pages.length}
                           >
                             <ArrowDown className="h-3.5 w-3.5" />
@@ -1139,7 +1163,10 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7 text-destructive hover:text-destructive"
-                            onClick={(e) => { e.stopPropagation(); handleDeletePage(page.id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePage(page.id);
+                            }}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -1148,9 +1175,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                     </div>
 
                     {/* Filename */}
-                    <div className="px-2 py-1 text-xs text-muted-foreground truncate border-t">
-                      {page.filename}
-                    </div>
+                    <div className="px-2 py-1 text-xs text-muted-foreground truncate border-t">{page.filename}</div>
                   </div>
                 ))}
               </div>
@@ -1163,7 +1188,8 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               <Layers className="h-12 w-12 text-muted-foreground/50 mb-4" />
               <h3 className="font-medium text-lg mb-1">No scans imported</h3>
               <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                Import scanned documents from your scanner software. Auto-rotation will detect and fix upside-down or sideways pages.
+                Import scanned documents from your scanner software. Auto-rotation will detect and fix upside-down or
+                sideways pages.
               </p>
               <Button onClick={() => fileInputRef.current?.click()}>
                 <Upload className="h-4 w-4 mr-2" />
@@ -1181,17 +1207,11 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
             </Button>
             <div className="flex gap-2">
               {pages.length > 0 && (
-                <Button
-                  variant="outline"
-                  onClick={() => setPages([])}
-                >
+                <Button variant="outline" onClick={() => setPages([])}>
                   Clear All
                 </Button>
               )}
-              <Button
-                onClick={handleConfirmPages}
-                disabled={pages.length === 0 || isProcessing}
-              >
+              <Button onClick={handleConfirmPages} disabled={pages.length === 0 || isProcessing}>
                 <Check className="h-4 w-4 mr-2" />
                 Process {pages.length} Pages
               </Button>
@@ -1201,26 +1221,30 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
       </Card>
 
       {/* Preview Dialog */}
-      <Dialog open={previewOpen} onOpenChange={(open) => {
-        setPreviewOpen(open);
-        if (!open) setPreviewSearchQuery('');
-      }}>
+      <Dialog
+        open={previewOpen}
+        onOpenChange={(open) => {
+          setPreviewOpen(open);
+          if (!open) setPreviewSearchQuery("");
+        }}
+      >
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
               Page {selectedPageData?.order} Preview
               {selectedPageData?.autoRotated && (
-                <Badge variant="outline" className="ml-2">Auto-rotated</Badge>
+                <Badge variant="outline" className="ml-2">
+                  Auto-rotated
+                </Badge>
               )}
               <span className="text-sm font-normal text-muted-foreground ml-auto">
-                {previewSearchQuery.trim() 
-                  ? `${filteredPages.findIndex(p => p.id === selectedPage) + 1} of ${filteredPages.length} results`
-                  : `${selectedPageIndex + 1} of ${pages.length}`
-                }
+                {previewSearchQuery.trim()
+                  ? `${filteredPages.findIndex((p) => p.id === selectedPage) + 1} of ${filteredPages.length} results`
+                  : `${selectedPageIndex + 1} of ${pages.length}`}
               </span>
             </DialogTitle>
-            
+
             {/* Worksheet Name - Prominently displayed */}
             {worksheetName && (
               <div className="flex items-center gap-2 mt-1">
@@ -1228,12 +1252,10 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                 <span className="font-medium text-base">{worksheetName}</span>
               </div>
             )}
-            
-            <DialogDescription className="text-xs">
-              File: {selectedPageData?.filename}
-            </DialogDescription>
+
+            <DialogDescription className="text-xs">File: {selectedPageData?.filename}</DialogDescription>
           </DialogHeader>
-          
+
           {/* Search Bar */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1248,33 +1270,34 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                 variant="ghost"
                 size="icon"
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                onClick={() => setPreviewSearchQuery('')}
+                onClick={() => setPreviewSearchQuery("")}
               >
                 <X className="h-4 w-4" />
               </Button>
             )}
           </div>
-          
+
           {/* No results message */}
           {previewSearchQuery.trim() && filteredPages.length === 0 && (
             <div className="text-center py-2 text-sm text-muted-foreground bg-muted/50 rounded">
-              No pages match "{previewSearchQuery}". Try searching by filename (e.g., "Composite Figure") or page number.
+              No pages match "{previewSearchQuery}". Try searching by filename (e.g., "Composite Figure") or page
+              number.
             </div>
           )}
-          
+
           {/* Navigation + Image Container */}
           <div className="flex items-center gap-2">
             {/* Left Navigation Arrow */}
             <Button
               variant="outline"
               size="icon"
-              onClick={() => navigatePreview('prev')}
+              onClick={() => navigatePreview("prev")}
               disabled={!canNavigatePrev}
               className="shrink-0 h-12 w-12"
             >
               <ChevronLeft className="h-6 w-6" />
             </Button>
-            
+
             {/* Image Preview */}
             <div className="flex-1 max-h-[55vh] overflow-auto border rounded-lg">
               {selectedPageData ? (
@@ -1287,34 +1310,30 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <Search className="h-12 w-12 mb-4 opacity-50" />
                   <p>No pages match your search</p>
-                  <Button 
-                    variant="link" 
-                    onClick={() => setPreviewSearchQuery('')}
-                    className="mt-2"
-                  >
+                  <Button variant="link" onClick={() => setPreviewSearchQuery("")} className="mt-2">
                     Clear search
                   </Button>
                 </div>
               ) : null}
             </div>
-            
+
             {/* Right Navigation Arrow */}
             <Button
               variant="outline"
               size="icon"
-              onClick={() => navigatePreview('next')}
+              onClick={() => navigatePreview("next")}
               disabled={!canNavigateNext}
               className="shrink-0 h-12 w-12"
             >
               <ChevronRight className="h-6 w-6" />
             </Button>
           </div>
-          
+
           {/* Rotate Controls */}
           <div className="flex justify-center gap-2">
             <Button
               variant="outline"
-              onClick={() => selectedPage && handleRotatePage(selectedPage, 'ccw')}
+              onClick={() => selectedPage && handleRotatePage(selectedPage, "ccw")}
               disabled={selectedPageData?.isProcessing}
             >
               <RotateCcw className="h-4 w-4 mr-2" />
@@ -1322,18 +1341,16 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
             </Button>
             <Button
               variant="outline"
-              onClick={() => selectedPage && handleRotatePage(selectedPage, 'cw')}
+              onClick={() => selectedPage && handleRotatePage(selectedPage, "cw")}
               disabled={selectedPageData?.isProcessing}
             >
               <RotateCw className="h-4 w-4 mr-2" />
               Rotate Right
             </Button>
           </div>
-          
+
           {/* Keyboard shortcuts hint */}
-          <p className="text-xs text-center text-muted-foreground">
-            Use ← → arrow keys to navigate between pages
-          </p>
+          <p className="text-xs text-center text-muted-foreground">Use ← → arrow keys to navigate between pages</p>
         </DialogContent>
       </Dialog>
 
@@ -1345,14 +1362,9 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               <Cloud className="h-5 w-5" />
               Import from Google Drive
             </DialogTitle>
-            <DialogDescription>
-              Select scanned documents from your Google Drive
-            </DialogDescription>
+            <DialogDescription>Select scanned documents from your Google Drive</DialogDescription>
           </DialogHeader>
-          <GoogleDriveImport 
-            onFilesSelected={handleDriveFilesImported}
-            onClose={() => setDriveImportOpen(false)}
-          />
+          <GoogleDriveImport onFilesSelected={handleDriveFilesImported} onClose={() => setDriveImportOpen(false)} />
         </DialogContent>
       </Dialog>
 
@@ -1364,9 +1376,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
               <Zap className="h-5 w-5" />
               Configure Auto-Sync
             </DialogTitle>
-            <DialogDescription>
-              Select a Google Drive folder to automatically import new scans
-            </DialogDescription>
+            <DialogDescription>Select a Google Drive folder to automatically import new scans</DialogDescription>
           </DialogHeader>
           <GoogleDriveAutoSyncConfig
             onFolderSelected={handleConfigureAutoSync}
