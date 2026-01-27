@@ -1,34 +1,86 @@
-import { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { Download, Printer, FileText, X, Sparkles, Loader2, Save, FolderOpen, Trash2, Share2, Copy, Check, Link, BookOpen, ImageIcon, Pencil, RefreshCw, Palette, ClipboardList, AlertTriangle, Eye, ZoomIn, ZoomOut, Send, Coins, Trophy, PenTool, Library, Clock, NotebookPen, Scissors, FileType, Brain } from 'lucide-react';
-import { Slider } from '@/components/ui/slider';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/lib/auth';
-import { useFeatureTracking } from '@/hooks/useFeatureTracking';
-import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
-import { renderMathText, sanitizeForPDF, fixEncodingCorruption } from '@/lib/mathRenderer';
-import { MathSymbolPreview } from './MathSymbolPreview';
-import { CanvasDrawingTool } from './CanvasDrawingTool';
-import { AIImageReviewDialog } from './AIImageReviewDialog';
-import { ImageLibraryPicker } from './ImageLibraryPicker';
-import { useAIImageLibrary } from '@/hooks/useAIImageLibrary';
-import jsPDF from 'jspdf';
-import { Document, Packer, Paragraph, TextRun, BorderStyle, AlignmentType, convertInchesToTwip, ImageRun } from 'docx';
-import { getFormulasForTopics, type FormulaCategory } from '@/data/formulaReference';
-import { ScrapPaperGenerator } from '@/components/print/ScrapPaperGenerator';
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
+import {
+  Download,
+  Printer,
+  FileText,
+  X,
+  Sparkles,
+  Loader2,
+  Save,
+  FolderOpen,
+  Trash2,
+  Share2,
+  Copy,
+  Check,
+  Link,
+  BookOpen,
+  ImageIcon,
+  Pencil,
+  RefreshCw,
+  Palette,
+  ClipboardList,
+  AlertTriangle,
+  Eye,
+  ZoomIn,
+  ZoomOut,
+  Send,
+  Coins,
+  Trophy,
+  PenTool,
+  Library,
+  Clock,
+  NotebookPen,
+  Scissors,
+  FileType,
+  Brain,
+} from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
+import { useFeatureTracking } from "@/hooks/useFeatureTracking";
+import { handleApiError, checkResponseForApiError } from "@/lib/apiErrorHandler";
+import { renderMathText, sanitizeForPDF, fixEncodingCorruption } from "@/lib/mathRenderer";
+import { MathSymbolPreview } from "./MathSymbolPreview";
+import { CanvasDrawingTool } from "./CanvasDrawingTool";
+import { AIImageReviewDialog } from "./AIImageReviewDialog";
+import { ImageLibraryPicker } from "./ImageLibraryPicker";
+import { useAIImageLibrary } from "@/hooks/useAIImageLibrary";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  BorderStyle,
+  AlignmentType,
+  convertInchesToTwip,
+  ImageRun,
+  Table,
+} from "docx";
+import { getFormulasForTopics, type FormulaCategory } from "@/data/formulaReference";
+import { ScrapPaperGenerator } from "@/components/print/ScrapPaperGenerator";
 // Shared assignments are now saved directly to database - no need for usePushToSisterApp
 
 export interface WorksheetQuestion {
@@ -41,10 +93,10 @@ export interface WorksheetQuestion {
 }
 
 // Advancement levels A-F for diagnostic worksheets
-export type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+export type AdvancementLevel = "A" | "B" | "C" | "D" | "E" | "F";
 
 // Bloom's Taxonomy Cognitive Levels
-export type BloomLevel = 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
+export type BloomLevel = "remember" | "understand" | "apply" | "analyze" | "evaluate" | "create";
 
 interface GeneratedQuestion {
   questionNumber: number;
@@ -52,7 +104,7 @@ interface GeneratedQuestion {
   standard: string;
   question: string;
   answer?: string; // The correct answer for teacher's answer key
-  difficulty: 'medium' | 'hard' | 'challenging';
+  difficulty: "medium" | "hard" | "challenging";
   bloomLevel?: BloomLevel;
   bloomVerb?: string;
   advancementLevel?: AdvancementLevel; // For diagnostic worksheets
@@ -64,20 +116,20 @@ interface GeneratedQuestion {
 
 // Bloom's Taxonomy level display helpers
 const BLOOM_LEVELS: { level: BloomLevel; label: string; color: string; description: string }[] = [
-  { level: 'remember', label: 'Remember', color: 'bg-slate-500', description: 'Recall facts and basic concepts' },
-  { level: 'understand', label: 'Understand', color: 'bg-blue-500', description: 'Explain ideas or concepts' },
-  { level: 'apply', label: 'Apply', color: 'bg-green-500', description: 'Use information in new situations' },
-  { level: 'analyze', label: 'Analyze', color: 'bg-yellow-500', description: 'Draw connections among ideas' },
-  { level: 'evaluate', label: 'Evaluate', color: 'bg-orange-500', description: 'Justify decisions or actions' },
-  { level: 'create', label: 'Create', color: 'bg-red-500', description: 'Produce new or original work' },
+  { level: "remember", label: "Remember", color: "bg-slate-500", description: "Recall facts and basic concepts" },
+  { level: "understand", label: "Understand", color: "bg-blue-500", description: "Explain ideas or concepts" },
+  { level: "apply", label: "Apply", color: "bg-green-500", description: "Use information in new situations" },
+  { level: "analyze", label: "Analyze", color: "bg-yellow-500", description: "Draw connections among ideas" },
+  { level: "evaluate", label: "Evaluate", color: "bg-orange-500", description: "Justify decisions or actions" },
+  { level: "create", label: "Create", color: "bg-red-500", description: "Produce new or original work" },
 ];
 
 const getBloomInfo = (level?: BloomLevel) => {
-  return BLOOM_LEVELS.find(b => b.level === level) || BLOOM_LEVELS[2]; // Default to 'apply'
+  return BLOOM_LEVELS.find((b) => b.level === level) || BLOOM_LEVELS[2]; // Default to 'apply'
 };
 
 // Worksheet mode types
-export type WorksheetMode = 'basic_assessment' | 'diagnostic';
+export type WorksheetMode = "basic_assessment" | "diagnostic";
 
 interface SavedWorksheet {
   id: string;
@@ -109,100 +161,100 @@ interface SavedWorksheet {
 const svgToPngDataUrl = async (svgInput: string, width: number = 200, height: number = 200): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (!svgInput) {
-      reject(new Error('No SVG input provided'));
+      reject(new Error("No SVG input provided"));
       return;
     }
-    
+
     // If it's already a PNG data URL, return it as-is
-    if (svgInput.startsWith('data:image/png') || svgInput.startsWith('data:image/jpeg')) {
+    if (svgInput.startsWith("data:image/png") || svgInput.startsWith("data:image/jpeg")) {
       resolve(svgInput);
       return;
     }
-    
+
     // Create an image element
     const img = new Image();
-    img.crossOrigin = 'anonymous';
-    
+    img.crossOrigin = "anonymous";
+
     let objectUrl: string | null = null;
-    
+
     // Set a timeout to prevent hanging
     const timeoutId = setTimeout(() => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
-      reject(new Error('Image load timeout'));
+      reject(new Error("Image load timeout"));
     }, 10000);
-    
+
     img.onload = () => {
       clearTimeout(timeoutId);
       try {
-        const canvas = document.createElement('canvas');
+        const canvas = document.createElement("canvas");
         // Use natural dimensions if available, or fallback to requested size
         const naturalWidth = img.naturalWidth || img.width || width;
         const naturalHeight = img.naturalHeight || img.height || height;
-        
+
         // Set canvas size to requested dimensions
         canvas.width = width;
         canvas.height = height;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext("2d");
         if (ctx) {
           // Fill with white background for transparency handling
-          ctx.fillStyle = 'white';
+          ctx.fillStyle = "white";
           ctx.fillRect(0, 0, width, height);
-          
+
           // Scale image to fit while maintaining aspect ratio
           const scale = Math.min(width / naturalWidth, height / naturalHeight);
           const scaledWidth = naturalWidth * scale;
           const scaledHeight = naturalHeight * scale;
           const x = (width - scaledWidth) / 2;
           const y = (height - scaledHeight) / 2;
-          
+
           ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
-          const pngDataUrl = canvas.toDataURL('image/png', 1.0);
+          const pngDataUrl = canvas.toDataURL("image/png", 1.0);
           if (objectUrl) URL.revokeObjectURL(objectUrl);
           resolve(pngDataUrl);
         } else {
           if (objectUrl) URL.revokeObjectURL(objectUrl);
-          reject(new Error('Could not get canvas context'));
+          reject(new Error("Could not get canvas context"));
         }
       } catch (err) {
         if (objectUrl) URL.revokeObjectURL(objectUrl);
         reject(err);
       }
     };
-    
+
     img.onerror = (e) => {
       clearTimeout(timeoutId);
       if (objectUrl) URL.revokeObjectURL(objectUrl);
-      console.error('Image load error:', e);
-      reject(new Error('Failed to load SVG image'));
+      console.error("Image load error:", e);
+      reject(new Error("Failed to load SVG image"));
     };
-    
+
     // Handle different input types
-    if (svgInput.startsWith('data:image/svg+xml')) {
+    if (svgInput.startsWith("data:image/svg+xml")) {
       // SVG data URL - may be base64 or URI encoded
       img.src = svgInput;
-    } else if (svgInput.startsWith('http://') || svgInput.startsWith('https://')) {
+    } else if (svgInput.startsWith("http://") || svgInput.startsWith("https://")) {
       // HTTP URL - try to load directly, handle CORS by converting to canvas
       img.src = svgInput;
-    } else if (svgInput.startsWith('<svg') || svgInput.includes('xmlns') || svgInput.includes('<svg')) {
+    } else if (svgInput.startsWith("<svg") || svgInput.includes("xmlns") || svgInput.includes("<svg")) {
       // Raw SVG string - ensure proper encoding and create blob URL
       let svgContent = svgInput.trim();
-      
+
       // Add XML declaration if missing
-      if (!svgContent.startsWith('<?xml')) {
+      if (!svgContent.startsWith("<?xml")) {
         svgContent = '<?xml version="1.0" encoding="UTF-8"?>' + svgContent;
       }
-      
+
       // Ensure xmlns is present
-      if (!svgContent.includes('xmlns=')) {
-        svgContent = svgContent.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      if (!svgContent.includes("xmlns=")) {
+        svgContent = svgContent.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
       }
-      
-      const svgBlob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+
+      const svgBlob = new Blob([svgContent], { type: "image/svg+xml;charset=utf-8" });
       objectUrl = URL.createObjectURL(svgBlob);
       img.src = objectUrl;
     } else {
       // Unknown format, try using as-is
-      console.warn('Unknown image format, attempting to load:', svgInput.substring(0, 50));
+      console.warn("Unknown image format, attempting to load:", svgInput.substring(0, 50));
       img.src = svgInput;
     }
   });
@@ -212,8 +264,8 @@ const svgToPngDataUrl = async (svgInput: string, width: number = 200, height: nu
 const fetchImageAsArrayBuffer = async (imageUrl: string): Promise<ArrayBuffer | null> => {
   try {
     // Handle data URLs directly
-    if (imageUrl.startsWith('data:')) {
-      const base64Data = imageUrl.split(',')[1];
+    if (imageUrl.startsWith("data:")) {
+      const base64Data = imageUrl.split(",")[1];
       const binaryString = atob(base64Data);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
@@ -221,16 +273,16 @@ const fetchImageAsArrayBuffer = async (imageUrl: string): Promise<ArrayBuffer | 
       }
       return bytes.buffer;
     }
-    
+
     // Fetch external URL
     const response = await fetch(imageUrl);
     if (!response.ok) {
-      console.error('Failed to fetch image:', response.statusText);
+      console.error("Failed to fetch image:", response.statusText);
       return null;
     }
     return await response.arrayBuffer();
   } catch (error) {
-    console.error('Error fetching image as ArrayBuffer:', error);
+    console.error("Error fetching image as ArrayBuffer:", error);
     return null;
   }
 };
@@ -244,41 +296,41 @@ const PageBreakIndicators = ({
   pageMarginIn: number;
 }) => {
   const [pageBreaks, setPageBreaks] = useState<number[]>([]);
-  
+
   useEffect(() => {
     if (!contentRef.current) return;
-    
+
     // Standard US Letter: 11in page height minus margins for content area
     // At 96 DPI: inches * 96 = pixels per page content area
-    const pageContentHeight = Math.max(1, (11 - (pageMarginIn * 2)) * 96);
-    
+    const pageContentHeight = Math.max(1, (11 - pageMarginIn * 2) * 96);
+
     const calculateBreaks = () => {
       if (!contentRef.current) return;
       const contentHeight = contentRef.current.scrollHeight;
       const breaks: number[] = [];
-      
+
       // Add a break at each page boundary
       let currentPosition = pageContentHeight;
       while (currentPosition < contentHeight) {
         breaks.push(currentPosition);
         currentPosition += pageContentHeight;
       }
-      
+
       setPageBreaks(breaks);
     };
-    
+
     // Calculate on mount and when content changes
     calculateBreaks();
-    
+
     // Use ResizeObserver to detect content changes
     const observer = new ResizeObserver(calculateBreaks);
     observer.observe(contentRef.current);
-    
+
     return () => observer.disconnect();
   }, [contentRef, pageMarginIn]);
-  
+
   if (pageBreaks.length === 0) return null;
-  
+
   return (
     <>
       {pageBreaks.map((position, index) => (
@@ -286,35 +338,39 @@ const PageBreakIndicators = ({
           key={index}
           className="print:hidden"
           style={{
-            position: 'absolute',
+            position: "absolute",
             left: 0,
             right: 0,
             top: `${position}px`,
             zIndex: 10,
-            pointerEvents: 'none',
+            pointerEvents: "none",
           }}
         >
           {/* Dashed line */}
-          <div style={{
-            borderTop: '2px dashed #ef4444',
-            position: 'relative',
-          }}>
+          <div
+            style={{
+              borderTop: "2px dashed #ef4444",
+              position: "relative",
+            }}
+          >
             {/* Page number badge */}
-            <div style={{
-              position: 'absolute',
-              left: '50%',
-              transform: 'translateX(-50%) translateY(-50%)',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              padding: '0.25rem 0.75rem',
-              borderRadius: '9999px',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.375rem',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            }}>
+            <div
+              style={{
+                position: "absolute",
+                left: "50%",
+                transform: "translateX(-50%) translateY(-50%)",
+                backgroundColor: "#ef4444",
+                color: "white",
+                padding: "0.25rem 0.75rem",
+                borderRadius: "9999px",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: "0.375rem",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+              }}
+            >
               <Scissors className="h-3 w-3" />
               Page {index + 1} ends here
             </div>
@@ -332,28 +388,40 @@ interface WorksheetBuilderProps {
   onOpenAdaptiveGenerator?: () => void;
 }
 
-export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearAll, onOpenAdaptiveGenerator }: WorksheetBuilderProps) {
+export function WorksheetBuilder({
+  selectedQuestions,
+  onRemoveQuestion,
+  onClearAll,
+  onOpenAdaptiveGenerator,
+}: WorksheetBuilderProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { trackFeature } = useFeatureTracking();
-  const [worksheetTitle, setWorksheetTitle] = useState('Diagnostic Assessment');
+  const [worksheetTitle, setWorksheetTitle] = useState("Diagnostic Assessment");
   const [hasUserEditedTitle, setHasUserEditedTitle] = useState(false);
-  const [worksheetMode, setWorksheetMode] = useState<WorksheetMode>('diagnostic');
-  const [teacherName, setTeacherName] = useState('');
+  const [worksheetMode, setWorksheetMode] = useState<WorksheetMode>("diagnostic");
+  const [teacherName, setTeacherName] = useState("");
 
   // Auto-update title to first topic name when questions are added
   useEffect(() => {
     if (selectedQuestions.length > 0 && !hasUserEditedTitle) {
-      const prefix = worksheetMode === 'basic_assessment' ? 'Assessment: ' : 'Diagnostic: ';
+      const prefix = worksheetMode === "basic_assessment" ? "Assessment: " : "Diagnostic: ";
       setWorksheetTitle(prefix + selectedQuestions[0].topicName);
     } else if (selectedQuestions.length === 0 && !hasUserEditedTitle) {
-      setWorksheetTitle(worksheetMode === 'basic_assessment' ? 'Math Assessment' : 'Diagnostic Assessment');
+      setWorksheetTitle(worksheetMode === "basic_assessment" ? "Math Assessment" : "Diagnostic Assessment");
     }
   }, [selectedQuestions, hasUserEditedTitle, worksheetMode]);
   const [showAnswerLines, setShowAnswerLines] = useState(true);
-  const [questionCount, setQuestionCount] = useState('5');
-  const [difficultyFilter, setDifficultyFilter] = useState<string[]>(['medium', 'hard', 'challenging']);
-  const [bloomFilter, setBloomFilter] = useState<BloomLevel[]>(['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create']);
+  const [questionCount, setQuestionCount] = useState("5");
+  const [difficultyFilter, setDifficultyFilter] = useState<string[]>(["medium", "hard", "challenging"]);
+  const [bloomFilter, setBloomFilter] = useState<BloomLevel[]>([
+    "remember",
+    "understand",
+    "apply",
+    "analyze",
+    "evaluate",
+    "create",
+  ]);
   const [includeFormulas, setIncludeFormulas] = useState(false);
   const [includeFormulaSheet, setIncludeFormulaSheet] = useState(false);
   const [includeGraphPaper, setIncludeGraphPaper] = useState(false);
@@ -362,9 +430,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [useNanoBanana, setUseNanoBanana] = useState(false); // Use Nano Banana for realistic shape images
   const [imageSize, setImageSize] = useState(200); // Image size in pixels (100-400)
   const [includeAnswerKey, setIncludeAnswerKey] = useState(false); // Include answer key for teachers
-  const [marginSize, setMarginSize] = useState<'small' | 'medium' | 'large'>('medium'); // Page margin size
+  const [marginSize, setMarginSize] = useState<"small" | "medium" | "large">("medium"); // Page margin size
   const [includeScrapPaper, setIncludeScrapPaper] = useState(false); // Bundle scrap paper with worksheet
-  const [scrapPaperLayout, setScrapPaperLayout] = useState<'single' | 'split-2' | 'split-4'>('split-2'); // Scrap paper layout
+  const [scrapPaperLayout, setScrapPaperLayout] = useState<"single" | "split-2" | "split-4">("split-2"); // Scrap paper layout
   const [isCompiling, setIsCompiling] = useState(false);
   const [compiledQuestions, setCompiledQuestions] = useState<GeneratedQuestion[]>([]);
   const [isCompiled, setIsCompiled] = useState(false);
@@ -377,129 +445,125 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const [isLoadingWorksheets, setIsLoadingWorksheets] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  
+
   // Image generation state
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [imageGenerationProgress, setImageGenerationProgress] = useState(0);
-  const [imageGenerationStatus, setImageGenerationStatus] = useState('');
+  const [imageGenerationStatus, setImageGenerationStatus] = useState("");
   const [imagesGenerated, setImagesGenerated] = useState(false);
-  
+
   // Prompt editing modal state
   const [showPromptEditor, setShowPromptEditor] = useState(false);
   const [editablePrompts, setEditablePrompts] = useState<{ questionNumber: number; prompt: string }[]>([]);
-  
+
   // Single image regeneration state
   const [regeneratingQuestionNumber, setRegeneratingQuestionNumber] = useState<number | null>(null);
-  
+
   // Clipart state
   const [showClipartDialog, setShowClipartDialog] = useState(false);
   const [isGeneratingClipart, setIsGeneratingClipart] = useState(false);
   const [clipartProgress, setClipartProgress] = useState(0);
-  const [clipartStatus, setClipartStatus] = useState('');
+  const [clipartStatus, setClipartStatus] = useState("");
   const [clipartGenerated, setClipartGenerated] = useState(false);
   const [clipartSize, setClipartSize] = useState(15); // Clipart size in mm (10-40)
 
-  const marginMm = marginSize === 'small' ? 12 : marginSize === 'large' ? 25 : 20;
+  // PDF generation state
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  const marginMm = marginSize === "small" ? 12 : marginSize === "large" ? 25 : 20;
   const marginIn = marginMm / 25.4;
   const marginInCss = marginIn.toFixed(3);
   const marginPt = marginIn * 72;
-  
+
   // Lightbox state for full-screen image viewing
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
   const [lightboxQuestionNumber, setLightboxQuestionNumber] = useState<number | null>(null);
-  
+
   // Canvas drawing tool state
   const [showDrawingTool, setShowDrawingTool] = useState(false);
   const [drawingQuestionNumber, setDrawingQuestionNumber] = useState<number | null>(null);
-  
+
   // Push to NYCLogic AI state
   const [showPushDialog, setShowPushDialog] = useState(false);
   const [pushXpReward, setPushXpReward] = useState(50);
   const [pushCoinReward, setPushCoinReward] = useState(25);
-  const [pushDueDate, setPushDueDate] = useState('');
+  const [pushDueDate, setPushDueDate] = useState("");
   const [isPushing, setIsPushing] = useState(false);
   // Push button now uses direct database insert - no hook needed
-  
+
   // AI Image Review state
   const [showImageReviewDialog, setShowImageReviewDialog] = useState(false);
   const [imageSelectionQuestionNumber, setImageSelectionQuestionNumber] = useState<number | null>(null);
   const { pendingCount, saveImageForReview, approvedImages } = useAIImageLibrary();
-  
+
   // Scrap Paper Generator state
   const [showScrapPaperGenerator, setShowScrapPaperGenerator] = useState(false);
-  
+
   const printRef = useRef<HTMLDivElement>(null);
 
   // ESC key handler for preview modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showPreview) {
+      if (e.key === "Escape" && showPreview) {
         setShowPreview(false);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showPreview]);
 
   // Determine if selected topics are geometry/trigonometry related (for shape generation vs clipart)
-  const isGeometryOrTrigSubject = selectedQuestions.some(q => {
-    const subject = q.subject?.toLowerCase() || '';
-    const category = q.category?.toLowerCase() || '';
-    const topicName = q.topicName?.toLowerCase() || '';
+  const isGeometryOrTrigSubject = selectedQuestions.some((q) => {
+    const subject = q.subject?.toLowerCase() || "";
+    const category = q.category?.toLowerCase() || "";
+    const topicName = q.topicName?.toLowerCase() || "";
     return (
-      subject.includes('geometry') ||
-      subject.includes('trigonometry') ||
-      category.includes('geometry') ||
-      category.includes('trigonometry') ||
-      topicName.includes('geometry') ||
-      topicName.includes('trigonometry') ||
-      topicName.includes('triangle') ||
-      topicName.includes('circle') ||
-      topicName.includes('polygon') ||
-      topicName.includes('angle') ||
-      topicName.includes('congruence') ||
-      topicName.includes('similarity') ||
-      topicName.includes('pythagorean') ||
-      topicName.includes('sine') ||
-      topicName.includes('cosine') ||
-      topicName.includes('tangent')
+      subject.includes("geometry") ||
+      subject.includes("trigonometry") ||
+      category.includes("geometry") ||
+      category.includes("trigonometry") ||
+      topicName.includes("geometry") ||
+      topicName.includes("trigonometry") ||
+      topicName.includes("triangle") ||
+      topicName.includes("circle") ||
+      topicName.includes("polygon") ||
+      topicName.includes("angle") ||
+      topicName.includes("congruence") ||
+      topicName.includes("similarity") ||
+      topicName.includes("pythagorean") ||
+      topicName.includes("sine") ||
+      topicName.includes("cosine") ||
+      topicName.includes("tangent")
     );
   });
 
   const toggleDifficulty = (difficulty: string) => {
-    setDifficultyFilter(prev => 
-      prev.includes(difficulty)
-        ? prev.filter(d => d !== difficulty)
-        : [...prev, difficulty]
+    setDifficultyFilter((prev) =>
+      prev.includes(difficulty) ? prev.filter((d) => d !== difficulty) : [...prev, difficulty],
     );
   };
 
   const toggleBloomLevel = (level: BloomLevel) => {
-    setBloomFilter(prev => 
-      prev.includes(level)
-        ? prev.filter(l => l !== level)
-        : [...prev, level]
-    );
+    setBloomFilter((prev) => (prev.includes(level) ? prev.filter((l) => l !== level) : [...prev, level]));
   };
 
   const fetchSavedWorksheets = async () => {
     if (!user) return;
     setIsLoadingWorksheets(true);
     try {
-      const { data, error } = await supabase
-        .from('worksheets')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.from("worksheets").select("*").order("created_at", { ascending: false });
 
       if (error) throw error;
-      setSavedWorksheets((data || []).map(w => ({
-        ...w,
-        questions: w.questions as unknown as GeneratedQuestion[],
-        topics: w.topics as unknown as WorksheetQuestion[],
-        settings: w.settings as unknown as SavedWorksheet['settings'],
-      })));
+      setSavedWorksheets(
+        (data || []).map((w) => ({
+          ...w,
+          questions: w.questions as unknown as GeneratedQuestion[],
+          topics: w.topics as unknown as WorksheetQuestion[],
+          settings: w.settings as unknown as SavedWorksheet["settings"],
+        })),
+      );
     } catch (error) {
-      console.error('Error fetching worksheets:', error);
+      console.error("Error fetching worksheets:", error);
     } finally {
       setIsLoadingWorksheets(false);
     }
@@ -516,36 +580,38 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         teacher_name: teacherName || null,
         questions: JSON.parse(JSON.stringify(compiledQuestions)),
         topics: JSON.parse(JSON.stringify(selectedQuestions)),
-        settings: JSON.parse(JSON.stringify({
-          questionCount,
-          difficultyFilter,
-          showAnswerLines,
-          includeFormulas,
-          includeFormulaSheet,
-          includeGraphPaper,
-          includeCoordinateGeometry,
-          useAIImages,
-          imageSize,
-          includeClipart: clipartGenerated,
-          worksheetMode,
-          includeAnswerKey,
-        })),
+        settings: JSON.parse(
+          JSON.stringify({
+            questionCount,
+            difficultyFilter,
+            showAnswerLines,
+            includeFormulas,
+            includeFormulaSheet,
+            includeGraphPaper,
+            includeCoordinateGeometry,
+            useAIImages,
+            imageSize,
+            includeClipart: clipartGenerated,
+            worksheetMode,
+            includeAnswerKey,
+          }),
+        ),
       };
-      const { error } = await supabase.from('worksheets').insert([worksheetData]);
+      const { error } = await supabase.from("worksheets").insert([worksheetData]);
 
       if (error) throw error;
 
       toast({
-        title: 'Worksheet saved!',
-        description: 'You can access it from your saved worksheets.',
+        title: "Worksheet saved!",
+        description: "You can access it from your saved worksheets.",
       });
       fetchSavedWorksheets();
     } catch (error) {
-      console.error('Error saving worksheet:', error);
+      console.error("Error saving worksheet:", error);
       toast({
-        title: 'Failed to save',
-        description: 'Could not save worksheet. Please try again.',
-        variant: 'destructive',
+        title: "Failed to save",
+        description: "Could not save worksheet. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setIsSaving(false);
@@ -555,7 +621,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const loadWorksheet = (worksheet: SavedWorksheet) => {
     setWorksheetTitle(worksheet.title);
     setHasUserEditedTitle(true);
-    setTeacherName(worksheet.teacher_name || '');
+    setTeacherName(worksheet.teacher_name || "");
     setCompiledQuestions(worksheet.questions);
     setQuestionCount(worksheet.settings.questionCount);
     setDifficultyFilter(worksheet.settings.difficultyFilter);
@@ -564,29 +630,29 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setIncludeFormulaSheet(worksheet.settings.includeFormulaSheet ?? false);
     setIncludeGraphPaper(worksheet.settings.includeGraphPaper ?? false);
     setIncludeCoordinateGeometry(worksheet.settings.includeCoordinateGeometry ?? false);
-    setUseAIImages(worksheet.settings.useAIImages ?? (worksheet.settings.includeGeometry ?? false));
+    setUseAIImages(worksheet.settings.useAIImages ?? worksheet.settings.includeGeometry ?? false);
     setImageSize(worksheet.settings.imageSize ?? 200);
     setIncludeAnswerKey(worksheet.settings.includeAnswerKey ?? false);
     setIsCompiled(true);
     setShowSavedWorksheets(false);
     toast({
-      title: 'Worksheet loaded',
+      title: "Worksheet loaded",
       description: `"${worksheet.title}" has been loaded.`,
     });
   };
 
   const deleteWorksheet = async (id: string) => {
     try {
-      const { error } = await supabase.from('worksheets').delete().eq('id', id);
+      const { error } = await supabase.from("worksheets").delete().eq("id", id);
       if (error) throw error;
-      setSavedWorksheets(prev => prev.filter(w => w.id !== id));
-      toast({ title: 'Worksheet deleted' });
+      setSavedWorksheets((prev) => prev.filter((w) => w.id !== id));
+      toast({ title: "Worksheet deleted" });
     } catch (error) {
-      console.error('Error deleting worksheet:', error);
+      console.error("Error deleting worksheet:", error);
       toast({
-        title: 'Failed to delete',
-        description: 'Could not delete worksheet.',
-        variant: 'destructive',
+        title: "Failed to delete",
+        description: "Could not delete worksheet.",
+        variant: "destructive",
       });
     }
   };
@@ -601,37 +667,37 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       if (worksheet.is_shared) {
         // Unshare
         const { error } = await supabase
-          .from('worksheets')
+          .from("worksheets")
           .update({ is_shared: false, share_code: null })
-          .eq('id', worksheet.id);
+          .eq("id", worksheet.id);
 
         if (error) throw error;
 
-        setSavedWorksheets(prev => prev.map(w => 
-          w.id === worksheet.id ? { ...w, is_shared: false, share_code: null } : w
-        ));
-        toast({ title: 'Worksheet unshared' });
+        setSavedWorksheets((prev) =>
+          prev.map((w) => (w.id === worksheet.id ? { ...w, is_shared: false, share_code: null } : w)),
+        );
+        toast({ title: "Worksheet unshared" });
       } else {
         // Share
         const shareCode = generateShareCode();
         const { error } = await supabase
-          .from('worksheets')
+          .from("worksheets")
           .update({ is_shared: true, share_code: shareCode })
-          .eq('id', worksheet.id);
+          .eq("id", worksheet.id);
 
         if (error) throw error;
 
-        setSavedWorksheets(prev => prev.map(w => 
-          w.id === worksheet.id ? { ...w, is_shared: true, share_code: shareCode } : w
-        ));
-        toast({ title: 'Worksheet shared!' });
+        setSavedWorksheets((prev) =>
+          prev.map((w) => (w.id === worksheet.id ? { ...w, is_shared: true, share_code: shareCode } : w)),
+        );
+        toast({ title: "Worksheet shared!" });
       }
     } catch (error) {
-      console.error('Error toggling share:', error);
+      console.error("Error toggling share:", error);
       toast({
-        title: 'Failed to update sharing',
-        description: 'Please try again.',
-        variant: 'destructive',
+        title: "Failed to update sharing",
+        description: "Please try again.",
+        variant: "destructive",
       });
     } finally {
       setIsSharing(false);
@@ -644,12 +710,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       await navigator.clipboard.writeText(shareUrl);
       setCopiedId(worksheetId);
       setTimeout(() => setCopiedId(null), 2000);
-      toast({ title: 'Link copied to clipboard!' });
+      toast({ title: "Link copied to clipboard!" });
     } catch (error) {
       toast({
-        title: 'Failed to copy',
+        title: "Failed to copy",
         description: shareUrl,
-        variant: 'destructive',
+        variant: "destructive",
       });
     }
   };
@@ -663,9 +729,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const compileWorksheet = async () => {
     if (selectedQuestions.length === 0) {
       toast({
-        title: 'No topics selected',
-        description: 'Please select at least one topic to compile.',
-        variant: 'destructive',
+        title: "No topics selected",
+        description: "Please select at least one topic to compile.",
+        variant: "destructive",
       });
       return;
     }
@@ -673,9 +739,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setIsCompiling(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('generate-worksheet-questions', {
+      const { data, error } = await supabase.functions.invoke("generate-worksheet-questions", {
         body: {
-          topics: selectedQuestions.map(q => ({
+          topics: selectedQuestions.map((q) => ({
             topicName: q.topicName,
             standard: q.standard,
             subject: q.subject,
@@ -696,7 +762,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       });
 
       if (error) {
-        handleApiError(error, 'Worksheet generation');
+        handleApiError(error, "Worksheet generation");
         return;
       }
 
@@ -707,12 +773,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       if (data.questions && data.questions.length > 0) {
         setCompiledQuestions(data.questions);
         setIsCompiled(true);
-        
+
         // Track worksheet compilation
         trackFeature({
-          featureName: 'Compile Worksheet',
-          category: 'worksheets',
-          action: 'compiled',
+          featureName: "Compile Worksheet",
+          category: "worksheets",
+          action: "compiled",
           metadata: {
             questionCount: data.questions.length,
             topicCount: selectedQuestions.length,
@@ -725,21 +791,21 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         if (!isGeometryOrTrigSubject) {
           setShowClipartDialog(true);
           toast({
-            title: 'Worksheet compiled!',
+            title: "Worksheet compiled!",
             description: `Generated ${data.questions.length} questions. Would you like to add clipart?`,
           });
         } else {
           toast({
-            title: 'Worksheet compiled!',
+            title: "Worksheet compiled!",
             description: `Generated ${data.questions.length} questions. You can generate diagrams for geometry problems.`,
           });
         }
       } else {
-        throw new Error('No questions generated');
+        throw new Error("No questions generated");
       }
     } catch (error) {
-      console.error('Error compiling worksheet:', error);
-      handleApiError(error, 'Worksheet generation');
+      console.error("Error compiling worksheet:", error);
+      handleApiError(error, "Worksheet generation");
     } finally {
       setIsCompiling(false);
     }
@@ -750,10 +816,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setCompiledQuestions([]);
     setImagesGenerated(false);
     setImageGenerationProgress(0);
-    setImageGenerationStatus('');
+    setImageGenerationStatus("");
     setClipartGenerated(false);
     setClipartProgress(0);
-    setClipartStatus('');
+    setClipartStatus("");
   };
 
   // Generate clipart for all questions
@@ -763,7 +829,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setShowClipartDialog(false);
     setIsGeneratingClipart(true);
     setClipartProgress(0);
-    setClipartStatus('Generating fun clipart for your worksheet...');
+    setClipartStatus("Generating fun clipart for your worksheet...");
 
     try {
       const updatedQuestions = [...compiledQuestions];
@@ -776,12 +842,14 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         // Create a themed clipart prompt based on the question topic
         const clipartPrompt = `Create a simple, fun, black and white line art clipart icon suitable for a math worksheet. The clipart should relate to: "${question.topic}" in the context of ${question.question.substring(0, 100)}. Make it educational, appropriate for students, simple enough to print clearly, cartoon-style with clean lines. No text, just the image. White background.`;
 
-        const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+        const { data, error } = await supabase.functions.invoke("generate-diagram-images", {
           body: {
-            questions: [{
-              questionNumber: question.questionNumber,
-              imagePrompt: clipartPrompt,
-            }],
+            questions: [
+              {
+                questionNumber: question.questionNumber,
+                imagePrompt: clipartPrompt,
+              },
+            ],
           },
         });
 
@@ -798,17 +866,17 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
       setCompiledQuestions(updatedQuestions);
       setClipartGenerated(true);
-      
+
       toast({
-        title: 'Clipart added!',
+        title: "Clipart added!",
         description: `Successfully generated ${successCount} clipart images for your worksheet.`,
       });
     } catch (error) {
-      console.error('Error generating clipart:', error);
+      console.error("Error generating clipart:", error);
       toast({
-        title: 'Clipart generation failed',
-        description: 'Some clipart could not be generated. You can continue without them.',
-        variant: 'destructive',
+        title: "Clipart generation failed",
+        description: "Some clipart could not be generated. You can continue without them.",
+        variant: "destructive",
       });
     } finally {
       setIsGeneratingClipart(false);
@@ -818,7 +886,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
   // Regenerate clipart for a single question
   const regenerateClipart = async (questionNumber: number) => {
-    const question = compiledQuestions.find(q => q.questionNumber === questionNumber);
+    const question = compiledQuestions.find((q) => q.questionNumber === questionNumber);
     if (!question) return;
 
     setRegeneratingQuestionNumber(questionNumber);
@@ -826,36 +894,36 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     try {
       const clipartPrompt = `Create a simple, fun, black and white line art clipart icon suitable for a math worksheet. The clipart should relate to: "${question.topic}" in the context of ${question.question.substring(0, 100)}. Make it educational, appropriate for students, simple enough to print clearly, cartoon-style with clean lines. No text, just the image. White background.`;
 
-      const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+      const { data, error } = await supabase.functions.invoke("generate-diagram-images", {
         body: {
-          questions: [{
-            questionNumber: questionNumber,
-            imagePrompt: clipartPrompt,
-          }],
+          questions: [
+            {
+              questionNumber: questionNumber,
+              imagePrompt: clipartPrompt,
+            },
+          ],
         },
       });
 
       if (!error && data?.results?.[0]?.imageUrl) {
-        const updatedQuestions = compiledQuestions.map(q =>
-          q.questionNumber === questionNumber
-            ? { ...q, clipartUrl: data.results[0].imageUrl }
-            : q
+        const updatedQuestions = compiledQuestions.map((q) =>
+          q.questionNumber === questionNumber ? { ...q, clipartUrl: data.results[0].imageUrl } : q,
         );
         setCompiledQuestions(updatedQuestions);
-        
+
         toast({
-          title: 'Clipart regenerated!',
+          title: "Clipart regenerated!",
           description: `New clipart created for question ${questionNumber}.`,
         });
       } else {
-        throw new Error('No image returned');
+        throw new Error("No image returned");
       }
     } catch (error) {
-      console.error('Error regenerating clipart:', error);
+      console.error("Error regenerating clipart:", error);
       toast({
-        title: 'Regeneration failed',
-        description: 'Could not regenerate the clipart. Please try again.',
-        variant: 'destructive',
+        title: "Regeneration failed",
+        description: "Could not regenerate the clipart. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setRegeneratingQuestionNumber(null);
@@ -863,29 +931,44 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   };
 
   // Check if there are questions that need images
-  const questionsNeedingImages = compiledQuestions.filter(q => q.imagePrompt && !q.imageUrl);
-  const hasQuestionsWithImagePrompts = compiledQuestions.some(q => q.imagePrompt);
+  const questionsNeedingImages = compiledQuestions.filter((q) => q.imagePrompt && !q.imageUrl);
+  const hasQuestionsWithImagePrompts = compiledQuestions.some((q) => q.imagePrompt);
+
+  // Helper to enhance prompts for better graph generation
+  const enhanceGraphPrompt = (prompt: string): string => {
+    if (!prompt) return prompt;
+
+    const lower = prompt.toLowerCase();
+    const isGraph =
+      lower.includes("graph") || lower.includes("plot") || lower.includes("coordinate") || lower.includes("axis");
+
+    if (isGraph) {
+      // Check if it already has the enhancement (to avoid duplication)
+      if (prompt.includes("Ensure x and y axes are clearly labeled")) return prompt;
+
+      return `${prompt} . IMPORTANT: Ensure x and y axes are clearly labeled with unique, non-repeating integers. If plotting a range (e.g. 1 to 10), show marks at standard intervals (1, 2, 5, etc). Do not duplicate numbers. Plot points accurately. White background, high contrast, black line art. No grid lines unless necessary.`;
+    }
+    return prompt;
+  };
 
   // Open prompt editor modal
   const openPromptEditor = () => {
-    const promptsToEdit = compiledQuestions
-      .filter(q => q.imagePrompt && !q.imageUrl)
-      .map(q => ({
-        questionNumber: q.questionNumber,
-        prompt: q.imagePrompt!,
-      }));
+    // If pending images exist, prioritize them. Otherwise enable review of all prompts.
+    const targetQuestions =
+      questionsNeedingImages.length > 0 ? questionsNeedingImages : compiledQuestions.filter((q) => q.imagePrompt);
+
+    const promptsToEdit = targetQuestions.map((q) => ({
+      questionNumber: q.questionNumber,
+      prompt: q.imagePrompt!,
+    }));
     setEditablePrompts(promptsToEdit);
     setShowPromptEditor(true);
   };
 
   // Update a single prompt in the editable prompts array
   const updateEditablePrompt = (questionNumber: number, newPrompt: string) => {
-    setEditablePrompts(prev =>
-      prev.map(p =>
-        p.questionNumber === questionNumber
-          ? { ...p, prompt: newPrompt }
-          : p
-      )
+    setEditablePrompts((prev) =>
+      prev.map((p) => (p.questionNumber === questionNumber ? { ...p, prompt: newPrompt } : p)),
     );
   };
 
@@ -893,15 +976,15 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const generateImagesWithEditedPrompts = async () => {
     if (editablePrompts.length === 0) {
       toast({
-        title: 'No diagrams to generate',
-        description: 'All questions already have images or no diagrams are needed.',
+        title: "No diagrams to generate",
+        description: "All questions already have images or no diagrams are needed.",
       });
       return;
     }
 
     // Update the compiled questions with edited prompts before generating
-    const updatedQuestions = compiledQuestions.map(q => {
-      const editedPrompt = editablePrompts.find(p => p.questionNumber === q.questionNumber);
+    const updatedQuestions = compiledQuestions.map((q) => {
+      const editedPrompt = editablePrompts.find((p) => p.questionNumber === q.questionNumber);
       if (editedPrompt) {
         return { ...q, imagePrompt: editedPrompt.prompt };
       }
@@ -915,11 +998,11 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setImageGenerationStatus(`Generating images for ${editablePrompts.length} questions...`);
 
     try {
-      const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+      const { data, error } = await supabase.functions.invoke("generate-diagram-images", {
         body: {
-          questions: editablePrompts.map(p => ({
+          questions: editablePrompts.map((p) => ({
             questionNumber: p.questionNumber,
-            imagePrompt: p.prompt,
+            imagePrompt: enhanceGraphPrompt(p.prompt),
           })),
           useNanoBanana,
         },
@@ -931,19 +1014,19 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         // Update questions with generated images and save for review
         const finalQuestions = [...updatedQuestions];
         let successCount = 0;
-        
+
         for (const result of data.results) {
-          const questionIndex = finalQuestions.findIndex(q => q.questionNumber === result.questionNumber);
+          const questionIndex = finalQuestions.findIndex((q) => q.questionNumber === result.questionNumber);
           if (questionIndex !== -1 && result.imageUrl) {
             const question = finalQuestions[questionIndex];
-            
+
             // Save image to library for teacher review
-            await saveImageForReview(result.imageUrl, question.imagePrompt || '', {
-              subject: selectedQuestions[0]?.subject || 'math',
+            await saveImageForReview(result.imageUrl, question.imagePrompt || "", {
+              subject: selectedQuestions[0]?.subject || "math",
               topic: question.topic,
-              source: 'worksheet',
+              source: "worksheet",
             });
-            
+
             finalQuestions[questionIndex] = {
               ...finalQuestions[questionIndex],
               imageUrl: result.imageUrl,
@@ -958,18 +1041,18 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
         setCompiledQuestions(finalQuestions);
         setImagesGenerated(true);
-        
+
         toast({
-          title: 'Diagrams generated & saved for review!',
+          title: "Diagrams generated & saved for review!",
           description: `${successCount} images created. Review them in your Image Library before using on worksheets.`,
         });
       }
     } catch (error) {
-      console.error('Error generating images:', error);
+      console.error("Error generating images:", error);
       toast({
-        title: 'Image generation failed',
-        description: 'Some diagrams could not be generated. You can try again.',
-        variant: 'destructive',
+        title: "Image generation failed",
+        description: "Some diagrams could not be generated. You can try again.",
+        variant: "destructive",
       });
     } finally {
       setIsGeneratingImages(false);
@@ -979,12 +1062,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
   // Regenerate a single image
   const regenerateSingleImage = async (questionNumber: number) => {
-    const question = compiledQuestions.find(q => q.questionNumber === questionNumber);
+    const question = compiledQuestions.find((q) => q.questionNumber === questionNumber);
     if (!question?.imagePrompt) {
       toast({
-        title: 'Cannot regenerate',
-        description: 'No diagram prompt found for this question.',
-        variant: 'destructive',
+        title: "Cannot regenerate",
+        description: "No diagram prompt found for this question.",
+        variant: "destructive",
       });
       return;
     }
@@ -992,12 +1075,14 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setRegeneratingQuestionNumber(questionNumber);
 
     try {
-      const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
+      const { data, error } = await supabase.functions.invoke("generate-diagram-images", {
         body: {
-          questions: [{
-            questionNumber: questionNumber,
-            imagePrompt: question.imagePrompt,
-          }],
+          questions: [
+            {
+              questionNumber: questionNumber,
+              imagePrompt: enhanceGraphPrompt(question.imagePrompt),
+            },
+          ],
           useNanoBanana,
         },
       });
@@ -1005,26 +1090,24 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       if (error) throw error;
 
       if (data.results && data.results[0]?.imageUrl) {
-        const updatedQuestions = compiledQuestions.map(q =>
-          q.questionNumber === questionNumber
-            ? { ...q, imageUrl: data.results[0].imageUrl }
-            : q
+        const updatedQuestions = compiledQuestions.map((q) =>
+          q.questionNumber === questionNumber ? { ...q, imageUrl: data.results[0].imageUrl } : q,
         );
         setCompiledQuestions(updatedQuestions);
-        
+
         toast({
-          title: 'Diagram regenerated!',
+          title: "Diagram regenerated!",
           description: `New diagram created for question ${questionNumber}.`,
         });
       } else {
-        throw new Error('No image returned');
+        throw new Error("No image returned");
       }
     } catch (error) {
-      console.error('Error regenerating image:', error);
+      console.error("Error regenerating image:", error);
       toast({
-        title: 'Regeneration failed',
-        description: 'Could not regenerate the diagram. Please try again.',
-        variant: 'destructive',
+        title: "Regeneration failed",
+        description: "Could not regenerate the diagram. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setRegeneratingQuestionNumber(null);
@@ -1034,14 +1117,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   // Handle saving custom drawing to a question
   const handleSaveDrawing = (dataUrl: string, questionNumber?: number) => {
     if (questionNumber) {
-      const updatedQuestions = compiledQuestions.map(q =>
-        q.questionNumber === questionNumber
-          ? { ...q, imageUrl: dataUrl }
-          : q
+      const updatedQuestions = compiledQuestions.map((q) =>
+        q.questionNumber === questionNumber ? { ...q, imageUrl: dataUrl } : q,
       );
       setCompiledQuestions(updatedQuestions);
       toast({
-        title: 'Drawing added!',
+        title: "Drawing added!",
         description: `Custom shape added to question ${questionNumber}.`,
       });
     }
@@ -1051,38 +1132,38 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
   // State for regenerating question text
   const [regeneratingQuestionTextNumber, setRegeneratingQuestionTextNumber] = useState<number | null>(null);
-  
+
   // State for tracking recently corrected symbols per question
   const [correctedSymbols, setCorrectedSymbols] = useState<Record<number, string[]>>({});
 
   // Helper to detect encoding issues in question text BEFORE regeneration
   const detectEncodingIssues = (text: string): { hasIssues: boolean; issues: string[] } => {
     const issues: string[] = [];
-    
+
     // Common UTF-8 mojibake patterns that indicate encoding corruption
     const corruptionPatterns: { pattern: RegExp; description: string }[] = [
-      { pattern: /Â(?=[πθ°²³√≤≥≠±×÷∠△½¼¾⊥∥≅])/g, description: 'Â before symbol' },
-      { pattern: /Â(?=\d)/g, description: 'Â before number (likely π)' },
-      { pattern: /(\d)Â\s/g, description: 'number + Â (likely π)' },
-      { pattern: /Â°/g, description: 'corrupted degree symbol' },
-      { pattern: /Â²/g, description: 'corrupted squared' },
-      { pattern: /Â³/g, description: 'corrupted cubed' },
-      { pattern: /Â½/g, description: 'corrupted ½' },
-      { pattern: /Â¼/g, description: 'corrupted ¼' },
-      { pattern: /Â¾/g, description: 'corrupted ¾' },
-      { pattern: /Â±/g, description: 'corrupted ±' },
-      { pattern: /â‰¤/g, description: 'corrupted ≤' },
-      { pattern: /â‰¥/g, description: 'corrupted ≥' },
-      { pattern: /â‰ /g, description: 'corrupted ≠' },
-      { pattern: /âˆš/g, description: 'corrupted √' },
-      { pattern: /Ï€/g, description: 'corrupted π' },
-      { pattern: /Î¸/g, description: 'corrupted θ' },
-      { pattern: /Î±/g, description: 'corrupted α' },
-      { pattern: /Î²/g, description: 'corrupted β' },
-      { pattern: /â†'/g, description: 'corrupted →' },
-      { pattern: /âˆž/g, description: 'corrupted ∞' },
+      { pattern: /Â(?=[πθ°²³√≤≥≠±×÷∠△½¼¾⊥∥≅])/g, description: "Â before symbol" },
+      { pattern: /Â(?=\d)/g, description: "Â before number (likely π)" },
+      { pattern: /(\d)Â\s/g, description: "number + Â (likely π)" },
+      { pattern: /Â°/g, description: "corrupted degree symbol" },
+      { pattern: /Â²/g, description: "corrupted squared" },
+      { pattern: /Â³/g, description: "corrupted cubed" },
+      { pattern: /Â½/g, description: "corrupted ½" },
+      { pattern: /Â¼/g, description: "corrupted ¼" },
+      { pattern: /Â¾/g, description: "corrupted ¾" },
+      { pattern: /Â±/g, description: "corrupted ±" },
+      { pattern: /â‰¤/g, description: "corrupted ≤" },
+      { pattern: /â‰¥/g, description: "corrupted ≥" },
+      { pattern: /â‰ /g, description: "corrupted ≠" },
+      { pattern: /âˆš/g, description: "corrupted √" },
+      { pattern: /Ï€/g, description: "corrupted π" },
+      { pattern: /Î¸/g, description: "corrupted θ" },
+      { pattern: /Î±/g, description: "corrupted α" },
+      { pattern: /Î²/g, description: "corrupted β" },
+      { pattern: /â†'/g, description: "corrupted →" },
+      { pattern: /âˆž/g, description: "corrupted ∞" },
       // Generic Â not followed by expected characters (likely corruption)
-      { pattern: /Â(?!\s|$)/g, description: 'stray Â character' },
+      { pattern: /Â(?!\s|$)/g, description: "stray Â character" },
     ];
 
     for (const { pattern, description } of corruptionPatterns) {
@@ -1097,47 +1178,47 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   // Helper to detect math symbols that were fixed
   const detectCorrectedSymbols = (oldText: string, newText: string): string[] => {
     const mathSymbolPatterns: { pattern: RegExp; name: string }[] = [
-      { pattern: /π/g, name: 'π (pi)' },
-      { pattern: /°/g, name: '° (degrees)' },
-      { pattern: /²/g, name: '² (squared)' },
-      { pattern: /³/g, name: '³ (cubed)' },
-      { pattern: /√/g, name: '√ (square root)' },
-      { pattern: /≤/g, name: '≤ (less than or equal)' },
-      { pattern: /≥/g, name: '≥ (greater than or equal)' },
-      { pattern: /≠/g, name: '≠ (not equal)' },
-      { pattern: /±/g, name: '± (plus/minus)' },
-      { pattern: /×/g, name: '× (times)' },
-      { pattern: /÷/g, name: '÷ (divide)' },
-      { pattern: /θ/g, name: 'θ (theta)' },
-      { pattern: /∠/g, name: '∠ (angle)' },
-      { pattern: /△/g, name: '△ (triangle)' },
-      { pattern: /½/g, name: '½ (one half)' },
-      { pattern: /¼/g, name: '¼ (one quarter)' },
-      { pattern: /¾/g, name: '¾ (three quarters)' },
-      { pattern: /⊥/g, name: '⊥ (perpendicular)' },
-      { pattern: /∥/g, name: '∥ (parallel)' },
-      { pattern: /≅/g, name: '≅ (congruent)' },
+      { pattern: /π/g, name: "π (pi)" },
+      { pattern: /°/g, name: "° (degrees)" },
+      { pattern: /²/g, name: "² (squared)" },
+      { pattern: /³/g, name: "³ (cubed)" },
+      { pattern: /√/g, name: "√ (square root)" },
+      { pattern: /≤/g, name: "≤ (less than or equal)" },
+      { pattern: /≥/g, name: "≥ (greater than or equal)" },
+      { pattern: /≠/g, name: "≠ (not equal)" },
+      { pattern: /±/g, name: "± (plus/minus)" },
+      { pattern: /×/g, name: "× (times)" },
+      { pattern: /÷/g, name: "÷ (divide)" },
+      { pattern: /θ/g, name: "θ (theta)" },
+      { pattern: /∠/g, name: "∠ (angle)" },
+      { pattern: /△/g, name: "△ (triangle)" },
+      { pattern: /½/g, name: "½ (one half)" },
+      { pattern: /¼/g, name: "¼ (one quarter)" },
+      { pattern: /¾/g, name: "¾ (three quarters)" },
+      { pattern: /⊥/g, name: "⊥ (perpendicular)" },
+      { pattern: /∥/g, name: "∥ (parallel)" },
+      { pattern: /≅/g, name: "≅ (congruent)" },
     ];
 
     const corrected: string[] = [];
-    
+
     // Check for symbols that appear in new text but were corrupted in old text
     for (const { pattern, name } of mathSymbolPatterns) {
       const newMatches = (newText.match(pattern) || []).length;
       const oldMatches = (oldText.match(pattern) || []).length;
-      
+
       // If new text has more of this symbol, it was likely fixed
       if (newMatches > oldMatches) {
         corrected.push(name);
       }
     }
-    
+
     // Also check for common corruption patterns that were fixed
     const corruptionPatterns = [
-      { old: /Â/g, name: 'encoding errors' },
-      { old: /â€/g, name: 'character corruption' },
+      { old: /Â/g, name: "encoding errors" },
+      { old: /â€/g, name: "character corruption" },
     ];
-    
+
     for (const { old, name } of corruptionPatterns) {
       if (old.test(oldText) && !old.test(newText)) {
         corrected.push(name);
@@ -1149,24 +1230,26 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
   // Regenerate the text of a single question (to fix formatting issues like π rendering)
   const regenerateQuestionText = async (questionNumber: number) => {
-    const question = compiledQuestions.find(q => q.questionNumber === questionNumber);
+    const question = compiledQuestions.find((q) => q.questionNumber === questionNumber);
     if (!question) return;
 
     const oldQuestionText = question.question;
     setRegeneratingQuestionTextNumber(questionNumber);
 
     try {
-      const { data, error } = await supabase.functions.invoke('generate-worksheet-questions', {
+      const { data, error } = await supabase.functions.invoke("generate-worksheet-questions", {
         body: {
-          topics: [{
-            topicName: question.topic,
-            standard: question.standard,
-            subject: selectedQuestions[0]?.subject || 'Math',
-            category: selectedQuestions[0]?.category || 'General',
-          }],
+          topics: [
+            {
+              topicName: question.topic,
+              standard: question.standard,
+              subject: selectedQuestions[0]?.subject || "Math",
+              category: selectedQuestions[0]?.category || "General",
+            },
+          ],
           questionCount: 1,
           difficultyLevels: [question.difficulty],
-          bloomLevels: question.bloomLevel ? [question.bloomLevel] : ['apply'],
+          bloomLevels: question.bloomLevel ? [question.bloomLevel] : ["apply"],
           includeGeometry: !!question.imagePrompt,
           includeFormulas,
           includeGraphPaper,
@@ -1180,51 +1263,51 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
       if (data.questions && data.questions[0]) {
         const newQuestion = data.questions[0];
-        const updatedQuestions = compiledQuestions.map(q =>
+        const updatedQuestions = compiledQuestions.map((q) =>
           q.questionNumber === questionNumber
-            ? { 
-                ...q, 
+            ? {
+                ...q,
                 question: newQuestion.question,
                 bloomLevel: newQuestion.bloomLevel || q.bloomLevel,
                 bloomVerb: newQuestion.bloomVerb || q.bloomVerb,
                 imagePrompt: newQuestion.imagePrompt || q.imagePrompt,
               }
-            : q
+            : q,
         );
         setCompiledQuestions(updatedQuestions);
-        
+
         // Detect which symbols were corrected
         const detected = detectCorrectedSymbols(oldQuestionText, newQuestion.question);
-        
+
         if (detected.length > 0) {
           // Store corrected symbols for visual display
-          setCorrectedSymbols(prev => ({ ...prev, [questionNumber]: detected }));
-          
+          setCorrectedSymbols((prev) => ({ ...prev, [questionNumber]: detected }));
+
           // Clear the indicator after 5 seconds
           setTimeout(() => {
-            setCorrectedSymbols(prev => {
+            setCorrectedSymbols((prev) => {
               const newState = { ...prev };
               delete newState[questionNumber];
               return newState;
             });
           }, 5000);
-          
+
           toast({
-            title: '✓ Symbols corrected!',
-            description: `Fixed: ${detected.join(', ')}`,
+            title: "✓ Symbols corrected!",
+            description: `Fixed: ${detected.join(", ")}`,
           });
         } else {
           toast({
-            title: 'Question regenerated!',
+            title: "Question regenerated!",
             description: `New question text created for question ${questionNumber}.`,
           });
         }
       } else {
-        throw new Error('No question returned');
+        throw new Error("No question returned");
       }
     } catch (error) {
-      console.error('Error regenerating question:', error);
-      handleApiError(error, 'Question regeneration');
+      console.error("Error regenerating question:", error);
+      handleApiError(error, "Question regeneration");
     } finally {
       setRegeneratingQuestionTextNumber(null);
     }
@@ -1237,7 +1320,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     y: number,
     width: number,
     height: number,
-    problemNumber: number
+    problemNumber: number,
   ) => {
     // Main container border (navy blue)
     pdf.setDrawColor(30, 58, 95);
@@ -1246,26 +1329,26 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
     // Work area background
     pdf.setFillColor(248, 250, 252);
-    pdf.rect(x + 0.4, y + 0.4, width - 0.8, height - 0.8, 'F');
+    pdf.rect(x + 0.4, y + 0.4, width - 0.8, height - 0.8, "F");
 
     // Problem label header
     const headerHeight = 8;
     pdf.setFillColor(224, 242, 254);
-    pdf.rect(x + 0.4, y + 0.4, width - 0.8, headerHeight, 'F');
-    
+    pdf.rect(x + 0.4, y + 0.4, width - 0.8, headerHeight, "F");
+
     // Problem number badge
     pdf.setFillColor(30, 58, 95);
-    pdf.roundedRect(x + 3, y + 2, 28, 5, 1, 1, 'F');
+    pdf.roundedRect(x + 3, y + 2, 28, 5, 1, 1, "F");
     pdf.setFontSize(7);
-    pdf.setFont('helvetica', 'bold');
+    pdf.setFont("helvetica", "bold");
     pdf.setTextColor(255, 255, 255);
     pdf.text(`PROBLEM #${problemNumber}`, x + 5, y + 5.5);
 
     // Instructions
     pdf.setFontSize(6);
-    pdf.setFont('helvetica', 'italic');
+    pdf.setFont("helvetica", "italic");
     pdf.setTextColor(100, 116, 139);
-    pdf.text('Show all work within this zone', x + width - 38, y + 5.5);
+    pdf.text("Show all work within this zone", x + width - 38, y + 5.5);
     pdf.setTextColor(0);
 
     // Separator line
@@ -1319,7 +1402,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
     // Answer section background (amber)
     pdf.setFillColor(254, 243, 199);
-    pdf.rect(x + 0.4, answerY + 0.5, width - 0.8, answerSectionHeight, 'F');
+    pdf.rect(x + 0.4, answerY + 0.5, width - 0.8, answerSectionHeight, "F");
 
     // Answer section top border
     pdf.setDrawColor(245, 158, 11);
@@ -1328,12 +1411,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
     // Final Answer badge
     pdf.setFillColor(253, 230, 138);
-    pdf.roundedRect(x + 3, answerY + 2.5, 25, 5, 1, 1, 'F');
+    pdf.roundedRect(x + 3, answerY + 2.5, 25, 5, 1, 1, "F");
     pdf.setDrawColor(245, 158, 11);
     pdf.setLineWidth(0.3);
-    pdf.roundedRect(x + 3, answerY + 2.5, 25, 5, 1, 1, 'S');
+    pdf.roundedRect(x + 3, answerY + 2.5, 25, 5, 1, 1, "S");
     pdf.setFontSize(6);
-    pdf.setFont('helvetica', 'bold');
+    pdf.setFont("helvetica", "bold");
     pdf.setTextColor(146, 64, 14);
     pdf.text(`ANSWER #${problemNumber}`, x + 4.5, answerY + 6);
 
@@ -1345,12 +1428,756 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     pdf.setTextColor(0);
   };
 
+  // Helper function to draw a scrap paper work zone with PIXEL units (for generatePDF with px unit)
+  const drawScrapWorkZonePx = (
+    pdf: jsPDF,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    problemNumber: number,
+  ) => {
+    // Note: jsPDF with 'px' unit still uses points for font sizes
+    // Positioning is in pixels, but fonts are in points
+
+    // Main container border (navy blue)
+    pdf.setDrawColor(30, 58, 95);
+    pdf.setLineWidth(2);
+    pdf.rect(x, y, width, height);
+
+    // Work area background (light gray-blue)
+    pdf.setFillColor(248, 250, 252);
+    pdf.rect(x + 1, y + 1, width - 2, height - 2, "F");
+
+    // Problem label header background (light blue)
+    const headerHeight = 28;
+    pdf.setFillColor(224, 242, 254);
+    pdf.rect(x + 1, y + 1, width - 2, headerHeight, "F");
+
+    // Problem number badge (navy blue rounded rect)
+    pdf.setFillColor(30, 58, 95);
+    pdf.roundedRect(x + 10, y + 6, 85, 18, 3, 3, "F");
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(`PROBLEM #${problemNumber}`, x + 18, y + 18);
+
+    // Instructions text on right
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "italic");
+    pdf.setTextColor(100, 116, 139);
+    pdf.text("Show all work within this zone", x + width - 140, y + 18);
+    pdf.setTextColor(0);
+
+    // Separator line below header
+    pdf.setDrawColor(148, 163, 184);
+    pdf.setLineWidth(1);
+    pdf.line(x, y + headerHeight, x + width, y + headerHeight);
+
+    const contentStartY = y + headerHeight + 8;
+    const answerSectionHeight = 42;
+    const contentEndY = y + height - answerSectionHeight - 8;
+
+    // Draw lined paper
+    pdf.setDrawColor(220, 225, 230);
+    pdf.setLineWidth(0.5);
+    const lineSpacing = 22;
+    for (let lineY = contentStartY + lineSpacing; lineY < contentEndY; lineY += lineSpacing) {
+      pdf.line(x + 10, lineY, x + width - 10, lineY);
+    }
+
+    // Corner markers for AI zone detection
+    pdf.setDrawColor(30, 58, 95);
+    pdf.setLineWidth(1.5);
+    const markerSize = 15;
+    const markerInset = 8;
+    const markerTopY = contentStartY + 5;
+    const markerBottomY = contentEndY - 5;
+
+    // Top-left corner marker
+    pdf.line(x + markerInset, markerTopY, x + markerInset, markerTopY + markerSize);
+    pdf.line(x + markerInset, markerTopY, x + markerInset + markerSize, markerTopY);
+
+    // Top-right corner marker
+    pdf.line(x + width - markerInset, markerTopY, x + width - markerInset, markerTopY + markerSize);
+    pdf.line(x + width - markerInset, markerTopY, x + width - markerInset - markerSize, markerTopY);
+
+    // Bottom-left corner marker
+    pdf.line(x + markerInset, markerBottomY, x + markerInset, markerBottomY - markerSize);
+    pdf.line(x + markerInset, markerBottomY, x + markerInset + markerSize, markerBottomY);
+
+    // Bottom-right corner marker
+    pdf.line(x + width - markerInset, markerBottomY, x + width - markerInset, markerBottomY - markerSize);
+    pdf.line(x + width - markerInset, markerBottomY, x + width - markerInset - markerSize, markerBottomY);
+
+    // Final Answer Section
+    const answerY = y + height - answerSectionHeight;
+
+    // Dashed separator line
+    pdf.setDrawColor(180, 180, 180);
+    pdf.setLineDashPattern([6, 4], 0);
+    pdf.setLineWidth(1);
+    pdf.line(x + 8, answerY, x + width - 8, answerY);
+    pdf.setLineDashPattern([], 0);
+
+    // Answer section background (amber/cream)
+    pdf.setFillColor(254, 243, 199);
+    pdf.rect(x + 1, answerY + 2, width - 2, answerSectionHeight - 3, "F");
+
+    // Answer section top accent border (orange)
+    pdf.setDrawColor(245, 158, 11);
+    pdf.setLineWidth(2);
+    pdf.line(x, answerY + 2, x + width, answerY + 2);
+
+    // Answer badge (lighter amber with border)
+    pdf.setFillColor(253, 230, 138);
+    pdf.roundedRect(x + 10, answerY + 10, 80, 18, 3, 3, "F");
+    pdf.setDrawColor(245, 158, 11);
+    pdf.setLineWidth(1);
+    pdf.roundedRect(x + 10, answerY + 10, 80, 18, 3, 3, "S");
+
+    // Answer label text
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(146, 64, 14);
+    pdf.text(`ANSWER #${problemNumber}`, x + 17, answerY + 22);
+
+    // Answer line
+    pdf.setDrawColor(217, 119, 6);
+    pdf.setLineWidth(1);
+    pdf.line(x + 100, answerY + 28, x + width - 15, answerY + 28);
+
+    // Reset text color
+    pdf.setTextColor(0);
+  };
+
+  /**
+   * Generate PDF using WYSIWYG approach with intelligent page break handling.
+   * Renders each logical section (header, questions, formula sheet, answer key) separately,
+   * measures heights, and ensures content is never cut mid-section.
+   * Major sections like Formula Reference Sheet and Answer Key always start on new pages.
+   */
   const generatePDF = async () => {
     if (compiledQuestions.length === 0) {
       toast({
-        title: 'No questions compiled',
-        description: 'Please compile the worksheet first.',
-        variant: 'destructive',
+        title: "No questions compiled",
+        description: "Please compile the worksheet first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    toast({
+      title: "Generating PDF...",
+      description: "Creating optimized PDF with intelligent page breaks. Please wait.",
+    });
+
+    try {
+      // Page dimensions at 96 DPI
+      const pageWidthPx = 816; // 8.5in at 96 DPI
+      const pageHeightPx = 1056; // 11in at 96 DPI
+      const marginPx = marginIn * 96; // Convert margin from inches to pixels
+      const usableHeight = pageHeightPx - marginPx * 2; // Height available for content per page
+      const scale = 2; // 2x scale for better quality
+
+      // Create temporary container for measuring heights
+      const tempContainer = document.createElement("div");
+      tempContainer.style.cssText = `
+        position: absolute;
+        left: -10000px;
+        top: 0;
+        width: ${pageWidthPx}px;
+        background: white;
+      `;
+      document.body.appendChild(tempContainer);
+
+      // Common styles for content sections
+      const baseStyles = `
+        background-color: white;
+        padding: 0;
+        box-sizing: border-box;
+        width: ${pageWidthPx - marginPx * 2}px;
+        max-width: ${pageWidthPx - marginPx * 2}px;
+        overflow: hidden;
+        font-family: 'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif;
+      `;
+
+      // Helper function to create a section element and measure its height
+      const createSection = (htmlContent: string): HTMLElement => {
+        const section = document.createElement("div");
+        section.style.cssText = baseStyles;
+        section.innerHTML = htmlContent;
+        return section;
+      };
+
+      // Helper function to measure element height
+      const waitForImages = (root: HTMLElement) => {
+        const images = Array.from(root.querySelectorAll("img"));
+        if (images.length === 0) {
+          return Promise.resolve();
+        }
+        return Promise.all(
+          images.map((img) => {
+            if (img.complete) {
+              return Promise.resolve();
+            }
+            return new Promise<void>((resolve) => {
+              const handle = () => {
+                img.removeEventListener("load", handle);
+                img.removeEventListener("error", handle);
+                resolve();
+              };
+              img.addEventListener("load", handle, { once: true });
+              img.addEventListener("error", handle, { once: true });
+            });
+          }),
+        );
+      };
+
+      const measureHeight = async (element: HTMLElement): Promise<number> => {
+        tempContainer.innerHTML = "";
+        tempContainer.appendChild(element);
+
+        await waitForImages(element);
+
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+
+        return element.scrollHeight;
+      };
+
+      // Build all content sections
+      interface ContentSection {
+        type: "header" | "question" | "formula-sheet" | "answer-key" | "footer";
+        html: string;
+        height: number;
+        forceNewPage: boolean;
+      }
+
+      const sections: ContentSection[] = [];
+
+      // Section 1: Header (Instructions + Title + Student Info)
+      let headerHtml = "";
+      if (showAnswerLines) {
+        headerHtml += `
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.4rem 0.75rem;
+            margin-bottom: 0.75rem;
+            background-color: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: 0.25rem;
+            font-size: 0.65rem;
+            color: #166534;
+          ">
+            <span style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">
+              Instructions:
+            </span>
+            <span style="flex: 1;">
+              Write all work in the <strong>Work Area</strong> boxes. Put your final answer in the <strong>Final Answer</strong> section.
+            </span>
+          </div>
+        `;
+      }
+      headerHtml += `
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+          <h1 style="font-size: 1.5rem; font-weight: bold; color: black; margin: 0;">${worksheetTitle}</h1>
+          ${teacherName ? `<p style="color: #4b5563; margin-top: 0.25rem; font-size: 0.875rem;">Teacher: ${teacherName}</p>` : ""}
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 1.5rem; border-bottom: 1px solid #d1d5db; padding-bottom: 1rem; color: black;">
+          <span>Name: _______________________</span>
+          <span>Date: ___________</span>
+          <span>Period: _____</span>
+        </div>
+      `;
+      const headerElement = createSection(headerHtml);
+      sections.push({
+        type: "header",
+        html: headerHtml,
+        height: await measureHeight(headerElement),
+        forceNewPage: false,
+      });
+
+      // Section 2: Individual Questions (each question as separate section for intelligent breaking)
+      for (const question of compiledQuestions) {
+        const bloomLevel = question.bloomLevel || "Remember";
+        const bloomVerb = question.bloomVerb || "state";
+        const advancementColor =
+          question.advancementLevel === "A"
+            ? "#166534"
+            : question.advancementLevel === "B"
+              ? "#047857"
+              : question.advancementLevel === "C"
+                ? "#a16207"
+                : question.advancementLevel === "D"
+                  ? "#c2410c"
+                  : question.advancementLevel === "E"
+                    ? "#b91c1c"
+                    : "#374151";
+
+        const questionHtml = `
+          <div style="margin-bottom: 1.5rem; width: 100%; box-sizing: border-box;">
+            <!-- Question header -->
+            <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; margin-bottom: 0.125rem; border-bottom: 1px solid #1e3a5f; padding-bottom: 0.25rem;">
+              <span style="font-weight: 700; color: black; font-size: 0.9rem;">
+                ${question.questionNumber}. [${bloomLevel.charAt(0).toUpperCase() + bloomLevel.slice(1)}: ${bloomVerb}]
+              </span>
+              ${
+                worksheetMode === "diagnostic" && question.advancementLevel
+                  ? `
+                <span style="font-size: 0.75rem; font-weight: 600; color: ${advancementColor};">
+                  [Level ${question.advancementLevel}]
+                </span>
+              `
+                  : ""
+              }
+              <span style="font-size: 0.75rem; color: #374151;">
+                [${question.difficulty}]
+              </span>
+            </div>
+            
+            <!-- Topic/Standard -->
+            <p style="font-size: 0.75rem; color: #6b7280; margin-left: 1rem; margin-bottom: 0.375rem; font-style: italic;">
+              ${question.topic} (${question.standard})
+            </p>
+            
+            <!-- Question text -->
+            <div style="margin-left: 1rem; margin-right: 0.5rem; font-family: serif; line-height: 1.3; font-size: 0.95rem; color: black; word-wrap: break-word; overflow-wrap: break-word; word-break: normal; hyphens: auto; letter-spacing: 0.02em;">
+              ${renderMathText(fixEncodingCorruption(question.question))}
+            </div>
+            
+            ${
+              question.svg
+                ? `
+              <div style="margin-left: 1rem; margin-top: 0.5rem; display: flex; justify-content: center;">
+                ${question.svg}
+              </div>
+            `
+                : ""
+            }
+            
+            ${
+              question.imageUrl
+                ? `
+              <div style="margin-left: 1rem; margin-top: 0.5rem; display: flex; justify-content: center;">
+                <img src="${question.imageUrl}" alt="Question ${question.questionNumber}" style="max-width: ${imageSize}px; max-height: ${imageSize}px;" />
+              </div>
+            `
+                : ""
+            }
+            
+            <!-- Work Area Box -->
+            ${
+              showAnswerLines
+                ? `
+              <div style="border: 2px solid #1e3a5f; margin-top: 0.5rem; margin-left: 1rem; margin-right: 0.5rem; background-color: #ffffff; overflow: hidden; box-sizing: border-box;">
+                <!-- Work Area Section -->
+                <div style="border-bottom: 2px dashed #94a3b8; padding: 0.5rem 0.75rem; background-color: #ffffff;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.375rem;">
+                    <span style="font-size: 0.7rem; font-weight: 700; color: #1e3a5f; text-transform: uppercase; letter-spacing: 0.05em;">
+                      Work Area Q${question.questionNumber}
+                    </span>
+                    <span style="font-size: 0.6rem; color: #64748b; font-style: italic;">
+                      Show all calculations & reasoning here
+                    </span>
+                  </div>
+                  <div style="min-height: 90px; position: relative;">
+                    <div style="border-bottom: 1px solid #d1d5db; height: 1.1rem;"></div>
+                    <div style="border-bottom: 1px solid #d1d5db; height: 1.1rem;"></div>
+                    <div style="border-bottom: 1px solid #d1d5db; height: 1.1rem;"></div>
+                    <div style="border-bottom: 1px solid #d1d5db; height: 1.1rem;"></div>
+                    <div style="border-bottom: 1px solid #d1d5db; height: 1.1rem;"></div>
+                    <div style="position: absolute; top: 0; left: 0; width: 10px; height: 10px; border-left: 2px solid #1e3a5f; border-top: 2px solid #1e3a5f;"></div>
+                    <div style="position: absolute; top: 0; right: 0; width: 10px; height: 10px; border-right: 2px solid #1e3a5f; border-top: 2px solid #1e3a5f;"></div>
+                  </div>
+                </div>
+                
+                <!-- Final Answer Section -->
+                <div style="padding: 0.5rem 0.75rem; background-color: #fef3c7; border-top: 2px solid #f59e0b;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 0.7rem; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.03em; background-color: #fde68a; padding: 0.15rem 0.5rem; border-radius: 0.2rem; border: 1.5px solid #f59e0b; white-space: nowrap;">
+                      Final Answer
+                    </span>
+                    <div style="flex: 1; border-bottom: 1.5px solid #d97706; min-height: 1.25rem;"></div>
+                  </div>
+                </div>
+              </div>
+            `
+                : ""
+            }
+          </div>
+        `;
+
+        const questionElement = createSection(questionHtml);
+        sections.push({
+          type: "question",
+          html: questionHtml,
+          height: await measureHeight(questionElement),
+          forceNewPage: false,
+        });
+      }
+
+      // Section 3: Formula Reference Sheet (ALWAYS starts on new page)
+      if (includeFormulaSheet) {
+        const relevantFormulas = getFormulasForTopics(
+          selectedQuestions.map((q) => ({ category: q.category, topicName: q.topicName })),
+        );
+
+        if (relevantFormulas.length > 0) {
+          const formulaHtml = `
+            <div style="padding-top: 1rem;">
+              <h2 style="font-size: 1.25rem; font-weight: bold; text-align: center; margin-bottom: 0.5rem; color: black;">Formula Reference Sheet</h2>
+              <p style="text-align: center; font-size: 0.875rem; color: #6b7280; margin-bottom: 1.5rem;">Based on selected topics</p>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                ${relevantFormulas
+                  .map(
+                    (category) => `
+                  <div style="space-y: 0.5rem;">
+                    <h3 style="font-weight: 600; font-size: 0.875rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.25rem; color: black;">${category.category}</h3>
+                    <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.875rem;">
+                      ${category.formulas
+                        .map(
+                          (formula) => `
+                        <li style="color: black; margin-bottom: 0.25rem;">
+                          <span style="font-weight: 500;">${formula.name}:</span>
+                          <span style="font-family: monospace; font-size: 0.75rem;">${formula.formula}</span>
+                          ${formula.description ? `<span style="font-size: 0.75rem; color: #6b7280; margin-left: 1rem;">(${formula.description})</span>` : ""}
+                        </li>
+                      `,
+                        )
+                        .join("")}
+                    </ul>
+                  </div>
+                `,
+                  )
+                  .join("")}
+              </div>
+            </div>
+          `;
+
+          const formulaElement = createSection(formulaHtml);
+          sections.push({
+            type: "formula-sheet",
+            html: formulaHtml,
+            height: await measureHeight(formulaElement),
+            forceNewPage: true, // Always start on new page
+          });
+        }
+      }
+
+      // Section 4: Answer Key (ALWAYS starts on new page)
+      if (includeAnswerKey && compiledQuestions.some((q) => q.answer)) {
+        // 4a. Answer Key Header
+        const answerKeyHeaderHtml = `
+          <div style="padding-top: 1rem;">
+            <h2 style="font-size: 1.25rem; font-weight: bold; text-align: center; margin-bottom: 0.5rem; color: black;">ANSWER KEY</h2>
+            <p style="text-align: center; font-size: 0.875rem; color: #4b5563; margin-bottom: 0.25rem;">${worksheetTitle}</p>
+            <p style="text-align: center; font-size: 0.75rem; color: #dc2626; font-style: italic; margin-bottom: 1.5rem;">FOR TEACHER USE ONLY</p>
+          </div>
+        `;
+        const answerKeyHeaderElement = createSection(answerKeyHeaderHtml);
+        sections.push({
+          type: "answer-key", // treating header as answer-key type for footer logic
+          html: answerKeyHeaderHtml,
+          height: await measureHeight(answerKeyHeaderElement),
+          forceNewPage: true,
+        });
+
+        // 4b. Individual Answers (generated as separate sections to allow page breaking)
+        const relevantQuestions = compiledQuestions.filter((q) => q.answer);
+        for (const question of relevantQuestions) {
+          const answerHtml = `
+            <div style="padding-bottom: 0.75rem; border-bottom: 1px solid #e5e7eb; margin-bottom: 0.75rem;">
+              <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                <span style="font-weight: bold; color: black;">Question ${question.questionNumber}:</span>
+                <span style="font-size: 0.75rem; color: #6b7280; font-style: italic;">${question.topic}</span>
+              </div>
+              <div style="margin-top: 0.25rem; margin-left: 1rem; font-size: 0.875rem; color: black;">
+                <span style="font-weight: 500; color: #15803d;">Answer: </span>
+                ${renderMathText(fixEncodingCorruption(question.answer || ""))}
+              </div>
+            </div>
+          `;
+
+          const answerElement = createSection(answerHtml);
+          sections.push({
+            type: "answer-key",
+            html: answerHtml,
+            height: await measureHeight(answerElement),
+            forceNewPage: false, // Allow flowing naturally
+          });
+        }
+      }
+
+      // Organize sections into pages with intelligent breaks
+      interface PageContent {
+        sections: ContentSection[];
+        totalHeight: number;
+      }
+
+      const pages: PageContent[] = [];
+      let currentPage: PageContent = { sections: [], totalHeight: 0 };
+
+      // Safety buffer to account for rendering discrepancies (measured vs captured)
+      // This prevents content from flowing to the edge and getting cut off
+      const heightBuffer = 70;
+      const safeUsableHeight = usableHeight - heightBuffer;
+
+      for (const section of sections) {
+        // If section forces a new page AND we have content on current page, start new page
+        if (section.forceNewPage && currentPage.sections.length > 0) {
+          pages.push(currentPage);
+          currentPage = { sections: [], totalHeight: 0 };
+        }
+
+        // Check if section fits on current page (using safe height)
+        const wouldExceed = currentPage.totalHeight + section.height > safeUsableHeight;
+
+        if (wouldExceed && currentPage.sections.length > 0) {
+          // Section doesn't fit, start new page
+          pages.push(currentPage);
+          currentPage = { sections: [], totalHeight: 0 };
+        }
+
+        // Add section to current page
+        currentPage.sections.push(section);
+        currentPage.totalHeight += section.height;
+      }
+
+      // Don't forget the last page
+      if (currentPage.sections.length > 0) {
+        pages.push(currentPage);
+      }
+
+      // Create PDF with letter size
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "px",
+        format: [pageWidthPx, pageHeightPx],
+        hotfixes: ["px_scaling"],
+      });
+
+      let isFirstPdfPage = true;
+
+      // Render each page
+      for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+        const page = pages[pageIndex];
+
+        // Create a container for this page's content
+        const pageContent = document.createElement("div");
+        pageContent.style.cssText = `
+          background-color: white;
+          padding: ${marginPx}px;
+          box-sizing: border-box;
+          width: ${pageWidthPx}px;
+          min-height: ${pageHeightPx}px;
+          font-family: 'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif;
+        `;
+
+        // Add all sections for this page
+        for (const section of page.sections) {
+          const sectionDiv = document.createElement("div");
+          sectionDiv.innerHTML = section.html;
+          pageContent.appendChild(sectionDiv);
+        }
+
+        // Add footer to last page or pages with formula sheet / answer key
+        const isLastPage = pageIndex === pages.length - 1;
+        const hasSpecialSection = page.sections.some((s) => s.type === "formula-sheet" || s.type === "answer-key");
+
+        if (isLastPage || hasSpecialSection) {
+          const footer = document.createElement("div");
+          footer.innerHTML = `
+            <div style="margin-top: 2rem; text-align: center; font-size: 0.5rem; color: #9ca3af;">
+              Generated with NYCLogic Ai - NYS Regents Aligned
+            </div>
+          `;
+          pageContent.appendChild(footer);
+        }
+
+        // Temporarily add to DOM for rendering
+        tempContainer.innerHTML = "";
+        tempContainer.appendChild(pageContent);
+
+        await waitForImages(pageContent);
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+
+        const actualHeight = pageContent.scrollHeight;
+        const captureHeight = Math.max(pageHeightPx, actualHeight);
+
+        const canvas = await html2canvas(pageContent, {
+          scale: scale,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          width: pageWidthPx,
+          height: captureHeight,
+          windowWidth: pageWidthPx,
+          windowHeight: captureHeight,
+        });
+
+        const pagesNeeded = Math.ceil(captureHeight / pageHeightPx);
+        const scaledPageHeight = pageHeightPx * scale;
+        const scaledPageWidth = pageWidthPx * scale;
+
+        for (let sliceIndex = 0; sliceIndex < pagesNeeded; sliceIndex++) {
+          if (!isFirstPdfPage) {
+            pdf.addPage();
+          }
+          isFirstPdfPage = false;
+
+          const sourceY = sliceIndex * scaledPageHeight;
+          const remaining = canvas.height - sourceY;
+          const sourceHeight = Math.min(scaledPageHeight, remaining);
+
+          const pageCanvas = document.createElement("canvas");
+          pageCanvas.width = scaledPageWidth;
+          pageCanvas.height = scaledPageHeight;
+          const ctx = pageCanvas.getContext("2d");
+
+          if (ctx) {
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, scaledPageWidth, scaledPageHeight);
+
+            if (sourceHeight > 0) {
+              ctx.drawImage(canvas, 0, sourceY, canvas.width, sourceHeight, 0, 0, scaledPageWidth, sourceHeight);
+            }
+
+            const imgData = pageCanvas.toDataURL("image/png", 1.0);
+            pdf.addImage(imgData, "PNG", 0, 0, pageWidthPx, pageHeightPx, undefined, "FAST");
+          }
+        }
+      }
+
+      // Clean up
+      document.body.removeChild(tempContainer);
+
+      // Add Scrap Paper Pages if enabled
+      let scrapPaperPagesCount = 0;
+
+      if (includeScrapPaper) {
+        const problemNumbers = compiledQuestions.map((q) => q.questionNumber);
+        const zonesPerPage = scrapPaperLayout === "single" ? 1 : scrapPaperLayout === "split-2" ? 2 : 4;
+        const pagesNeeded = Math.ceil(problemNumbers.length / zonesPerPage);
+        scrapPaperPagesCount = pagesNeeded;
+
+        let problemIndex = 0;
+
+        for (let page = 0; page < pagesNeeded; page++) {
+          pdf.addPage([pageWidthPx, pageHeightPx]);
+
+          // Set white background
+          pdf.setFillColor(255, 255, 255);
+          pdf.rect(0, 0, pageWidthPx, pageHeightPx, "F");
+
+          // Use pixel-based margin
+          const margin = marginPx;
+          const contentWidth = pageWidthPx - marginPx * 2;
+
+          let yPos = margin;
+
+          // Scrap Paper Header
+          pdf.setFontSize(14);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(30, 58, 95);
+          pdf.text(`${worksheetTitle} - Scrap Paper`, pageWidthPx / 2, yPos, { align: "center" });
+          yPos += 20;
+
+          // Subheader
+          pdf.setFontSize(9);
+          pdf.setFont("helvetica", "normal");
+          pdf.setTextColor(100, 116, 139);
+          pdf.text(`Page ${page + 1} of ${pagesNeeded} | AI-Optimized Work Zones`, pageWidthPx / 2, yPos, {
+            align: "center",
+          });
+          yPos += 15;
+
+          // Name/Date line
+          pdf.setFontSize(10);
+          pdf.setTextColor(0);
+          pdf.text("Name: _______________________", margin, yPos);
+          pdf.text("Date: ___________", pageWidthPx - margin - 120, yPos);
+          yPos += 25;
+
+          // Instructions banner
+          pdf.setFillColor(236, 253, 245);
+          pdf.setDrawColor(110, 231, 183);
+          pdf.roundedRect(margin, yPos, contentWidth, 25, 3, 3, "FD");
+          pdf.setFontSize(8);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(4, 120, 87);
+          pdf.text("[!] INSTRUCTIONS:", margin + 10, yPos + 16);
+          pdf.setFont("helvetica", "normal");
+          pdf.text(
+            "Keep all work within the designated zones for AI scanning. Write clearly and stay inside the boxes.",
+            margin + 120,
+            yPos + 16,
+          );
+          yPos += 35;
+
+          const availableHeight = pageHeightPx - yPos - margin;
+
+          // Draw work zones based on layout (using pixel-based function)
+          if (scrapPaperLayout === "single") {
+            const zoneHeight = availableHeight;
+            const problemNum = problemNumbers[problemIndex] || problemIndex + 1;
+            drawScrapWorkZonePx(pdf, margin, yPos, contentWidth, zoneHeight, problemNum);
+            problemIndex++;
+          } else if (scrapPaperLayout === "split-2") {
+            const zoneHeight = (availableHeight - 15) / 2;
+            for (let i = 0; i < 2 && problemIndex < problemNumbers.length; i++) {
+              const problemNum = problemNumbers[problemIndex] || problemIndex + 1;
+              drawScrapWorkZonePx(pdf, margin, yPos + i * (zoneHeight + 15), contentWidth, zoneHeight, problemNum);
+              problemIndex++;
+            }
+          } else if (scrapPaperLayout === "split-4") {
+            const zoneWidth = (contentWidth - 15) / 2;
+            const zoneHeight = (availableHeight - 15) / 2;
+            for (let row = 0; row < 2; row++) {
+              for (let col = 0; col < 2 && problemIndex < problemNumbers.length; col++) {
+                const problemNum = problemNumbers[problemIndex] || problemIndex + 1;
+                const x = margin + col * (zoneWidth + 15);
+                const y = yPos + row * (zoneHeight + 15);
+                drawScrapWorkZonePx(pdf, x, y, zoneWidth, zoneHeight, problemNum);
+                problemIndex++;
+              }
+            }
+          }
+        }
+      }
+
+      // Download the PDF
+      const fileName = `${worksheetTitle.replace(/[^a-z0-9]/gi, "_")}_worksheet.pdf`;
+      pdf.save(fileName);
+
+      const pdfPageCount = pdf.getNumberOfPages();
+      toast({
+        title: "PDF Downloaded!",
+        description: `Saved as ${fileName} (${pdfPageCount} page${pdfPageCount > 1 ? "s" : ""}${scrapPaperPagesCount > 0 ? `, including ${scrapPaperPagesCount} scrap paper page${scrapPaperPagesCount > 1 ? "s" : ""}` : ""})`,
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "PDF Generation Failed",
+        description: "There was an error generating the PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Legacy PDF generation function kept for reference but not used
+  const generatePDFLegacy = async () => {
+    if (compiledQuestions.length === 0) {
+      toast({
+        title: "No questions compiled",
+        description: "Please compile the worksheet first.",
+        variant: "destructive",
       });
       return;
     }
@@ -1358,7 +2185,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setIsGenerating(true);
 
     try {
-      const pdf = new jsPDF('p', 'mm', 'letter');
+      const pdf = new jsPDF("p", "mm", "letter");
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = marginMm; // Based on user preference
@@ -1367,20 +2194,20 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
       // Header
       pdf.setFontSize(18);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(sanitizeForPDF(worksheetTitle), pageWidth / 2, yPosition, { align: 'center' });
+      pdf.setFont("helvetica", "bold");
+      pdf.text(sanitizeForPDF(worksheetTitle), pageWidth / 2, yPosition, { align: "center" });
       yPosition += 10;
 
       if (teacherName) {
         pdf.setFontSize(12);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text(sanitizeForPDF(`Teacher: ${teacherName}`), pageWidth / 2, yPosition, { align: 'center' });
+        pdf.setFont("helvetica", "normal");
+        pdf.text(sanitizeForPDF(`Teacher: ${teacherName}`), pageWidth / 2, yPosition, { align: "center" });
         yPosition += 8;
       }
 
       // Student info line
       pdf.setFontSize(11);
-      pdf.text('Name: _______________________   Date: ___________   Period: _____', margin, yPosition);
+      pdf.text("Name: _______________________   Date: ___________   Period: _____", margin, yPosition);
       yPosition += 15;
 
       // Separator
@@ -1397,26 +2224,26 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
         // Question number, Bloom's level, advancement level (for diagnostic), and difficulty badge
         pdf.setFontSize(11);
-        pdf.setFont('helvetica', 'bold');
+        pdf.setFont("helvetica", "bold");
         const difficultyText = question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1);
-        const bloomLabel = question.bloomLevel 
+        const bloomLabel = question.bloomLevel
           ? question.bloomLevel.charAt(0).toUpperCase() + question.bloomLevel.slice(1)
-          : '';
-        
-        let headerParts: string[] = [`${question.questionNumber}.`];
+          : "";
+
+        const headerParts: string[] = [`${question.questionNumber}.`];
         if (bloomLabel) {
-          headerParts.push(`[${bloomLabel}${question.bloomVerb ? `: ${question.bloomVerb}` : ''}]`);
+          headerParts.push(`[${bloomLabel}${question.bloomVerb ? `: ${question.bloomVerb}` : ""}]`);
         }
-        if (worksheetMode === 'diagnostic' && question.advancementLevel) {
+        if (worksheetMode === "diagnostic" && question.advancementLevel) {
           headerParts.push(`[Level ${question.advancementLevel}]`);
         }
         headerParts.push(`[${difficultyText}]`);
-        
-        pdf.text(headerParts.join(' '), margin, yPosition);
+
+        pdf.text(headerParts.join(" "), margin, yPosition);
         yPosition += 6;
 
         // Topic and standard reference
-        pdf.setFont('helvetica', 'normal');
+        pdf.setFont("helvetica", "normal");
         pdf.setFontSize(9);
         pdf.setTextColor(100);
         pdf.text(sanitizeForPDF(`${question.topic} (${question.standard})`), margin + 5, yPosition);
@@ -1428,7 +2255,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         const sanitizedQuestion = sanitizeForPDF(renderMathText(fixEncodingCorruption(question.question)));
         // Use 85% of content width to prevent text overflow
         const lines = pdf.splitTextToSize(sanitizedQuestion, contentWidth * 0.85);
-        
+
         lines.forEach((line: string) => {
           if (yPosition > pageHeight - 40) {
             pdf.addPage();
@@ -1449,47 +2276,47 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             await new Promise<void>((resolve, reject) => {
               img.onload = () => resolve();
               img.onerror = reject;
-              img.crossOrigin = 'anonymous';
+              img.crossOrigin = "anonymous";
               img.src = question.imageUrl!;
             });
-            
+
             // Draw to canvas and get as PNG data URL
-            const canvas = document.createElement('canvas');
+            const canvas = document.createElement("canvas");
             canvas.width = img.width || 400;
             canvas.height = img.height || 400;
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext("2d");
             if (ctx) {
-              ctx.fillStyle = 'white';
+              ctx.fillStyle = "white";
               ctx.fillRect(0, 0, canvas.width, canvas.height);
               ctx.drawImage(img, 0, 0);
-              const pngDataUrl = canvas.toDataURL('image/png');
-              
+              const pngDataUrl = canvas.toDataURL("image/png");
+
               // Check if we need a new page for the image
               if (yPosition > pageHeight - 80) {
                 pdf.addPage();
                 yPosition = margin;
               }
-              
+
               // Add image to PDF (centered) - use user-configured size
               // Convert pixel size to mm (roughly 0.26mm per pixel at 96dpi)
               const imgSizeMm = imageSize * 0.26;
               const imgWidth = imgSizeMm;
               const imgHeight = imgSizeMm;
               const imgX = (pageWidth - imgWidth) / 2;
-              pdf.addImage(pngDataUrl, 'PNG', imgX, yPosition, imgWidth, imgHeight);
+              pdf.addImage(pngDataUrl, "PNG", imgX, yPosition, imgWidth, imgHeight);
               yPosition += imgHeight + 5;
             }
           } catch (imgError) {
-            console.error('Error rendering AI image to PDF:', imgError);
+            console.error("Error rendering AI image to PDF:", imgError);
           }
         }
         // Render SVG as image if present (fallback)
         else if (question.svg) {
           try {
             // Convert SVG to data URL
-            const svgBlob = new Blob([question.svg], { type: 'image/svg+xml;charset=utf-8' });
+            const svgBlob = new Blob([question.svg], { type: "image/svg+xml;charset=utf-8" });
             const svgUrl = URL.createObjectURL(svgBlob);
-            
+
             // Create an image from SVG
             const img = new Image();
             await new Promise<void>((resolve, reject) => {
@@ -1497,35 +2324,35 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               img.onerror = reject;
               img.src = svgUrl;
             });
-            
+
             // Draw to canvas and get as PNG data URL
-            const canvas = document.createElement('canvas');
+            const canvas = document.createElement("canvas");
             canvas.width = 200;
             canvas.height = 200;
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext("2d");
             if (ctx) {
-              ctx.fillStyle = 'white';
+              ctx.fillStyle = "white";
               ctx.fillRect(0, 0, 200, 200);
               ctx.drawImage(img, 0, 0, 200, 200);
-              const pngDataUrl = canvas.toDataURL('image/png');
-              
+              const pngDataUrl = canvas.toDataURL("image/png");
+
               // Check if we need a new page for the image
               if (yPosition > pageHeight - 70) {
                 pdf.addPage();
                 yPosition = margin;
               }
-              
+
               // Add image to PDF (centered) - 30% larger than base size
               const imgWidth = 65; // mm (50 * 1.3)
               const imgHeight = 65; // mm (50 * 1.3)
               const imgX = (pageWidth - imgWidth) / 2;
-              pdf.addImage(pngDataUrl, 'PNG', imgX, yPosition, imgWidth, imgHeight);
+              pdf.addImage(pngDataUrl, "PNG", imgX, yPosition, imgWidth, imgHeight);
               yPosition += imgHeight + 5;
             }
-            
+
             URL.revokeObjectURL(svgUrl);
           } catch (svgError) {
-            console.error('Error rendering SVG to PDF:', svgError);
+            console.error("Error rendering SVG to PDF:", svgError);
           }
         }
 
@@ -1536,26 +2363,33 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             await new Promise<void>((resolve, reject) => {
               clipImg.onload = () => resolve();
               clipImg.onerror = reject;
-              clipImg.crossOrigin = 'anonymous';
+              clipImg.crossOrigin = "anonymous";
               clipImg.src = question.clipartUrl!;
             });
-            
-            const canvas = document.createElement('canvas');
+
+            const canvas = document.createElement("canvas");
             canvas.width = clipImg.width || 100;
             canvas.height = clipImg.height || 100;
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext("2d");
             if (ctx) {
-              ctx.fillStyle = 'white';
+              ctx.fillStyle = "white";
               ctx.fillRect(0, 0, canvas.width, canvas.height);
               ctx.drawImage(clipImg, 0, 0);
-              const pngDataUrl = canvas.toDataURL('image/png');
-              
+              const pngDataUrl = canvas.toDataURL("image/png");
+
               // Add clipart icon with user-configured size at right margin
               const clipartSizeMm = clipartSize;
-              pdf.addImage(pngDataUrl, 'PNG', pageWidth - margin - clipartSizeMm, yPosition - (clipartSizeMm * 0.75), clipartSizeMm, clipartSizeMm);
+              pdf.addImage(
+                pngDataUrl,
+                "PNG",
+                pageWidth - margin - clipartSizeMm,
+                yPosition - clipartSizeMm * 0.75,
+                clipartSizeMm,
+                clipartSizeMm,
+              );
             }
           } catch (clipError) {
-            console.error('Error rendering clipart to PDF:', clipError);
+            console.error("Error rendering clipart to PDF:", clipError);
           }
         }
 
@@ -1566,85 +2400,100 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             pdf.addPage();
             yPosition = margin;
           }
-          
+
           const boxMarginLeft = margin + 5;
           const boxWidth = contentWidth - 5;
           const workAreaHeight = 35; // mm for work area
           const answerAreaHeight = 12; // mm for answer box
           const totalBoxHeight = workAreaHeight + answerAreaHeight + 10;
-          
+
           // Main container border (navy blue)
           pdf.setDrawColor(30, 58, 95); // #1e3a5f
           pdf.setLineWidth(0.8);
           pdf.rect(boxMarginLeft, yPosition, boxWidth, totalBoxHeight);
-          
+
           // Work Area Section background
           pdf.setFillColor(248, 250, 252); // #f8fafc light gray
-          pdf.rect(boxMarginLeft, yPosition, boxWidth, workAreaHeight + 8, 'F');
-          
+          pdf.rect(boxMarginLeft, yPosition, boxWidth, workAreaHeight + 8, "F");
+
           // Work Area label
           pdf.setFillColor(224, 242, 254); // #e0f2fe light blue
-          pdf.roundedRect(boxMarginLeft + 3, yPosition + 2, 32, 5, 1, 1, 'F');
+          pdf.roundedRect(boxMarginLeft + 3, yPosition + 2, 32, 5, 1, 1, "F");
           pdf.setFontSize(7);
-          pdf.setFont('helvetica', 'bold');
+          pdf.setFont("helvetica", "bold");
           pdf.setTextColor(30, 58, 95);
           pdf.text(`WORK AREA Q${question.questionNumber}`, boxMarginLeft + 5, yPosition + 5.5);
-          
+
           // Instructions text
           pdf.setFontSize(6);
-          pdf.setFont('helvetica', 'italic');
+          pdf.setFont("helvetica", "italic");
           pdf.setTextColor(100, 116, 139); // #64748b
-          pdf.text('Show all calculations & reasoning here', boxMarginLeft + boxWidth - 45, yPosition + 5.5);
-          
+          pdf.text("Show all calculations & reasoning here", boxMarginLeft + boxWidth - 45, yPosition + 5.5);
+
           // Dashed separator line between work and answer areas
           pdf.setDrawColor(148, 163, 184); // #94a3b8
           pdf.setLineWidth(0.3);
           pdf.setLineDashPattern([2, 2], 0);
-          pdf.line(boxMarginLeft, yPosition + workAreaHeight + 7, boxMarginLeft + boxWidth, yPosition + workAreaHeight + 7);
+          pdf.line(
+            boxMarginLeft,
+            yPosition + workAreaHeight + 7,
+            boxMarginLeft + boxWidth,
+            yPosition + workAreaHeight + 7,
+          );
           pdf.setLineDashPattern([], 0); // Reset dash pattern
-          
+
           // Work area lines
           pdf.setDrawColor(203, 213, 225); // #cbd5e1
           pdf.setLineWidth(0.15);
           for (let i = 0; i < 4; i++) {
-            pdf.line(boxMarginLeft + 3, yPosition + 10 + (i * 7), boxMarginLeft + boxWidth - 3, yPosition + 10 + (i * 7));
+            pdf.line(boxMarginLeft + 3, yPosition + 10 + i * 7, boxMarginLeft + boxWidth - 3, yPosition + 10 + i * 7);
           }
-          
+
           // Corner markers for AI zone detection
           pdf.setDrawColor(30, 58, 95);
           pdf.setLineWidth(0.5);
           // Top-left corner
           pdf.line(boxMarginLeft + 2, yPosition + 8, boxMarginLeft + 2, yPosition + 12);
           pdf.line(boxMarginLeft + 2, yPosition + 8, boxMarginLeft + 6, yPosition + 8);
-          // Top-right corner  
+          // Top-right corner
           pdf.line(boxMarginLeft + boxWidth - 2, yPosition + 8, boxMarginLeft + boxWidth - 2, yPosition + 12);
           pdf.line(boxMarginLeft + boxWidth - 2, yPosition + 8, boxMarginLeft + boxWidth - 6, yPosition + 8);
-          
+
           // Final Answer Section background (yellow/amber)
           pdf.setFillColor(254, 243, 199); // #fef3c7
-          pdf.rect(boxMarginLeft, yPosition + workAreaHeight + 8, boxWidth, answerAreaHeight, 'F');
-          
+          pdf.rect(boxMarginLeft, yPosition + workAreaHeight + 8, boxWidth, answerAreaHeight, "F");
+
           // Answer section top border (amber)
           pdf.setDrawColor(245, 158, 11); // #f59e0b
           pdf.setLineWidth(0.5);
-          pdf.line(boxMarginLeft, yPosition + workAreaHeight + 8, boxMarginLeft + boxWidth, yPosition + workAreaHeight + 8);
-          
+          pdf.line(
+            boxMarginLeft,
+            yPosition + workAreaHeight + 8,
+            boxMarginLeft + boxWidth,
+            yPosition + workAreaHeight + 8,
+          );
+
           // Final Answer label
           pdf.setFillColor(253, 230, 138); // #fde68a
-          pdf.roundedRect(boxMarginLeft + 3, yPosition + workAreaHeight + 10, 22, 5, 1, 1, 'F');
+          pdf.roundedRect(boxMarginLeft + 3, yPosition + workAreaHeight + 10, 22, 5, 1, 1, "F");
           pdf.setDrawColor(245, 158, 11);
           pdf.setLineWidth(0.3);
-          pdf.roundedRect(boxMarginLeft + 3, yPosition + workAreaHeight + 10, 22, 5, 1, 1, 'S');
+          pdf.roundedRect(boxMarginLeft + 3, yPosition + workAreaHeight + 10, 22, 5, 1, 1, "S");
           pdf.setFontSize(7);
-          pdf.setFont('helvetica', 'bold');
+          pdf.setFont("helvetica", "bold");
           pdf.setTextColor(146, 64, 14); // #92400e
-          pdf.text('FINAL ANSWER', boxMarginLeft + 5, yPosition + workAreaHeight + 13.5);
-          
+          pdf.text("FINAL ANSWER", boxMarginLeft + 5, yPosition + workAreaHeight + 13.5);
+
           // Answer line
           pdf.setDrawColor(217, 119, 6); // #d97706
           pdf.setLineWidth(0.4);
-          pdf.line(boxMarginLeft + 28, yPosition + workAreaHeight + 15, boxMarginLeft + boxWidth - 5, yPosition + workAreaHeight + 15);
-          
+          pdf.line(
+            boxMarginLeft + 28,
+            yPosition + workAreaHeight + 15,
+            boxMarginLeft + boxWidth - 5,
+            yPosition + workAreaHeight + 15,
+          );
+
           pdf.setTextColor(0); // Reset text color
           yPosition += totalBoxHeight + 8;
         } else {
@@ -1655,7 +2504,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       // Formula Reference Sheet
       if (includeFormulaSheet) {
         const relevantFormulas = getFormulasForTopics(
-          selectedQuestions.map(q => ({ category: q.category, topicName: q.topicName }))
+          selectedQuestions.map((q) => ({ category: q.category, topicName: q.topicName })),
         );
 
         if (relevantFormulas.length > 0) {
@@ -1664,15 +2513,15 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
           // Formula sheet header
           pdf.setFontSize(16);
-          pdf.setFont('helvetica', 'bold');
+          pdf.setFont("helvetica", "bold");
           pdf.setTextColor(0);
-          pdf.text('Formula Reference Sheet', pageWidth / 2, yPosition, { align: 'center' });
+          pdf.text("Formula Reference Sheet", pageWidth / 2, yPosition, { align: "center" });
           yPosition += 12;
 
           pdf.setFontSize(10);
-          pdf.setFont('helvetica', 'italic');
+          pdf.setFont("helvetica", "italic");
           pdf.setTextColor(100);
-          pdf.text('Based on selected topics', pageWidth / 2, yPosition, { align: 'center' });
+          pdf.text("Based on selected topics", pageWidth / 2, yPosition, { align: "center" });
           pdf.setTextColor(0);
           yPosition += 10;
 
@@ -1690,13 +2539,13 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
             // Category header
             pdf.setFontSize(11);
-            pdf.setFont('helvetica', 'bold');
+            pdf.setFont("helvetica", "bold");
             pdf.text(sanitizeForPDF(category.category), margin, yPosition);
             yPosition += 7;
 
             // Formulas in this category
             pdf.setFontSize(10);
-            pdf.setFont('helvetica', 'normal');
+            pdf.setFont("helvetica", "normal");
 
             for (const formula of category.formulas) {
               if (yPosition > pageHeight - 30) {
@@ -1707,7 +2556,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               // Formula name and formula - sanitize for PDF
               const formulaLine = sanitizeForPDF(`• ${formula.name}: ${formula.formula}`);
               const lines = pdf.splitTextToSize(formulaLine, contentWidth - 10);
-              
+
               lines.forEach((line: string) => {
                 pdf.text(line, margin + 5, yPosition);
                 yPosition += 5;
@@ -1732,26 +2581,26 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       }
 
       // Answer Key Section (for teachers)
-      if (includeAnswerKey && compiledQuestions.some(q => q.answer)) {
+      if (includeAnswerKey && compiledQuestions.some((q) => q.answer)) {
         pdf.addPage();
         yPosition = margin;
 
         // Answer key header
         pdf.setFontSize(18);
-        pdf.setFont('helvetica', 'bold');
+        pdf.setFont("helvetica", "bold");
         pdf.setTextColor(0);
-        pdf.text('ANSWER KEY', pageWidth / 2, yPosition, { align: 'center' });
+        pdf.text("ANSWER KEY", pageWidth / 2, yPosition, { align: "center" });
         yPosition += 8;
 
         pdf.setFontSize(12);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text(sanitizeForPDF(worksheetTitle), pageWidth / 2, yPosition, { align: 'center' });
+        pdf.setFont("helvetica", "normal");
+        pdf.text(sanitizeForPDF(worksheetTitle), pageWidth / 2, yPosition, { align: "center" });
         yPosition += 10;
 
         pdf.setFontSize(10);
-        pdf.setFont('helvetica', 'italic');
+        pdf.setFont("helvetica", "italic");
         pdf.setTextColor(100);
-        pdf.text('FOR TEACHER USE ONLY', pageWidth / 2, yPosition, { align: 'center' });
+        pdf.text("FOR TEACHER USE ONLY", pageWidth / 2, yPosition, { align: "center" });
         pdf.setTextColor(0);
         yPosition += 10;
 
@@ -1771,13 +2620,13 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
           // Question number and brief question text
           pdf.setFontSize(11);
-          pdf.setFont('helvetica', 'bold');
+          pdf.setFont("helvetica", "bold");
           pdf.text(`Question ${question.questionNumber}:`, margin, yPosition);
           yPosition += 6;
 
           // Topic reference
           pdf.setFontSize(9);
-          pdf.setFont('helvetica', 'italic');
+          pdf.setFont("helvetica", "italic");
           pdf.setTextColor(100);
           pdf.text(sanitizeForPDF(`${question.topic} (${question.standard})`), margin + 5, yPosition);
           pdf.setTextColor(0);
@@ -1785,9 +2634,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
 
           // Answer
           pdf.setFontSize(10);
-          pdf.setFont('helvetica', 'normal');
+          pdf.setFont("helvetica", "normal");
           const answerLines = pdf.splitTextToSize(sanitizeForPDF(`Answer: ${question.answer}`), contentWidth - 10);
-          
+
           answerLines.forEach((line: string) => {
             if (yPosition > pageHeight - 20) {
               pdf.addPage();
@@ -1798,7 +2647,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           });
 
           yPosition += 8;
-          
+
           // Separator line
           pdf.setDrawColor(200);
           pdf.setLineWidth(0.2);
@@ -1806,74 +2655,79 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         }
       }
 
-      // Add Scrap Paper Pages if enabled
       if (includeScrapPaper) {
-        const problemNumbers = compiledQuestions.map(q => q.questionNumber);
-        const zonesPerPage = scrapPaperLayout === 'single' ? 1 : scrapPaperLayout === 'split-2' ? 2 : 4;
+        const problemNumbers = compiledQuestions.map((q) => q.questionNumber);
+        const zonesPerPage = scrapPaperLayout === "single" ? 1 : scrapPaperLayout === "split-2" ? 2 : 4;
         const pagesNeeded = Math.ceil(problemNumbers.length / zonesPerPage);
-        
+
         let problemIndex = 0;
-        
+
         for (let page = 0; page < pagesNeeded; page++) {
           pdf.addPage();
           let yPos = margin;
-          
+
           // Scrap Paper Header
           pdf.setFontSize(14);
-          pdf.setFont('helvetica', 'bold');
+          pdf.setFont("helvetica", "bold");
           pdf.setTextColor(30, 58, 95);
-          pdf.text(sanitizeForPDF(`${worksheetTitle} - Scrap Paper`), pageWidth / 2, yPos, { align: 'center' });
+          pdf.text(sanitizeForPDF(`${worksheetTitle} - Scrap Paper`), pageWidth / 2, yPos, { align: "center" });
           yPos += 6;
-          
+
           // Subheader
           pdf.setFontSize(9);
-          pdf.setFont('helvetica', 'normal');
+          pdf.setFont("helvetica", "normal");
           pdf.setTextColor(100, 116, 139);
-          pdf.text(`Page ${page + 1} of ${pagesNeeded} | AI-Optimized Work Zones`, pageWidth / 2, yPos, { align: 'center' });
+          pdf.text(`Page ${page + 1} of ${pagesNeeded} | AI-Optimized Work Zones`, pageWidth / 2, yPos, {
+            align: "center",
+          });
           yPos += 4;
-          
+
           // Name/Date line
           pdf.setFontSize(10);
           pdf.setTextColor(0);
-          pdf.text('Name: _______________________', margin, yPos);
-          pdf.text('Date: ___________', pageWidth - margin - 40, yPos);
+          pdf.text("Name: _______________________", margin, yPos);
+          pdf.text("Date: ___________", pageWidth - margin - 40, yPos);
           yPos += 8;
-          
+
           // Instructions banner
           pdf.setFillColor(236, 253, 245);
           pdf.setDrawColor(110, 231, 183);
-          pdf.roundedRect(margin, yPos, contentWidth, 8, 2, 2, 'FD');
+          pdf.roundedRect(margin, yPos, contentWidth, 8, 2, 2, "FD");
           pdf.setFontSize(7);
-          pdf.setFont('helvetica', 'bold');
+          pdf.setFont("helvetica", "bold");
           pdf.setTextColor(4, 120, 87);
-          pdf.text('[!] INSTRUCTIONS:', margin + 3, yPos + 5);
-          pdf.setFont('helvetica', 'normal');
-          pdf.text('Keep all work within the designated zones for AI scanning. Write clearly and stay inside the boxes.', margin + 30, yPos + 5);
+          pdf.text("[!] INSTRUCTIONS:", margin + 3, yPos + 5);
+          pdf.setFont("helvetica", "normal");
+          pdf.text(
+            "Keep all work within the designated zones for AI scanning. Write clearly and stay inside the boxes.",
+            margin + 30,
+            yPos + 5,
+          );
           yPos += 12;
-          
+
           const availableHeight = pageHeight - yPos - margin;
-          
+
           // Draw work zones based on layout
-          if (scrapPaperLayout === 'single') {
+          if (scrapPaperLayout === "single") {
             const zoneHeight = availableHeight;
-            const problemNum = problemNumbers[problemIndex] || (problemIndex + 1);
+            const problemNum = problemNumbers[problemIndex] || problemIndex + 1;
             drawScrapWorkZone(pdf, margin, yPos, contentWidth, zoneHeight, problemNum);
             problemIndex++;
-          } else if (scrapPaperLayout === 'split-2') {
+          } else if (scrapPaperLayout === "split-2") {
             const zoneHeight = (availableHeight - 5) / 2;
             for (let i = 0; i < 2 && problemIndex < problemNumbers.length; i++) {
-              const problemNum = problemNumbers[problemIndex] || (problemIndex + 1);
-              drawScrapWorkZone(pdf, margin, yPos + (i * (zoneHeight + 5)), contentWidth, zoneHeight, problemNum);
+              const problemNum = problemNumbers[problemIndex] || problemIndex + 1;
+              drawScrapWorkZone(pdf, margin, yPos + i * (zoneHeight + 5), contentWidth, zoneHeight, problemNum);
               problemIndex++;
             }
-          } else if (scrapPaperLayout === 'split-4') {
+          } else if (scrapPaperLayout === "split-4") {
             const zoneWidth = (contentWidth - 5) / 2;
             const zoneHeight = (availableHeight - 5) / 2;
             for (let row = 0; row < 2; row++) {
               for (let col = 0; col < 2 && problemIndex < problemNumbers.length; col++) {
-                const problemNum = problemNumbers[problemIndex] || (problemIndex + 1);
-                const x = margin + (col * (zoneWidth + 5));
-                const y = yPos + (row * (zoneHeight + 5));
+                const problemNum = problemNumbers[problemIndex] || problemIndex + 1;
+                const x = margin + col * (zoneWidth + 5);
+                const y = yPos + row * (zoneHeight + 5);
                 drawScrapWorkZone(pdf, x, y, zoneWidth, zoneHeight, problemNum);
                 problemIndex++;
               }
@@ -1885,21 +2739,21 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       // Footer on last page
       pdf.setFontSize(8);
       pdf.setTextColor(150);
-      pdf.text('Generated with NYCLogic Ai - NYS Regents Aligned', pageWidth / 2, pageHeight - 10, { align: 'center' });
+      pdf.text("Generated with NYCLogic Ai - NYS Regents Aligned", pageWidth / 2, pageHeight - 10, { align: "center" });
 
       // Download
-      pdf.save(`${worksheetTitle.replace(/\s+/g, '_')}.pdf`);
+      pdf.save(`${worksheetTitle.replace(/\s+/g, "_")}.pdf`);
 
       toast({
-        title: 'Worksheet downloaded!',
-        description: `Your worksheet with ${compiledQuestions.length} question(s)${includeScrapPaper ? ' and scrap paper' : ''} has been saved.`,
+        title: "Worksheet downloaded!",
+        description: `Your worksheet with ${compiledQuestions.length} question(s)${includeScrapPaper ? " and scrap paper" : ""} has been saved.`,
       });
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error("Error generating PDF:", error);
       toast({
-        title: 'Error',
-        description: 'Failed to generate worksheet. Please try again.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to generate worksheet. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setIsGenerating(false);
@@ -1910,9 +2764,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const generateWordDocument = async () => {
     if (compiledQuestions.length === 0) {
       toast({
-        title: 'No questions compiled',
-        description: 'Please compile the worksheet first.',
-        variant: 'destructive',
+        title: "No questions compiled",
+        description: "Please compile the worksheet first.",
+        variant: "destructive",
       });
       return;
     }
@@ -1920,7 +2774,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
     setIsGenerating(true);
 
     try {
-      const children: any[] = [];
+      const children: (Paragraph | Table)[] = [];
 
       // Header
       children.push(
@@ -1934,7 +2788,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           ],
           alignment: AlignmentType.CENTER,
           spacing: { after: 200 },
-        })
+        }),
       );
 
       if (teacherName) {
@@ -1948,7 +2802,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             ],
             alignment: AlignmentType.CENTER,
             spacing: { after: 150 },
-          })
+          }),
         );
       }
 
@@ -1956,10 +2810,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       children.push(
         new Paragraph({
           children: [
-            new TextRun({ text: 'Name: _______________________   Date: ___________   Period: _____', size: 22 }),
+            new TextRun({ text: "Name: _______________________   Date: ___________   Period: _____", size: 22 }),
           ],
           spacing: { after: 300 },
-        })
+        }),
       );
 
       // Separator
@@ -1967,25 +2821,25 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         new Paragraph({
           children: [],
           border: {
-            bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+            bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
           },
           spacing: { after: 300 },
-        })
+        }),
       );
 
       // Questions
       for (const question of compiledQuestions) {
         const sanitizedQuestion = sanitizeForPDF(renderMathText(fixEncodingCorruption(question.question)));
         const difficultyText = question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1);
-        const bloomLabel = question.bloomLevel 
+        const bloomLabel = question.bloomLevel
           ? question.bloomLevel.charAt(0).toUpperCase() + question.bloomLevel.slice(1)
-          : '';
+          : "";
 
-        let headerParts: string[] = [`${question.questionNumber}.`];
+        const headerParts: string[] = [`${question.questionNumber}.`];
         if (bloomLabel) {
-          headerParts.push(`[${bloomLabel}${question.bloomVerb ? `: ${question.bloomVerb}` : ''}]`);
+          headerParts.push(`[${bloomLabel}${question.bloomVerb ? `: ${question.bloomVerb}` : ""}]`);
         }
-        if (worksheetMode === 'diagnostic' && question.advancementLevel) {
+        if (worksheetMode === "diagnostic" && question.advancementLevel) {
           headerParts.push(`[Level ${question.advancementLevel}]`);
         }
         headerParts.push(`[${difficultyText}]`);
@@ -1993,102 +2847,104 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         // Question header
         children.push(
           new Paragraph({
-            children: [
-              new TextRun({ text: headerParts.join(' '), bold: true, size: 22 }),
-            ],
+            children: [new TextRun({ text: headerParts.join(" "), bold: true, size: 22 })],
             spacing: { before: 200, after: 100 },
-          })
+          }),
         );
 
         // Topic and standard
         children.push(
           new Paragraph({
             children: [
-              new TextRun({ 
-                text: `${question.topic} (${question.standard})`, 
-                size: 18, 
+              new TextRun({
+                text: `${question.topic} (${question.standard})`,
+                size: 18,
                 italics: true,
-                color: '666666',
+                color: "666666",
               }),
             ],
             spacing: { after: 100 },
-          })
+          }),
         );
 
         // Question text
         children.push(
           new Paragraph({
-            children: [
-              new TextRun({ text: sanitizedQuestion, size: 20 }),
-            ],
+            children: [new TextRun({ text: sanitizedQuestion, size: 20 })],
             spacing: { after: 150 },
-          })
+          }),
         );
 
         // Add image/diagram if available (imageUrl, svg, or generate from imagePrompt)
         if (question.imageUrl || question.svg || question.imagePrompt) {
           try {
-            let imageData = '';
-            
+            let imageData = "";
+
             // Priority 1: Use imageUrl if available
             if (question.imageUrl) {
               // Check if it's an SVG that needs conversion to PNG for Word compatibility
-              const isSvg = question.imageUrl.startsWith('data:image/svg') || 
-                           (question.imageUrl.startsWith('<svg') || question.imageUrl.includes('xmlns="http://www.w3.org/2000/svg"'));
+              const isSvg =
+                question.imageUrl.startsWith("data:image/svg") ||
+                question.imageUrl.startsWith("<svg") ||
+                question.imageUrl.includes('xmlns="http://www.w3.org/2000/svg"');
               if (isSvg) {
                 try {
                   imageData = await svgToPngDataUrl(question.imageUrl, 300, 300);
                 } catch (svgErr) {
-                  console.error('Error converting SVG URL to PNG for Word:', svgErr);
+                  console.error("Error converting SVG URL to PNG for Word:", svgErr);
                 }
-              } else if (question.imageUrl.startsWith('data:image/png') || question.imageUrl.startsWith('data:image/jpeg')) {
+              } else if (
+                question.imageUrl.startsWith("data:image/png") ||
+                question.imageUrl.startsWith("data:image/jpeg")
+              ) {
                 // Already PNG/JPEG data URL - use directly
                 imageData = question.imageUrl;
-              } else if (question.imageUrl.startsWith('http')) {
+              } else if (question.imageUrl.startsWith("http")) {
                 // External URL - try to fetch and convert via canvas to ensure PNG format
                 try {
                   imageData = await svgToPngDataUrl(question.imageUrl, 300, 300);
                 } catch (fetchErr) {
-                  console.error('Error fetching external image for Word:', fetchErr);
+                  console.error("Error fetching external image for Word:", fetchErr);
                   imageData = question.imageUrl; // Fallback to URL
                 }
               } else {
                 imageData = question.imageUrl;
               }
             }
-            
+
             // Priority 2: Convert SVG string to PNG if available
             if (!imageData && question.svg) {
               try {
                 imageData = await svgToPngDataUrl(question.svg, 300, 300);
               } catch (svgErr) {
-                console.error('Error converting SVG to PNG for Word:', svgErr);
+                console.error("Error converting SVG to PNG for Word:", svgErr);
               }
             }
-            
+
             // Priority 3: Generate from imagePrompt on-demand
             if (!imageData && question.imagePrompt) {
               try {
-                console.log('Generating diagram for Word doc:', question.imagePrompt.substring(0, 50));
-                const { data: genData, error: genError } = await supabase.functions.invoke('generate-diagram-images', {
+                console.log("Generating diagram for Word doc:", question.imagePrompt.substring(0, 50));
+                const { data: genData, error: genError } = await supabase.functions.invoke("generate-diagram-images", {
                   body: {
                     questions: [{ questionNumber: question.questionNumber, imagePrompt: question.imagePrompt }],
                     useNanoBanana: false, // Use simple B&W SVG for worksheets (faster, more reliable)
                     preferDeterministicSVG: true,
                   },
                 });
-                
+
                 if (genError) {
-                  console.error('Edge function error:', genError);
+                  console.error("Edge function error:", genError);
                 } else {
-                  const generatedUrl = genData?.results?.[0]?.imageUrl || '';
-                  console.log('Generated image URL type:', generatedUrl.substring(0, 30));
-                  
+                  const generatedUrl = genData?.results?.[0]?.imageUrl || "";
+                  console.log("Generated image URL type:", generatedUrl.substring(0, 30));
+
                   if (generatedUrl) {
                     // Check if it's SVG and needs conversion
-                    const isGenSvg = generatedUrl.startsWith('data:image/svg') || 
-                                    generatedUrl.startsWith('<svg') || 
-                                    generatedUrl.includes('xmlns="http://www.w3.org/2000/svg"');
+                    const isGenSvg =
+                      generatedUrl.startsWith("data:image/svg") ||
+                      generatedUrl.startsWith("<svg") ||
+                      generatedUrl.includes('xmlns="http://www.w3.org/2000/svg"');
                     if (isGenSvg) {
                       imageData = await svgToPngDataUrl(generatedUrl, 300, 300);
                     } else {
@@ -2098,10 +2954,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   }
                 }
               } catch (genError) {
-                console.error('Error generating diagram on-demand for Word:', genError);
+                console.error("Error generating diagram on-demand for Word:", genError);
               }
             }
-            
+
             // Embed the image if we have data
             if (imageData) {
               const imageBuffer = await fetchImageAsArrayBuffer(imageData);
@@ -2109,13 +2965,11 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 // Add diagram label
                 children.push(
                   new Paragraph({
-                    children: [
-                      new TextRun({ text: '📐 Diagram', size: 16, color: '2563EB', italics: true }),
-                    ],
+                    children: [new TextRun({ text: "📐 Diagram", size: 16, color: "2563EB", italics: true })],
                     spacing: { before: 50, after: 50 },
-                  })
+                  }),
                 );
-                
+
                 // Add the image - using user-configured size
                 const imageSizePx = Math.round(imageSize * 0.75); // Scale appropriately for Word
                 children.push(
@@ -2127,16 +2981,16 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                           width: imageSizePx,
                           height: imageSizePx,
                         },
-                        type: 'png',
+                        type: "png",
                       }),
                     ],
                     spacing: { before: 50, after: 100 },
-                  })
+                  }),
                 );
               }
             }
           } catch (imgError) {
-            console.error('Error adding image to Word document:', imgError);
+            console.error("Error adding image to Word document:", imgError);
           }
         }
 
@@ -2154,15 +3008,15 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         width: 60,
                         height: 60,
                       },
-                      type: 'png',
+                      type: "png",
                     }),
                   ],
                   spacing: { before: 50, after: 50 },
-                })
+                }),
               );
             }
           } catch (clipartError) {
-            console.error('Error adding clipart to Word document:', clipartError);
+            console.error("Error adding clipart to Word document:", clipartError);
           }
         }
 
@@ -2170,30 +3024,28 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         if (showAnswerLines) {
           children.push(
             new Paragraph({
-              children: [
-                new TextRun({ text: 'WORK AREA:', bold: true, size: 14, color: '1e3a5f' }),
-              ],
+              children: [new TextRun({ text: "WORK AREA:", bold: true, size: 14, color: "1e3a5f" })],
               border: {
-                top: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
-                left: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
-                right: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
+                top: { style: BorderStyle.SINGLE, size: 6, color: "9CA3AF" },
+                left: { style: BorderStyle.SINGLE, size: 6, color: "9CA3AF" },
+                right: { style: BorderStyle.SINGLE, size: 6, color: "9CA3AF" },
               },
-              shading: { fill: 'F8FAFC' },
+              shading: { fill: "F8FAFC" },
               spacing: { before: 100 },
-            })
+            }),
           );
 
           // Empty work area lines
           for (let i = 0; i < 4; i++) {
             children.push(
               new Paragraph({
-                children: [new TextRun({ text: '' })],
+                children: [new TextRun({ text: "" })],
                 border: {
-                  left: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
-                  right: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
+                  left: { style: BorderStyle.SINGLE, size: 6, color: "9CA3AF" },
+                  right: { style: BorderStyle.SINGLE, size: 6, color: "9CA3AF" },
                 },
-                shading: { fill: 'F8FAFC' },
-              })
+                shading: { fill: "F8FAFC" },
+              }),
             );
           }
 
@@ -2201,17 +3053,17 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           children.push(
             new Paragraph({
               children: [
-                new TextRun({ text: 'FINAL ANSWER: ', bold: true, size: 18, color: '92400E' }),
-                new TextRun({ text: '________________________________', size: 18 }),
+                new TextRun({ text: "FINAL ANSWER: ", bold: true, size: 18, color: "92400E" }),
+                new TextRun({ text: "________________________________", size: 18 }),
               ],
               border: {
-                bottom: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
-                left: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
-                right: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' },
+                bottom: { style: BorderStyle.SINGLE, size: 6, color: "9CA3AF" },
+                left: { style: BorderStyle.SINGLE, size: 6, color: "9CA3AF" },
+                right: { style: BorderStyle.SINGLE, size: 6, color: "9CA3AF" },
               },
-              shading: { fill: 'FEF3C7' },
+              shading: { fill: "FEF3C7" },
               spacing: { after: 300 },
-            })
+            }),
           );
         }
       }
@@ -2220,52 +3072,54 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       children.push(
         new Paragraph({
           children: [
-            new TextRun({ 
-              text: 'Generated with NYCLogic Ai - NYS Regents Aligned', 
-              size: 16, 
+            new TextRun({
+              text: "Generated with NYCLogic Ai - NYS Regents Aligned",
+              size: 16,
               italics: true,
-              color: '999999',
+              color: "999999",
             }),
           ],
           alignment: AlignmentType.CENTER,
           spacing: { before: 400 },
-        })
+        }),
       );
 
       const doc = new Document({
-        sections: [{
-          properties: {
-            page: {
-              margin: {
-                top: convertInchesToTwip(marginMm / 25.4),
-                bottom: convertInchesToTwip(marginMm / 25.4),
-                left: convertInchesToTwip(marginMm / 25.4),
-                right: convertInchesToTwip(marginMm / 25.4),
+        sections: [
+          {
+            properties: {
+              page: {
+                margin: {
+                  top: convertInchesToTwip(marginMm / 25.4),
+                  bottom: convertInchesToTwip(marginMm / 25.4),
+                  left: convertInchesToTwip(marginMm / 25.4),
+                  right: convertInchesToTwip(marginMm / 25.4),
+                },
               },
             },
+            children,
           },
-          children,
-        }],
+        ],
       });
 
       const blob = await Packer.toBlob(doc);
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `${worksheetTitle.replace(/\s+/g, '_')}.docx`;
+      a.download = `${worksheetTitle.replace(/\s+/g, "_")}.docx`;
       a.click();
       URL.revokeObjectURL(url);
 
       toast({
-        title: 'Word document downloaded!',
+        title: "Word document downloaded!",
         description: `Your worksheet with ${compiledQuestions.length} question(s) has been saved as .docx.`,
       });
     } catch (error) {
-      console.error('Error generating Word document:', error);
+      console.error("Error generating Word document:", error);
       toast({
-        title: 'Error',
-        description: 'Failed to generate Word document. Please try again.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to generate Word document. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setIsGenerating(false);
@@ -2275,9 +3129,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const handlePrint = () => {
     if (compiledQuestions.length === 0) {
       toast({
-        title: 'No questions compiled',
-        description: 'Please compile the worksheet first.',
-        variant: 'destructive',
+        title: "No questions compiled",
+        description: "Please compile the worksheet first.",
+        variant: "destructive",
       });
       return;
     }
@@ -2287,45 +3141,387 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
   const handlePreview = () => {
     if (compiledQuestions.length === 0) {
       toast({
-        title: 'No questions compiled',
-        description: 'Please compile the worksheet first.',
-        variant: 'destructive',
+        title: "No questions compiled",
+        description: "Please compile the worksheet first.",
+        variant: "destructive",
       });
       return;
     }
     setShowPreview(true);
   };
 
+  /**
+   * Generate PDF from the preview content using html2canvas.
+   * This captures exactly what the user sees in the preview (WYSIWYG).
+   * All Unicode symbols, special characters, and formatting are preserved.
+   */
+  /**
+   * Generate WYSIWYG PDF from the preview modal with intelligent page break handling.
+   * Captures the actual preview content but organizes it into pages that don't cut content mid-section.
+   */
+  const generateWYSIWYGPdf = async () => {
+    const printContent = printRef.current;
+    if (!printContent) {
+      toast({
+        title: "Error",
+        description: "Could not find preview content to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingPDF(true);
+    toast({
+      title: "Generating PDF...",
+      description: "Creating optimized PDF with intelligent page breaks. Please wait.",
+    });
+
+    try {
+      // Page dimensions at 96 DPI
+      const pageWidthPx = 816; // 8.5in at 96 DPI
+      const pageHeightPx = 1056; // 11in at 96 DPI
+      const marginPx = marginIn * 96; // Convert margin from inches to pixels
+      const usableHeight = pageHeightPx - marginPx * 2; // Height available for content per page
+      const scale = 2; // 2x scale for better quality
+
+      // Get the actual content element (the print-worksheet div)
+      const worksheetContent = printContent.querySelector(".print-worksheet") as HTMLElement;
+      if (!worksheetContent) {
+        throw new Error("Worksheet content not found");
+      }
+
+      // Create temporary container for measuring and rendering
+      const tempContainer = document.createElement("div");
+      tempContainer.style.cssText = `
+        position: absolute;
+        left: -10000px;
+        top: 0;
+        width: ${pageWidthPx}px;
+        background: white;
+      `;
+      document.body.appendChild(tempContainer);
+
+      // Clone the content to manipulate without affecting the preview
+      const clonedContent = worksheetContent.cloneNode(true) as HTMLElement;
+      clonedContent.style.transform = "none";
+      clonedContent.style.width = `${pageWidthPx}px`;
+      clonedContent.style.maxWidth = `${pageWidthPx}px`;
+      clonedContent.style.boxShadow = "none";
+      clonedContent.style.border = "none";
+
+      // Find all the logical content sections in the cloned content
+      // Look for: header area, question blocks, formula reference sheet, answer key
+      interface ContentBlock {
+        element: HTMLElement;
+        type: "header" | "question" | "formula-sheet" | "answer-key" | "other";
+        height: number;
+        forceNewPage: boolean;
+      }
+
+      const blocks: ContentBlock[] = [];
+
+      // Temporarily add to DOM for measurement
+      tempContainer.appendChild(clonedContent);
+
+      // Identify content blocks by looking at the structure
+      const children = Array.from(clonedContent.children) as HTMLElement[];
+
+      for (const child of children) {
+        // Detect section type by content
+        const text = child.textContent?.toLowerCase() || "";
+        const isFormulaSheet = text.includes("formula reference sheet");
+        const isAnswerKey = text.includes("answer key") && text.includes("for teacher use only");
+
+        // Check if this is a question block (has work area or question number pattern)
+        const hasWorkArea =
+          child.querySelector('[class*="work-area"]') ||
+          child.innerHTML.includes("Work Area Q") ||
+          /\d+\.\s*\[/.test(child.textContent || "");
+
+        let blockType: ContentBlock["type"] = "other";
+        let forceNewPage = false;
+
+        if (isFormulaSheet) {
+          blockType = "formula-sheet";
+          forceNewPage = true;
+        } else if (isAnswerKey) {
+          blockType = "answer-key";
+          forceNewPage = true;
+        } else if (hasWorkArea) {
+          blockType = "question";
+        }
+
+        blocks.push({
+          element: child,
+          type: blockType,
+          height: child.offsetHeight,
+          forceNewPage,
+        });
+      }
+
+      // Organize blocks into pages with intelligent breaks
+      interface PageContent {
+        blocks: ContentBlock[];
+        totalHeight: number;
+      }
+
+      const pages: PageContent[] = [];
+      let currentPage: PageContent = { blocks: [], totalHeight: 0 };
+
+      for (const block of blocks) {
+        // If block forces a new page AND we have content on current page, start new page
+        if (block.forceNewPage && currentPage.blocks.length > 0) {
+          pages.push(currentPage);
+          currentPage = { blocks: [], totalHeight: 0 };
+        }
+
+        // Check if block fits on current page
+        const wouldExceed = currentPage.totalHeight + block.height > usableHeight;
+
+        if (wouldExceed && currentPage.blocks.length > 0) {
+          // Block doesn't fit, start new page
+          pages.push(currentPage);
+          currentPage = { blocks: [], totalHeight: 0 };
+        }
+
+        // Add block to current page
+        currentPage.blocks.push(block);
+        currentPage.totalHeight += block.height;
+      }
+
+      // Don't forget the last page
+      if (currentPage.blocks.length > 0) {
+        pages.push(currentPage);
+      }
+
+      // Create PDF with letter size
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "px",
+        format: [pageWidthPx, pageHeightPx],
+        hotfixes: ["px_scaling"],
+      });
+
+      // Render each page
+      for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+        if (pageIndex > 0) {
+          pdf.addPage();
+        }
+
+        const page = pages[pageIndex];
+
+        // Create a container for this page's content
+        const pageContent = document.createElement("div");
+        pageContent.style.cssText = `
+          background-color: white;
+          padding: ${marginPx}px;
+          box-sizing: border-box;
+          width: ${pageWidthPx}px;
+          min-height: ${pageHeightPx}px;
+          font-family: 'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif;
+        `;
+
+        // Add all blocks for this page
+        for (const block of page.blocks) {
+          const clonedBlock = block.element.cloneNode(true) as HTMLElement;
+          pageContent.appendChild(clonedBlock);
+        }
+
+        // Temporarily add to DOM for rendering
+        tempContainer.innerHTML = "";
+        tempContainer.appendChild(pageContent);
+
+        // Capture with html2canvas
+        const canvas = await html2canvas(pageContent, {
+          scale: scale,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          width: pageWidthPx,
+          height: pageHeightPx,
+          windowWidth: pageWidthPx,
+          windowHeight: pageHeightPx,
+        });
+
+        // Add canvas to PDF
+        const imgData = canvas.toDataURL("image/png", 1.0);
+        pdf.addImage(imgData, "PNG", 0, 0, pageWidthPx, pageHeightPx, undefined, "FAST");
+      }
+
+      // Clean up
+      document.body.removeChild(tempContainer);
+
+      // Add Scrap Paper Pages if enabled
+      let scrapPaperPagesCount = 0;
+
+      if (includeScrapPaper) {
+        // Convert pixel dimensions to mm for jsPDF drawing operations
+        const pageWidthMm = 215.9; // 8.5 inches in mm
+        const pageHeightMm = 279.4; // 11 inches in mm
+        const marginMm = marginIn * 25.4; // Convert margin from inches to mm
+        const contentWidthMm = pageWidthMm - marginMm * 2;
+
+        const problemNumbers = compiledQuestions.map((q) => q.questionNumber);
+        const zonesPerPage = scrapPaperLayout === "single" ? 1 : scrapPaperLayout === "split-2" ? 2 : 4;
+        const pagesNeeded = Math.ceil(problemNumbers.length / zonesPerPage);
+        scrapPaperPagesCount = pagesNeeded;
+
+        let problemIndex = 0;
+
+        for (let page = 0; page < pagesNeeded; page++) {
+          pdf.addPage([pageWidthPx, pageHeightPx]);
+
+          // Set white background
+          pdf.setFillColor(255, 255, 255);
+          pdf.rect(0, 0, pageWidthPx, pageHeightPx, "F");
+
+          // Convert mm positions to pixels (96 DPI)
+          const mmToPx = 96 / 25.4;
+          const margin = marginMm * mmToPx;
+          const contentWidth = contentWidthMm * mmToPx;
+
+          let yPos = margin;
+
+          // Scrap Paper Header
+          pdf.setFontSize(14);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(30, 58, 95);
+          pdf.text(`${worksheetTitle} - Scrap Paper`, pageWidthPx / 2, yPos, { align: "center" });
+          yPos += 20;
+
+          // Subheader
+          pdf.setFontSize(9);
+          pdf.setFont("helvetica", "normal");
+          pdf.setTextColor(100, 116, 139);
+          pdf.text(`Page ${page + 1} of ${pagesNeeded} | AI-Optimized Work Zones`, pageWidthPx / 2, yPos, {
+            align: "center",
+          });
+          yPos += 15;
+
+          // Name/Date line
+          pdf.setFontSize(10);
+          pdf.setTextColor(0);
+          pdf.text("Name: _______________________", margin, yPos);
+          pdf.text("Date: ___________", pageWidthPx - margin - 120, yPos);
+          yPos += 25;
+
+          // Instructions banner
+          pdf.setFillColor(236, 253, 245);
+          pdf.setDrawColor(110, 231, 183);
+          pdf.roundedRect(margin, yPos, contentWidth, 25, 3, 3, "FD");
+          pdf.setFontSize(8);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(4, 120, 87);
+          pdf.text("[!] INSTRUCTIONS:", margin + 10, yPos + 16);
+          pdf.setFont("helvetica", "normal");
+          pdf.text(
+            "Keep all work within the designated zones for AI scanning. Write clearly and stay inside the boxes.",
+            margin + 120,
+            yPos + 16,
+          );
+          yPos += 35;
+
+          const availableHeight = pageHeightPx - yPos - margin;
+
+          // Draw work zones based on layout (using pixel-based function)
+          if (scrapPaperLayout === "single") {
+            const zoneHeight = availableHeight;
+            const problemNum = problemNumbers[problemIndex] || problemIndex + 1;
+            drawScrapWorkZonePx(pdf, margin, yPos, contentWidth, zoneHeight, problemNum);
+            problemIndex++;
+          } else if (scrapPaperLayout === "split-2") {
+            const zoneHeight = (availableHeight - 15) / 2;
+            for (let i = 0; i < 2 && problemIndex < problemNumbers.length; i++) {
+              const problemNum = problemNumbers[problemIndex] || problemIndex + 1;
+              drawScrapWorkZonePx(pdf, margin, yPos + i * (zoneHeight + 15), contentWidth, zoneHeight, problemNum);
+              problemIndex++;
+            }
+          } else if (scrapPaperLayout === "split-4") {
+            const zoneWidth = (contentWidth - 15) / 2;
+            const zoneHeight = (availableHeight - 15) / 2;
+            for (let row = 0; row < 2; row++) {
+              for (let col = 0; col < 2 && problemIndex < problemNumbers.length; col++) {
+                const problemNum = problemNumbers[problemIndex] || problemIndex + 1;
+                const x = margin + col * (zoneWidth + 15);
+                const y = yPos + row * (zoneHeight + 15);
+                drawScrapWorkZonePx(pdf, x, y, zoneWidth, zoneHeight, problemNum);
+                problemIndex++;
+              }
+            }
+          }
+        }
+      }
+
+      // Download the PDF
+      const fileName = `${worksheetTitle.replace(/[^a-z0-9]/gi, "_")}_worksheet.pdf`;
+      pdf.save(fileName);
+
+      const totalPages = pages.length + scrapPaperPagesCount;
+      toast({
+        title: "PDF Downloaded!",
+        description: `Saved as ${fileName} (${totalPages} page${totalPages > 1 ? "s" : ""}${scrapPaperPagesCount > 0 ? `, including ${scrapPaperPagesCount} scrap paper page${scrapPaperPagesCount > 1 ? "s" : ""}` : ""})`,
+      });
+    } catch (error) {
+      console.error("Error generating WYSIWYG PDF:", error);
+      toast({
+        title: "PDF Generation Failed",
+        description: "There was an error generating the PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'hard': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'challenging': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-muted text-muted-foreground';
+      case "medium":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "hard":
+        return "bg-orange-100 text-orange-800 border-orange-200";
+      case "challenging":
+        return "bg-red-100 text-red-800 border-red-200";
+      default:
+        return "bg-muted text-muted-foreground";
     }
   };
 
   const getAdvancementLevelColor = (level: AdvancementLevel) => {
     switch (level) {
-      case 'A': return 'bg-green-100 text-green-800 border-green-300';
-      case 'B': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
-      case 'C': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'D': return 'bg-orange-100 text-orange-800 border-orange-300';
-      case 'E': return 'bg-red-100 text-red-800 border-red-300';
-      case 'F': return 'bg-gray-100 text-gray-800 border-gray-300';
-      default: return 'bg-muted text-muted-foreground';
+      case "A":
+        return "bg-green-100 text-green-800 border-green-300";
+      case "B":
+        return "bg-emerald-100 text-emerald-800 border-emerald-300";
+      case "C":
+        return "bg-yellow-100 text-yellow-800 border-yellow-300";
+      case "D":
+        return "bg-orange-100 text-orange-800 border-orange-300";
+      case "E":
+        return "bg-red-100 text-red-800 border-red-300";
+      case "F":
+        return "bg-gray-100 text-gray-800 border-gray-300";
+      default:
+        return "bg-muted text-muted-foreground";
     }
   };
 
   const getAdvancementLevelDescription = (level: AdvancementLevel) => {
     switch (level) {
-      case 'A': return 'Advanced';
-      case 'B': return 'Proficient';
-      case 'C': return 'Developing';
-      case 'D': return 'Beginning';
-      case 'E': return 'Emerging';
-      case 'F': return 'Foundational';
-      default: return '';
+      case "A":
+        return "Advanced";
+      case "B":
+        return "Proficient";
+      case "C":
+        return "Developing";
+      case "D":
+        return "Beginning";
+      case "E":
+        return "Emerging";
+      case "F":
+        return "Foundational";
+      default:
+        return "";
     }
   };
 
@@ -2340,10 +3536,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
           </p>
           <div className="flex flex-col gap-2">
             {onOpenAdaptiveGenerator && (
-              <Button 
-                onClick={onOpenAdaptiveGenerator}
-                className="bg-purple-600 hover:bg-purple-700"
-              >
+              <Button onClick={onOpenAdaptiveGenerator} className="bg-purple-600 hover:bg-purple-700">
                 <Brain className="h-4 w-4 mr-2" />
                 Adaptive Worksheets
               </Button>
@@ -2377,9 +3570,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : savedWorksheets.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              No saved worksheets yet.
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-8">No saved worksheets yet.</p>
           ) : (
             <ScrollArea className="h-64">
               <div className="space-y-2">
@@ -2404,11 +3595,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         </p>
                       </div>
                       <div className="flex items-center gap-1 ml-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => loadWorksheet(worksheet)}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => loadWorksheet(worksheet)}>
                           Load
                         </Button>
                         <Button
@@ -2421,7 +3608,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         </Button>
                       </div>
                     </div>
-                    
+
                     {/* Share controls */}
                     <div className="flex items-center gap-2 pt-1 border-t">
                       <Button
@@ -2432,7 +3619,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         disabled={isSharing}
                       >
                         <Share2 className="h-3 w-3 mr-1" />
-                        {worksheet.is_shared ? 'Unshare' : 'Share'}
+                        {worksheet.is_shared ? "Unshare" : "Share"}
                       </Button>
                       {worksheet.is_shared && worksheet.share_code && (
                         <Button
@@ -2485,16 +3672,20 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
-                    variant={worksheetMode === 'basic_assessment' ? 'default' : 'outline'}
+                    variant={worksheetMode === "basic_assessment" ? "default" : "outline"}
                     className={`h-auto py-3 flex flex-col items-center gap-1.5 ${
-                      worksheetMode === 'basic_assessment' 
-                        ? 'bg-blue-600 text-white ring-2 ring-blue-600 ring-offset-2' 
-                        : 'hover:bg-muted border-blue-200'
+                      worksheetMode === "basic_assessment"
+                        ? "bg-blue-600 text-white ring-2 ring-blue-600 ring-offset-2"
+                        : "hover:bg-muted border-blue-200"
                     }`}
                     onClick={() => {
-                      setWorksheetMode('basic_assessment');
+                      setWorksheetMode("basic_assessment");
                       if (!hasUserEditedTitle) {
-                        setWorksheetTitle(selectedQuestions.length > 0 ? 'Assessment: ' + selectedQuestions[0].topicName : 'Math Assessment');
+                        setWorksheetTitle(
+                          selectedQuestions.length > 0
+                            ? "Assessment: " + selectedQuestions[0].topicName
+                            : "Math Assessment",
+                        );
                       }
                     }}
                   >
@@ -2504,16 +3695,20 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   </Button>
                   <Button
                     type="button"
-                    variant={worksheetMode === 'diagnostic' ? 'default' : 'outline'}
+                    variant={worksheetMode === "diagnostic" ? "default" : "outline"}
                     className={`h-auto py-3 flex flex-col items-center gap-1.5 ${
-                      worksheetMode === 'diagnostic' 
-                        ? 'bg-purple-600 text-white ring-2 ring-purple-600 ring-offset-2' 
-                        : 'hover:bg-muted border-purple-200'
+                      worksheetMode === "diagnostic"
+                        ? "bg-purple-600 text-white ring-2 ring-purple-600 ring-offset-2"
+                        : "hover:bg-muted border-purple-200"
                     }`}
                     onClick={() => {
-                      setWorksheetMode('diagnostic');
+                      setWorksheetMode("diagnostic");
                       if (!hasUserEditedTitle) {
-                        setWorksheetTitle(selectedQuestions.length > 0 ? 'Diagnostic: ' + selectedQuestions[0].topicName : 'Diagnostic Assessment');
+                        setWorksheetTitle(
+                          selectedQuestions.length > 0
+                            ? "Diagnostic: " + selectedQuestions[0].topicName
+                            : "Diagnostic Assessment",
+                        );
                       }
                     }}
                   >
@@ -2522,17 +3717,17 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     <span className="text-[10px] opacity-80 text-center leading-tight">Individualized A-F</span>
                   </Button>
                 </div>
-                
+
                 {/* Assessment Mode Description */}
-                {worksheetMode === 'basic_assessment' && (
+                {worksheetMode === "basic_assessment" && (
                   <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-start gap-2">
                       <FileText className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                       <div className="space-y-1">
                         <p className="text-sm font-medium text-blue-900">Adaptive Assessment</p>
                         <p className="text-xs text-blue-700">
-                          All students receive the same adaptive questions at a consistent difficulty level. 
-                          Fair for quizzes and tests where everyone is assessed equally.
+                          All students receive the same adaptive questions at a consistent difficulty level. Fair for
+                          quizzes and tests where everyone is assessed equally.
                         </p>
                       </div>
                     </div>
@@ -2540,28 +3735,33 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 )}
 
                 {/* Diagnostic Mode Description */}
-                {worksheetMode === 'diagnostic' && (
+                {worksheetMode === "diagnostic" && (
                   <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
                     <div className="flex items-start gap-2">
                       <Sparkles className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
                       <div className="space-y-1">
                         <p className="text-sm font-medium text-purple-900">Individualized Diagnostic</p>
                         <p className="text-xs text-purple-700">
-                          Questions span levels A-F to identify each student's understanding. 
-                          Use responses to generate personalized follow-up worksheets.
+                          Questions span levels A-F to identify each student's understanding. Use responses to generate
+                          personalized follow-up worksheets.
                         </p>
                         <div className="flex flex-wrap gap-1 mt-2">
-                          {['A', 'B', 'C', 'D', 'E', 'F'].map((level) => (
-                            <Badge 
-                              key={level} 
-                              variant="outline" 
+                          {["A", "B", "C", "D", "E", "F"].map((level) => (
+                            <Badge
+                              key={level}
+                              variant="outline"
                               className={`text-[10px] px-1.5 py-0 ${
-                                level === 'A' ? 'bg-green-50 border-green-300 text-green-700' :
-                                level === 'B' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' :
-                                level === 'C' ? 'bg-yellow-50 border-yellow-300 text-yellow-700' :
-                                level === 'D' ? 'bg-orange-50 border-orange-300 text-orange-700' :
-                                level === 'E' ? 'bg-red-50 border-red-300 text-red-700' :
-                                'bg-gray-50 border-gray-300 text-gray-700'
+                                level === "A"
+                                  ? "bg-green-50 border-green-300 text-green-700"
+                                  : level === "B"
+                                    ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+                                    : level === "C"
+                                      ? "bg-yellow-50 border-yellow-300 text-yellow-700"
+                                      : level === "D"
+                                        ? "bg-orange-50 border-orange-300 text-orange-700"
+                                        : level === "E"
+                                          ? "bg-red-50 border-red-300 text-red-700"
+                                          : "bg-gray-50 border-gray-300 text-gray-700"
                               }`}
                             >
                               Level {level}
@@ -2579,7 +3779,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               {/* Configuration */}
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="title" className="text-sm">Worksheet Title</Label>
+                  <Label htmlFor="title" className="text-sm">
+                    Worksheet Title
+                  </Label>
                   <Input
                     id="title"
                     value={worksheetTitle}
@@ -2591,7 +3793,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="teacher" className="text-sm">Teacher Name (optional)</Label>
+                  <Label htmlFor="teacher" className="text-sm">
+                    Teacher Name (optional)
+                  </Label>
                   <Input
                     id="teacher"
                     value={teacherName}
@@ -2600,7 +3804,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="questionCount" className="text-sm">Number of Questions</Label>
+                  <Label htmlFor="questionCount" className="text-sm">
+                    Number of Questions
+                  </Label>
                   <Select value={questionCount} onValueChange={setQuestionCount}>
                     <SelectTrigger>
                       <SelectValue />
@@ -2618,19 +3824,19 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 <div className="space-y-1.5">
                   <Label className="text-sm">Difficulty Levels</Label>
                   <div className="flex flex-wrap gap-2">
-                    {['medium', 'hard', 'challenging'].map((level) => (
+                    {["medium", "hard", "challenging"].map((level) => (
                       <button
                         key={level}
                         type="button"
                         onClick={() => toggleDifficulty(level)}
                         className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
                           difficultyFilter.includes(level)
-                            ? level === 'medium'
-                              ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
-                              : level === 'hard'
-                              ? 'bg-orange-100 text-orange-800 border-orange-300'
-                              : 'bg-red-100 text-red-800 border-red-300'
-                            : 'bg-muted text-muted-foreground border-border'
+                            ? level === "medium"
+                              ? "bg-yellow-100 text-yellow-800 border-yellow-300"
+                              : level === "hard"
+                                ? "bg-orange-100 text-orange-800 border-orange-300"
+                                : "bg-red-100 text-red-800 border-red-300"
+                            : "bg-muted text-muted-foreground border-border"
                         }`}
                       >
                         {level.charAt(0).toUpperCase() + level.slice(1)}
@@ -2641,12 +3847,14 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     <p className="text-xs text-destructive">Select at least one difficulty level</p>
                   )}
                 </div>
-                
+
                 {/* Bloom's Taxonomy Filter */}
                 <div className="space-y-1.5">
                   <Label className="text-sm flex items-center gap-1.5">
                     Bloom's Taxonomy Levels
-                    <Badge variant="outline" className="text-[10px] font-normal">Cognitive</Badge>
+                    <Badge variant="outline" className="text-[10px] font-normal">
+                      Cognitive
+                    </Badge>
                   </Label>
                   <div className="flex flex-wrap gap-1.5">
                     {BLOOM_LEVELS.map((bloom) => (
@@ -2658,7 +3866,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         className={`px-2 py-1 text-xs font-medium rounded-full border transition-colors ${
                           bloomFilter.includes(bloom.level)
                             ? `${bloom.color} text-white border-transparent`
-                            : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+                            : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
                         }`}
                       >
                         {bloom.label}
@@ -2746,11 +3954,13 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         <Sparkles className="h-3.5 w-3.5 text-purple-500" />
                         Include AI-generated geometric/scientific diagrams
                       </span>
-                      <span className="text-xs text-muted-foreground ml-5">Generates images for shapes, graphs, and coordinate geometry</span>
+                      <span className="text-xs text-muted-foreground ml-5">
+                        Generates images for shapes, graphs, and coordinate geometry
+                      </span>
                     </span>
                   </Label>
                 </div>
-                
+
                 {/* Image Size Slider - shown when AI images are enabled */}
                 {useAIImages && (
                   <div className="space-y-3 ml-5 pl-2 border-l-2 border-muted">
@@ -2769,11 +3979,13 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                             <Palette className="h-3.5 w-3.5 text-primary" />
                             Use Nano Banana for realistic shapes
                           </span>
-                          <span className="text-xs text-muted-foreground ml-5">Generates high-quality images using advanced AI model</span>
+                          <span className="text-xs text-muted-foreground ml-5">
+                            Generates high-quality images using advanced AI model
+                          </span>
                         </span>
                       </Label>
                     </div>
-                    
+
                     <div className="flex items-center justify-between">
                       <Label className="text-sm flex items-center gap-1">
                         <ImageIcon className="h-3.5 w-3.5" />
@@ -2793,7 +4005,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       <span>Small</span>
                       <span>Large</span>
                     </div>
-                    
+
                     {/* Image Library & Review Button */}
                     <div className="flex gap-2 pt-2">
                       <Button
@@ -2814,12 +4026,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     {pendingCount > 0 && (
                       <p className="text-xs text-amber-600 flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {pendingCount} image{pendingCount > 1 ? 's' : ''} pending review
+                        {pendingCount} image{pendingCount > 1 ? "s" : ""} pending review
                       </p>
                     )}
                   </div>
                 )}
-                
+
                 {/* Answer Key Option */}
                 <div className="flex items-center gap-2 pt-2 border-t border-dashed">
                   <input
@@ -2835,18 +4047,20 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         <ClipboardList className="h-3.5 w-3.5 text-green-600" />
                         Include answer key (for teacher)
                       </span>
-                      <span className="text-xs text-muted-foreground ml-5">Generates a separate answer key page with solutions</span>
+                      <span className="text-xs text-muted-foreground ml-5">
+                        Generates a separate answer key page with solutions
+                      </span>
                     </span>
                   </Label>
                 </div>
-                
+
                 {/* Page Margin Size */}
                 <div className="space-y-2 pt-2 border-t border-dashed">
                   <Label className="text-sm flex items-center gap-1">
                     <FileText className="h-3.5 w-3.5" />
                     Page Margins
                   </Label>
-                  <Select value={marginSize} onValueChange={(v) => setMarginSize(v as 'small' | 'medium' | 'large')}>
+                  <Select value={marginSize} onValueChange={(v) => setMarginSize(v as "small" | "medium" | "large")}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
@@ -2857,7 +4071,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 {/* Include Scrap Paper Option */}
                 <div className="space-y-3 pt-2 border-t border-dashed">
                   <div className="flex items-center gap-2">
@@ -2874,15 +4088,20 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                           <NotebookPen className="h-3.5 w-3.5 text-amber-600" />
                           Bundle scrap paper with worksheet
                         </span>
-                        <span className="text-xs text-muted-foreground ml-5">Adds AI-optimized work zones after questions</span>
+                        <span className="text-xs text-muted-foreground ml-5">
+                          Adds AI-optimized work zones after questions
+                        </span>
                       </span>
                     </Label>
                   </div>
-                  
+
                   {includeScrapPaper && (
                     <div className="ml-5 space-y-2">
                       <Label className="text-xs text-muted-foreground">Problems per scrap page</Label>
-                      <Select value={scrapPaperLayout} onValueChange={(v) => setScrapPaperLayout(v as 'single' | 'split-2' | 'split-4')}>
+                      <Select
+                        value={scrapPaperLayout}
+                        onValueChange={(v) => setScrapPaperLayout(v as "single" | "split-2" | "split-4")}
+                      >
                         <SelectTrigger className="w-full h-8 text-sm">
                           <SelectValue />
                         </SelectTrigger>
@@ -2950,12 +4169,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 )}
               </Button>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-muted-foreground"
-                onClick={onClearAll}
-              >
+              <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={onClearAll}>
                 Clear All
               </Button>
             </>
@@ -2968,12 +4182,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   <span className="text-sm font-medium">Bloom's Taxonomy Distribution</span>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {BLOOM_LEVELS.map(bloom => {
-                    const count = compiledQuestions.filter(q => q.bloomLevel === bloom.level).length;
+                  {BLOOM_LEVELS.map((bloom) => {
+                    const count = compiledQuestions.filter((q) => q.bloomLevel === bloom.level).length;
                     if (count === 0) return null;
                     return (
-                      <Badge 
-                        key={bloom.level} 
+                      <Badge
+                        key={bloom.level}
                         className={`text-xs text-white ${bloom.color}`}
                         title={bloom.description}
                       >
@@ -2990,35 +4204,30 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   <Label className="text-sm">Generated Questions</Label>
                   {hasQuestionsWithImagePrompts && (
                     <Badge variant={imagesGenerated ? "default" : "secondary"} className="text-xs">
-                      {imagesGenerated 
-                        ? `${compiledQuestions.filter(q => q.imageUrl).length} diagrams`
+                      {imagesGenerated
+                        ? `${compiledQuestions.filter((q) => q.imageUrl).length} diagrams`
                         : `${questionsNeedingImages.length} diagrams pending`}
                     </Badge>
                   )}
                 </div>
                 <ScrollArea className="h-64 rounded-md border p-2">
                   {compiledQuestions.map((question) => (
-                    <div
-                      key={question.questionNumber}
-                      className="py-3 px-2 border-b last:border-b-0"
-                    >
+                    <div key={question.questionNumber} className="py-3 px-2 border-b last:border-b-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-sm font-bold">{question.questionNumber}.</span>
                         {/* Bloom's Taxonomy Level Badge */}
                         {question.bloomLevel && (
-                          <Badge 
+                          <Badge
                             className={`text-xs text-white ${getBloomInfo(question.bloomLevel).color}`}
                             title={getBloomInfo(question.bloomLevel).description}
                           >
                             {getBloomInfo(question.bloomLevel).label}
-                            {question.bloomVerb && (
-                              <span className="ml-1 opacity-80">• {question.bloomVerb}</span>
-                            )}
+                            {question.bloomVerb && <span className="ml-1 opacity-80">• {question.bloomVerb}</span>}
                           </Badge>
                         )}
-                        {question.advancementLevel && worksheetMode === 'diagnostic' && (
-                          <Badge 
-                            variant="outline" 
+                        {question.advancementLevel && worksheetMode === "diagnostic" && (
+                          <Badge
+                            variant="outline"
                             className={`text-xs font-semibold ${getAdvancementLevelColor(question.advancementLevel)}`}
                           >
                             Level {question.advancementLevel}
@@ -3030,7 +4239,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         {question.imageUrl && (
                           <HoverCard openDelay={200} closeDelay={100}>
                             <HoverCardTrigger asChild>
-                              <Badge variant="default" className="text-xs cursor-pointer bg-primary/90 hover:bg-primary">
+                              <Badge
+                                variant="default"
+                                className="text-xs cursor-pointer bg-primary/90 hover:bg-primary"
+                              >
                                 <ImageIcon className="h-3 w-3 mr-1" />
                                 Diagram
                               </Badge>
@@ -3038,8 +4250,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                             <HoverCardContent side="right" className="w-auto p-2">
                               <div className="flex flex-col items-center gap-2">
                                 <p className="text-xs font-medium text-muted-foreground">Click to enlarge</p>
-                                <img 
-                                  src={question.imageUrl} 
+                                <img
+                                  src={question.imageUrl}
                                   alt={`Preview for question ${question.questionNumber}`}
                                   className="border rounded max-w-[200px] max-h-[200px] object-contain cursor-pointer hover:opacity-80 transition-opacity"
                                   onClick={() => {
@@ -3063,7 +4275,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                       </p>
                       <div className="flex items-start gap-2">
                         <div className="flex-1 relative">
-                          <p className="text-sm font-serif leading-relaxed">{renderMathText(fixEncodingCorruption(question.question))}</p>
+                          <p className="text-sm font-serif leading-relaxed">
+                            {renderMathText(fixEncodingCorruption(question.question))}
+                          </p>
                           {regeneratingQuestionTextNumber === question.questionNumber && (
                             <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded">
                               <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -3097,7 +4311,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                                   Possible encoding issue detected
                                 </p>
                                 <p className="text-xs text-amber-600 dark:text-amber-400 truncate">
-                                  Click regenerate (↻) to fix: {encodingCheck.issues.slice(0, 2).join(', ')}
+                                  Click regenerate (↻) to fix: {encodingCheck.issues.slice(0, 2).join(", ")}
                                   {encodingCheck.issues.length > 2 && ` +${encodingCheck.issues.length - 2} more`}
                                 </p>
                               </div>
@@ -3107,30 +4321,34 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         return null;
                       })()}
                       {/* Corrected symbols indicator */}
-                      {correctedSymbols[question.questionNumber] && correctedSymbols[question.questionNumber].length > 0 && (
-                        <div className="mt-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-300">
-                          <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white text-xs gap-1">
-                            <Check className="h-3 w-3" />
-                            Symbols fixed
-                          </Badge>
-                          <div className="flex flex-wrap gap-1">
-                            {correctedSymbols[question.questionNumber].map((symbol, idx) => (
-                              <Badge 
-                                key={idx} 
-                                variant="outline" 
-                                className="text-xs border-green-500/50 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30"
-                              >
-                                {symbol}
-                              </Badge>
-                            ))}
+                      {correctedSymbols[question.questionNumber] &&
+                        correctedSymbols[question.questionNumber].length > 0 && (
+                          <div className="mt-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-300">
+                            <Badge
+                              variant="default"
+                              className="bg-green-500 hover:bg-green-600 text-white text-xs gap-1"
+                            >
+                              <Check className="h-3 w-3" />
+                              Symbols fixed
+                            </Badge>
+                            <div className="flex flex-wrap gap-1">
+                              {correctedSymbols[question.questionNumber].map((symbol, idx) => (
+                                <Badge
+                                  key={idx}
+                                  variant="outline"
+                                  className="text-xs border-green-500/50 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30"
+                                >
+                                  {symbol}
+                                </Badge>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
                       {question.imageUrl && (
                         <div className="mt-2 flex flex-col items-center gap-2">
                           <div className="relative group">
-                            <img 
-                              src={question.imageUrl} 
+                            <img
+                              src={question.imageUrl}
                               alt={`Diagram for question ${question.questionNumber}`}
                               className="border rounded"
                               style={{ maxWidth: `${imageSize}px`, maxHeight: `${imageSize}px` }}
@@ -3169,10 +4387,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                         </div>
                       )}
                       {!question.imageUrl && question.svg && (
-                        <div 
-                          className="mt-2 flex justify-center"
-                          dangerouslySetInnerHTML={{ __html: question.svg }}
-                        />
+                        <div className="mt-2 flex justify-center" dangerouslySetInnerHTML={{ __html: question.svg }} />
                       )}
                       {/* Clipart Display */}
                       {question.clipartUrl && (
@@ -3184,11 +4399,11 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                             </Badge>
                           </div>
                           <div className="relative group">
-                            <img 
-                              src={question.clipartUrl} 
+                            <img
+                              src={question.clipartUrl}
                               alt={`Clipart for question ${question.questionNumber}`}
                               className="border rounded bg-white"
-                              style={{ maxWidth: '60px', maxHeight: '60px' }}
+                              style={{ maxWidth: "60px", maxHeight: "60px" }}
                             />
                             {regeneratingQuestionNumber === question.questionNumber && (
                               <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded">
@@ -3213,8 +4428,8 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 </ScrollArea>
               </div>
 
-              {/* Generate Images Button - shown when there are questions with imagePrompt but no imageUrl */}
-              {useAIImages && questionsNeedingImages.length > 0 && (
+              {/* Generate Images Button - shown when there are questions with imagePrompt */}
+              {useAIImages && hasQuestionsWithImagePrompts && (
                 <div className="space-y-3">
                   {isGeneratingImages && (
                     <div className="space-y-2">
@@ -3239,7 +4454,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     ) : (
                       <>
                         <Pencil className="h-4 w-4 mr-2" />
-                        Review & Generate {questionsNeedingImages.length} Diagram{questionsNeedingImages.length > 1 ? 's' : ''}
+                        {questionsNeedingImages.length > 0
+                          ? `Review & Generate ${questionsNeedingImages.length} Diagram${questionsNeedingImages.length > 1 ? "s" : ""}`
+                          : "Review / Regenerate All Diagrams"}
                       </>
                     )}
                   </Button>
@@ -3278,7 +4495,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     <div className="flex items-center gap-2 text-sm">
                       <Palette className="h-4 w-4 text-primary" />
                       <span className="font-medium text-primary">
-                        {compiledQuestions.filter(q => q.clipartUrl).length} clipart added
+                        {compiledQuestions.filter((q) => q.clipartUrl).length} clipart added
                       </span>
                     </div>
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={generateClipart}>
@@ -3314,13 +4531,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               {/* Download/Print/Save Actions */}
               <div className="space-y-2">
                 <div className="flex gap-2">
-                  <Button
-                    className="flex-1"
-                    onClick={generatePDF}
-                    disabled={isGenerating}
-                  >
+                  <Button className="flex-1" onClick={generatePDF} disabled={isGenerating}>
                     <Download className="h-4 w-4 mr-2" />
-                    {isGenerating ? 'Generating...' : 'Download PDF'}
+                    {isGenerating ? "Generating..." : "Download PDF"}
                   </Button>
                   <Button
                     className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -3331,18 +4544,10 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                     <FileType className="h-4 w-4 mr-2" />
                     Word
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handlePreview}
-                    title="Preview before printing"
-                  >
+                  <Button variant="outline" onClick={handlePreview} title="Preview before printing">
                     <Eye className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handlePrint}
-                    title="Print worksheet"
-                  >
+                  <Button variant="outline" onClick={handlePrint} title="Print worksheet">
                     <Printer className="h-4 w-4" />
                   </Button>
                 </div>
@@ -3359,24 +4564,12 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               </div>
 
               <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  className="flex-1"
-                  onClick={saveWorksheet}
-                  disabled={isSaving}
-                >
-                  {isSaving ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
+                <Button variant="secondary" className="flex-1" onClick={saveWorksheet} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                   Save Worksheet
                 </Button>
                 {savedWorksheets.length > 0 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowSavedWorksheets(true)}
-                  >
+                  <Button variant="outline" onClick={() => setShowSavedWorksheets(true)}>
                     <FolderOpen className="h-4 w-4" />
                   </Button>
                 )}
@@ -3393,27 +4586,22 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               </Button>
 
               {/* Diagnostic: Record Results Note */}
-              {worksheetMode === 'diagnostic' && (
+              {worksheetMode === "diagnostic" && (
                 <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
                   <div className="flex items-start gap-2">
                     <ClipboardList className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-purple-900">Diagnostic Worksheet</p>
                       <p className="text-xs text-purple-700">
-                        After students complete this worksheet, record their results in the 
-                        "Differentiated Worksheets" tool to generate personalized follow-up worksheets.
+                        After students complete this worksheet, record their results in the "Differentiated Worksheets"
+                        tool to generate personalized follow-up worksheets.
                       </p>
                     </div>
                   </div>
                 </div>
               )}
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-muted-foreground"
-                onClick={resetCompilation}
-              >
+              <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={resetCompilation}>
                 Edit Topics
               </Button>
             </>
@@ -3422,280 +4610,143 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       </Card>
 
       {/* Print Preview Modal - Uses Portal to render at document root */}
-      {showPreview && createPortal(
-        <div 
-          className="print:static print:overflow-visible print:bg-white"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            zIndex: 99999,
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          {/* Large Fixed X Close Button - TOP RIGHT CORNER - Very Prominent */}
-          <button
-            type="button"
-            onClick={() => setShowPreview(false)}
-            className="print:hidden"
+      {showPreview &&
+        createPortal(
+          <div
+            className="print:static print:overflow-visible print:bg-white"
             style={{
-              position: 'fixed',
-              top: '0.75rem',
-              right: '0.75rem',
-              zIndex: 100001,
-              width: '56px',
-              height: '56px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '50%',
-              backgroundColor: '#dc2626',
-              color: 'white',
-              border: '4px solid white',
-              boxShadow: '0 6px 24px rgba(0,0,0,0.6), 0 0 0 2px #dc2626',
-              cursor: 'pointer',
-              transition: 'transform 0.2s, background-color 0.2s, box-shadow 0.2s',
-              fontWeight: 'bold',
-              fontSize: '1.5rem',
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.85)",
+              zIndex: 99999,
+              display: "flex",
+              flexDirection: "column",
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#b91c1c';
-              e.currentTarget.style.transform = 'scale(1.15)';
-              e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.7), 0 0 0 3px #b91c1c';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#dc2626';
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.6), 0 0 0 2px #dc2626';
-            }}
-            aria-label="Close preview"
-            title="Close Preview (ESC)"
           >
-            <X className="h-8 w-8" strokeWidth={3.5} />
-          </button>
+            {/* Large Fixed X Close Button - TOP RIGHT CORNER - Very Prominent */}
+            <button
+              type="button"
+              onClick={() => setShowPreview(false)}
+              className="print:hidden"
+              style={{
+                position: "fixed",
+                top: "0.75rem",
+                right: "0.75rem",
+                zIndex: 100001,
+                width: "56px",
+                height: "56px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "50%",
+                backgroundColor: "#dc2626",
+                color: "white",
+                border: "4px solid white",
+                boxShadow: "0 6px 24px rgba(0,0,0,0.6), 0 0 0 2px #dc2626",
+                cursor: "pointer",
+                transition: "transform 0.2s, background-color 0.2s, box-shadow 0.2s",
+                fontWeight: "bold",
+                fontSize: "1.5rem",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#b91c1c";
+                e.currentTarget.style.transform = "scale(1.15)";
+                e.currentTarget.style.boxShadow = "0 8px 30px rgba(0,0,0,0.7), 0 0 0 3px #b91c1c";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "#dc2626";
+                e.currentTarget.style.transform = "scale(1)";
+                e.currentTarget.style.boxShadow = "0 6px 24px rgba(0,0,0,0.6), 0 0 0 2px #dc2626";
+              }}
+              aria-label="Close preview"
+              title="Close Preview (ESC)"
+            >
+              <X className="h-8 w-8" strokeWidth={3.5} />
+            </button>
 
-          {/* Preview Header Toolbar */}
-          <div 
-            className="print:hidden"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '0.75rem 1rem',
-              backgroundColor: 'white',
-              borderBottom: '1px solid #e5e7eb',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            }}
-          >
-            <div className="flex items-center gap-4">
-              <h2 className="font-semibold text-lg">Print Preview</h2>
-              <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setPreviewZoom(Math.max(50, previewZoom - 25))}
-                  disabled={previewZoom <= 50}
-                >
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-medium min-w-[4rem] text-center">{previewZoom}%</span>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setPreviewZoom(Math.min(200, previewZoom + 25))}
-                  disabled={previewZoom >= 200}
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
+            {/* Preview Header Toolbar */}
+            <div
+              className="print:hidden"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "0.75rem 1rem",
+                backgroundColor: "white",
+                borderBottom: "1px solid #e5e7eb",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+              }}
+            >
+              <div className="flex items-center gap-4">
+                <h2 className="font-semibold text-lg">Print Preview</h2>
+                <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPreviewZoom(Math.max(50, previewZoom - 25))}
+                    disabled={previewZoom <= 50}
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-medium min-w-[4rem] text-center">{previewZoom}%</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPreviewZoom(Math.min(200, previewZoom + 25))}
+                    disabled={previewZoom >= 200}
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {compiledQuestions.length} question{compiledQuestions.length !== 1 ? "s" : ""} • Press ESC to close
+                </span>
               </div>
-              <span className="text-sm text-muted-foreground">
-                {compiledQuestions.length} question{compiledQuestions.length !== 1 ? 's' : ''} • Press ESC to close
-              </span>
-            </div>
-            <div className="flex items-center gap-2" style={{ marginRight: '4rem' }}>
-              <Button variant="outline" onClick={() => setShowPreview(false)}>
-                <X className="h-4 w-4 mr-2" />
-                Close
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => {
-                  // Generate professional PDF from worksheet content
-                  const pdf = new jsPDF({
-                    orientation: 'portrait',
-                    unit: 'pt',
-                    format: 'letter',
-                  });
-                  
-                  const pageWidth = 612; // 8.5in in points
-                  const pageHeight = 792; // 11in in points
-                  const marginLeft = marginPt;
-                  const marginRight = marginPt;
-                  const marginTop = marginPt;
-                  const marginBottom = marginPt;
-                  const contentWidth = pageWidth - marginLeft - marginRight;
-                  let yPosition = marginTop;
-                  
-                  // Helper function to clean text for PDF - use sanitizeForPDF to convert all 
-                  // Unicode symbols to ASCII equivalents that jsPDF can reliably render
-                  const cleanTextForPDF = (text: string): string => {
-                    return sanitizeForPDF(renderMathText(fixEncodingCorruption(text)));
-                  };
-                  
-                  // Helper to check page break
-                  const checkPageBreak = (neededHeight: number) => {
-                    if (yPosition + neededHeight > pageHeight - marginBottom) {
-                      pdf.addPage();
-                      yPosition = marginTop;
-                      return true;
+              <div className="flex items-center gap-2" style={{ marginRight: "4rem" }}>
+                <Button variant="outline" onClick={() => setShowPreview(false)}>
+                  <X className="h-4 w-4 mr-2" />
+                  Close
+                </Button>
+                <Button variant="outline" onClick={generateWYSIWYGPdf} disabled={isGeneratingPDF}>
+                  {isGeneratingPDF ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download PDF
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={() => {
+                    // Print the worksheet content properly
+                    const printContent = printRef.current;
+                    if (!printContent) {
+                      toast({ title: "Error", description: "Could not find content to print", variant: "destructive" });
+                      return;
                     }
-                    return false;
-                  };
-                  
-                  // Title
-                  pdf.setFontSize(20);
-                  pdf.setFont('helvetica', 'bold');
-                  pdf.text(cleanTextForPDF(worksheetTitle), pageWidth / 2, yPosition, { align: 'center' });
-                  yPosition += 28;
-                  
-                  // Teacher name
-                  if (teacherName) {
-                    pdf.setFontSize(11);
-                    pdf.setFont('helvetica', 'normal');
-                    pdf.text(`Teacher: ${teacherName}`, pageWidth / 2, yPosition, { align: 'center' });
-                    yPosition += 20;
-                  }
-                  
-                  // Name/Date/Period fields
-                  yPosition += 10;
-                  pdf.setFontSize(11);
-                  pdf.setFont('helvetica', 'normal');
-                  pdf.text('Name: ________________________________', marginLeft, yPosition);
-                  pdf.text('Date: ____________', marginLeft + 280, yPosition);
-                  pdf.text('Period: _____', marginLeft + 420, yPosition);
-                  yPosition += 8;
-                  
-                  // Divider line
-                  pdf.setDrawColor(180, 180, 180);
-                  pdf.setLineWidth(0.5);
-                  pdf.line(marginLeft, yPosition, pageWidth - marginRight, yPosition);
-                  yPosition += 25;
-                  
-                  // Questions
-                  compiledQuestions.forEach((q) => {
-                    // Estimate question height
-                    const questionText = cleanTextForPDF(q.question);
-                    const questionLines = pdf.splitTextToSize(questionText, contentWidth - 20);
-                    const estimatedHeight = showAnswerLines ? 180 : 60 + (questionLines.length * 14);
-                    
-                    checkPageBreak(estimatedHeight);
-                    
-                    // Question number and topic header
-                    pdf.setFontSize(11);
-                    pdf.setFont('helvetica', 'bold');
-                    pdf.text(`${q.questionNumber}.`, marginLeft, yPosition);
-                    
-                    pdf.setFontSize(9);
-                    pdf.setFont('helvetica', 'normal');
-                    pdf.setTextColor(100, 100, 100);
-                    pdf.text(`[${q.difficulty}] ${cleanTextForPDF(q.topic)}`, marginLeft + 20, yPosition);
-                    pdf.setTextColor(0, 0, 0);
-                    yPosition += 18;
-                    
-                    // Question text
-                    pdf.setFontSize(11);
-                    pdf.setFont('helvetica', 'normal');
-                    questionLines.forEach((line: string) => {
-                      checkPageBreak(16);
-                      pdf.text(line, marginLeft + 15, yPosition);
-                      yPosition += 14;
-                    });
-                    
-                    // Work area box if enabled
-                    if (showAnswerLines) {
-                      yPosition += 8;
-                      const boxHeight = 100;
-                      checkPageBreak(boxHeight + 30);
-                      
-                      // Draw work area box
-                      pdf.setDrawColor(30, 58, 95);
-                      pdf.setLineWidth(1.5);
-                      pdf.rect(marginLeft, yPosition, contentWidth, boxHeight);
-                      
-                      // Work Area label
-                      pdf.setFontSize(8);
-                      pdf.setTextColor(100, 100, 100);
-                      pdf.text('Work Area', marginLeft + 5, yPosition + 12);
-                      pdf.setTextColor(0, 0, 0);
-                      
-                      yPosition += boxHeight + 10;
-                      
-                      // Final Answer line
-                      pdf.setFontSize(10);
-                      pdf.text('Final Answer: ___________________________________________', marginLeft + 15, yPosition);
-                      yPosition += 25;
-                    } else {
-                      yPosition += 15;
-                    }
-                  });
-                  
-                  // Answer Key on new page if answers exist
-                  const questionsWithAnswers = compiledQuestions.filter(q => q.answer);
-                  if (questionsWithAnswers.length > 0) {
-                    pdf.addPage();
-                    yPosition = marginTop;
-                    
-                    pdf.setFontSize(18);
-                    pdf.setFont('helvetica', 'bold');
-                    pdf.text('Answer Key', pageWidth / 2, yPosition, { align: 'center' });
-                    yPosition += 35;
-                    
-                    pdf.setFontSize(10);
-                    pdf.setFont('helvetica', 'normal');
-                    questionsWithAnswers.forEach((q) => {
-                      checkPageBreak(30);
-                      const answerText = `${q.questionNumber}. ${cleanTextForPDF(q.answer || '')}`;
-                      const answerLines = pdf.splitTextToSize(answerText, contentWidth);
-                      answerLines.forEach((line: string) => {
-                        pdf.text(line, marginLeft, yPosition);
-                        yPosition += 14;
+
+                    // Create a new window for printing
+                    const printWindow = window.open("", "_blank");
+                    if (!printWindow) {
+                      toast({
+                        title: "Error",
+                        description: "Popup blocked. Please allow popups.",
+                        variant: "destructive",
                       });
-                      yPosition += 8;
-                    });
-                  }
-                  
-                  // Download
-                  const fileName = `${worksheetTitle.replace(/[^a-z0-9]/gi, '_')}_worksheet.pdf`;
-                  pdf.save(fileName);
-                  toast({ title: "PDF Downloaded", description: `Saved as ${fileName}` });
-                }}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
-              </Button>
-              <Button onClick={() => {
-                // Print the worksheet content properly
-                const printContent = printRef.current;
-                if (!printContent) {
-                  toast({ title: "Error", description: "Could not find content to print", variant: "destructive" });
-                  return;
-                }
-                
-                // Create a new window for printing
-                const printWindow = window.open('', '_blank');
-                if (!printWindow) {
-                  toast({ title: "Error", description: "Popup blocked. Please allow popups.", variant: "destructive" });
-                  return;
-                }
-                
-                // Get the worksheet HTML
-                const worksheetHTML = printContent.innerHTML;
-                
-                printWindow.document.write(`
+                      return;
+                    }
+
+                    // Get the worksheet HTML
+                    const worksheetHTML = printContent.innerHTML;
+
+                    printWindow.document.write(`
                   <!DOCTYPE html>
                   <html>
                   <head>
@@ -3732,351 +4783,432 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                   </body>
                   </html>
                 `);
-                printWindow.document.close();
-              }}>
-                <Printer className="h-4 w-4 mr-2" />
-                Print from Preview
-              </Button>
-            </div>
-          </div>
-
-          {/* Preview Content Area - render as 8.5x11 pages with page break indicators */}
-          <div 
-            className="print:p-0 print:overflow-visible"
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              overflowX: 'auto',
-              padding: '2rem',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '0',
-            }}
-          >
-            {/* Page container with visual page breaks */}
-            <div 
-              ref={printRef} 
-              className="print:shadow-none print:border-none"
-              style={{ 
-                width: '8.5in',
-                transform: `scale(${previewZoom / 100})`,
-                transformOrigin: 'top center',
-              }}
-            >
-              {/* Wrapper that shows page boundaries */}
-              <div style={{ position: 'relative' }}>
-                {/* Page break indicators - based on configured page margins */}
-                <PageBreakIndicators contentRef={printRef} pageMarginIn={marginIn} />
-                
-                {/* Actual page content */}
-                <div 
-                  className="print-worksheet print:shadow-none print:border-none"
-                  style={{ 
-                    backgroundColor: 'white',
-                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-                    border: '1px solid #d1d5db',
-                    padding: `${marginInCss}in`,
-                    boxSizing: 'border-box',
-                    width: '100%',
-                    maxWidth: '8.5in',
-                    overflow: 'visible',
-                    fontFamily: "'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif",
+                    printWindow.document.close();
                   }}
                 >
-                  {/* Instructions Banner - Print friendly */}
-                  {showAnswerLines && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      padding: '0.4rem 0.75rem',
-                      marginBottom: '0.75rem',
-                      backgroundColor: '#f0fdf4',
-                      border: '1px solid #86efac',
-                      borderRadius: '0.25rem',
-                      fontSize: '0.65rem',
-                      color: '#166534',
-                    }}>
-                      <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                        Instructions:
-                      </span>
-                      <span style={{ flex: 1 }}>
-                        Write all work in the <strong>Work Area</strong> boxes. Put your final answer in the <strong>Final Answer</strong> section.
-                      </span>
-                    </div>
-                  )}
-                  
-                  <div className="text-center mb-6">
-                    <h1 className="text-2xl font-bold text-black">{worksheetTitle}</h1>
-                    {teacherName && <p className="text-gray-600 mt-1">Teacher: {teacherName}</p>}
-                  </div>
-                  <div className="flex justify-between text-sm mb-6 border-b border-gray-300 pb-4 text-black">
-                    <span>Name: _______________________</span>
-                    <span>Date: ___________</span>
-                    <span>Period: _____</span>
-                  </div>
-                  <div style={{ width: '100%' }}>
-                    {compiledQuestions.map((question) => (
-                      <div 
-                        key={question.questionNumber} 
-                        style={{ 
-                          pageBreakInside: 'avoid',
-                          marginBottom: '1.5rem',
-                          width: '100%',
-                          boxSizing: 'border-box',
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print from Preview
+                </Button>
+              </div>
+            </div>
+
+            {/* Preview Content Area - render as 8.5x11 pages with page break indicators */}
+            <div
+              className="print:p-0 print:overflow-visible"
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                overflowX: "auto",
+                padding: "2rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "0",
+              }}
+            >
+              {/* Page container with visual page breaks */}
+              <div
+                ref={printRef}
+                className="print:shadow-none print:border-none"
+                style={{
+                  width: "8.5in",
+                  transform: `scale(${previewZoom / 100})`,
+                  transformOrigin: "top center",
+                }}
+              >
+                {/* Wrapper that shows page boundaries */}
+                <div style={{ position: "relative" }}>
+                  {/* Page break indicators - based on configured page margins */}
+                  <PageBreakIndicators contentRef={printRef} pageMarginIn={marginIn} />
+
+                  {/* Actual page content */}
+                  <div
+                    className="print-worksheet print:shadow-none print:border-none"
+                    style={{
+                      backgroundColor: "white",
+                      boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)",
+                      border: "1px solid #d1d5db",
+                      padding: `${marginInCss}in`,
+                      boxSizing: "border-box",
+                      width: "100%",
+                      maxWidth: "8.5in",
+                      overflow: "visible",
+                      fontFamily: "'Times New Roman', 'DejaVu Serif', Georgia, 'Cambria Math', serif",
+                    }}
+                  >
+                    {/* Instructions Banner - Print friendly */}
+                    {showAnswerLines && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.75rem",
+                          padding: "0.4rem 0.75rem",
+                          marginBottom: "0.75rem",
+                          backgroundColor: "#f0fdf4",
+                          border: "1px solid #86efac",
+                          borderRadius: "0.25rem",
+                          fontSize: "0.65rem",
+                          color: "#166534",
                         }}
                       >
-                        {/* Question header - single line with number, bloom level, difficulty */}
-                        <div style={{ 
-                          display: 'flex', 
-                          flexWrap: 'wrap', 
-                          alignItems: 'baseline', 
-                          gap: '0.5rem', 
-                          marginBottom: '0.125rem',
-                          borderBottom: '1px solid #1e3a5f',
-                          paddingBottom: '0.25rem',
-                        }}>
-                          <span style={{ fontWeight: 700, color: 'black', fontSize: '0.9rem' }}>
-                            {question.questionNumber}. [{question.bloomLevel || 'Remember'}: {question.bloomVerb || 'state'}]
-                          </span>
-                          {worksheetMode === 'diagnostic' && question.advancementLevel && (
-                            <span style={{
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              color: question.advancementLevel === 'A' ? '#166534' :
-                                     question.advancementLevel === 'B' ? '#047857' :
-                                     question.advancementLevel === 'C' ? '#a16207' :
-                                     question.advancementLevel === 'D' ? '#c2410c' :
-                                     question.advancementLevel === 'E' ? '#b91c1c' : '#374151',
-                            }}>
-                              [Level {question.advancementLevel}]
-                            </span>
-                          )}
-                          <span style={{ fontSize: '0.75rem', color: '#374151' }}>
-                            [{question.difficulty}]
-                          </span>
-                        </div>
-                        
-                        {/* Topic/Standard - compact italic */}
-                        <p style={{ 
-                          fontSize: '0.75rem', 
-                          color: '#6b7280', 
-                          marginLeft: '1rem', 
-                          marginBottom: '0.375rem',
-                          fontStyle: 'italic',
-                        }}>
-                          {question.topic} ({question.standard})
-                        </p>
-                        
-                        {/* Question text - single spaced, proper margins */}
-                        <div 
-                          style={{ 
-                            marginLeft: '1rem',
-                            marginRight: '0.5rem',
-                            fontFamily: 'serif',
-                            lineHeight: '1.3',
-                            fontSize: '0.95rem',
-                            color: 'black',
-                            wordWrap: 'break-word', 
-                            overflowWrap: 'break-word',
-                            wordBreak: 'normal',
-                            hyphens: 'auto',
-                            letterSpacing: '0.02em',
+                        <span style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                          Instructions:
+                        </span>
+                        <span style={{ flex: 1 }}>
+                          Write all work in the <strong>Work Area</strong> boxes. Put your final answer in the{" "}
+                          <strong>Final Answer</strong> section.
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="text-center mb-6">
+                      <h1 className="text-2xl font-bold text-black">{worksheetTitle}</h1>
+                      {teacherName && <p className="text-gray-600 mt-1">Teacher: {teacherName}</p>}
+                    </div>
+                    <div className="flex justify-between text-sm mb-6 border-b border-gray-300 pb-4 text-black">
+                      <span>Name: _______________________</span>
+                      <span>Date: ___________</span>
+                      <span>Period: _____</span>
+                    </div>
+                    <div style={{ width: "100%" }}>
+                      {compiledQuestions.map((question) => (
+                        <div
+                          key={question.questionNumber}
+                          style={{
+                            pageBreakInside: "avoid",
+                            marginBottom: "1.5rem",
+                            width: "100%",
+                            boxSizing: "border-box",
                           }}
                         >
-                          {renderMathText(fixEncodingCorruption(question.question))}
-                        </div>
-                        
-                        {/* SVG if present */}
-                        {question.svg && (
-                          <div 
-                            style={{ marginLeft: '1rem', marginTop: '0.5rem', display: 'flex', justifyContent: 'center' }}
-                            dangerouslySetInnerHTML={{ __html: question.svg }}
-                          />
-                        )}
-                        
-                        {/* Work Area Box - Clean design matching reference */}
-                        {showAnswerLines && (
-                          <div style={{
-                            border: '2px solid #1e3a5f',
-                            marginTop: '0.5rem',
-                            marginLeft: '1rem',
-                            marginRight: '0.5rem',
-                            backgroundColor: '#ffffff',
-                            overflow: 'hidden',
-                            boxSizing: 'border-box',
-                          }}>
-                            {/* Work Area Section */}
-                            <div style={{
-                              borderBottom: '2px dashed #94a3b8',
-                              padding: '0.5rem 0.75rem',
-                              backgroundColor: '#ffffff',
-                            }}>
-                              <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '0.375rem',
-                              }}>
-                                <span style={{
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700,
-                                  color: '#1e3a5f',
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.05em',
-                                }}>
-                                  Work Area Q{question.questionNumber}
-                                </span>
-                                <span style={{
-                                  fontSize: '0.6rem',
-                                  color: '#64748b',
-                                  fontStyle: 'italic',
-                                }}>
-                                  Show all calculations & reasoning here
-                                </span>
-                              </div>
-                              {/* Work lines with corner markers */}
-                              <div style={{ 
-                                minHeight: '90px',
-                                position: 'relative',
-                              }}>
-                                {[...Array(5)].map((_, i) => (
-                                  <div key={i} style={{
-                                    borderBottom: '1px solid #d1d5db',
-                                    height: '1.1rem',
-                                  }} />
-                                ))}
-                                {/* Corner markers */}
-                                <div style={{
-                                  position: 'absolute',
-                                  top: 0,
-                                  left: 0,
-                                  width: '10px',
-                                  height: '10px',
-                                  borderLeft: '2px solid #1e3a5f',
-                                  borderTop: '2px solid #1e3a5f',
-                                }} />
-                                <div style={{
-                                  position: 'absolute',
-                                  top: 0,
-                                  right: 0,
-                                  width: '10px',
-                                  height: '10px',
-                                  borderRight: '2px solid #1e3a5f',
-                                  borderTop: '2px solid #1e3a5f',
-                                }} />
-                              </div>
-                            </div>
-                            
-                            {/* Final Answer Section - Yellow background */}
-                            <div style={{
-                              padding: '0.5rem 0.75rem',
-                              backgroundColor: '#fef3c7',
-                              borderTop: '2px solid #f59e0b',
-                            }}>
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                              }}>
-                                <span style={{
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700,
-                                  color: '#92400e',
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.03em',
-                                  backgroundColor: '#fde68a',
-                                  padding: '0.15rem 0.5rem',
-                                  borderRadius: '0.2rem',
-                                  border: '1.5px solid #f59e0b',
-                                  whiteSpace: 'nowrap',
-                                }}>
-                                  Final Answer
-                                </span>
-                                <div style={{
-                                  flex: 1,
-                                  borderBottom: '1.5px solid #d97706',
-                                  minHeight: '1.25rem',
-                                }} />
-                              </div>
-                            </div>
+                          {/* Question header - single line with number, bloom level, difficulty */}
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              alignItems: "baseline",
+                              gap: "0.5rem",
+                              marginBottom: "0.125rem",
+                              borderBottom: "1px solid #1e3a5f",
+                              paddingBottom: "0.25rem",
+                            }}
+                          >
+                            <span style={{ fontWeight: 700, color: "black", fontSize: "0.9rem" }}>
+                              {question.questionNumber}. [{question.bloomLevel || "Remember"}:{" "}
+                              {question.bloomVerb || "state"}]
+                            </span>
+                            {worksheetMode === "diagnostic" && question.advancementLevel && (
+                              <span
+                                style={{
+                                  fontSize: "0.75rem",
+                                  fontWeight: 600,
+                                  color:
+                                    question.advancementLevel === "A"
+                                      ? "#166534"
+                                      : question.advancementLevel === "B"
+                                        ? "#047857"
+                                        : question.advancementLevel === "C"
+                                          ? "#a16207"
+                                          : question.advancementLevel === "D"
+                                            ? "#c2410c"
+                                            : question.advancementLevel === "E"
+                                              ? "#b91c1c"
+                                              : "#374151",
+                                }}
+                              >
+                                [Level {question.advancementLevel}]
+                              </span>
+                            )}
+                            <span style={{ fontSize: "0.75rem", color: "#374151" }}>[{question.difficulty}]</span>
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
 
-                {/* Formula Reference Sheet in Print Preview */}
-                {includeFormulaSheet && (() => {
-                  const relevantFormulas = getFormulasForTopics(
-                    selectedQuestions.map(q => ({ category: q.category, topicName: q.topicName }))
-                  );
-                  
-                  if (relevantFormulas.length === 0) return null;
-                  
-                  return (
-                    <div className="mt-12 pt-8 border-t-2 border-dashed border-gray-300" style={{ pageBreakBefore: 'always' }}>
-                      <h2 className="text-xl font-bold text-center mb-2 text-black">Formula Reference Sheet</h2>
-                      <p className="text-center text-sm text-gray-500 mb-6">Based on selected topics</p>
-                      
-                      <div className="grid grid-cols-2 gap-6">
-                        {relevantFormulas.map((category) => (
-                          <div key={category.category} className="space-y-2">
-                            <h3 className="font-semibold text-sm border-b border-gray-200 pb-1 text-black">{category.category}</h3>
-                            <ul className="space-y-1 text-sm">
-                              {category.formulas.map((formula, idx) => (
-                                <li key={idx} className="flex flex-col text-black">
-                                  <span>
-                                    <span className="font-medium">{formula.name}:</span>{' '}
-                                    <span className="font-mono text-xs">{formula.formula}</span>
-                                  </span>
-                                  {formula.description && (
-                                    <span className="text-xs text-gray-500 ml-4">({formula.description})</span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Answer Key Section in Print Preview */}
-                {includeAnswerKey && compiledQuestions.some(q => q.answer) && (
-                  <div className="mt-12 pt-8 border-t-2 border-dashed border-gray-300" style={{ pageBreakBefore: 'always' }}>
-                    <h2 className="text-xl font-bold text-center mb-2 text-black">ANSWER KEY</h2>
-                    <p className="text-center text-sm text-gray-600 mb-1">{worksheetTitle}</p>
-                    <p className="text-center text-xs text-red-600 italic mb-6">FOR TEACHER USE ONLY</p>
-                    
-                    <div className="space-y-4">
-                      {compiledQuestions.filter(q => q.answer).map((question) => (
-                        <div key={question.questionNumber} className="pb-3 border-b border-gray-200">
-                          <div className="flex items-baseline gap-2">
-                            <span className="font-bold text-black">Question {question.questionNumber}:</span>
-                            <span className="text-xs text-gray-500 italic">{question.topic}</span>
-                          </div>
-                          <p className="mt-1 ml-4 text-sm text-black">
-                            <span className="font-medium text-green-700">Answer: </span>
-                            {renderMathText(fixEncodingCorruption(question.answer || ''))}
+                          {/* Topic/Standard - compact italic */}
+                          <p
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "#6b7280",
+                              marginLeft: "1rem",
+                              marginBottom: "0.375rem",
+                              fontStyle: "italic",
+                            }}
+                          >
+                            {question.topic} ({question.standard})
                           </p>
+
+                          {/* Question text - single spaced, proper margins */}
+                          <div
+                            style={{
+                              marginLeft: "1rem",
+                              marginRight: "0.5rem",
+                              fontFamily: "serif",
+                              lineHeight: "1.3",
+                              fontSize: "0.95rem",
+                              color: "black",
+                              wordWrap: "break-word",
+                              overflowWrap: "break-word",
+                              wordBreak: "normal",
+                              hyphens: "auto",
+                              letterSpacing: "0.02em",
+                            }}
+                          >
+                            {renderMathText(fixEncodingCorruption(question.question))}
+                          </div>
+
+                          {/* SVG if present */}
+                          {question.svg && (
+                            <div
+                              style={{
+                                marginLeft: "1rem",
+                                marginTop: "0.5rem",
+                                display: "flex",
+                                justifyContent: "center",
+                              }}
+                              dangerouslySetInnerHTML={{ __html: question.svg }}
+                            />
+                          )}
+
+                          {/* Image if present */}
+                          {question.imageUrl && (
+                            <div
+                              style={{
+                                marginLeft: "1rem",
+                                marginTop: "0.5rem",
+                                display: "flex",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <img
+                                src={question.imageUrl}
+                                alt={`Question ${question.questionNumber}`}
+                                style={{
+                                  maxWidth: `${imageSize}px`,
+                                  maxHeight: `${imageSize}px`,
+                                  objectFit: "contain",
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          {/* Work Area Box - Clean design matching reference */}
+                          {showAnswerLines && (
+                            <div
+                              style={{
+                                border: "2px solid #1e3a5f",
+                                marginTop: "0.5rem",
+                                marginLeft: "1rem",
+                                marginRight: "0.5rem",
+                                backgroundColor: "#ffffff",
+                                overflow: "hidden",
+                                boxSizing: "border-box",
+                              }}
+                            >
+                              {/* Work Area Section */}
+                              <div
+                                style={{
+                                  borderBottom: "2px dashed #94a3b8",
+                                  padding: "0.5rem 0.75rem",
+                                  backgroundColor: "#ffffff",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    marginBottom: "0.375rem",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: "0.7rem",
+                                      fontWeight: 700,
+                                      color: "#1e3a5f",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.05em",
+                                    }}
+                                  >
+                                    Work Area Q{question.questionNumber}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: "0.6rem",
+                                      color: "#64748b",
+                                      fontStyle: "italic",
+                                    }}
+                                  >
+                                    Show all calculations & reasoning here
+                                  </span>
+                                </div>
+                                {/* Work lines with corner markers */}
+                                <div
+                                  style={{
+                                    minHeight: "90px",
+                                    position: "relative",
+                                  }}
+                                >
+                                  {[...Array(5)].map((_, i) => (
+                                    <div
+                                      key={i}
+                                      style={{
+                                        borderBottom: "1px solid #d1d5db",
+                                        height: "1.1rem",
+                                      }}
+                                    />
+                                  ))}
+                                  {/* Corner markers */}
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      top: 0,
+                                      left: 0,
+                                      width: "10px",
+                                      height: "10px",
+                                      borderLeft: "2px solid #1e3a5f",
+                                      borderTop: "2px solid #1e3a5f",
+                                    }}
+                                  />
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      top: 0,
+                                      right: 0,
+                                      width: "10px",
+                                      height: "10px",
+                                      borderRight: "2px solid #1e3a5f",
+                                      borderTop: "2px solid #1e3a5f",
+                                    }}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Final Answer Section - Yellow background */}
+                              <div
+                                style={{
+                                  padding: "0.5rem 0.75rem",
+                                  backgroundColor: "#fef3c7",
+                                  borderTop: "2px solid #f59e0b",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.5rem",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: "0.7rem",
+                                      fontWeight: 700,
+                                      color: "#92400e",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.03em",
+                                      backgroundColor: "#fde68a",
+                                      padding: "0.15rem 0.5rem",
+                                      borderRadius: "0.2rem",
+                                      border: "1.5px solid #f59e0b",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    Final Answer
+                                  </span>
+                                  <div
+                                    style={{
+                                      flex: 1,
+                                      borderBottom: "1.5px solid #d97706",
+                                      minHeight: "1.25rem",
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
+
+                    {/* Formula Reference Sheet in Print Preview */}
+                    {includeFormulaSheet &&
+                      (() => {
+                        const relevantFormulas = getFormulasForTopics(
+                          selectedQuestions.map((q) => ({ category: q.category, topicName: q.topicName })),
+                        );
+
+                        if (relevantFormulas.length === 0) return null;
+
+                        return (
+                          <div
+                            className="mt-12 pt-8 border-t-2 border-dashed border-gray-300"
+                            style={{ pageBreakBefore: "always" }}
+                          >
+                            <h2 className="text-xl font-bold text-center mb-2 text-black">Formula Reference Sheet</h2>
+                            <p className="text-center text-sm text-gray-500 mb-6">Based on selected topics</p>
+
+                            <div className="grid grid-cols-2 gap-6">
+                              {relevantFormulas.map((category) => (
+                                <div key={category.category} className="space-y-2">
+                                  <h3 className="font-semibold text-sm border-b border-gray-200 pb-1 text-black">
+                                    {category.category}
+                                  </h3>
+                                  <ul className="space-y-1 text-sm">
+                                    {category.formulas.map((formula, idx) => (
+                                      <li key={idx} className="flex flex-col text-black">
+                                        <span>
+                                          <span className="font-medium">{formula.name}:</span>{" "}
+                                          <span className="font-mono text-xs">{formula.formula}</span>
+                                        </span>
+                                        {formula.description && (
+                                          <span className="text-xs text-gray-500 ml-4">({formula.description})</span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                    {/* Answer Key Section in Print Preview */}
+                    {includeAnswerKey && compiledQuestions.some((q) => q.answer) && (
+                      <div
+                        className="mt-12 pt-8 border-t-2 border-dashed border-gray-300"
+                        style={{ pageBreakBefore: "always" }}
+                      >
+                        <h2 className="text-xl font-bold text-center mb-2 text-black">ANSWER KEY</h2>
+                        <p className="text-center text-sm text-gray-600 mb-1">{worksheetTitle}</p>
+                        <p className="text-center text-xs text-red-600 italic mb-6">FOR TEACHER USE ONLY</p>
+
+                        <div className="space-y-4">
+                          {compiledQuestions
+                            .filter((q) => q.answer)
+                            .map((question) => (
+                              <div key={question.questionNumber} className="pb-3 border-b border-gray-200">
+                                <div className="flex items-baseline gap-2">
+                                  <span className="font-bold text-black">Question {question.questionNumber}:</span>
+                                  <span className="text-xs text-gray-500 italic">{question.topic}</span>
+                                </div>
+                                <p className="mt-1 ml-4 text-sm text-black">
+                                  <span className="font-medium text-green-700">Answer: </span>
+                                  {renderMathText(fixEncodingCorruption(question.answer || ""))}
+                                </p>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="mt-12 text-center text-xs text-gray-400 print:hidden">
+                      Generated with NYCLogic Ai - NYS Regents Aligned
+                    </div>
                   </div>
-                )}
-                <div className="mt-12 text-center text-xs text-gray-400 print:hidden">
-                  Generated with NYCLogic Ai - NYS Regents Aligned
-                </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body,
+        )}
 
       {/* Print Styles */}
       <style>{`
@@ -4164,25 +5296,22 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               Review & Edit Diagram Prompts
             </DialogTitle>
             <DialogDescription>
-              Review and edit the AI prompts for each diagram before generating. Better prompts lead to more accurate diagrams.
+              Review and edit the AI prompts for each diagram before generating. Better prompts lead to more accurate
+              diagrams.
             </DialogDescription>
           </DialogHeader>
-          
+
           <ScrollArea className="flex-1 pr-4">
             <div className="space-y-4 py-4">
               {editablePrompts.map((item, index) => {
-                const question = compiledQuestions.find(q => q.questionNumber === item.questionNumber);
+                const question = compiledQuestions.find((q) => q.questionNumber === item.questionNumber);
                 return (
                   <div key={item.questionNumber} className="space-y-2 p-3 border rounded-lg">
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-xs">
                         Question {item.questionNumber}
                       </Badge>
-                      {question && (
-                        <span className="text-xs text-muted-foreground">
-                          {question.topic}
-                        </span>
-                      )}
+                      {question && <span className="text-xs text-muted-foreground">{question.topic}</span>}
                     </div>
                     {question && (
                       <p className="text-sm text-muted-foreground line-clamp-2">
@@ -4213,7 +5342,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             </Button>
             <Button onClick={generateImagesWithEditedPrompts} disabled={editablePrompts.length === 0}>
               <ImageIcon className="h-4 w-4 mr-2" />
-              Generate {editablePrompts.length} Diagram{editablePrompts.length > 1 ? 's' : ''}
+              Generate {editablePrompts.length} Diagram{editablePrompts.length > 1 ? "s" : ""}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -4228,22 +5357,25 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
               Add Fun Clipart?
             </DialogTitle>
             <DialogDescription>
-              Would you like to add AI-generated clipart images to make your worksheet more engaging? Each question will get a themed clipart icon based on its topic.
+              Would you like to add AI-generated clipart images to make your worksheet more engaging? Each question will
+              get a themed clipart icon based on its topic.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-4 space-y-3">
             <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
               <Palette className="h-5 w-5 text-primary mt-0.5" />
               <div>
                 <p className="text-sm font-medium">Themed Clipart Icons</p>
                 <p className="text-xs text-muted-foreground">
-                  Simple, fun line art images that match each question's topic to help students engage with the material.
+                  Simple, fun line art images that match each question's topic to help students engage with the
+                  material.
                 </p>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              This will generate {compiledQuestions.length} clipart image{compiledQuestions.length > 1 ? 's' : ''} and may take a moment.
+              This will generate {compiledQuestions.length} clipart image{compiledQuestions.length > 1 ? "s" : ""} and
+              may take a moment.
             </p>
           </div>
 
@@ -4272,45 +5404,47 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 </div>
               </div>
               <Progress value={clipartProgress} className="h-2" />
-              <p className="text-xs text-muted-foreground text-center">
-                {Math.round(clipartProgress)}% complete
-              </p>
+              <p className="text-xs text-muted-foreground text-center">{Math.round(clipartProgress)}% complete</p>
             </CardContent>
           </Card>
         </div>
       )}
 
       {/* Lightbox Dialog for Full-Screen Image Viewing */}
-      <Dialog open={!!lightboxImageUrl} onOpenChange={(open) => {
-        if (!open) {
-          setLightboxImageUrl(null);
-          setLightboxQuestionNumber(null);
-        }
-      }}>
+      <Dialog
+        open={!!lightboxImageUrl}
+        onOpenChange={(open) => {
+          if (!open) {
+            setLightboxImageUrl(null);
+            setLightboxQuestionNumber(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-4xl w-[95vw] max-h-[95vh] p-0 overflow-hidden">
           <DialogHeader className="p-4 pb-2">
             <DialogTitle className="flex items-center gap-2">
               <ImageIcon className="h-5 w-5" />
               Question {lightboxQuestionNumber} - Diagram
             </DialogTitle>
-            <DialogDescription>
-              Full-size diagram preview
-            </DialogDescription>
+            <DialogDescription>Full-size diagram preview</DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-auto p-4 pt-0 flex items-center justify-center bg-muted/30">
             {lightboxImageUrl && (
-              <img 
-                src={lightboxImageUrl} 
+              <img
+                src={lightboxImageUrl}
                 alt={`Full-size diagram for question ${lightboxQuestionNumber}`}
                 className="max-w-full max-h-[70vh] object-contain rounded-lg border shadow-md"
               />
             )}
           </div>
           <DialogFooter className="p-4 pt-2">
-            <Button variant="outline" onClick={() => {
-              setLightboxImageUrl(null);
-              setLightboxQuestionNumber(null);
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLightboxImageUrl(null);
+                setLightboxQuestionNumber(null);
+              }}
+            >
               <X className="h-4 w-4 mr-2" />
               Close
             </Button>
@@ -4336,7 +5470,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
             <div className="p-3 bg-muted/50 rounded-lg">
               <p className="text-sm font-medium">{worksheetTitle}</p>
               <p className="text-xs text-muted-foreground">
-                {compiledQuestions.length} questions • {selectedQuestions.map(q => q.topicName).join(', ')}
+                {compiledQuestions.length} questions • {selectedQuestions.map((q) => q.topicName).join(", ")}
               </p>
             </div>
 
@@ -4357,7 +5491,9 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 />
                 <span className="text-sm font-medium w-16 text-right">{pushXpReward} XP</span>
               </div>
-              <p className="text-xs text-muted-foreground">Experience points students earn for completing this assignment</p>
+              <p className="text-xs text-muted-foreground">
+                Experience points students earn for completing this assignment
+              </p>
             </div>
 
             {/* Coin Reward */}
@@ -4401,39 +5537,37 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
                 setIsPushing(true);
                 try {
                   const standardCode = selectedQuestions.length > 0 ? selectedQuestions[0].standard : undefined;
-                  const topicName = selectedQuestions.map(q => q.topicName).join(', ');
-                  
+                  const topicName = selectedQuestions.map((q) => q.topicName).join(", ");
+
                   // Save directly to shared_assignments table instead of calling external API
-                  const { error } = await supabase
-                    .from('shared_assignments')
-                    .insert({
-                      teacher_id: user?.id,
-                      title: worksheetTitle,
-                      description: `${compiledQuestions.length} question worksheet covering: ${topicName}`,
-                      topics: JSON.parse(JSON.stringify(selectedQuestions)),
-                      questions: JSON.parse(JSON.stringify(compiledQuestions)),
-                      xp_reward: pushXpReward,
-                      coin_reward: pushCoinReward,
-                      due_at: pushDueDate || null,
-                      source_app: 'nyclogic_ai',
-                      status: 'active',
-                    });
+                  const { error } = await supabase.from("shared_assignments").insert({
+                    teacher_id: user?.id,
+                    title: worksheetTitle,
+                    description: `${compiledQuestions.length} question worksheet covering: ${topicName}`,
+                    topics: JSON.parse(JSON.stringify(selectedQuestions)),
+                    questions: JSON.parse(JSON.stringify(compiledQuestions)),
+                    xp_reward: pushXpReward,
+                    coin_reward: pushCoinReward,
+                    due_at: pushDueDate || null,
+                    source_app: "nyclogic_ai",
+                    status: "active",
+                  });
 
                   if (error) {
                     throw error;
                   }
 
                   toast({
-                    title: 'Pushed to NYClogic Scholar Ai!',
+                    title: "Pushed to NYClogic Scholar Ai!",
                     description: `"${worksheetTitle}" is now available as an assignment with ${pushXpReward} XP and ${pushCoinReward} coins.`,
                   });
                   setShowPushDialog(false);
                 } catch (error) {
-                  console.error('Push error:', error);
+                  console.error("Push error:", error);
                   toast({
-                    title: 'Push failed',
-                    description: error instanceof Error ? error.message : 'An unexpected error occurred.',
-                    variant: 'destructive',
+                    title: "Push failed",
+                    description: error instanceof Error ? error.message : "An unexpected error occurred.",
+                    variant: "destructive",
                   });
                 } finally {
                   setIsPushing(false);
@@ -4474,22 +5608,21 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
         onSelectImage={(imageUrl, imageId) => {
           if (imageSelectionQuestionNumber !== null) {
             // Replace the image for the selected question with approved library image
-            const updatedQuestions = compiledQuestions.map(q =>
-              q.questionNumber === imageSelectionQuestionNumber
-                ? { ...q, imageUrl }
-                : q
+            const updatedQuestions = compiledQuestions.map((q) =>
+              q.questionNumber === imageSelectionQuestionNumber ? { ...q, imageUrl } : q,
             );
             setCompiledQuestions(updatedQuestions);
             setImageSelectionQuestionNumber(null);
             toast({
-              title: 'Image applied!',
+              title: "Image applied!",
               description: `Approved image added to question ${imageSelectionQuestionNumber}.`,
             });
           }
         }}
-        topicFilter={imageSelectionQuestionNumber !== null 
-          ? compiledQuestions.find(q => q.questionNumber === imageSelectionQuestionNumber)?.topic
-          : undefined
+        topicFilter={
+          imageSelectionQuestionNumber !== null
+            ? compiledQuestions.find((q) => q.questionNumber === imageSelectionQuestionNumber)?.topic
+            : undefined
         }
       />
 
@@ -4497,7 +5630,7 @@ export function WorksheetBuilder({ selectedQuestions, onRemoveQuestion, onClearA
       <ScrapPaperGenerator
         open={showScrapPaperGenerator}
         onOpenChange={setShowScrapPaperGenerator}
-        problemNumbers={compiledQuestions.map(q => q.questionNumber)}
+        problemNumbers={compiledQuestions.map((q) => q.questionNumber)}
         worksheetTitle={worksheetTitle}
       />
     </>
