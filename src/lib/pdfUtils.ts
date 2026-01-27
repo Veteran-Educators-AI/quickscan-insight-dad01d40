@@ -1,8 +1,7 @@
 import * as pdfjsLib from "pdfjs-dist";
 
-// Configure PDF.js worker - use the worker from public directory
-// This avoids Vite bundling issues with dynamic imports
-pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+// Configure PDF.js worker using jsDelivr CDN with HTTPS
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 /**
  * Convert a PDF file to an array of image data URLs (one per page)
