@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { type TopicCategory, type JMAPTopic } from '@/data/nysTopics';
 import { SubjectWorksheetGeneratorDialog, type GeneratedQuestion } from './SubjectWorksheetGeneratorDialog';
 import { FORMULA_REFERENCE } from '@/data/formulaReference';
-import { GeometryPacingCalendar } from './GeometryPacingCalendar';
+import { GeometryPacingCalendar, type LessonDraft } from './GeometryPacingCalendar';
 import { Algebra1PacingCalendar } from './Algebra1PacingCalendar';
 
 interface SubjectLessonSuggestionsProps {
@@ -18,6 +18,7 @@ interface SubjectLessonSuggestionsProps {
   searchQuery?: string;
   onSelectTopic?: (topic: JMAPTopic, category: TopicCategory) => void;
   onGenerateQuestions?: (questions: GeneratedQuestion[]) => void;
+  onSelectLesson?: (lesson: LessonDraft) => void;
 }
 
 // Subject icons mapping
@@ -102,6 +103,7 @@ export function SubjectLessonSuggestions({
   searchQuery = '',
   onSelectTopic,
   onGenerateQuestions,
+  onSelectLesson,
 }: SubjectLessonSuggestionsProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [showWorksheetGenerator, setShowWorksheetGenerator] = useState(false);
@@ -201,7 +203,10 @@ export function SubjectLessonSuggestions({
       
       {/* Show Pacing Calendar for Geometry */}
       {subjectId === 'geometry' && (
-        <GeometryPacingCalendar onSelectUnit={handleSelectUnit} />
+        <GeometryPacingCalendar 
+          onSelectUnit={handleSelectUnit} 
+          onSelectLesson={onSelectLesson}
+        />
       )}
       
       <Card className={`border-2 ${colors.border}`}>
