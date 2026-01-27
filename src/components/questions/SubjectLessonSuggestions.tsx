@@ -9,6 +9,7 @@ import { type TopicCategory, type JMAPTopic } from '@/data/nysTopics';
 import { SubjectWorksheetGeneratorDialog, type GeneratedQuestion } from './SubjectWorksheetGeneratorDialog';
 import { FORMULA_REFERENCE } from '@/data/formulaReference';
 import { GeometryPacingCalendar } from './GeometryPacingCalendar';
+import { Algebra1PacingCalendar } from './Algebra1PacingCalendar';
 
 interface SubjectLessonSuggestionsProps {
   subject: string;
@@ -170,6 +171,11 @@ export function SubjectLessonSuggestions({
 
   return (
     <>
+      {/* Show Pacing Calendar for Algebra 1 */}
+      {subjectId === 'algebra1' && (
+        <Algebra1PacingCalendar />
+      )}
+      
       {/* Show Pacing Calendar for Geometry */}
       {subjectId === 'geometry' && (
         <GeometryPacingCalendar />
