@@ -3954,6 +3954,7 @@ QUALITY CHECK BEFORE FINISHING
               questionCount={parseInt(questionCount) + parseInt(warmUpCount)}
               includeImages={useAIImages}
               includeSvg={includeGeometry}
+              studentCount={selectedCount}
             />
           )}
 

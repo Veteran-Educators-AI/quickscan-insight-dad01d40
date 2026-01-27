@@ -1,10 +1,12 @@
-import { Clock, Zap, Image, FileText } from 'lucide-react';
+import { Clock, Zap, Image, FileText, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface GenerationTimeEstimatorProps {
   questionCount: number;
   includeImages: boolean;
   includeSvg?: boolean;
+  /** Number of students/sheets in the class set. If > 1, shows class set calculations */
+  studentCount?: number;
 }
 
 // Time estimates in seconds
@@ -13,20 +15,45 @@ const TIME_ESTIMATES = {
   imagePerQuestion: 8, // Additional time for AI image generation
   svgPerQuestion: 3, // Additional time for SVG diagram generation
   overhead: 3, // Network/processing overhead
+  overheadPerSheet: 0.5, // Additional overhead per student sheet
 };
 
 export function GenerationTimeEstimator({
   questionCount,
   includeImages,
   includeSvg = true,
+  studentCount = 1,
 }: GenerationTimeEstimatorProps) {
-  // Calculate estimates for different scenarios
-  const textOnlyTime = TIME_ESTIMATES.overhead + (questionCount * TIME_ESTIMATES.basePerQuestion);
-  const withSvgTime = textOnlyTime + (questionCount * TIME_ESTIMATES.svgPerQuestion * 0.5); // ~50% need diagrams
-  const withImagesTime = textOnlyTime + (questionCount * TIME_ESTIMATES.imagePerQuestion * 0.3); // ~30% need images
-  const fullTime = textOnlyTime + 
+  const isClassSet = studentCount > 1;
+  const sheetsToGenerate = studentCount;
+  
+  // Calculate estimates for a single sheet
+  const singleSheetTextTime = TIME_ESTIMATES.overhead + (questionCount * TIME_ESTIMATES.basePerQuestion);
+  const singleSheetSvgTime = singleSheetTextTime + (questionCount * TIME_ESTIMATES.svgPerQuestion * 0.5);
+  const singleSheetImageTime = singleSheetTextTime + (questionCount * TIME_ESTIMATES.imagePerQuestion * 0.3);
+  const singleSheetFullTime = singleSheetTextTime + 
     (questionCount * TIME_ESTIMATES.svgPerQuestion * 0.5) + 
     (questionCount * TIME_ESTIMATES.imagePerQuestion * 0.3);
+
+  // For class sets, questions are generated per-level (cached), not per-student
+  // So the main generation time doesn't scale linearly with students
+  // Estimate ~6 unique levels, so generation is roughly 6x single sheet for questions
+  const uniqueLevels = Math.min(sheetsToGenerate, 6);
+  const classSetOverhead = TIME_ESTIMATES.overhead + (sheetsToGenerate * TIME_ESTIMATES.overheadPerSheet);
+  
+  // Class set time estimates (generation is per-level, not per-student)
+  const classSetTextTime = classSetOverhead + (questionCount * TIME_ESTIMATES.basePerQuestion * uniqueLevels);
+  const classSetSvgTime = classSetTextTime + (questionCount * TIME_ESTIMATES.svgPerQuestion * 0.5 * uniqueLevels);
+  const classSetImageTime = classSetTextTime + (questionCount * TIME_ESTIMATES.imagePerQuestion * 0.3 * uniqueLevels);
+  const classSetFullTime = classSetTextTime + 
+    (questionCount * TIME_ESTIMATES.svgPerQuestion * 0.5 * uniqueLevels) + 
+    (questionCount * TIME_ESTIMATES.imagePerQuestion * 0.3 * uniqueLevels);
+
+  // Use class set times if applicable
+  const textOnlyTime = isClassSet ? classSetTextTime : singleSheetTextTime;
+  const withSvgTime = isClassSet ? classSetSvgTime : singleSheetSvgTime;
+  const withImagesTime = isClassSet ? classSetImageTime : singleSheetImageTime;
+  const fullTime = isClassSet ? classSetFullTime : singleSheetFullTime;
 
   const formatTime = (seconds: number) => {
     if (seconds < 60) {
@@ -50,15 +77,30 @@ export function GenerationTimeEstimator({
       </div>
       
       {/* Current estimate highlight */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Badge variant="default" className="text-sm px-3 py-1">
           <Zap className="h-3 w-3 mr-1" />
           {formatTime(currentEstimate)}
         </Badge>
         <span className="text-xs text-muted-foreground">
-          for {questionCount} questions
+          {isClassSet ? (
+            <>for <strong>{sheetsToGenerate} student sheets</strong> ({questionCount} questions each)</>
+          ) : (
+            <>for {questionCount} questions</>
+          )}
         </span>
       </div>
+
+      {/* Class set info */}
+      {isClassSet && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-primary/5 p-2 rounded">
+          <Users className="h-3 w-3" />
+          <span>
+            Generating differentiated worksheets for {sheetsToGenerate} students 
+            (questions cached per difficulty level)
+          </span>
+        </div>
+      )}
 
       {/* Breakdown */}
       <div className="grid grid-cols-2 gap-2 text-xs">
@@ -98,7 +140,9 @@ export function GenerationTimeEstimator({
       </div>
 
       <p className="text-[10px] text-muted-foreground">
-        Times vary based on complexity. Text-only is fastest for quick reviews.
+        {isClassSet 
+          ? 'Class set generation caches questions per level. Times vary based on complexity.'
+          : 'Times vary based on complexity. Text-only is fastest for quick reviews.'}
       </p>
     </div>
   );
