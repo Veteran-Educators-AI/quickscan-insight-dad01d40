@@ -674,9 +674,13 @@ export function NycologicPresents({
                   <span 
                     onClick={() => isEditing && setEditingField('subtitle')}
                     className={isEditing ? 'cursor-text hover:underline' : ''}
-                  >
-                    {slide.subtitle}
-                  </span>
+                    dangerouslySetInnerHTML={{ 
+                      __html: slide.subtitle.replace(
+                        /\*\*(.*?)\*\*/g, 
+                        `<span style="color: ${colors.accentHex}">$1</span>`
+                      )
+                    }}
+                  />
                 )}
               </motion.p>
             )}
@@ -748,9 +752,13 @@ export function NycologicPresents({
                           "text-white/85 leading-relaxed",
                           isEditing ? 'cursor-text hover:text-white' : ''
                         )}
-                      >
-                        {item}
-                      </p>
+                        dangerouslySetInnerHTML={{ 
+                          __html: item.replace(
+                            /\*\*(.*?)\*\*/g, 
+                            `<span style="color: ${colors.accentHex}">$1</span>`
+                          )
+                        }}
+                      />
                     )}
                   </motion.div>
                 ))}
@@ -766,7 +774,15 @@ export function NycologicPresents({
                 className="mt-12 space-y-10 w-full max-w-4xl mx-auto"
               >
                 <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
-                  <p className="text-2xl md:text-3xl text-white font-medium leading-relaxed">{slide.question.prompt}</p>
+                  <p 
+                    className="text-2xl md:text-3xl text-white font-medium leading-relaxed"
+                    dangerouslySetInnerHTML={{ 
+                      __html: slide.question.prompt.replace(
+                        /\*\*(.*?)\*\*/g, 
+                        `<span style="color: ${colors.accentHex}">$1</span>`
+                      )
+                    }}
+                  />
                 </div>
                 
                 {slide.question.options && (
