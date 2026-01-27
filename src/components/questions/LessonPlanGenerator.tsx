@@ -376,7 +376,7 @@ export function LessonPlanGenerator({
   };
 
   const generateLessonPlan = async () => {
-    if (!topic) return;
+    if (!topic || !user) return;
 
     setIsGenerating(true);
     setLessonPlan(null);
@@ -398,6 +398,26 @@ export function LessonPlanGenerator({
       if (data.lessonPlan) {
         setLessonPlan(data.lessonPlan);
         
+        // Auto-save the lesson plan to the database
+        const insertData = {
+          teacher_id: user.id,
+          title: data.lessonPlan.title,
+          standard: data.lessonPlan.standard,
+          topic_name: data.lessonPlan.topicName,
+          subject: topic.subject || null,
+          objective: data.lessonPlan.objective,
+          duration: data.lessonPlan.duration,
+          slides: data.lessonPlan.slides as unknown,
+          recommended_worksheets: data.lessonPlan.recommendedWorksheets as unknown,
+          class_id: classId || null,
+        };
+        
+        const { error: saveError } = await supabase.from('lesson_plans').insert(insertData as any);
+        
+        if (saveError) {
+          console.error('Auto-save failed:', saveError);
+        }
+        
         // Track lesson plan generation
         trackFeature({
           featureName: 'Generate Lesson Plan',
@@ -412,7 +432,7 @@ export function LessonPlanGenerator({
         });
 
         toast({
-          title: 'Lesson plan generated!',
+          title: 'Lesson plan generated & saved!',
           description: `Created ${data.lessonPlan.slides?.length || 0} slides for "${topic.topicName}"`,
         });
       }
