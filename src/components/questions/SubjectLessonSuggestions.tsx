@@ -108,6 +108,29 @@ export function SubjectLessonSuggestions({
   const [selectedTopic, setSelectedTopic] = useState<JMAPTopic | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<TopicCategory | null>(null);
   const [preselectedLevel, setPreselectedLevel] = useState<'basic' | 'intermediate' | 'advanced' | undefined>(undefined);
+  const [unitWorksheetTopic, setUnitWorksheetTopic] = useState<string | null>(null);
+  const [unitWorksheetStandards, setUnitWorksheetStandards] = useState<string[]>([]);
+
+  // Handle pacing calendar unit selection
+  const handleSelectUnit = (unit: { title: string; standards: string[]; lessons: string[] }) => {
+    // Create a synthetic topic from the unit data
+    const syntheticTopic: JMAPTopic = {
+      name: unit.title,
+      standard: unit.standards[0] || '',
+      url: ''
+    };
+    const syntheticCategory: TopicCategory = {
+      category: unit.title,
+      topics: [syntheticTopic]
+    };
+    
+    setSelectedTopic(syntheticTopic);
+    setSelectedCategory(syntheticCategory);
+    setUnitWorksheetTopic(unit.title);
+    setUnitWorksheetStandards(unit.standards);
+    setPreselectedLevel(undefined);
+    setShowWorksheetGenerator(true);
+  };
 
   const colors = SUBJECT_COLORS[subjectId] || SUBJECT_COLORS.algebra1;
   const icon = SUBJECT_ICONS[subjectId] || <BookOpen className="h-5 w-5" />;
@@ -173,12 +196,12 @@ export function SubjectLessonSuggestions({
     <>
       {/* Show Pacing Calendar for Algebra 1 */}
       {subjectId === 'algebra1' && (
-        <Algebra1PacingCalendar />
+        <Algebra1PacingCalendar onSelectUnit={handleSelectUnit} />
       )}
       
       {/* Show Pacing Calendar for Geometry */}
       {subjectId === 'geometry' && (
-        <GeometryPacingCalendar />
+        <GeometryPacingCalendar onSelectUnit={handleSelectUnit} />
       )}
       
       <Card className={`border-2 ${colors.border}`}>
