@@ -11,6 +11,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useFeatureTracking } from '@/hooks/useFeatureTracking';
+import { GenerationTimeEstimator } from './GenerationTimeEstimator';
+import { GenerationProgressCounter } from './GenerationProgressCounter';
 import type { LiteraryText, TextQuestion, LessonSuggestion } from '@/data/englishLiteratureTopics';
 
 // Question format types for English
@@ -348,6 +350,13 @@ export function EnglishWorksheetGeneratorDialog({
             </div>
           </div>
 
+          {/* Generation Time Estimator */}
+          <GenerationTimeEstimator
+            questionCount={parseInt(questionCount)}
+            includeImages={false}
+            includeSvg={false}
+          />
+
           {/* Text Info Summary */}
           {text && (
             <div className="p-3 rounded-lg bg-muted/50 space-y-2">
@@ -365,6 +374,16 @@ export function EnglishWorksheetGeneratorDialog({
             </div>
           )}
         </div>
+
+        {/* Progress Counter (shown during generation) */}
+        {isGenerating && (
+          <GenerationProgressCounter
+            isGenerating={isGenerating}
+            questionCount={parseInt(questionCount)}
+            includeImages={false}
+            includeSvg={false}
+          />
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

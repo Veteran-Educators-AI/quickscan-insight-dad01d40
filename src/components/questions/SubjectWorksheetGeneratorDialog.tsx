@@ -5,11 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, FileText, Brain, Target, Sparkles, Calculator } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Loader2, FileText, Brain, Target, Sparkles, Calculator, Image } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { type JMAPTopic, type TopicCategory } from '@/data/nysTopics';
 import { FORMULA_REFERENCE, getFormulasForTopics } from '@/data/formulaReference';
+import { GenerationTimeEstimator } from './GenerationTimeEstimator';
+import { GenerationProgressCounter } from './GenerationProgressCounter';
 
 // Question format types
 type QuestionFormat = 'multiple_choice' | 'short_answer' | 'extended_response' | 'application' | 'mixed';
@@ -200,6 +203,12 @@ export function SubjectWorksheetGeneratorDialog({
     new Set(preselectedLevel ? [preselectedLevel] : ['intermediate'])
   );
   const [questionCount, setQuestionCount] = useState(6);
+  const [includeGeometry, setIncludeGeometry] = useState(true);
+  const [includeImages, setIncludeImages] = useState(false);
+
+  // Check if subject supports geometry diagrams
+  const supportsGeometry = ['algebra1', 'algebra2', 'geometry', 'precalculus', 'physics'].includes(subjectId);
+  const supportsImages = ['biology', 'chemistry', 'physics', 'earthscience', 'history'].includes(subjectId);
 
   // Update levels when preselected level changes
   useEffect(() => {
@@ -429,6 +438,36 @@ export function SubjectWorksheetGeneratorDialog({
               </div>
             </div>
 
+            {/* Visual Content Options */}
+            {(supportsGeometry || supportsImages) && (
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2">
+                  <Image className="h-4 w-4" />
+                  Visual Content
+                </Label>
+                <div className="space-y-2">
+                  {supportsGeometry && (
+                    <div className="flex items-center justify-between p-3 rounded-lg border">
+                      <div>
+                        <div className="font-medium text-sm">Include Geometry Diagrams</div>
+                        <div className="text-xs text-muted-foreground">Auto-generate SVG diagrams for applicable questions</div>
+                      </div>
+                      <Switch checked={includeGeometry} onCheckedChange={setIncludeGeometry} />
+                    </div>
+                  )}
+                  {supportsImages && (
+                    <div className="flex items-center justify-between p-3 rounded-lg border">
+                      <div>
+                        <div className="font-medium text-sm">Include AI Images</div>
+                        <div className="text-xs text-muted-foreground">Generate illustrative images (slower)</div>
+                      </div>
+                      <Switch checked={includeImages} onCheckedChange={setIncludeImages} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Relevant Formulas */}
             {relevantFormulas && (
               <div className="space-y-3">
@@ -449,8 +488,25 @@ export function SubjectWorksheetGeneratorDialog({
                 </div>
               </div>
             )}
+
+            {/* Generation Time Estimator */}
+            <GenerationTimeEstimator
+              questionCount={questionCount}
+              includeImages={includeImages}
+              includeSvg={supportsGeometry && includeGeometry}
+            />
           </div>
         </ScrollArea>
+
+        {/* Progress Counter (shown during generation) */}
+        {isGenerating && (
+          <GenerationProgressCounter
+            isGenerating={isGenerating}
+            questionCount={questionCount}
+            includeImages={includeImages}
+            includeSvg={supportsGeometry && includeGeometry}
+          />
+        )}
 
         <DialogFooter className="pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isGenerating}>
