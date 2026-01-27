@@ -4359,25 +4359,49 @@ export function WorksheetBuilder({
                               </div>
                             )}
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs text-muted-foreground hover:text-foreground"
-                            onClick={() => regenerateSingleImage(question.questionNumber)}
-                            disabled={regeneratingQuestionNumber !== null}
-                          >
-                            {regeneratingQuestionNumber === question.questionNumber ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Regenerating...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="h-3 w-3 mr-1" />
-                                Regenerate diagram
-                              </>
-                            )}
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-muted-foreground hover:text-foreground"
+                              onClick={() => regenerateSingleImage(question.questionNumber)}
+                              disabled={regeneratingQuestionNumber !== null}
+                            >
+                              {regeneratingQuestionNumber === question.questionNumber ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  Regenerating...
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="h-3 w-3 mr-1" />
+                                  Regenerate
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => {
+                                setCompiledQuestions((prev) =>
+                                  prev.map((q) =>
+                                    q.questionNumber === question.questionNumber
+                                      ? { ...q, imageUrl: undefined, svg: undefined }
+                                      : q
+                                  )
+                                );
+                                toast({
+                                  title: "Image removed",
+                                  description: `Diagram removed from question ${question.questionNumber}`,
+                                });
+                              }}
+                              disabled={regeneratingQuestionNumber !== null}
+                            >
+                              <X className="h-3 w-3 mr-1" />
+                              Remove
+                            </Button>
+                          </div>
                         </div>
                       )}
                       {!question.imageUrl && question.imagePrompt && (

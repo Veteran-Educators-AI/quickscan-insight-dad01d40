@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw, QrCode, Palette, BookOpen, ImageIcon, FileType } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QuestionPreviewPanel } from './QuestionPreviewPanel';
+import { GenerationTimeEstimator } from './GenerationTimeEstimator';
+import { GenerationProgressCounter } from './GenerationProgressCounter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -2857,25 +2859,41 @@ QUALITY CHECK BEFORE FINISHING
                     {includeStoryboardArt && (
                       <div className="mt-2">
                         {storyboardImages[`${cacheKey}-warmUp-${idx}`] ? (
-                          <div className="relative group/img">
+                          <div className="relative group/img flex flex-col items-center gap-1">
                             <img 
                               src={storyboardImages[`${cacheKey}-warmUp-${idx}`]} 
                               alt="Storyboard illustration" 
-                              className="max-w-[200px] max-h-[150px] border rounded mx-auto"
+                              className="max-w-[200px] max-h-[150px] border rounded"
                             />
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="absolute top-1 right-1 h-6 opacity-0 group-hover/img:opacity-100 transition-opacity"
-                              onClick={() => regenerateStoryboardArt(q.question, `${cacheKey}-warmUp-${idx}`)}
-                              disabled={regeneratingImageKey === `${cacheKey}-warmUp-${idx}`}
-                            >
-                              {regeneratingImageKey === `${cacheKey}-warmUp-${idx}` ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <RefreshCw className="h-3 w-3" />
-                              )}
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-6"
+                                onClick={() => regenerateStoryboardArt(q.question, `${cacheKey}-warmUp-${idx}`)}
+                                disabled={regeneratingImageKey === `${cacheKey}-warmUp-${idx}`}
+                              >
+                                {regeneratingImageKey === `${cacheKey}-warmUp-${idx}` ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-3 w-3" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-6 text-destructive border-destructive/30 hover:bg-destructive/10"
+                                onClick={() => {
+                                  setStoryboardImages(prev => {
+                                    const updated = { ...prev };
+                                    delete updated[`${cacheKey}-warmUp-${idx}`];
+                                    return updated;
+                                  });
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
                         ) : (
                           <Button
@@ -2964,45 +2982,95 @@ QUALITY CHECK BEFORE FINISHING
                             />
                           )}
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs gap-1 bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
-                          onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-main-${idx}`)}
-                          disabled={regeneratingShapeKey === `${cacheKey}-main-${idx}`}
-                        >
-                          {regeneratingShapeKey === `${cacheKey}-main-${idx}` ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-3 w-3" />
-                          )}
-                          Regenerate Diagram
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs gap-1 bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+                            onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-main-${idx}`)}
+                            disabled={regeneratingShapeKey === `${cacheKey}-main-${idx}`}
+                          >
+                            {regeneratingShapeKey === `${cacheKey}-main-${idx}` ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-3 w-3" />
+                            )}
+                            Regenerate
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
+                            onClick={() => {
+                              // Remove the geometry shape from the generated cache
+                              setGeometryShapes(prev => {
+                                const updated = { ...prev };
+                                delete updated[`${cacheKey}-main-${idx}`];
+                                return updated;
+                              });
+                              // Also remove from the question data in preview
+                              if (previewData) {
+                                setPreviewData(prev => {
+                                  if (!prev) return prev;
+                                  const updatedQuestions = { ...prev.questions };
+                                  if (updatedQuestions[cacheKey]) {
+                                    updatedQuestions[cacheKey] = {
+                                      ...updatedQuestions[cacheKey],
+                                      main: updatedQuestions[cacheKey].main.map((question, i) => 
+                                        i === idx ? { ...question, imageUrl: undefined, svg: undefined } : question
+                                      )
+                                    };
+                                  }
+                                  return { ...prev, questions: updatedQuestions };
+                                });
+                              }
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                            Remove
+                          </Button>
+                        </div>
                       </div>
                     ) : null}
                     {/* Show storyboard art in preview */}
                     {includeStoryboardArt && (
                       <div className="mt-2">
                         {storyboardImages[`${cacheKey}-main-${idx}`] ? (
-                          <div className="relative group/img flex justify-center">
+                          <div className="relative group/img flex flex-col items-center gap-1">
                             <img 
                               src={storyboardImages[`${cacheKey}-main-${idx}`]} 
                               alt="Storyboard illustration" 
                               className="max-w-[220px] max-h-[180px] border rounded"
                             />
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="absolute top-1 right-1 h-6 opacity-0 group-hover/img:opacity-100 transition-opacity"
-                              onClick={() => regenerateStoryboardArt(q.question, `${cacheKey}-main-${idx}`)}
-                              disabled={regeneratingImageKey === `${cacheKey}-main-${idx}`}
-                            >
-                              {regeneratingImageKey === `${cacheKey}-main-${idx}` ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <RefreshCw className="h-3 w-3" />
-                              )}
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-6"
+                                onClick={() => regenerateStoryboardArt(q.question, `${cacheKey}-main-${idx}`)}
+                                disabled={regeneratingImageKey === `${cacheKey}-main-${idx}`}
+                              >
+                                {regeneratingImageKey === `${cacheKey}-main-${idx}` ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-3 w-3" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-6 text-destructive border-destructive/30 hover:bg-destructive/10"
+                                onClick={() => {
+                                  setStoryboardImages(prev => {
+                                    const updated = { ...prev };
+                                    delete updated[`${cacheKey}-main-${idx}`];
+                                    return updated;
+                                  });
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
                         ) : (
                           <Button
@@ -3880,15 +3948,24 @@ QUALITY CHECK BEFORE FINISHING
             </Card>
           )}
 
-          {/* Generation progress */}
+          {/* Time estimator - shown before generation */}
+          {!isGenerating && selectedCount > 0 && (
+            <GenerationTimeEstimator
+              questionCount={parseInt(questionCount) + parseInt(warmUpCount)}
+              includeImages={useAIImages}
+              includeSvg={includeGeometry}
+            />
+          )}
+
+          {/* Generation progress counter */}
           {isGenerating && (
-            <div className="space-y-2 p-3 bg-purple-50 rounded-lg border border-purple-200">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-purple-700">{generationStatus}</span>
-                <span className="font-medium text-purple-900">{Math.round(generationProgress)}%</span>
-              </div>
-              <Progress value={generationProgress} className="h-2" />
-            </div>
+            <GenerationProgressCounter
+              isGenerating={isGenerating}
+              questionCount={(parseInt(questionCount) + parseInt(warmUpCount)) * selectedCount}
+              includeImages={useAIImages}
+              includeSvg={includeGeometry}
+              currentStep={generationStatus}
+            />
           )}
         </div>
 
