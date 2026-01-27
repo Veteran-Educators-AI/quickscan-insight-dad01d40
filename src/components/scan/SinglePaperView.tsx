@@ -212,7 +212,7 @@ export function SinglePaperView({
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}
+                    onClick={() => setZoom(z => Math.max(0.5, z - 0.02))}
                   >
                     <ZoomOut className="h-4 w-4" />
                   </Button>
@@ -222,7 +222,7 @@ export function SinglePaperView({
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setZoom(z => Math.min(3, z + 0.25))}
+                    onClick={() => setZoom(z => Math.min(3, z + 0.02))}
                   >
                     <ZoomIn className="h-4 w-4" />
                   </Button>

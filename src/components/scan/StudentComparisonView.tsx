@@ -138,11 +138,11 @@ export function StudentComparisonView({
             <span className="font-medium">{student.studentName}</span>
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}>
+            <Button variant="ghost" size="icon" onClick={() => setZoom(Math.max(0.5, zoom - 0.02))}>
               <ZoomOut className="h-4 w-4" />
             </Button>
             <span className="text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
-            <Button variant="ghost" size="icon" onClick={() => setZoom(Math.min(3, zoom + 0.25))}>
+            <Button variant="ghost" size="icon" onClick={() => setZoom(Math.min(3, zoom + 0.02))}>
               <ZoomIn className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={() => setRotation((rotation + 90) % 360)}>

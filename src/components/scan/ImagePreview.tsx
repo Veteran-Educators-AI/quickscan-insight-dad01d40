@@ -163,11 +163,11 @@ export function ImagePreview({ imageDataUrl, onConfirm, onRetake }: ImagePreview
   };
 
   const zoomIn = () => {
-    setScale(prev => Math.min(prev + 0.25, 3));
+    setScale(prev => Math.min(prev + 0.02, 3));
   };
 
   const zoomOut = () => {
-    setScale(prev => Math.max(prev - 0.25, 0.5));
+    setScale(prev => Math.max(prev - 0.02, 0.5));
   };
 
   const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {

@@ -139,7 +139,7 @@ const mathSymbols: Record<string, string> = {
   'congruent': '≅',
   'similar': '~',
   'triangle': '△',
-  'circle': '○',
+  // 'circle' removed - keep as word to avoid "○" → "o" corruption in PDF sanitization
   'square': '□',
   
   // Arrows
@@ -554,7 +554,7 @@ export function sanitizeForPDF(text: string): string {
     [/★/g, '*'],
     [/☆/g, '*'],
     [/•/g, '-'],
-    [/○/g, 'o'],
+    [/○/g, 'circle'],
     [/●/g, '*'],
     [/□/g, '[ ]'],
     [/■/g, '[x]'],
