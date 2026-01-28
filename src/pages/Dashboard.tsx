@@ -238,6 +238,7 @@ export default function Dashboard() {
   };
 
   const quickActions = [
+    { label: 'Simple Mode', href: '/simple-mode', icon: Sparkles, color: 'bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 dark:from-violet-900 dark:to-purple-900 dark:text-violet-300' },
     { label: 'Create Class', href: '/classes/new', icon: Users, color: 'bg-primary/10 text-primary' },
     { label: 'New Assessment', href: '/questions', icon: ClipboardList, color: 'bg-accent/10 text-accent' },
     { label: 'Make a Lesson', href: null, icon: Presentation, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300', onClick: () => setShowTopicSelector(true) },
@@ -362,7 +363,7 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 animate-slide-up">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 animate-slide-up">
           {quickActions.map((action) => {
             const Icon = action.icon;
             const content = (

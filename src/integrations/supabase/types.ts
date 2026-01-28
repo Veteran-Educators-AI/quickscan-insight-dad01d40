@@ -2007,6 +2007,86 @@ export type Database = {
           },
         ]
       }
+      simple_mode_suggestions: {
+        Row: {
+          approval_token: string | null
+          approved_at: string | null
+          class_id: string | null
+          created_at: string
+          id: string
+          lesson_plan_id: string | null
+          reason: string
+          source_data: Json | null
+          status: string
+          suggested_standard: string | null
+          suggested_topic: string
+          teacher_id: string
+          token_expires_at: string | null
+          worksheet_id: string | null
+        }
+        Insert: {
+          approval_token?: string | null
+          approved_at?: string | null
+          class_id?: string | null
+          created_at?: string
+          id?: string
+          lesson_plan_id?: string | null
+          reason: string
+          source_data?: Json | null
+          status?: string
+          suggested_standard?: string | null
+          suggested_topic: string
+          teacher_id: string
+          token_expires_at?: string | null
+          worksheet_id?: string | null
+        }
+        Update: {
+          approval_token?: string | null
+          approved_at?: string | null
+          class_id?: string | null
+          created_at?: string
+          id?: string
+          lesson_plan_id?: string | null
+          reason?: string
+          source_data?: Json | null
+          status?: string
+          suggested_standard?: string | null
+          suggested_topic?: string
+          teacher_id?: string
+          token_expires_at?: string | null
+          worksheet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simple_mode_suggestions_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "simple_mode_suggestions_lesson_plan_id_fkey"
+            columns: ["lesson_plan_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "simple_mode_suggestions_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "simple_mode_suggestions_worksheet_id_fkey"
+            columns: ["worksheet_id"]
+            isOneToOne: false
+            referencedRelation: "worksheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sister_app_sync_log: {
         Row: {
           action: string
