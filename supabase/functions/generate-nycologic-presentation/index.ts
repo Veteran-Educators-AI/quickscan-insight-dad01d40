@@ -43,30 +43,17 @@ async function callLovableAI(prompt: string): Promise<string> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-2.5-pro",
+      max_tokens: 8192,
       messages: [
         {
           role: "system",
-          content: `You are an expert presentation designer and educator. You create stunning, engaging presentations that feel like modern websites - not boring PowerPoints.
+          content: `You are an expert presentation designer. Create engaging, modern presentations.
 
-Your presentations:
-- Use bold, impactful statements
-- Feature interactive Q&A moments
-- Have smooth visual flow
-- Include relevant examples and analogies
-- Use **bold** markers for key terms that should be highlighted
+Slide types: "title", "content", "question", "reveal", "summary", "interactive"
+Icons: "lightbulb", "book", "question", "award", "sparkles"
 
-Slide types available:
-- "title": Opening slide with main topic
-- "content": Information and explanations
-- "question": Interactive Q&A with multiple choice or open questions
-- "reveal": Information revealed step by step
-- "summary": Key takeaways
-- "interactive": Engagement activities
-
-Icons available: "lightbulb" (ideas), "book" (learning), "question" (Q&A), "award" (achievements), "sparkles" (highlights)
-
-Always return valid JSON without markdown formatting.`,
+CRITICAL: Always return COMPLETE, valid JSON. No markdown. No comments. No truncation.`,
         },
         { role: "user", content: prompt },
       ],
@@ -85,7 +72,6 @@ Always return valid JSON without markdown formatting.`,
     throw new Error(`AI API error: ${response.status}`);
   }
 
-  // Get response text first to handle empty responses
   const responseText = await response.text();
   
   if (!responseText || responseText.trim() === "") {
@@ -105,6 +91,13 @@ Always return valid JSON without markdown formatting.`,
   if (!content) {
     console.error("AI response missing content:", JSON.stringify(data).substring(0, 500));
     throw new Error("AI response was incomplete. Please try again.");
+  }
+
+  // Check for truncation indicators
+  const finishReason = data.choices?.[0]?.finish_reason;
+  if (finishReason === 'length') {
+    console.error("AI response was truncated due to length limit");
+    throw new Error("AI response was truncated. Please try again with a shorter presentation.");
   }
 
   return content;
@@ -145,78 +138,33 @@ serve(async (req) => {
     const minSlides = Math.floor(durationMinutes / 4);
     const maxSlides = Math.floor(durationMinutes / 2.5);
 
-    const prompt = `Create a stunning, modern presentation about "${topic}" for ${subject}.
+    const prompt = `Create a presentation about "${topic}" for ${subject}.
+${description ? `Context: ${description}` : ''}
+${standard ? `Standard: ${standard}` : ''}
+Duration: ${duration} (${minSlides}-${maxSlides} slides)
+${includeQuestions ? `Include ${questionCount} question slides` : ''}
 
-${description ? `Additional context: ${description}` : ''}
-${standard ? `Academic standard: ${standard}` : ''}
-
-Style: ${style === 'engaging' ? 'Engaging and interactive with questions' : style === 'formal' ? 'Formal and academic' : 'Story-based learning journey'}
-Duration: ${duration} (aim for ${minSlides}-${maxSlides} slides)
-${includeQuestions ? `Include ${questionCount} interactive question slides spread throughout` : 'No question slides needed'}
-
-Generate a JSON object with this exact structure:
-
+Return a JSON object with this structure:
 {
   "id": "${generateId()}",
-  "title": "An engaging, memorable title",
-  "subtitle": "A compelling subtitle or tagline",
+  "title": "Engaging title",
+  "subtitle": "Tagline",
   "topic": "${topic}",
   "slides": [
-    {
-      "id": "unique-id",
-      "type": "title",
-      "title": "Main **Topic** Title",
-      "subtitle": "${subject.toUpperCase()} SERIES",
-      "content": ["A brief engaging description of what students will learn"],
-      "speakerNotes": "Welcome and introduction notes",
-      "icon": "sparkles"
-    },
-    {
-      "id": "unique-id",
-      "type": "content",
-      "title": "Key Concept with **Highlighted** Terms",
-      "content": ["Point 1 explanation", "Point 2 explanation"],
-      "speakerNotes": "Teaching notes for this slide",
-      "icon": "book"
-    },
-    {
-      "id": "unique-id",
-      "type": "question",
-      "title": "Let's **Test** Your Understanding",
-      "subtitle": "QUICK CHECK",
-      "content": [],
-      "question": {
-        "prompt": "The question to ask",
-        "options": ["Option A", "Option B", "Option C", "Option D"],
-        "answer": "The correct option text",
-        "explanation": "Why this is the correct answer"
-      },
-      "icon": "question"
-    },
-    // More slides following this pattern...
-    {
-      "id": "unique-id",
-      "type": "summary",
-      "title": "**Key** Takeaways",
-      "content": ["Takeaway 1", "Takeaway 2", "Takeaway 3"],
-      "icon": "award"
-    }
+    {"id": "slide-1", "type": "title", "title": "Main **Topic**", "subtitle": "${subject.toUpperCase()}", "content": ["Brief intro"], "speakerNotes": "Notes", "icon": "sparkles"},
+    {"id": "slide-2", "type": "content", "title": "Key **Concept**", "content": ["Point 1", "Point 2"], "speakerNotes": "Notes", "icon": "book"},
+    {"id": "slide-3", "type": "question", "title": "Quick **Check**", "subtitle": "QUIZ", "content": [], "question": {"prompt": "Question?", "options": ["A", "B", "C", "D"], "answer": "Correct option", "explanation": "Why"}, "icon": "question"},
+    {"id": "slide-N", "type": "summary", "title": "**Key** Takeaways", "content": ["Point 1", "Point 2"], "icon": "award"}
   ],
   "createdAt": "${new Date().toISOString()}"
 }
 
-Requirements:
-1. Use **bold** markers around key terms that should be highlighted in amber/gold
-2. Each slide should have a clear, impactful title
-3. Content should be concise - bullet points, not paragraphs
-4. Questions should have 4 multiple choice options with one correct answer
-5. Include speaker notes with teaching tips
-6. Use appropriate icons for each slide type
-7. Create a logical flow from introduction to summary
-8. Make it feel like a modern website presentation, not PowerPoint
-9. Generate unique IDs for each slide (use format "slide-1", "slide-2", etc.)
+Rules:
+- Use **bold** for key terms
+- Keep content concise (bullet points)
+- Questions need 4 options with answer + explanation
+- Return ONLY valid JSON, no markdown or comments`;
 
-Return ONLY the JSON object, no markdown formatting or code blocks.`;
 
     const aiResponse = await callLovableAI(prompt);
     
