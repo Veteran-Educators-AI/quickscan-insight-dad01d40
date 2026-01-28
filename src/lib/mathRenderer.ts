@@ -307,13 +307,35 @@ function convertExponents(text: string): string {
 
 /**
  * Converts plain text subscripts (like x_1 or a_n) to subscript Unicode
+ * IMPORTANT: Only applies to single-letter variables to avoid corrupting words like "needed_2"
  */
 function convertSubscripts(text: string): string {
-  // Pattern: something_{content} or something_content (single char or digit sequence)
-  return text.replace(/_{([^}]+)}|_(\d+|[a-z])/gi, (match, braced, simple) => {
-    const content = braced || simple;
-    return content.split('').map((char: string) => subscripts[char] || char).join('');
+  // Pattern 1: Single letter followed by _{content} - e.g., x_{12} -> x₁₂
+  let result = text.replace(/\b([a-zA-Z])_{([^}]+)}/g, (match, letter, content) => {
+    const subscripted = content.split('').map((char: string) => subscripts[char] || char).join('');
+    return letter + subscripted;
   });
+  
+  // Pattern 2: Single letter followed by _digit(s) - e.g., x_2 -> x₂, y_12 -> y₁₂
+  // Must be preceded by word boundary or space to avoid "needed_2" becoming "needed₂"
+  result = result.replace(/(?<=\s|^)([a-zA-Z])_(\d+)(?=\s|$|[,.:;!?)])/g, (match, letter, digits) => {
+    const subscripted = digits.split('').map((char: string) => subscripts[char] || char).join('');
+    return letter + subscripted;
+  });
+  
+  // Pattern 3: Common math notation - single letter variable with subscript in math context
+  // e.g., "solve for x_1" or "(x_2 + y_3)"
+  result = result.replace(/([a-zA-Z])_(\d+|[a-z])(?=[\s+\-*/=<>()[\],.:;]|$)/gi, (match, letter, sub, offset) => {
+    // Check if the character before is a letter (making it part of a word)
+    const prevChar = result[offset - 1];
+    if (prevChar && /[a-zA-Z]/.test(prevChar)) {
+      return match; // Don't convert - it's part of a word like "needed_2"
+    }
+    const subscripted = sub.split('').map((char: string) => subscripts[char] || char).join('');
+    return letter + subscripted;
+  });
+  
+  return result;
 }
 
 /**
@@ -466,6 +488,66 @@ export function formatCurrency(text: string): string {
 }
 
 /**
+ * Repairs common word splitting artifacts from AI-generated text
+ * Fixes issues like "mu st" -> "must", "formu la" -> "formula"
+ */
+function repairSplitWords(text: string): string {
+  if (!text) return '';
+  
+  // Common split word patterns to repair
+  const splitWordFixes: [RegExp, string][] = [
+    // Common words that get split
+    [/\bmu\s+st\b/gi, 'must'],
+    [/\bformu\s*la\b/gi, 'formula'],
+    [/\bcalcu\s*late\b/gi, 'calculate'],
+    [/\bdeter\s*mine\b/gi, 'determine'],
+    [/\bferti\s*lizer\b/gi, 'fertilizer'],
+    [/\bsec\s*tor\b/gi, 'sector'],
+    [/\bcen\s*tral\b/gi, 'central'],
+    [/\bgar\s*den\b/gi, 'garden'],
+    [/\bgard\s*ener\b/gi, 'gardener'],
+    [/\bexpress\b/gi, 'express'],
+    [/\bra\s*dius\b/gi, 'radius'],
+    [/\bdi\s*ameter\b/gi, 'diameter'],
+    [/\bcir\s*cumference\b/gi, 'circumference'],
+    [/\bpe\s*rimeter\b/gi, 'perimeter'],
+    [/\bar\s*ea\b/gi, 'area'],
+    [/\bvo\s*lume\b/gi, 'volume'],
+    [/\btri\s*angle\b/gi, 'triangle'],
+    [/\brec\s*tangle\b/gi, 'rectangle'],
+    [/\bsq\s*uare\b/gi, 'square'],
+    [/\bcir\s*cle\b/gi, 'circle'],
+    [/\beq\s*uation\b/gi, 'equation'],
+    [/\bex\s*pression\b/gi, 'expression'],
+    [/\bco\s*efficient\b/gi, 'coefficient'],
+    [/\bva\s*riable\b/gi, 'variable'],
+    [/\bcon\s*stant\b/gi, 'constant'],
+    [/\bso\s*lution\b/gi, 'solution'],
+    [/\bpro\s*blem\b/gi, 'problem'],
+    [/\ban\s*swer\b/gi, 'answer'],
+    [/\bques\s*tion\b/gi, 'question'],
+    [/\bre\s*member\b/gi, 'remember'],
+    [/\bre\s*lates\b/gi, 'relates'],
+    [/\bam\s*ount\b/gi, 'amount'],
+    [/\bplan\s*ted\b/gi, 'planted'],
+    [/\bspe\s*cial\b/gi, 'special'],
+    [/\bde\s*grees\b/gi, 'degrees'],
+    [/\bsp\s*ans\b/gi, 'spans'],
+    // Generic pattern: single space inside common word suffixes
+    [/(\w{2,})e\s+d\b/gi, '$1ed'], // "need e d" -> "needed"
+    [/(\w{2,})i\s+ng\b/gi, '$1ing'], // "calculat i ng" -> "calculating"
+    [/(\w{2,})t\s+ion\b/gi, '$1tion'], // "calcula t ion" -> "calculation"
+  ];
+  
+  let result = text;
+  for (const [pattern, replacement] of splitWordFixes) {
+    result = result.replace(pattern, replacement);
+  }
+  
+  return result;
+}
+
+/**
  * Main function to render math text with proper Unicode symbols
  * Transforms plain text math notation and LaTeX into beautifully formatted text
  */
@@ -473,6 +555,9 @@ export function renderMathText(text: string): string {
   if (!text) return '';
   
   let result = text;
+  
+  // First repair any split words from AI artifacts
+  result = repairSplitWords(result);
   
   // Apply transformations in order - LaTeX first, then plain text
   result = convertLatex(result);

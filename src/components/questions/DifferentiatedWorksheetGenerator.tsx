@@ -442,6 +442,37 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   // Selective regeneration state
   const [regeneratingKey, setRegeneratingKey] = useState<string | null>(null);
   const [selectedRegenerateKeys, setSelectedRegenerateKeys] = useState<Set<string>>(new Set());
+  
+  // Image generation warning dialog state
+  const [showImageWarning, setShowImageWarning] = useState(false);
+  const [pendingImageOption, setPendingImageOption] = useState<'geometry' | 'aiImages' | 'storyboard' | null>(null);
+  
+  // Handler to show warning before enabling image generation
+  const handleImageToggle = (option: 'geometry' | 'aiImages' | 'storyboard', currentValue: boolean) => {
+    if (!currentValue) {
+      // Turning ON - show warning
+      setPendingImageOption(option);
+      setShowImageWarning(true);
+    } else {
+      // Turning OFF - no warning needed
+      if (option === 'geometry') setIncludeGeometry(false);
+      else if (option === 'aiImages') setUseAIImages(false);
+      else if (option === 'storyboard') setIncludeStoryboardArt(false);
+    }
+  };
+  
+  const confirmImageGeneration = () => {
+    if (pendingImageOption === 'geometry') setIncludeGeometry(true);
+    else if (pendingImageOption === 'aiImages') setUseAIImages(true);
+    else if (pendingImageOption === 'storyboard') setIncludeStoryboardArt(true);
+    setShowImageWarning(false);
+    setPendingImageOption(null);
+  };
+  
+  const cancelImageGeneration = () => {
+    setShowImageWarning(false);
+    setPendingImageOption(null);
+  };
 
   // Load presets from localStorage on mount
   useEffect(() => {
@@ -3522,7 +3553,7 @@ QUALITY CHECK BEFORE FINISHING
             <Switch
               id="includeGeometry"
               checked={includeGeometry}
-              onCheckedChange={setIncludeGeometry}
+              onCheckedChange={() => handleImageToggle('geometry', includeGeometry)}
             />
           </div>
 
@@ -3569,7 +3600,7 @@ QUALITY CHECK BEFORE FINISHING
                     id="useAIImages"
                     checked={useAIImages}
                     disabled={preferDeterministicSVG}
-                    onCheckedChange={setUseAIImages}
+                    onCheckedChange={() => handleImageToggle('aiImages', useAIImages)}
                   />
                 </div>
               </div>
@@ -3607,7 +3638,7 @@ QUALITY CHECK BEFORE FINISHING
             <Switch
               id="includeStoryboardArt"
               checked={includeStoryboardArt}
-              onCheckedChange={setIncludeStoryboardArt}
+              onCheckedChange={() => handleImageToggle('storyboard', includeStoryboardArt)}
             />
           </div>
 
@@ -4198,6 +4229,52 @@ QUALITY CHECK BEFORE FINISHING
           </DialogContent>
         </Dialog>
       )}
+      
+      {/* Image Generation Warning Dialog */}
+      <Dialog open={showImageWarning} onOpenChange={setShowImageWarning}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertCircle className="h-5 w-5" />
+              Image Generation Warning
+            </DialogTitle>
+            <DialogDescription className="space-y-3 pt-2">
+              <p className="text-sm text-gray-700">
+                <strong>Please be aware:</strong>
+              </p>
+              <ul className="text-sm text-gray-600 space-y-2 list-disc ml-4">
+                <li>
+                  <strong>Generation time:</strong> Each image takes <span className="text-amber-600 font-semibold">5+ minutes</span> to generate. 
+                  For a full class set, this could take <span className="text-amber-600 font-semibold">30+ minutes</span> or more.
+                </li>
+                <li>
+                  <strong>Accuracy concerns:</strong> AI-generated images may contain <span className="text-red-600 font-semibold">inaccuracies</span> such as 
+                  incorrect labels, wrong measurements, or visual errors that require manual review.
+                </li>
+                <li>
+                  <strong>Recommendation:</strong> For math diagrams, use the "Guaranteed Accurate Diagrams" option when possible.
+                </li>
+              </ul>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mt-3">
+                <p className="text-xs text-amber-800">
+                  <strong>Tip:</strong> Consider generating worksheets without images first, then adding images only to specific questions that need them.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 pt-2">
+            <Button variant="outline" onClick={cancelImageGeneration}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmImageGeneration}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              I Understand, Proceed
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
