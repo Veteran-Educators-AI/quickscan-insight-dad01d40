@@ -904,7 +904,7 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
               const imageFormat = detectImageFormat(rawData);
 
               if (imageFormat) {
-                const blob = new Blob([rawData], { type: imageFormat });
+                const blob = new Blob([rawData.buffer as ArrayBuffer], { type: imageFormat });
                 const imageUrl = URL.createObjectURL(blob);
                 images.push(imageUrl);
               }
@@ -939,7 +939,7 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
                   .join(" "),
               );
               try {
-                await device.transferOut(outEndpoint.endpointNumber, cmd);
+                await device.transferOut(outEndpoint.endpointNumber, cmd.buffer as ArrayBuffer);
                 // Small delay between commands
                 await new Promise((resolve) => setTimeout(resolve, 50));
               } catch (cmdErr) {
@@ -1088,7 +1088,7 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
             }
 
             if (imageFormat && imageData) {
-              const blob = new Blob([imageData], { type: imageFormat });
+              const blob = new Blob([imageData.buffer as ArrayBuffer], { type: imageFormat });
               const imageUrl = URL.createObjectURL(blob);
               images.push(imageUrl);
               console.log("[WebUSB Scanner] Image created:", imageFormat, imageData.length, "bytes");
