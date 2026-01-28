@@ -1226,11 +1226,10 @@ export default function PresentationView() {
           <motion.div
             key={currentSlide}
             initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: zoomLevel }}
+            animate={{ opacity: 1, scale: zoomLevel * (fontScale / 100) }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-            className="w-full max-w-6xl mx-auto origin-center"
-            style={{ fontSize: `${fontScale}%` }}
+            className="w-full max-w-6xl mx-auto origin-top"
           >
             {/* Zoom indicator */}
             {zoomLevel !== 1 && (
