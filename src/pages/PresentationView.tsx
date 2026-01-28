@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown, Cloud, CloudOff, Library, ImagePlus, Radio, Users, Wand2, Send } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown, Cloud, CloudOff, Library, ImagePlus, Radio, Users, Wand2, Send, Type, Minus } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -108,6 +109,10 @@ export default function PresentationView() {
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const [isResizingImage, setIsResizingImage] = useState(false);
   const [isRotatingImage, setIsRotatingImage] = useState(false);
+  
+  // Font size control state (percentage scale: 80 = 80%, 100 = default, 150 = 150%)
+  const [fontScale, setFontScale] = useState(100);
+  const [showFontControls, setShowFontControls] = useState(false);
   const [imageResizeCorner, setImageResizeCorner] = useState<string | null>(null);
   const [rotationStartAngle, setRotationStartAngle] = useState(0);
   const [rotationStartValue, setRotationStartValue] = useState(0);
@@ -893,6 +898,70 @@ export default function PresentationView() {
           >
             {isEditing ? <Check className="h-5 w-5" /> : <Pencil className="h-5 w-5" />}
           </Button>
+          
+          {/* Font Size Control */}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowFontControls(prev => !prev)}
+              className={cn(
+                "h-10 w-10 rounded-full transition-all",
+                showFontControls 
+                  ? `${colors.accent} bg-white/10` 
+                  : "text-white/60 hover:text-white hover:bg-white/10"
+              )}
+              title={`Font size: ${fontScale}%`}
+            >
+              <Type className="h-5 w-5" />
+            </Button>
+            
+            {/* Font Size Popover */}
+            {showFontControls && (
+              <div className="absolute top-12 right-0 bg-black/90 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border border-white/10 z-50 min-w-[200px]">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-white/80 text-sm font-medium">Font Size</span>
+                  <span className="text-white/60 text-sm">{fontScale}%</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setFontScale(prev => Math.max(60, prev - 10))}
+                    className="h-8 w-8 rounded-full text-white/60 hover:text-white hover:bg-white/10"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <Slider
+                    value={[fontScale]}
+                    onValueChange={(value) => setFontScale(value[0])}
+                    min={60}
+                    max={150}
+                    step={5}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setFontScale(prev => Math.min(150, prev + 10))}
+                    className="h-8 w-8 rounded-full text-white/60 hover:text-white hover:bg-white/10"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex justify-center mt-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFontScale(100)}
+                    className="text-white/50 hover:text-white text-xs h-7 px-3"
+                  >
+                    Reset to 100%
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -1155,6 +1224,7 @@ export default function PresentationView() {
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
             className="w-full max-w-6xl mx-auto origin-center"
+            style={{ fontSize: `${fontScale}%` }}
           >
             {/* Zoom indicator */}
             {zoomLevel !== 1 && (
