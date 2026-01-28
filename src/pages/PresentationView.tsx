@@ -72,6 +72,12 @@ const themeColors: Record<string, { bg: string; accent: string; glow: string; bg
 
 const defaultColors = { bg: 'from-[#0a1628] via-[#0f1f3a] to-[#0a1628]', accent: 'text-amber-400', glow: 'rgba(251, 191, 36, 0.15)', bgHex: 'linear-gradient(135deg, #0a1628 0%, #0f1f3a 50%, #0a1628 100%)', accentHex: '#fbbf24' };
 
+// Helper to strip markdown bold markers (**) from text
+const stripAsterisks = (text: string | undefined): string => {
+  if (!text) return '';
+  return text.replace(/\*\*/g, '');
+};
+
 export default function PresentationView() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -1087,7 +1093,7 @@ export default function PresentationView() {
                           {idx + 1}
                         </span>
                         <p className="text-white text-xs font-medium truncate flex-1">
-                          {s.title}
+                          {stripAsterisks(s.title)}
                         </p>
                       </div>
                       <p className="text-white/40 text-[10px] uppercase tracking-wide mt-1 ml-7">
@@ -1379,7 +1385,7 @@ export default function PresentationView() {
                       onClick={() => isEditing && setEditingField('title')}
                       className={cn(isEditing && 'cursor-text hover:bg-white/5 px-4 py-2 rounded-lg transition-colors')}
                     >
-                      {slide.title}
+                      {stripAsterisks(slide.title)}
                     </span>
                   )}
                 </motion.h1>
@@ -1476,7 +1482,7 @@ export default function PresentationView() {
                         onClick={() => isEditing && setEditingField('question-title')}
                         className={cn(isEditing && 'cursor-text hover:bg-white/5 px-4 py-2 rounded-lg transition-colors')}
                       >
-                        {slide.title}
+                        {stripAsterisks(slide.title)}
                       </span>
                     )}
                   </motion.h2>
@@ -1504,7 +1510,7 @@ export default function PresentationView() {
                             isEditing && 'cursor-text hover:bg-white/5 px-2 py-1 rounded transition-colors'
                           )}
                         >
-                          {slide.question.prompt}
+                          {stripAsterisks(slide.question.prompt)}
                         </p>
                       )}
                     </motion.div>
@@ -1888,7 +1894,7 @@ export default function PresentationView() {
                         onClick={() => isEditing && setEditingField('content-title')}
                         className={cn(isEditing && 'cursor-text hover:bg-white/5 px-2 py-1 rounded transition-colors')}
                       >
-                        {slide.title}
+                        {stripAsterisks(slide.title)}
                       </span>
                     )}
                   </motion.h2>
@@ -1930,7 +1936,7 @@ export default function PresentationView() {
                                 isEditing && 'cursor-text hover:bg-white/5 px-2 py-1 rounded transition-colors'
                               )}
                             >
-                              {itemText}
+                              {stripAsterisks(itemText)}
                             </p>
                           )}
                         {isEditing && slide.content.length > 1 && (
