@@ -43,6 +43,8 @@ import PresentationView from "./pages/PresentationView";
 import PresentationLibrary from "./pages/PresentationLibrary";
 import TeacherLibrary from "./pages/TeacherLibrary";
 import SchoolSelector from "./pages/SchoolSelector";
+import SimpleMode from "./pages/SimpleMode";
+import SimpleModeResponse from "./pages/SimpleModeResponse";
 import { BetaFeedbackButton } from "./components/BetaFeedbackButton";
 
 const queryClient = new QueryClient();
@@ -167,6 +169,9 @@ function AppRoutes() {
       <Route path="/presentation/library" element={<ProtectedRoute><PresentationLibrary /></ProtectedRoute>} />
       {/* Teacher Library */}
       <Route path="/library" element={<ProtectedRoute><TeacherLibrary /></ProtectedRoute>} />
+      {/* Simple Mode */}
+      <Route path="/simple-mode" element={<ProtectedRoute><SimpleMode /></ProtectedRoute>} />
+      <Route path="/simple-mode/respond" element={<SimpleModeResponse />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
