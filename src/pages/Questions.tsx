@@ -27,6 +27,7 @@ import { SubjectLessonSuggestions } from '@/components/questions/SubjectLessonSu
 import { RegentsShapeScanner } from '@/components/questions/RegentsShapeScanner';
 import { BatchSvgConverter } from '@/components/questions/BatchSvgConverter';
 import { useToast } from '@/hooks/use-toast';
+import { renderMathText } from '@/lib/mathRenderer';
 
 export default function Questions() {
   const { toast } = useToast();
@@ -287,7 +288,7 @@ const [showDifferentiatedGenerator, setShowDifferentiatedGenerator] = useState(f
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-sm">{topic.name}</span>
+              <span className="font-medium text-sm">{renderMathText(topic.name)}</span>
               <Badge variant="outline" className="text-xs font-mono">
                 {topic.standard}
               </Badge>

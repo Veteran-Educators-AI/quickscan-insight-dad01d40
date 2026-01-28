@@ -691,7 +691,9 @@ export function sanitizeForPDF(text: string): string {
     [/×/g, 'x'],
     [/÷/g, '/'],
     [/·/g, '*'],
-    [/√/g, 'sqrt'],
+    [/√\(([^)]+)\)/g, 'sqrt($1)'], // √(expression) -> sqrt(expression)
+    [/√(\d+)/g, 'sqrt($1)'], // √7 -> sqrt(7)
+    [/√/g, 'sqrt'], // Remaining standalone √
     [/∞/g, 'infinity'],
     
     // Arrows
