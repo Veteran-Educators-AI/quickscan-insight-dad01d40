@@ -369,6 +369,18 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
     const OPEN_TIMEOUT = 8000;
 
     try {
+      // If device is already open, try to close it first
+      if (device.opened) {
+        console.log("[WebUSB] Device already open, closing first...");
+        try {
+          await device.close();
+          // Small delay after closing
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        } catch (closeErr) {
+          console.log("[WebUSB] Error closing device (continuing):", closeErr);
+        }
+      }
+
       // Open the device with timeout
       const openWithTimeout = Promise.race([
         device.open(),
@@ -376,6 +388,7 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
       ]);
 
       await openWithTimeout;
+      console.log("[WebUSB] Device opened successfully");
 
       // Select configuration if not already selected
       if (device.configuration === null && device.configurations.length > 0) {
@@ -383,15 +396,57 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
           device.selectConfiguration(device.configurations[0].configurationValue),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error("CONFIG_TIMEOUT")), 5000)),
         ]);
+        console.log("[WebUSB] Configuration selected");
       }
 
-      // Claim the first interface
+      // Try to claim an interface - try multiple if first fails
+      let interfaceClaimed = false;
       if (device.configuration && device.configuration.interfaces.length > 0) {
-        const interfaceNumber = device.configuration.interfaces[0].interfaceNumber;
-        await Promise.race([
-          device.claimInterface(interfaceNumber),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("CLAIM_TIMEOUT")), 5000)),
-        ]);
+        for (const iface of device.configuration.interfaces) {
+          const interfaceNumber = iface.interfaceNumber;
+
+          // Skip if already claimed
+          if (iface.claimed) {
+            console.log(`[WebUSB] Interface ${interfaceNumber} already claimed`);
+            interfaceClaimed = true;
+            break;
+          }
+
+          try {
+            console.log(`[WebUSB] Attempting to claim interface ${interfaceNumber}...`);
+            await Promise.race([
+              device.claimInterface(interfaceNumber),
+              new Promise<never>((_, reject) => setTimeout(() => reject(new Error("CLAIM_TIMEOUT")), 5000)),
+            ]);
+            console.log(`[WebUSB] Successfully claimed interface ${interfaceNumber}`);
+            interfaceClaimed = true;
+            break;
+          } catch (claimErr: any) {
+            console.log(`[WebUSB] Failed to claim interface ${interfaceNumber}:`, claimErr.message);
+            // Try next interface
+          }
+        }
+
+        if (!interfaceClaimed) {
+          // Try resetting the device and claiming again
+          console.log("[WebUSB] All interfaces failed, attempting device reset...");
+          try {
+            await device.reset();
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // Try claiming first interface after reset
+            const interfaceNumber = device.configuration.interfaces[0].interfaceNumber;
+            await device.claimInterface(interfaceNumber);
+            interfaceClaimed = true;
+            console.log("[WebUSB] Claimed interface after reset");
+          } catch (resetErr) {
+            console.log("[WebUSB] Reset failed:", resetErr);
+          }
+        }
+      }
+
+      if (!interfaceClaimed) {
+        throw new Error("CLAIM_FAILED");
       }
 
       deviceRef.current = device;
@@ -433,8 +488,24 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
           setError("Failed to configure scanner.");
           toast.error("Scanner configuration failed");
         }
+      } else if (err.message === "CLAIM_FAILED") {
+        if (!isAutoReconnect) {
+          setError("Scanner is in use. Close other scanning apps, unplug the scanner for 5 seconds, then reconnect.");
+          toast.error("Scanner interface busy", {
+            description: "Close Epson Scan or other apps, then unplug and replug the scanner.",
+            duration: 6000,
+          });
+        }
+      } else if (err.message?.includes("Unable to claim interface") || err.message?.includes("LIBUSB_ERROR_BUSY")) {
+        if (!isAutoReconnect) {
+          setError("Scanner is being used by another application. Close other scanning software and try again.");
+          toast.error("Scanner in use by another app", {
+            description: "Close Epson Scan, Windows Fax and Scan, or similar apps.",
+            duration: 6000,
+          });
+        }
       } else if (!isAutoReconnect) {
-        setError("Could not connect to scanner.");
+        setError("Could not connect to scanner. Try unplugging and reconnecting it.");
       }
 
       return false;
@@ -575,6 +646,17 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
 
       console.log("Selected device:", device.productName, device.vendorId, device.productId);
 
+      // If device is already open, try to close it first
+      if (device.opened) {
+        console.log("[WebUSB] Device already open, closing first...");
+        try {
+          await device.close();
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        } catch (closeErr) {
+          console.log("[WebUSB] Error closing device (continuing):", closeErr);
+        }
+      }
+
       // Open the device with timeout
       const OPEN_TIMEOUT = 8000;
       const openWithTimeout = Promise.race([
@@ -583,6 +665,7 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
       ]);
 
       await openWithTimeout;
+      console.log("[WebUSB] Device opened successfully");
 
       // Select configuration if not already selected (with timeout)
       if (device.configuration === null && device.configurations.length > 0) {
@@ -590,15 +673,53 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
           device.selectConfiguration(device.configurations[0].configurationValue),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error("CONFIG_TIMEOUT")), 5000)),
         ]);
+        console.log("[WebUSB] Configuration selected");
       }
 
-      // Claim the first interface (with timeout)
+      // Try to claim an interface - try multiple if first fails
+      let interfaceClaimed = false;
       if (device.configuration && device.configuration.interfaces.length > 0) {
-        const interfaceNumber = device.configuration.interfaces[0].interfaceNumber;
-        await Promise.race([
-          device.claimInterface(interfaceNumber),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("CLAIM_TIMEOUT")), 5000)),
-        ]);
+        for (const iface of device.configuration.interfaces) {
+          const interfaceNumber = iface.interfaceNumber;
+
+          if (iface.claimed) {
+            console.log(`[WebUSB] Interface ${interfaceNumber} already claimed`);
+            interfaceClaimed = true;
+            break;
+          }
+
+          try {
+            console.log(`[WebUSB] Attempting to claim interface ${interfaceNumber}...`);
+            await Promise.race([
+              device.claimInterface(interfaceNumber),
+              new Promise<never>((_, reject) => setTimeout(() => reject(new Error("CLAIM_TIMEOUT")), 5000)),
+            ]);
+            console.log(`[WebUSB] Successfully claimed interface ${interfaceNumber}`);
+            interfaceClaimed = true;
+            break;
+          } catch (claimErr: any) {
+            console.log(`[WebUSB] Failed to claim interface ${interfaceNumber}:`, claimErr.message);
+          }
+        }
+
+        if (!interfaceClaimed) {
+          console.log("[WebUSB] All interfaces failed, attempting device reset...");
+          try {
+            await device.reset();
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            const interfaceNumber = device.configuration.interfaces[0].interfaceNumber;
+            await device.claimInterface(interfaceNumber);
+            interfaceClaimed = true;
+            console.log("[WebUSB] Claimed interface after reset");
+          } catch (resetErr) {
+            console.log("[WebUSB] Reset failed:", resetErr);
+          }
+        }
+      }
+
+      if (!interfaceClaimed) {
+        throw new Error("CLAIM_FAILED");
       }
 
       deviceRef.current = device;
@@ -637,13 +758,27 @@ export function useWebUSBScanner(): UseWebUSBScannerReturn {
         toast.error("Scanner configuration failed", {
           description: "Close any other scanning software and try again.",
         });
+      } else if (err.message === "CLAIM_FAILED") {
+        setError(
+          "Scanner is in use. Close other scanning apps (like Epson Scan), unplug the scanner for 5 seconds, then reconnect.",
+        );
+        toast.error("Scanner interface busy", {
+          description: "Close all scanning apps, unplug scanner for 5 seconds, then replug.",
+          duration: 7000,
+        });
       } else if (err.name === "NotFoundError" || err.name === "AbortError") {
         // User cancelled the dialog or no device was selected - not an error
         setError(null);
       } else if (err.name === "SecurityError") {
         setError("Permission denied. Please allow access to the scanner.");
-      } else if (err.message?.includes("Unable to claim interface")) {
-        setError("Scanner interface is busy. Try unplugging and reconnecting the scanner.");
+      } else if (err.message?.includes("Unable to claim interface") || err.message?.includes("LIBUSB_ERROR_BUSY")) {
+        setError(
+          "Scanner is being used by another application. Close Epson Scan or other scanning software and try again.",
+        );
+        toast.error("Scanner in use", {
+          description: "Close Epson Scan, then unplug and replug the scanner.",
+          duration: 6000,
+        });
       } else if (err.name === "NetworkError") {
         setError("Connection lost. Check USB cable and try again.");
       } else {
