@@ -27,7 +27,99 @@ interface NycologicPresentation {
   subtitle: string;
   topic: string;
   slides: PresentationSlide[];
-  createdAt: Date;
+  createdAt: string;
+}
+
+function generateId(): string {
+  return crypto.randomUUID();
+}
+
+/**
+ * Attempt to recover partial JSON from truncated AI responses
+ * Finds complete slide objects and reconstructs valid presentation
+ */
+function recoverTruncatedPresentation(jsonStr: string, topic: string): NycologicPresentation | null {
+  console.log("Attempting to recover truncated presentation...");
+  
+  try {
+    // Try to extract presentation metadata
+    const titleMatch = jsonStr.match(/"title"\s*:\s*"([^"]+)"/);
+    const subtitleMatch = jsonStr.match(/"subtitle"\s*:\s*"([^"]+)"/);
+    
+    // Find all complete slide objects
+    const slides: PresentationSlide[] = [];
+    const slidePattern = /\{\s*"id"\s*:\s*"slide-\d+"[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+    
+    // More robust: find slides by looking for complete objects with id starting with "slide-"
+    let depth = 0;
+    let currentSlide = "";
+    let inSlide = false;
+    
+    for (let i = 0; i < jsonStr.length; i++) {
+      const char = jsonStr[i];
+      
+      if (char === '{') {
+        if (!inSlide && jsonStr.substring(i, i + 30).includes('"id"') && jsonStr.substring(i, i + 50).includes('slide-')) {
+          inSlide = true;
+          currentSlide = "";
+          depth = 0;
+        }
+        if (inSlide) {
+          depth++;
+          currentSlide += char;
+        }
+      } else if (char === '}') {
+        if (inSlide) {
+          depth--;
+          currentSlide += char;
+          if (depth === 0) {
+            // Complete slide found
+            try {
+              const slide = JSON.parse(currentSlide);
+              if (slide.id && slide.type && slide.title) {
+                slides.push(slide);
+              }
+            } catch {
+              // Invalid slide, skip
+            }
+            inSlide = false;
+            currentSlide = "";
+          }
+        }
+      } else if (inSlide) {
+        currentSlide += char;
+      }
+    }
+    
+    if (slides.length >= 2) {
+      console.log(`Recovered ${slides.length} complete slides from truncated response`);
+      
+      // Add a summary slide if not present
+      const hasSum = slides.some(s => s.type === 'summary');
+      if (!hasSum) {
+        slides.push({
+          id: `slide-${slides.length + 1}`,
+          type: 'summary',
+          title: '**Key** Takeaways',
+          content: ['Review the main concepts covered today'],
+          icon: 'award'
+        });
+      }
+      
+      return {
+        id: generateId(),
+        title: titleMatch?.[1] || `Understanding ${topic}`,
+        subtitle: subtitleMatch?.[1] || 'Educational Presentation',
+        topic: topic,
+        slides: slides,
+        createdAt: new Date().toISOString()
+      };
+    }
+  } catch (err) {
+    console.error("Recovery failed:", err);
+  }
+  
+  return null;
 }
 
 async function callLovableAI(prompt: string): Promise<string> {
@@ -43,17 +135,13 @@ async function callLovableAI(prompt: string): Promise<string> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-pro",
-      max_tokens: 8192,
+      model: "google/gemini-3-flash-preview",
+      max_tokens: 4096,
       messages: [
         {
           role: "system",
-          content: `You are an expert presentation designer. Create engaging, modern presentations.
-
-Slide types: "title", "content", "question", "reveal", "summary", "interactive"
-Icons: "lightbulb", "book", "question", "award", "sparkles"
-
-CRITICAL: Always return COMPLETE, valid JSON. No markdown. No comments. No truncation.`,
+          content: `You create concise JSON presentations. Return ONLY valid JSON, no markdown.
+Keep speakerNotes under 20 words. Keep content items under 15 words each.`,
         },
         { role: "user", content: prompt },
       ],
@@ -75,36 +163,23 @@ CRITICAL: Always return COMPLETE, valid JSON. No markdown. No comments. No trunc
   const responseText = await response.text();
   
   if (!responseText || responseText.trim() === "") {
-    console.error("AI API returned empty response");
     throw new Error("AI returned an empty response. Please try again.");
   }
 
   let data;
   try {
     data = JSON.parse(responseText);
-  } catch (parseError) {
+  } catch {
     console.error("Failed to parse AI API response:", responseText.substring(0, 500));
     throw new Error("Failed to parse AI response. Please try again.");
   }
 
   const content = data.choices?.[0]?.message?.content;
   if (!content) {
-    console.error("AI response missing content:", JSON.stringify(data).substring(0, 500));
     throw new Error("AI response was incomplete. Please try again.");
   }
 
-  // Check for truncation indicators
-  const finishReason = data.choices?.[0]?.finish_reason;
-  if (finishReason === 'length') {
-    console.error("AI response was truncated due to length limit");
-    throw new Error("AI response was truncated. Please try again with a shorter presentation.");
-  }
-
   return content;
-}
-
-function generateId(): string {
-  return crypto.randomUUID();
 }
 
 serve(async (req) => {
@@ -119,8 +194,7 @@ serve(async (req) => {
       description = "", 
       duration = "30 minutes",
       includeQuestions = true,
-      questionCount = 3,
-      style = "engaging",
+      questionCount = 2,
       standard = ""
     } = await req.json();
 
@@ -133,38 +207,24 @@ serve(async (req) => {
 
     console.log(`Generating Nycologic presentation for: ${topic}`);
 
-    // Calculate slide count based on duration
-    const durationMinutes = parseInt(duration) || 30;
-    const minSlides = Math.floor(durationMinutes / 4);
-    const maxSlides = Math.floor(durationMinutes / 2.5);
+    // Keep slide count small to avoid truncation
+    const slideCount = Math.min(Math.floor((parseInt(duration) || 30) / 5), 8);
+    const qCount = Math.min(questionCount, 2);
 
-    const prompt = `Create a presentation about "${topic}" for ${subject}.
+    const prompt = `Create a ${slideCount}-slide presentation about "${topic}" for ${subject}.
 ${description ? `Context: ${description}` : ''}
 ${standard ? `Standard: ${standard}` : ''}
-Duration: ${duration} (${minSlides}-${maxSlides} slides)
-${includeQuestions ? `Include ${questionCount} question slides` : ''}
+${includeQuestions ? `Include ${qCount} question slides.` : ''}
 
-Return a JSON object with this structure:
-{
-  "id": "${generateId()}",
-  "title": "Engaging title",
-  "subtitle": "Tagline",
-  "topic": "${topic}",
-  "slides": [
-    {"id": "slide-1", "type": "title", "title": "Main **Topic**", "subtitle": "${subject.toUpperCase()}", "content": ["Brief intro"], "speakerNotes": "Notes", "icon": "sparkles"},
-    {"id": "slide-2", "type": "content", "title": "Key **Concept**", "content": ["Point 1", "Point 2"], "speakerNotes": "Notes", "icon": "book"},
-    {"id": "slide-3", "type": "question", "title": "Quick **Check**", "subtitle": "QUIZ", "content": [], "question": {"prompt": "Question?", "options": ["A", "B", "C", "D"], "answer": "Correct option", "explanation": "Why"}, "icon": "question"},
-    {"id": "slide-N", "type": "summary", "title": "**Key** Takeaways", "content": ["Point 1", "Point 2"], "icon": "award"}
-  ],
-  "createdAt": "${new Date().toISOString()}"
-}
+Return this exact JSON structure:
+{"id":"${generateId()}","title":"Title Here","subtitle":"Subtitle","topic":"${topic}","slides":[
+{"id":"slide-1","type":"title","title":"**${topic}**","subtitle":"${subject.toUpperCase()}","content":["Brief intro"],"speakerNotes":"Welcome notes","icon":"sparkles"},
+{"id":"slide-2","type":"content","title":"Key **Concept**","content":["Point 1","Point 2"],"speakerNotes":"Explain","icon":"book"},
+{"id":"slide-3","type":"question","title":"**Check**","subtitle":"QUIZ","content":[],"question":{"prompt":"Question?","options":["A","B","C","D"],"answer":"A","explanation":"Why"},"icon":"question"},
+{"id":"slide-4","type":"summary","title":"**Takeaways**","content":["Key point 1","Key point 2"],"icon":"award"}
+],"createdAt":"${new Date().toISOString()}"}
 
-Rules:
-- Use **bold** for key terms
-- Keep content concise (bullet points)
-- Questions need 4 options with answer + explanation
-- Return ONLY valid JSON, no markdown or comments`;
-
+IMPORTANT: Keep ALL text SHORT. No long sentences. Return ONLY the JSON object.`;
 
     const aiResponse = await callLovableAI(prompt);
     
@@ -183,40 +243,42 @@ Rules:
     }
     cleanedResponse = cleanedResponse.trim();
     
-    // Remove JavaScript-style comments that AI sometimes includes
-    // Remove single-line comments like // comment
+    // Remove comments
     cleanedResponse = cleanedResponse.replace(/\/\/[^\n]*\n?/g, '');
-    // Remove multi-line comments like /* comment */
     cleanedResponse = cleanedResponse.replace(/\/\*[\s\S]*?\*\//g, '');
     cleanedResponse = cleanedResponse.trim();
 
     let presentation: NycologicPresentation;
     try {
       presentation = JSON.parse(cleanedResponse);
+    } catch {
+      console.error("Failed to parse AI response, attempting recovery:", cleanedResponse.substring(0, 1000));
       
-      // Ensure all slides have IDs and content is properly formatted as strings
-      presentation.slides = presentation.slides.map((slide, index) => ({
-        ...slide,
-        id: slide.id || `slide-${index + 1}`,
-        // Ensure content array only contains strings (AI sometimes returns objects)
-        content: (slide.content || []).map((item: string | Record<string, unknown>) => {
-          if (typeof item === 'string') return item;
-          if (typeof item === 'object' && item !== null) {
-            // Handle {heading, text} or {text} objects
-            return String(item.text || item.heading || JSON.stringify(item));
-          }
-          return String(item || '');
-        }) as string[],
-      }));
-      
-      // Ensure presentation has an ID
-      if (!presentation.id) {
-        presentation.id = generateId();
+      // Try to recover partial data
+      const recovered = recoverTruncatedPresentation(cleanedResponse, topic);
+      if (recovered) {
+        presentation = recovered;
+      } else {
+        throw new Error("Failed to parse presentation. Please try again.");
       }
-      
-    } catch (parseError) {
-      console.error("Failed to parse AI response:", cleanedResponse.substring(0, 1000));
-      throw new Error("Failed to parse presentation from AI response");
+    }
+    
+    // Ensure all slides have IDs and content is properly formatted
+    presentation.slides = presentation.slides.map((slide, index) => ({
+      ...slide,
+      id: slide.id || `slide-${index + 1}`,
+      content: (slide.content || []).map((item: unknown) => {
+        if (typeof item === 'string') return item;
+        if (typeof item === 'object' && item !== null) {
+          const obj = item as Record<string, unknown>;
+          return String(obj.text || obj.heading || JSON.stringify(item));
+        }
+        return String(item || '');
+      }),
+    }));
+    
+    if (!presentation.id) {
+      presentation.id = generateId();
     }
 
     console.log(`Generated presentation with ${presentation.slides.length} slides`);
