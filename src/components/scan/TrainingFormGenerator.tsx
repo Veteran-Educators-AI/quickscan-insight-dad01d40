@@ -12,6 +12,7 @@ import { GEOMETRY_TOPICS, ALGEBRA1_TOPICS, ALGEBRA2_TOPICS, TopicCategory } from
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/lib/auth';
 import { Badge } from '@/components/ui/badge';
+import { renderMathText } from '@/lib/mathRenderer';
 
 interface GeneratedQuestion {
   question: string;
@@ -688,7 +689,7 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
                   {generatedQuestions.slice(0, 2).map((q, idx) => (
                     <div key={idx} className="border-l-2 border-primary pl-3">
                       <p className="text-sm font-medium">Question {idx + 1}</p>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{q.question}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{renderMathText(q.question)}</p>
                     </div>
                   ))}
                   {generatedQuestions.length > 2 && (
@@ -747,7 +748,7 @@ export function TrainingFormGenerator({ onFormGenerated }: TrainingFormGenerator
                     {isMultiTopicForm && q.topicName && (
                       <p className="text-xs text-gray-500 mb-1 font-medium">[{q.topicName}]</p>
                     )}
-                    <p className="text-base">{q.question}</p>
+                    <p className="text-base">{renderMathText(q.question)}</p>
                     {q.diagramSvg && (
                       <div 
                         className="mt-2 max-w-xs" 
