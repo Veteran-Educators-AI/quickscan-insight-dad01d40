@@ -5,7 +5,8 @@ import {
   RotateCcw, Check, Trash2, GripVertical, Maximize2, Minimize2,
   LayoutGrid, PieChart, BarChart3, GitBranch, Layers, Target,
   Lightbulb, Workflow, Users, BookOpen, Beaker, Globe, Calculator,
-  Atom, Brain, Clock, Sparkles, Plus, Upload
+  Atom, Brain, Clock, Sparkles, Plus, Upload, Triangle, Square, Circle, 
+  Hexagon, Pentagon, Octagon, Box, Diamond
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,6 +92,224 @@ const imageTemplates = {
   ],
 };
 
+// Pre-made geometric shapes as SVG data URLs with customizable colors
+const geometricShapes = [
+  {
+    id: 'right-triangle',
+    label: 'Right Triangle',
+    icon: Triangle,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <polygon points="50,250 250,250 50,50" fill="none" stroke="${color}" stroke-width="3"/>
+      <rect x="50" y="230" width="20" height="20" fill="none" stroke="${color}" stroke-width="2"/>
+      <text x="40" y="150" fill="${color}" font-size="14" font-family="sans-serif">a</text>
+      <text x="150" y="270" fill="${color}" font-size="14" font-family="sans-serif">b</text>
+      <text x="160" y="140" fill="${color}" font-size="14" font-family="sans-serif">c</text>
+    </svg>`,
+  },
+  {
+    id: 'equilateral-triangle',
+    label: 'Equilateral Triangle',
+    icon: Triangle,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <polygon points="150,30 280,250 20,250" fill="none" stroke="${color}" stroke-width="3"/>
+      <path d="M 140,240 A 20 20 0 0 1 160,240" fill="none" stroke="${color}" stroke-width="2"/>
+      <path d="M 50,245 A 20 20 0 0 1 35,225" fill="none" stroke="${color}" stroke-width="2"/>
+      <path d="M 250,245 A 20 20 0 0 0 265,225" fill="none" stroke="${color}" stroke-width="2"/>
+    </svg>`,
+  },
+  {
+    id: 'isosceles-triangle',
+    label: 'Isosceles Triangle',
+    icon: Triangle,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <polygon points="150,30 250,270 50,270" fill="none" stroke="${color}" stroke-width="3"/>
+      <line x1="80" y1="150" x2="90" y2="145" stroke="${color}" stroke-width="2"/>
+      <line x1="220" y1="150" x2="210" y2="145" stroke="${color}" stroke-width="2"/>
+    </svg>`,
+  },
+  {
+    id: 'square',
+    label: 'Square',
+    icon: Square,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <rect x="50" y="50" width="200" height="200" fill="none" stroke="${color}" stroke-width="3"/>
+      <rect x="50" y="230" width="20" height="20" fill="none" stroke="${color}" stroke-width="2"/>
+      <rect x="230" y="230" width="20" height="20" fill="none" stroke="${color}" stroke-width="2"/>
+      <rect x="50" y="50" width="20" height="20" fill="none" stroke="${color}" stroke-width="2"/>
+      <rect x="230" y="50" width="20" height="20" fill="none" stroke="${color}" stroke-width="2"/>
+    </svg>`,
+  },
+  {
+    id: 'rectangle',
+    label: 'Rectangle',
+    icon: Square,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <rect x="30" y="80" width="240" height="140" fill="none" stroke="${color}" stroke-width="3"/>
+      <rect x="30" y="200" width="15" height="15" fill="none" stroke="${color}" stroke-width="2"/>
+      <rect x="255" y="200" width="15" height="15" fill="none" stroke="${color}" stroke-width="2"/>
+      <text x="140" y="240" fill="${color}" font-size="14" font-family="sans-serif">l</text>
+      <text x="275" y="155" fill="${color}" font-size="14" font-family="sans-serif">w</text>
+    </svg>`,
+  },
+  {
+    id: 'parallelogram',
+    label: 'Parallelogram',
+    icon: Square,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <polygon points="80,220 50,80 220,80 250,220" fill="none" stroke="${color}" stroke-width="3"/>
+      <line x1="50" y1="80" x2="50" y2="220" stroke="${color}" stroke-width="1" stroke-dasharray="5,5"/>
+      <text x="135" y="70" fill="${color}" font-size="14" font-family="sans-serif">b</text>
+      <text x="25" y="155" fill="${color}" font-size="14" font-family="sans-serif">h</text>
+    </svg>`,
+  },
+  {
+    id: 'rhombus',
+    label: 'Rhombus',
+    icon: Diamond,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <polygon points="150,30 270,150 150,270 30,150" fill="none" stroke="${color}" stroke-width="3"/>
+      <line x1="30" y1="150" x2="270" y2="150" stroke="${color}" stroke-width="1" stroke-dasharray="5,5"/>
+      <line x1="150" y1="30" x2="150" y2="270" stroke="${color}" stroke-width="1" stroke-dasharray="5,5"/>
+    </svg>`,
+  },
+  {
+    id: 'trapezoid',
+    label: 'Trapezoid',
+    icon: Square,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <polygon points="80,80 220,80 270,220 30,220" fill="none" stroke="${color}" stroke-width="3"/>
+      <text x="145" y="70" fill="${color}" font-size="14" font-family="sans-serif">a</text>
+      <text x="145" y="245" fill="${color}" font-size="14" font-family="sans-serif">b</text>
+      <line x1="150" y1="80" x2="150" y2="220" stroke="${color}" stroke-width="1" stroke-dasharray="5,5"/>
+      <text x="155" y="155" fill="${color}" font-size="14" font-family="sans-serif">h</text>
+    </svg>`,
+  },
+  {
+    id: 'circle',
+    label: 'Circle',
+    icon: Circle,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <circle cx="150" cy="150" r="120" fill="none" stroke="${color}" stroke-width="3"/>
+      <circle cx="150" cy="150" r="3" fill="${color}"/>
+      <line x1="150" y1="150" x2="270" y2="150" stroke="${color}" stroke-width="2"/>
+      <text x="205" y="140" fill="${color}" font-size="14" font-family="sans-serif">r</text>
+    </svg>`,
+  },
+  {
+    id: 'pentagon',
+    label: 'Pentagon',
+    icon: Pentagon,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <polygon points="150,30 270,105 225,250 75,250 30,105" fill="none" stroke="${color}" stroke-width="3"/>
+    </svg>`,
+  },
+  {
+    id: 'hexagon',
+    label: 'Hexagon',
+    icon: Hexagon,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <polygon points="90,50 210,50 270,150 210,250 90,250 30,150" fill="none" stroke="${color}" stroke-width="3"/>
+    </svg>`,
+  },
+  {
+    id: 'octagon',
+    label: 'Octagon',
+    icon: Octagon,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <polygon points="100,35 200,35 265,100 265,200 200,265 100,265 35,200 35,100" fill="none" stroke="${color}" stroke-width="3"/>
+    </svg>`,
+  },
+  {
+    id: 'cube',
+    label: '3D Cube',
+    icon: Box,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <polygon points="60,100 150,50 240,100 240,200 150,250 60,200" fill="none" stroke="${color}" stroke-width="3"/>
+      <line x1="60" y1="100" x2="150" y2="150" stroke="${color}" stroke-width="2"/>
+      <line x1="240" y1="100" x2="150" y2="150" stroke="${color}" stroke-width="2"/>
+      <line x1="150" y1="150" x2="150" y2="250" stroke="${color}" stroke-width="2"/>
+      <line x1="60" y1="100" x2="60" y2="200" stroke="${color}" stroke-width="2" stroke-dasharray="5,5"/>
+    </svg>`,
+  },
+  {
+    id: 'cylinder',
+    label: 'Cylinder',
+    icon: Box,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <ellipse cx="150" cy="70" rx="100" ry="30" fill="none" stroke="${color}" stroke-width="3"/>
+      <line x1="50" y1="70" x2="50" y2="230" stroke="${color}" stroke-width="3"/>
+      <line x1="250" y1="70" x2="250" y2="230" stroke="${color}" stroke-width="3"/>
+      <ellipse cx="150" cy="230" rx="100" ry="30" fill="none" stroke="${color}" stroke-width="3"/>
+      <line x1="150" y1="70" x2="150" y2="230" stroke="${color}" stroke-width="1" stroke-dasharray="5,5"/>
+      <text x="155" y="155" fill="${color}" font-size="14" font-family="sans-serif">h</text>
+      <text x="185" y="250" fill="${color}" font-size="14" font-family="sans-serif">r</text>
+    </svg>`,
+  },
+  {
+    id: 'cone',
+    label: 'Cone',
+    icon: Triangle,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <ellipse cx="150" cy="240" rx="100" ry="30" fill="none" stroke="${color}" stroke-width="3"/>
+      <line x1="50" y1="240" x2="150" y2="50" stroke="${color}" stroke-width="3"/>
+      <line x1="250" y1="240" x2="150" y2="50" stroke="${color}" stroke-width="3"/>
+      <line x1="150" y1="50" x2="150" y2="240" stroke="${color}" stroke-width="1" stroke-dasharray="5,5"/>
+      <text x="155" y="150" fill="${color}" font-size="14" font-family="sans-serif">h</text>
+    </svg>`,
+  },
+  {
+    id: 'sphere',
+    label: 'Sphere',
+    icon: Circle,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <circle cx="150" cy="150" r="120" fill="none" stroke="${color}" stroke-width="3"/>
+      <ellipse cx="150" cy="150" rx="120" ry="40" fill="none" stroke="${color}" stroke-width="1" stroke-dasharray="5,5"/>
+      <ellipse cx="150" cy="150" rx="40" ry="120" fill="none" stroke="${color}" stroke-width="1" stroke-dasharray="5,5"/>
+      <circle cx="150" cy="150" r="3" fill="${color}"/>
+    </svg>`,
+  },
+  {
+    id: 'coordinate-plane',
+    label: 'Coordinate Plane',
+    icon: LayoutGrid,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <line x1="20" y1="150" x2="280" y2="150" stroke="${color}" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="150" y1="280" x2="150" y2="20" stroke="${color}" stroke-width="2" marker-end="url(#arrow)"/>
+      <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="${color}"/></marker></defs>
+      <text x="270" y="170" fill="${color}" font-size="16" font-family="sans-serif">x</text>
+      <text x="160" y="30" fill="${color}" font-size="16" font-family="sans-serif">y</text>
+      ${[50, 100, 200, 250].map(x => `<line x1="${x}" y1="145" x2="${x}" y2="155" stroke="${color}" stroke-width="1"/>`).join('')}
+      ${[50, 100, 200, 250].map(y => `<line x1="145" y1="${y}" x2="155" y2="${y}" stroke="${color}" stroke-width="1"/>`).join('')}
+    </svg>`,
+  },
+  {
+    id: 'unit-circle',
+    label: 'Unit Circle',
+    icon: Circle,
+    svg: (color: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+      <line x1="20" y1="150" x2="280" y2="150" stroke="${color}" stroke-width="2"/>
+      <line x1="150" y1="280" x2="150" y2="20" stroke="${color}" stroke-width="2"/>
+      <circle cx="150" cy="150" r="100" fill="none" stroke="${color}" stroke-width="3"/>
+      <line x1="150" y1="150" x2="220.7" y2="79.3" stroke="${color}" stroke-width="2"/>
+      <circle cx="220.7" cy="79.3" r="4" fill="${color}"/>
+      <path d="M 165,150 A 15 15 0 0 0 160.6,139.4" fill="none" stroke="${color}" stroke-width="2"/>
+      <text x="175" y="135" fill="${color}" font-size="12" font-family="sans-serif">θ</text>
+    </svg>`,
+  },
+];
+
+// Shape color options
+const shapeColors = [
+  { id: 'blue', color: '#3b82f6', label: 'Blue' },
+  { id: 'green', color: '#22c55e', label: 'Green' },
+  { id: 'purple', color: '#a855f7', label: 'Purple' },
+  { id: 'orange', color: '#f97316', label: 'Orange' },
+  { id: 'red', color: '#ef4444', label: 'Red' },
+  { id: 'cyan', color: '#06b6d4', label: 'Cyan' },
+  { id: 'pink', color: '#ec4899', label: 'Pink' },
+  { id: 'white', color: '#ffffff', label: 'White' },
+];
+
 interface SlideImageGeneratorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -131,9 +350,24 @@ export function SlideImageGenerator({
   const [initialSize, setInitialSize] = useState({ width: 400, height: 300 });
   const [isDropping, setIsDropping] = useState(false);
   const [pendingSuggestion, setPendingSuggestion] = useState<{ title: string; prompt: string } | null>(null);
+  const [selectedShapeColor, setSelectedShapeColor] = useState('#3b82f6');
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle inserting a geometric shape as SVG data URL
+  const handleInsertShape = (shapeId: string) => {
+    const shape = geometricShapes.find(s => s.id === shapeId);
+    if (!shape) return;
+    
+    const svgContent = shape.svg(selectedShapeColor);
+    const base64 = btoa(unescape(encodeURIComponent(svgContent)));
+    const dataUrl = `data:image/svg+xml;base64,${base64}`;
+    
+    setGeneratedUrl(dataUrl);
+    setPrompt(`Geometric shape: ${shape.label}`);
+    toast.success(`${shape.label} added to slide!`);
+  };
 
   // Get topic-specific image suggestions
   const topicSuggestions = useMemo(() => {
@@ -416,8 +650,12 @@ export function SlideImageGenerator({
                 <LayoutGrid className="h-4 w-4" />
                 Quick Templates
               </Label>
-              <Tabs defaultValue="suggested" className="w-full">
-                <TabsList className="w-full grid grid-cols-5 h-auto">
+              <Tabs defaultValue="shapes" className="w-full">
+                <TabsList className="w-full grid grid-cols-6 h-auto">
+                  <TabsTrigger value="shapes" className="text-xs py-1.5 gap-1">
+                    <Triangle className="h-3 w-3" />
+                    Shapes
+                  </TabsTrigger>
                   <TabsTrigger value="suggested" className="text-xs py-1.5 gap-1">
                     <Sparkles className="h-3 w-3" />
                     Topic
@@ -427,6 +665,57 @@ export function SlideImageGenerator({
                   <TabsTrigger value="concepts" className="text-xs py-1.5">Concepts</TabsTrigger>
                   <TabsTrigger value="subjects" className="text-xs py-1.5">Subjects</TabsTrigger>
                 </TabsList>
+
+                {/* Geometric Shapes - Insert instantly without AI generation */}
+                <TabsContent value="shapes" className="mt-3">
+                  <div className="space-y-3">
+                    {/* Color picker */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Label className="text-xs text-muted-foreground">Color:</Label>
+                      {shapeColors.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => setSelectedShapeColor(c.color)}
+                          className={cn(
+                            "w-6 h-6 rounded-full border-2 transition-all",
+                            selectedShapeColor === c.color 
+                              ? "border-foreground scale-110" 
+                              : "border-transparent hover:scale-105"
+                          )}
+                          style={{ backgroundColor: c.color }}
+                          title={c.label}
+                        />
+                      ))}
+                    </div>
+                    <ScrollArea className="h-[140px]">
+                      <div className="grid grid-cols-4 gap-2 pr-4">
+                        {geometricShapes.map((shape) => {
+                          const IconComponent = shape.icon;
+                          return (
+                            <Button
+                              key={shape.id}
+                              variant="outline"
+                              size="sm"
+                              className={cn(
+                                "h-auto py-2 px-2 flex flex-col items-center gap-1 text-xs",
+                                "hover:bg-primary/10 hover:border-primary transition-colors"
+                              )}
+                              onClick={() => handleInsertShape(shape.id)}
+                            >
+                              <IconComponent className="h-5 w-5" style={{ color: selectedShapeColor }} />
+                              <span className="text-[10px] leading-tight text-center">
+                                {shape.label}
+                              </span>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ⚡ Instant insert - no AI generation needed. Click a shape to add it.
+                  </p>
+                </TabsContent>
 
                 {/* Topic-Specific Suggestions - Click to preview/modify before generating */}
                 <TabsContent value="suggested" className="mt-3">
