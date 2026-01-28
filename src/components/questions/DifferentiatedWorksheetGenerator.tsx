@@ -2777,7 +2777,7 @@ QUALITY CHECK BEFORE FINISHING
                 return (
                   <div key={idx} className={`p-2 border rounded bg-gray-50 relative group ${isQuestionRegenerating ? 'opacity-50' : ''}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium flex-1">W{idx + 1}. {q.question}</p>
+                      <p className="text-sm font-medium flex-1">W{idx + 1}. {renderMathText(q.question)}</p>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -2935,7 +2935,7 @@ QUALITY CHECK BEFORE FINISHING
                 return (
                   <div key={idx} className={`p-3 border rounded relative group ${isQuestionRegenerating ? 'opacity-50' : ''}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium flex-1">{idx + 1}. {q.question}</p>
+                      <p className="text-sm font-medium flex-1">{idx + 1}. {renderMathText(q.question)}</p>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>

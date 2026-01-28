@@ -1,6 +1,6 @@
 import { StudentQRCode } from './StudentQRCode';
 import { StudentOnlyQRCode } from './StudentOnlyQRCode';
-import { cleanTextForPrint } from '@/lib/mathRenderer';
+import { renderMathText } from '@/lib/mathRenderer';
 
 interface Student {
   id: string;
@@ -661,7 +661,7 @@ export function PrintableWorksheet({
                     maxWidth: '100%',
                     color: '#1f2937',
                   }}>
-                    {cleanTextForPrint(question.prompt_text)}
+                    {renderMathText(question.prompt_text)}
                   </p>
                 )}
 
