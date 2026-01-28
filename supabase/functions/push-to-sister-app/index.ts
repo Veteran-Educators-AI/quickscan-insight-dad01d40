@@ -35,8 +35,9 @@ const corsHeaders = {
  * Contains class info, assignment details, and student grade data
  */
 interface PushRequest {
-  type?: 'ping' | 'grade' | 'behavior';   // Request type: 'ping' for connection test, 'grade' for actual data, 'behavior' for deductions
+  type?: 'ping' | 'grade' | 'behavior' | 'student_created';   // Request type
   class_id?: string;         // The class this data belongs to
+  class_name?: string;       // The class name
   title?: string;            // Assignment or activity title
   description?: string;       // Optional description
   due_at?: string;           // Optional due date
@@ -47,6 +48,9 @@ interface PushRequest {
   // Student-specific fields for individual grade pushes
   student_id?: string;       // The student's ID
   student_name?: string;     // The student's name
+  student_email?: string;    // The student's email
+  first_name?: string;       // Student first name
+  last_name?: string;        // Student last name
   grade?: number;            // The grade (0-100)
   topic_name?: string;       // The topic/subject of the work
   questions?: any[];         // Generated remediation or mastery challenge questions
@@ -104,6 +108,26 @@ function convertToBehaviorFormat(requestData: PushRequest) {
       notes: requestData.notes,
       class_id: requestData.class_id,
       student_name: requestData.student_name,
+      timestamp: new Date().toISOString(),
+    }
+  };
+}
+
+/**
+ * Convert student creation request to sister app format
+ * Sends new student info to sync roster with sister app
+ */
+function convertToStudentCreatedFormat(requestData: PushRequest) {
+  return {
+    action: 'student_created' as const,
+    student_id: requestData.student_id,
+    data: {
+      first_name: requestData.first_name,
+      last_name: requestData.last_name,
+      student_name: requestData.student_name,
+      email: requestData.student_email,
+      class_id: requestData.class_id,
+      class_name: requestData.class_name,
       timestamp: new Date().toISOString(),
     }
   };
@@ -179,6 +203,10 @@ serve(async (req) => {
       // Handle behavior deduction - sends negative XP/coins
       console.log('Processing behavior deduction request');
       sisterAppPayload = convertToBehaviorFormat(requestData);
+    } else if (requestData.type === 'student_created') {
+      // Handle new student creation - sync roster
+      console.log('Processing student creation request');
+      sisterAppPayload = convertToStudentCreatedFormat(requestData);
     } else {
       // Handle grade completion (default)
       sisterAppPayload = convertToSisterAppFormat(requestData);

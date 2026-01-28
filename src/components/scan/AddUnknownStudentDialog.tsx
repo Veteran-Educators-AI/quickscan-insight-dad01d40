@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -12,11 +12,14 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 
 interface AddUnknownStudentDialogProps {
   classId: string;
+  className?: string;
   detectedName?: string | null;
   onStudentCreated: (studentId: string, studentName: string) => void;
   trigger?: React.ReactNode;
@@ -24,6 +27,7 @@ interface AddUnknownStudentDialogProps {
 
 export function AddUnknownStudentDialog({
   classId,
+  className,
   detectedName,
   onStudentCreated,
   trigger,
@@ -34,6 +38,8 @@ export function AddUnknownStudentDialog({
   const [lastName, setLastName] = useState('');
   const [studentId, setStudentId] = useState('');
   const [email, setEmail] = useState('');
+  const [syncToScholar, setSyncToScholar] = useState(true);
+  const { pushToSisterApp } = usePushToSisterApp();
 
   // Parse detected name into first/last when dialog opens
   const handleOpenChange = (isOpen: boolean) => {
@@ -75,7 +81,33 @@ export function AddUnknownStudentDialog({
       if (error) throw error;
 
       const fullName = `${data.first_name} ${data.last_name}`;
-      toast.success(`Added ${fullName} to class`);
+      
+      // Push to sister app if enabled
+      if (syncToScholar) {
+        const pushResult = await pushToSisterApp({
+          class_id: classId,
+          title: 'New Student Added',
+          student_id: data.id,
+          student_name: fullName,
+          // @ts-ignore - extended type for student_created
+          type: 'student_created',
+          first_name: data.first_name,
+          last_name: data.last_name,
+          student_email: data.email || undefined,
+          class_name: className,
+        });
+        
+        if (pushResult.success) {
+          toast.success(`Added ${fullName} to class and synced to Scholar`);
+        } else {
+          toast.success(`Added ${fullName} to class`, {
+            description: 'Note: Scholar sync failed - you can sync later from Reports'
+          });
+        }
+      } else {
+        toast.success(`Added ${fullName} to class`);
+      }
+      
       onStudentCreated(data.id, fullName);
       
       // Reset form
@@ -83,6 +115,7 @@ export function AddUnknownStudentDialog({
       setLastName('');
       setStudentId('');
       setEmail('');
+      setSyncToScholar(true);
       setOpen(false);
     } catch (error: any) {
       console.error('Error creating student:', error);
@@ -159,6 +192,18 @@ export function AddUnknownStudentDialog({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="student@school.edu"
               />
+            </div>
+            
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox
+                id="syncToScholar"
+                checked={syncToScholar}
+                onCheckedChange={(checked) => setSyncToScholar(checked === true)}
+              />
+              <Label htmlFor="syncToScholar" className="text-sm font-normal flex items-center gap-1.5">
+                <Send className="h-3.5 w-3.5 text-purple-500" />
+                Sync to NYCLogic Scholar
+              </Label>
             </div>
           </div>
           
