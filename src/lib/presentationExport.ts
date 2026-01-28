@@ -159,6 +159,25 @@ export async function exportToPDF(presentation: NycologicPresentation): Promise<
   pdf.save(fileName);
 }
 
+// Helper to convert image URL to base64 for embedding
+async function fetchImageAsBase64(url: string): Promise<string | null> {
+  try {
+    if (url.startsWith('data:')) {
+      return url; // Already base64
+    }
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 // Export to PowerPoint
 export async function exportToPPTX(presentation: NycologicPresentation): Promise<void> {
   const colors = getThemeColors(presentation.visualTheme);
@@ -251,20 +270,20 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
     // Add slide image if present (geometric shapes, diagrams, etc.)
     if (slide.image?.url) {
       try {
-        // Convert position/size from pixels to inches (assuming 96 DPI base)
-        const imgX = Math.max(0.5, Math.min(7.5, (slide.image.position?.x || 400) / 96));
-        const imgY = Math.max(yPos, Math.min(6, (slide.image.position?.y || 200) / 96));
-        const imgW = Math.max(1.5, Math.min(4, (slide.image.size?.width || 200) / 96));
-        const imgH = Math.max(1.5, Math.min(3.5, (slide.image.size?.height || 200) / 96));
-
-        pptSlide.addImage({
-          path: slide.image.url,
-          x: imgX,
-          y: imgY,
-          w: imgW,
-          h: imgH,
-          rounding: true,
-        });
+        const imageData = await fetchImageAsBase64(slide.image.url);
+        if (imageData) {
+          // Position image on right side of slide, scaled appropriately
+          const imgW = Math.min(3.5, (slide.image.size?.width || 200) / 100);
+          const imgH = Math.min(3.5, (slide.image.size?.height || 200) / 100);
+          
+          pptSlide.addImage({
+            data: imageData,
+            x: 6.5,
+            y: 2.5,
+            w: imgW,
+            h: imgH,
+          });
+        }
       } catch (imgError) {
         console.warn('Failed to add image to slide:', imgError);
       }
