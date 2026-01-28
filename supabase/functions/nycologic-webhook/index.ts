@@ -101,7 +101,61 @@ interface PracticeSessionPayload {
   };
 }
 
-type WebhookPayload = AssignmentPayload | StudentProfilePayload | StatusQueryPayload | RemediationPayload | PracticeSessionPayload;
+// Payloads from push-to-sister-app (grade and student sync)
+interface GradeCompletedPayload {
+  action: "grade_completed";
+  student_id: string;
+  data: {
+    activity_type: string;
+    activity_name: string;
+    score: number;
+    xp_earned?: number;
+    coins_earned?: number;
+    topic_name?: string;
+    description?: string;
+    standard_code?: string;
+    class_id?: string;
+    student_name?: string;
+    printable_url?: string;
+    due_at?: string;
+    questions?: any[];
+    timestamp: string;
+  };
+}
+
+interface StudentCreatedPayload {
+  action: "student_created";
+  student_id: string;
+  data: {
+    first_name?: string;
+    last_name?: string;
+    student_name?: string;
+    email?: string;
+    class_id?: string;
+    class_name?: string;
+    timestamp: string;
+  };
+}
+
+interface BehaviorDeductionPayload {
+  action: "behavior_deduction";
+  student_id: string;
+  data: {
+    activity_type: string;
+    activity_name: string;
+    xp_deducted?: number;
+    coins_deducted?: number;
+    xp_earned?: number;
+    coins_earned?: number;
+    reason?: string;
+    notes?: string;
+    class_id?: string;
+    student_name?: string;
+    timestamp: string;
+  };
+}
+
+type WebhookPayload = AssignmentPayload | StudentProfilePayload | StatusQueryPayload | RemediationPayload | PracticeSessionPayload | GradeCompletedPayload | StudentCreatedPayload | BehaviorDeductionPayload;
 
 async function verifyApiKey(apiKey: string, supabaseUrl: string, supabaseKey: string): Promise<boolean> {
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -207,8 +261,10 @@ Deno.serve(async (req) => {
 
     const payload = await req.json();
     
-    // Determine the event type - support both 'type' and 'event_type' fields
-    const eventType = payload.type || payload.event_type;
+    // Determine the event type - support 'type', 'event_type', and 'action' fields
+    // 'action' is used by push-to-sister-app (grade_completed, student_created, behavior_deduction)
+    const eventType = payload.action || payload.type || payload.event_type;
+    console.log(`Processing webhook event: ${eventType}`);
     
     switch (eventType) {
       case "practice_session_completed": {
@@ -620,9 +676,120 @@ Deno.serve(async (req) => {
         );
       }
 
-      default:
+      // ================================================================
+      // HANDLERS FOR push-to-sister-app PAYLOADS
+      // ================================================================
+
+      case "grade_completed": {
+        // Handle grade data pushed from NYCLogic AI scan analysis
+        const gradeData = payload.data;
+        console.log(`Processing grade completion for student ${payload.student_id}`);
+        
+        // Find or validate student
+        const { data: studentRecord } = await supabase
+          .from("students")
+          .select("id, first_name, last_name, class_id")
+          .eq("id", payload.student_id)
+          .single();
+        
+        // Log the incoming grade data
+        const { error: logError } = await supabase
+          .from("inbound_scholar_data")
+          .insert({
+            source_app: "nycologic-ai",
+            event_type: "grade_completed",
+            student_id: studentRecord?.id || null,
+            student_name: gradeData.student_name,
+            class_id: gradeData.class_id,
+            payload: gradeData,
+            status: "pending",
+          });
+        
+        if (logError) {
+          console.error("Failed to log grade data:", logError);
+        }
+        
         return new Response(
-          JSON.stringify({ error: "Unknown payload type" }),
+          JSON.stringify({ 
+            success: true, 
+            status: "grade_received",
+            student_found: !!studentRecord,
+            topic: gradeData.topic_name,
+            score: gradeData.score,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "student_created": {
+        // Handle new student creation sync from NYCLogic AI
+        const studentData = payload.data;
+        console.log(`Processing student creation: ${studentData.student_name}`);
+        
+        // Log the incoming student data for review
+        const { error: logError } = await supabase
+          .from("inbound_scholar_data")
+          .insert({
+            source_app: "nycologic-ai",
+            event_type: "student_created",
+            student_id: payload.student_id,
+            student_name: studentData.student_name || `${studentData.first_name} ${studentData.last_name}`,
+            class_id: studentData.class_id,
+            payload: studentData,
+            status: "pending",
+          });
+        
+        if (logError) {
+          console.error("Failed to log student creation:", logError);
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            status: "student_received",
+            student_name: studentData.student_name || `${studentData.first_name} ${studentData.last_name}`,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "behavior_deduction": {
+        // Handle behavior deduction from NYCLogic AI
+        const behaviorData = payload.data;
+        console.log(`Processing behavior deduction for student ${payload.student_id}`);
+        
+        // Log the behavior data
+        const { error: logError } = await supabase
+          .from("inbound_scholar_data")
+          .insert({
+            source_app: "nycologic-ai",
+            event_type: "behavior_deduction",
+            student_id: payload.student_id,
+            student_name: behaviorData.student_name,
+            class_id: behaviorData.class_id,
+            payload: behaviorData,
+            status: "pending",
+          });
+        
+        if (logError) {
+          console.error("Failed to log behavior deduction:", logError);
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            status: "behavior_deduction_received",
+            reason: behaviorData.reason,
+            xp_deducted: behaviorData.xp_deducted,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      default:
+        console.error(`Unknown payload type: ${eventType}`);
+        return new Response(
+          JSON.stringify({ error: "Unknown payload type", received_type: eventType }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
