@@ -211,7 +211,7 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
   });
 
   // Create slides
-  presentation.slides.forEach((slide, index) => {
+  for (const slide of presentation.slides) {
     const pptSlide = pptx.addSlide({ masterName: 'NYCLOGIC_MASTER' });
 
     let yPos = 2.0;
@@ -247,6 +247,28 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
       valign: 'middle',
     });
     yPos += 1.4;
+
+    // Add slide image if present (geometric shapes, diagrams, etc.)
+    if (slide.image?.url) {
+      try {
+        // Convert position/size from pixels to inches (assuming 96 DPI base)
+        const imgX = Math.max(0.5, Math.min(7.5, (slide.image.position?.x || 400) / 96));
+        const imgY = Math.max(yPos, Math.min(6, (slide.image.position?.y || 200) / 96));
+        const imgW = Math.max(1.5, Math.min(4, (slide.image.size?.width || 200) / 96));
+        const imgH = Math.max(1.5, Math.min(3.5, (slide.image.size?.height || 200) / 96));
+
+        pptSlide.addImage({
+          path: slide.image.url,
+          x: imgX,
+          y: imgY,
+          w: imgW,
+          h: imgH,
+          rounding: true,
+        });
+      } catch (imgError) {
+        console.warn('Failed to add image to slide:', imgError);
+      }
+    }
 
     // Content
     if (slide.content.length > 0) {
@@ -328,7 +350,7 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
     if (slide.speakerNotes) {
       pptSlide.addNotes(slide.speakerNotes);
     }
-  });
+  }
 
   // Save the PowerPoint
   const fileName = `${presentation.title.replace(/[^a-z0-9]/gi, '_')}_presentation.pptx`;
