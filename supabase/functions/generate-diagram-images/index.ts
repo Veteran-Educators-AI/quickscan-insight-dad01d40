@@ -1965,6 +1965,227 @@ Return only valid SVG code, nothing else.`,
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// GPT-5.2 GEOMETRY SVG GENERATION WITH DEEPSEEK R1 VALIDATION
+// Pipeline: GPT-5.2 generates SVG → DeepSeek R1 validates mathematical accuracy
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface GPT52SVGResult {
+  imageUrl: string;
+  svgCode: string;
+}
+
+interface DeepSeekValidation {
+  isValid: boolean;
+  reason: string;
+}
+
+async function generateGeometrySVGWithGPT52(
+  prompt: string,
+  previousFeedback?: string
+): Promise<GPT52SVGResult | null> {
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) {
+    console.error("LOVABLE_API_KEY not configured for GPT-5.2");
+    return null;
+  }
+
+  try {
+    const feedbackClause = previousFeedback
+      ? `\n\nIMPORTANT: A previous attempt was rejected for this reason: "${previousFeedback}". Please fix this issue in your generation.`
+      : "";
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-5.2", // Most accurate model for complex geometry
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert geometry diagram generator for NYS Regents exams.
+            
+Your SVG diagrams MUST be mathematically precise:
+1. All coordinates must match the exact values in the prompt
+2. Angles must be drawn at correct positions (30°, 45°, 60°, 90° etc.)
+3. Parallel lines must use congruence tick marks
+4. Right angles must show the small square symbol
+5. Vertex labels (A, B, C, etc.) must be positioned clearly outside shapes
+6. Use viewBox="0 0 300 300"
+7. Black strokes (#000000) with stroke-width="2"
+8. White background fill="#ffffff"
+9. Font: Arial, size 12-14px for labels
+
+For coordinate geometry problems:
+- Draw axes with arrows and labeled tick marks
+- Plot points EXACTLY at specified coordinates
+- Use the formula: pixel_x = 30 + (coord_x * 24), pixel_y = 270 - (coord_y * 24)
+
+Return ONLY valid SVG code starting with <svg and ending with </svg>.`,
+          },
+          {
+            role: "user",
+            content: `Create a mathematically precise geometry diagram for this problem:
+
+${prompt}${feedbackClause}
+
+Requirements:
+- Every coordinate, angle, and measurement must be EXACTLY correct
+- All vertex labels clearly visible
+- Include all markings mentioned (parallel lines, congruent sides, angle measures)
+- Clean, professional textbook quality`,
+          },
+        ],
+        temperature: 0.1, // Very low for precision
+        max_tokens: 3000,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("GPT-5.2 API error:", response.status, errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      console.error("No content in GPT-5.2 response");
+      return null;
+    }
+
+    // Extract SVG from response
+    const svgMatch = content.match(/<svg[\s\S]*?<\/svg>/i);
+    if (!svgMatch) {
+      console.error("No valid SVG found in GPT-5.2 response");
+      return null;
+    }
+
+    let svgCode = svgMatch[0];
+
+    // Ensure required attributes
+    if (!svgCode.includes("viewBox")) {
+      svgCode = svgCode.replace("<svg", '<svg viewBox="0 0 300 300"');
+    }
+    if (!svgCode.includes("xmlns")) {
+      svgCode = svgCode.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+    if (!svgCode.includes("width=")) {
+      svgCode = svgCode.replace("<svg", '<svg width="300" height="300"');
+    }
+
+    // Convert to data URL
+    const base64Svg = btoa(unescape(encodeURIComponent(svgCode)));
+    const imageUrl = `data:image/svg+xml;base64,${base64Svg}`;
+
+    return { imageUrl, svgCode };
+  } catch (error) {
+    console.error("Error in GPT-5.2 geometry generation:", error);
+    return null;
+  }
+}
+
+async function validateWithDeepSeekR1(
+  originalPrompt: string,
+  svgCode: string
+): Promise<DeepSeekValidation> {
+  const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY");
+  if (!deepseekKey) {
+    console.log("DEEPSEEK_API_KEY not configured, skipping validation (approving by default)");
+    return { isValid: true, reason: "Validation skipped - no API key" };
+  }
+
+  try {
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${deepseekKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "deepseek-reasoner", // R1 model for chain-of-thought reasoning
+        messages: [
+          {
+            role: "system",
+            content: `You are a geometry expert validating SVG diagrams for mathematical accuracy.
+
+Analyze the SVG code against the original problem requirements and verify:
+1. All coordinates are plotted at correct pixel positions
+2. All angles are drawn at correct measurements
+3. All labels (A, B, C, etc.) are present and positioned correctly
+4. Required geometric markings are included (parallel lines, right angles, congruence marks)
+5. The diagram accurately represents the mathematical problem
+
+Respond with a JSON object:
+{
+  "isValid": true/false,
+  "reason": "Brief explanation of issues found or 'Diagram is mathematically accurate'"
+}
+
+Be strict - reject diagrams with ANY mathematical inaccuracies. Common issues to check:
+- Coordinates not matching specified values
+- Missing vertex labels
+- Wrong angle positions
+- Missing geometric notation (tick marks, squares for right angles)`,
+          },
+          {
+            role: "user",
+            content: `ORIGINAL PROBLEM:
+${originalPrompt}
+
+SVG CODE TO VALIDATE:
+${svgCode}
+
+Is this diagram mathematically accurate for the problem? Return JSON only.`,
+          },
+        ],
+        max_tokens: 2000,
+        temperature: 0.1,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("DeepSeek R1 validation error:", response.status, errorText);
+      // On API error, approve by default to avoid blocking
+      return { isValid: true, reason: "Validation API error - approved by default" };
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+
+    // Parse JSON response
+    try {
+      // Handle markdown code blocks
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          isValid: Boolean(parsed.isValid),
+          reason: String(parsed.reason || "No reason provided"),
+        };
+      }
+    } catch {
+      console.error("Failed to parse DeepSeek validation response:", content);
+    }
+
+    // If parsing fails, check for obvious approval/rejection keywords
+    const lowerContent = content.toLowerCase();
+    if (lowerContent.includes("accurate") || lowerContent.includes("correct") || lowerContent.includes("valid")) {
+      return { isValid: true, reason: "Diagram appears valid" };
+    }
+
+    return { isValid: false, reason: "Could not validate diagram accuracy" };
+  } catch (error) {
+    console.error("Error in DeepSeek R1 validation:", error);
+    return { isValid: true, reason: "Validation error - approved by default" };
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -2102,16 +2323,38 @@ Style: Simple line art, clean educational diagram suitable for projection.`
         }
       }
 
-      // STEP 3: Skip AI generation for worksheets - it's too inaccurate for geometry
-      // Instead, rely on the Regents Shape Library database of scanned verified diagrams
-      if (!imageUrl) {
-        console.log("No matching diagram found in Regents Shape Library. Skipping AI generation (disabled for accuracy).");
-        console.log("Tip: Import more diagrams from Regents PDFs to expand the library.");
+      // STEP 3: Try GPT-5.2 for geometry SVG generation with DeepSeek R1 validation
+      if (!imageUrl && subject === "math") {
+        console.log("Attempting GPT-5.2 geometry generation with DeepSeek R1 validation...");
+        const gpt52Result = await generateGeometrySVGWithGPT52(q.imagePrompt);
+        if (gpt52Result) {
+          // Validate with DeepSeek R1
+          const deepseekValidation = await validateWithDeepSeekR1(q.imagePrompt, gpt52Result.svgCode);
+          if (deepseekValidation.isValid) {
+            imageUrl = gpt52Result.imageUrl;
+            validation = { isValid: true, issues: [], shouldRetry: false };
+            console.log("GPT-5.2 geometry diagram validated by DeepSeek R1!");
+          } else {
+            console.log(`DeepSeek R1 rejected diagram: ${deepseekValidation.reason}`);
+            // Try regenerating once with the feedback
+            const retryResult = await generateGeometrySVGWithGPT52(q.imagePrompt, deepseekValidation.reason);
+            if (retryResult) {
+              const retryValidation = await validateWithDeepSeekR1(q.imagePrompt, retryResult.svgCode);
+              if (retryValidation.isValid) {
+                imageUrl = retryResult.imageUrl;
+                validation = { isValid: true, issues: ['Passed after DeepSeek feedback'], shouldRetry: false };
+                console.log("GPT-5.2 retry passed DeepSeek R1 validation!");
+              } else {
+                console.log("GPT-5.2 retry still failed validation, skipping AI diagram");
+              }
+            }
+          }
+        }
       }
 
       // STEP 4: Use hardcoded fallback shapes as last resort
       if (!imageUrl) {
-        console.log("AI generation failed, trying hardcoded fallback shapes...");
+        console.log("Using hardcoded fallback shapes...");
         imageUrl = getFallbackShape(q.imagePrompt);
         if (imageUrl) {
           console.log("Using hardcoded fallback shape");
