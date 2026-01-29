@@ -34,11 +34,15 @@ interface GeneratedQuestion {
   hint?: string;
 }
 
-async function callLovableAI(prompt: string): Promise<string> {
+async function callLovableAI(prompt: string, useAdvancedModel: boolean = false): Promise<string> {
   const apiKey = Deno.env.get('LOVABLE_API_KEY');
   if (!apiKey) {
     throw new Error('LOVABLE_API_KEY not configured');
   }
+
+  // Use GPT-5.2 for Geometry and Physics with shapes/diagrams for better accuracy
+  const model = useAdvancedModel ? 'openai/gpt-5.2' : 'google/gemini-2.5-flash';
+  console.log(`Using AI model: ${model} (advanced: ${useAdvancedModel})`);
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -47,7 +51,7 @@ async function callLovableAI(prompt: string): Promise<string> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
+      model,
       messages: [
         { role: 'system', content: `You are an expert math educator creating textbook-quality problems. 
 
@@ -871,7 +875,19 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
 
 }
 
-    const content = await callLovableAI(prompt);
+    // Use GPT-5.2 for Geometry and Physics worksheets with shapes for better diagram accuracy
+    const isGeometryOrPhysics = topics.some(t => 
+      t.subject?.toLowerCase() === 'geometry' || 
+      t.subject?.toLowerCase() === 'physics' ||
+      t.category?.toLowerCase().includes('geometry') ||
+      t.category?.toLowerCase().includes('trigonometry') ||
+      t.category?.toLowerCase().includes('physics')
+    );
+    const useAdvancedModel = isGeometryOrPhysics && (includeGeometry || useAIImages || includeCoordinateGeometry);
+    
+    console.log(`Worksheet generation: subjects=${topics.map(t => t.subject).join(',')}, useAdvancedModel=${useAdvancedModel}`);
+    
+    const content = await callLovableAI(prompt, useAdvancedModel);
 
     // Function to fix common Unicode encoding issues in math text
     function sanitizeMathText(text: string): string {
