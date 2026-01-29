@@ -406,6 +406,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       if (diagnosticMode) {
         setFormCount('4');
         setWarmUpDifficulty('easy');
+        // For diagnostics, default to including geometry with deterministic SVG
+        setIncludeGeometry(true);
+        setPreferDeterministicSVG(true);
+        setUseAIImages(false);
       }
       // Load initial topics from standards menu selection
       if (initialTopics.length > 0) {
@@ -2546,78 +2550,42 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   // Generate geometry shape for a specific question
   const generateGeometryShapeForQuestion = async (
     questionText: string,
-    questionKey: string
+    questionKey: string,
+    imagePrompt?: string,
   ): Promise<string | null> => {
     try {
       console.log(`Generating geometry shape for: ${questionKey}`);
       setRegeneratingShapeKey(questionKey);
       
-      // ═══════════════════════════════════════════════════════════════════════════════
-      // MASTER GEOMETRY TEMPLATE v2 - Simple, Strict, Explicit
-      // ═══════════════════════════════════════════════════════════════════════════════
-      const shapePrompt = `Create a simple, clean mathematical diagram for this question:
-
-"${questionText}"
-
-═══════════════════════════════════════════════════════════════════════════════
-STRICT RULES - FOLLOW EXACTLY
-═══════════════════════════════════════════════════════════════════════════════
-
-RULE 1: STYLE
-- Plain white background
-- Black lines only (no colors, no shading, no gradients)
-- Clean sans-serif font for all text
-- Simple and minimal - like a textbook diagram
-
-RULE 2: COORDINATE PLANE (if the question has coordinates)
-- Draw x-axis as a horizontal line with arrow pointing RIGHT, label "x"
-- Draw y-axis as a vertical line with arrow pointing UP, label "y"
-- Put small tick marks at each integer with numbers
-- Numbers go BELOW x-axis and to the LEFT of y-axis
-
-RULE 3: PLOTTING POINTS
-- Draw each point as a SOLID BLACK DOT
-- Write the label NEXT TO the dot (not on top)
-- Format: "A(1, 1)" or "B(7, 1)"
-- Each point gets ONE label only - never repeat
-
-RULE 4: SHAPES
-- Connect vertices with straight black lines
-- Label each vertex ONCE, positioned OUTSIDE the shape
-- Clockwise order: A, B, C, D starting from bottom-left or top
-
-RULE 5: MEASUREMENTS
-- Write measurements OUTSIDE the shape
-- Include units: "6 units" or "3 cm"
-- Only show measurements that are needed
-
-═══════════════════════════════════════════════════════════════════════════════
-DO NOT DO THESE THINGS
-═══════════════════════════════════════════════════════════════════════════════
-- DO NOT use colors or shading
-- DO NOT repeat the same vertex label twice
-- DO NOT put labels inside the shape
-- DO NOT add extra arrows or decorations not asked for
-- DO NOT add elements that were not in the question
-- DO NOT make it cluttered or confusing
-
-═══════════════════════════════════════════════════════════════════════════════
-QUALITY CHECK BEFORE FINISHING
-═══════════════════════════════════════════════════════════════════════════════
-✓ Each vertex has exactly ONE label
-✓ All coordinates match the question exactly
-✓ The shape is clearly visible
-✓ Labels are readable and outside the shape
-✓ The diagram is clean and simple`;
+      // Prefer using the structured imagePrompt from the question when available,
+      // since it already contains explicit coordinates and geometry details.
+      // Fall back to a concise, non-redundant description based on the question text.
+      const basePrompt =
+        imagePrompt ||
+        `Create a simple, clean black-and-white geometry diagram for this question:\n\n"${questionText}".\n\n` +
+          `Use a plain white background, black lines only, and label any points or axes clearly.`;
+      
+      // Detect if this is 3D geometry (planes, pillars, etc.) that needs AI generation
+      const is3DGeometry = basePrompt.toLowerCase().includes('plane') && 
+                          (basePrompt.toLowerCase().includes('pillar') || 
+                           basePrompt.toLowerCase().includes('support') ||
+                           basePrompt.toLowerCase().includes('foundation') ||
+                           basePrompt.toLowerCase().includes('3d') ||
+                           basePrompt.toLowerCase().includes('three-dimensional'));
+      
+      // For 3D geometry, force AI generation even if preferDeterministicSVG is true
+      // (deterministic SVG only works for 2D coordinate plane problems)
+      const shouldUseAI = useAIImages || is3DGeometry;
+      const shouldPreferDeterministic = preferDeterministicSVG && !is3DGeometry;
       
       const { data, error } = await supabase.functions.invoke('generate-diagram-images', {
         body: {
           questions: [{
             questionNumber: 1,
-            imagePrompt: shapePrompt,
+            imagePrompt: basePrompt,
           }],
-          useNanoBanana: useAIImages,
-          preferDeterministicSVG: preferDeterministicSVG,
+          useNanoBanana: shouldUseAI,
+          preferDeterministicSVG: shouldPreferDeterministic,
         },
       });
 
@@ -2645,13 +2613,13 @@ QUALITY CHECK BEFORE FINISHING
   };
 
   // Regenerate geometry shape for a specific question
-  const regenerateGeometryShape = async (questionText: string, questionKey: string) => {
+  const regenerateGeometryShape = async (questionText: string, questionKey: string, imagePrompt?: string) => {
     toast({
       title: 'Generating shape...',
       description: 'Creating a geometry diagram for this question.',
     });
     
-    const imageUrl = await generateGeometryShapeForQuestion(questionText, questionKey);
+    const imageUrl = await generateGeometryShapeForQuestion(questionText, questionKey, imagePrompt);
     
     if (imageUrl) {
       toast({
@@ -2859,7 +2827,7 @@ QUALITY CHECK BEFORE FINISHING
                           variant="outline"
                           size="sm"
                           className="text-xs gap-1 bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
-                          onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-warmUp-${idx}`)}
+                          onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-warmUp-${idx}`, q.imagePrompt)}
                           disabled={regeneratingShapeKey === `${cacheKey}-warmUp-${idx}`}
                         >
                           {regeneratingShapeKey === `${cacheKey}-warmUp-${idx}` ? (
@@ -2875,7 +2843,7 @@ QUALITY CHECK BEFORE FINISHING
                         variant="outline"
                         size="sm"
                         className="mt-2 text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 w-full"
-                        onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-warmUp-${idx}`)}
+                        onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-warmUp-${idx}`, q.imagePrompt)}
                         disabled={regeneratingShapeKey === `${cacheKey}-warmUp-${idx}`}
                       >
                         {regeneratingShapeKey === `${cacheKey}-warmUp-${idx}` ? (
@@ -3018,7 +2986,9 @@ QUALITY CHECK BEFORE FINISHING
                             variant="outline"
                             size="sm"
                             className="text-xs gap-1 bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
-                            onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-main-${idx}`)}
+                            onClick={() =>
+                              regenerateGeometryShape(q.question, `${cacheKey}-main-${idx}`, q.imagePrompt)
+                            }
                             disabled={regeneratingShapeKey === `${cacheKey}-main-${idx}`}
                           >
                             {regeneratingShapeKey === `${cacheKey}-main-${idx}` ? (
@@ -3133,7 +3103,7 @@ QUALITY CHECK BEFORE FINISHING
                             variant="outline"
                             size="sm"
                             className="text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-                            onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-main-${idx}`)}
+                            onClick={() => regenerateGeometryShape(q.question, `${cacheKey}-main-${idx}`, q.imagePrompt)}
                             disabled={regeneratingShapeKey === `${cacheKey}-main-${idx}`}
                           >
                             {regeneratingShapeKey === `${cacheKey}-main-${idx}` ? (

@@ -1,6 +1,9 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { GeometryMetadata } from "../_shared/geometryTypes.ts";
+import { renderGeometryToSVG } from "../_shared/geometryRenderer.ts";
+import { validateSVGDataURL, type SVGValidationResult as SVGStructureValidation } from "../_shared/svgValidation.ts"; // P9.6
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -386,6 +389,45 @@ const FALLBACK_SHAPES: Record<string, (params?: any) => string> = {
     <circle cx="240" cy="150" r="20" stroke="#000000" stroke-width="2" fill="none"/>
     <text x="240" y="155" font-family="Arial" font-size="14" text-anchor="middle" font-weight="bold">H</text>
     <text x="150" y="250" font-family="Arial" font-size="16" text-anchor="middle">H₂O</text>
+  </svg>`,
+  
+  // Plane with support pillars (3D geometry)
+  plane_with_pillars: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <!-- Foundation plane (top view) -->
+    <rect x="50" y="50" width="200" height="150" stroke="#000000" stroke-width="2" fill="#f0f0f0" opacity="0.3"/>
+    <text x="150" y="140" font-family="Arial" font-size="12" text-anchor="middle" font-weight="bold">Foundation Plane</text>
+    <!-- Four support pillars (3D perspective) -->
+    <!-- Front-left pillar -->
+    <rect x="70" y="70" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
+    <line x1="70" y1="70" x2="60" y2="60" stroke="#000000" stroke-width="2"/>
+    <line x1="100" y1="70" x2="90" y2="60" stroke="#000000" stroke-width="2"/>
+    <line x1="70" y1="100" x2="60" y2="90" stroke="#000000" stroke-width="2"/>
+    <rect x="60" y="60" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
+    <text x="85" y="95" font-family="Arial" font-size="10" text-anchor="middle">P1</text>
+    <!-- Front-right pillar -->
+    <rect x="180" y="70" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
+    <line x1="180" y1="70" x2="170" y2="60" stroke="#000000" stroke-width="2"/>
+    <line x1="210" y1="70" x2="200" y2="60" stroke="#000000" stroke-width="2"/>
+    <line x1="180" y1="100" x2="170" y2="90" stroke="#000000" stroke-width="2"/>
+    <rect x="170" y="60" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
+    <text x="195" y="95" font-family="Arial" font-size="10" text-anchor="middle">P2</text>
+    <!-- Back-left pillar -->
+    <rect x="70" y="170" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
+    <line x1="70" y1="170" x2="60" y2="160" stroke="#000000" stroke-width="2"/>
+    <line x1="100" y1="170" x2="90" y2="160" stroke="#000000" stroke-width="2"/>
+    <line x1="70" y1="200" x2="60" y2="190" stroke="#000000" stroke-width="2"/>
+    <rect x="60" y="160" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
+    <text x="85" y="195" font-family="Arial" font-size="10" text-anchor="middle">P3</text>
+    <!-- Back-right pillar -->
+    <rect x="180" y="170" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
+    <line x1="180" y1="170" x2="170" y2="160" stroke="#000000" stroke-width="2"/>
+    <line x1="210" y1="170" x2="200" y2="160" stroke="#000000" stroke-width="2"/>
+    <line x1="180" y1="200" x2="170" y2="190" stroke="#000000" stroke-width="2"/>
+    <rect x="170" y="160" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
+    <text x="195" y="195" font-family="Arial" font-size="10" text-anchor="middle">P4</text>
+    <!-- Label -->
+    <text x="150" y="240" font-family="Arial" font-size="11" text-anchor="middle">Four support pillars defining a plane</text>
   </svg>`
 };
 
@@ -410,14 +452,16 @@ function matchFallbackShape(prompt: string): string | null {
     return 'rectangle';
   }
   
-  // Circular shapes
+  // Circular shapes - be more specific to avoid false matches
   if (lowerPrompt.includes('tangent')) {
     return 'tangent';
   }
   if (lowerPrompt.includes('chord') || lowerPrompt.includes('inscribed')) {
     return 'chord';
   }
-  if (lowerPrompt.includes('arc') || lowerPrompt.includes('semicircle')) {
+  // Only match arc/semicircle if it's clearly about circular arcs, not planes or other geometry
+  if ((lowerPrompt.includes('arc') || lowerPrompt.includes('semicircle')) && 
+      (lowerPrompt.includes('circle') || lowerPrompt.includes('radius') || lowerPrompt.includes('diameter'))) {
     return 'arc';
   }
   if (lowerPrompt.includes('circle') && (lowerPrompt.includes('coordinate') || lowerPrompt.includes('plane'))) {
@@ -425,6 +469,12 @@ function matchFallbackShape(prompt: string): string | null {
   }
   if (lowerPrompt.includes('circle') && !lowerPrompt.includes('circuit')) {
     return 'simple_circle';
+  }
+  
+  // 3D Geometry - planes, pillars, foundations
+  if ((lowerPrompt.includes('plane') && (lowerPrompt.includes('pillar') || lowerPrompt.includes('support') || lowerPrompt.includes('foundation'))) ||
+      (lowerPrompt.includes('three points') || lowerPrompt.includes('four points')) && lowerPrompt.includes('define')) {
+    return 'plane_with_pillars';
   }
   
   // 3D Solids
@@ -460,8 +510,13 @@ function matchFallbackShape(prompt: string): string | null {
     return 'simple_circuit';
   }
   
-  // Chemistry
-  if (lowerPrompt.includes('molecule') || lowerPrompt.includes('h2o') || lowerPrompt.includes('water')) {
+  // Chemistry - ONLY trigger for actual chemistry contexts, NOT geometry problems mentioning water
+  if (lowerPrompt.includes('molecule') || 
+      lowerPrompt.includes('h2o molecule') || 
+      lowerPrompt.includes('water molecule') ||
+      lowerPrompt.includes('chemical') ||
+      lowerPrompt.includes('atom') ||
+      lowerPrompt.includes('bond')) {
     return 'molecule';
   }
   
@@ -479,8 +534,14 @@ function getFallbackShape(prompt: string): string | null {
   return null;
 }
 
+
 // Query the Regents Shape Library for matching shapes
-async function queryShapeLibrary(prompt: string, subject: string): Promise<string | null> {
+// Phase 5 - P5.1: Enhanced with geometry_type matching
+async function queryShapeLibrary(
+  prompt: string, 
+  subject: string,
+  geometry?: GeometryMetadata
+): Promise<string | null> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   
@@ -492,7 +553,14 @@ async function queryShapeLibrary(prompt: string, subject: string): Promise<strin
     const supabase = createClient(supabaseUrl, supabaseKey);
     const lowerPrompt = prompt.toLowerCase();
     
-    // Detect shape type from prompt - expanded keyword matching
+    // PHASE 5 ENHANCEMENT: Prefer geometry.type if available
+    let geometryType: string | null = null;
+    if (geometry?.type) {
+      geometryType = geometry.type;
+      console.log(`[Library] Using structured geometry type: ${geometryType}`);
+    }
+    
+    // Fallback: Detect shape type from prompt (legacy behavior)
     let shapeType = 'polygon';
     if (lowerPrompt.includes('triangle')) shapeType = 'triangle';
     else if (lowerPrompt.includes('parallelogram') || lowerPrompt.includes('rhombus') || 
@@ -509,19 +577,49 @@ async function queryShapeLibrary(prompt: string, subject: string): Promise<strin
              lowerPrompt.includes('pyramid') || lowerPrompt.includes('cone') || 
              lowerPrompt.includes('sphere')) shapeType = 'polygon'; // 3D solids
     
-    // Query the library for matching verified shapes - also search by description/tags
-    const { data, error } = await supabase
+    // Build query with geometry_type preference
+    let query = supabase
       .from('regents_shape_library')
-      .select('id, svg_data, vertices, parameters, usage_count, description, tags')
+      .select('id, svg_data, vertices, parameters, usage_count, description, tags, geometry_type')
       .eq('is_verified', true)
-      .eq('shape_type', shapeType)
-      .ilike('subject', `%${subject}%`)
+      .ilike('subject', `%${subject}%`);
+    
+    // PHASE 5 ENHANCEMENT: Prioritize geometry_type match if available
+    if (geometryType) {
+      query = query.eq('geometry_type', geometryType);
+    } else {
+      // Fallback to shape_type
+      query = query.eq('shape_type', shapeType);
+    }
+    
+    const { data, error } = await query
       .order('usage_count', { ascending: false })
       .limit(5);
     
     if (error || !data || data.length === 0) {
-      console.log(`No matching shape in library for ${shapeType}/${subject}`);
-      return null;
+      console.log(`[Library] No match for ${geometryType || shapeType}/${subject}`);
+      
+      // PHASE 5 ENHANCEMENT: Try broader search without geometry_type filter
+      if (geometryType) {
+        console.log(`[Library] Retrying with shape_type fallback...`);
+        const { data: fallbackData } = await supabase
+          .from('regents_shape_library')
+          .select('id, svg_data, vertices, parameters, usage_count, description, tags, geometry_type')
+          .eq('is_verified', true)
+          .eq('shape_type', shapeType)
+          .ilike('subject', `%${subject}%`)
+          .order('usage_count', { ascending: false })
+          .limit(5);
+        
+        if (fallbackData && fallbackData.length > 0) {
+          console.log(`[Library] Found ${fallbackData.length} fallback matches`);
+          data.push(...fallbackData);
+        }
+      }
+      
+      if (!data || data.length === 0) {
+        return null;
+      }
     }
     
     // Find best match by checking description/tags against the prompt
@@ -530,7 +628,16 @@ async function queryShapeLibrary(prompt: string, subject: string): Promise<strin
     let bestScore = 0;
     
     for (const shape of data) {
-      const shapeWithMeta = shape as { id: string; svg_data: string | null; vertices: unknown; parameters: unknown; usage_count: number; description: string; tags: string[] };
+      const shapeWithMeta = shape as { 
+        id: string; 
+        svg_data: string | null; 
+        vertices: unknown; 
+        parameters: unknown; 
+        usage_count: number; 
+        description: string; 
+        tags: string[];
+        geometry_type: string | null;
+      };
       const desc = (shapeWithMeta.description || '').toLowerCase();
       const tags = (shapeWithMeta.tags || []).join(' ').toLowerCase();
       const combined = desc + ' ' + tags;
@@ -538,6 +645,11 @@ async function queryShapeLibrary(prompt: string, subject: string): Promise<strin
       let score = 0;
       for (const keyword of promptKeywords) {
         if (combined.includes(keyword)) score++;
+      }
+      
+      // PHASE 5 ENHANCEMENT: Bonus points for exact geometry_type match
+      if (geometryType && shapeWithMeta.geometry_type === geometryType) {
+        score += 20;
       }
       
       // Prioritize shapes with actual SVG data
@@ -549,24 +661,30 @@ async function queryShapeLibrary(prompt: string, subject: string): Promise<strin
       }
     }
     
-    const shape = bestMatch as { id: string; svg_data: string | null; vertices: unknown; parameters: unknown; usage_count: number; description: string };
+    const shape = bestMatch as { 
+      id: string; 
+      svg_data: string | null; 
+      vertices: unknown; 
+      parameters: unknown; 
+      usage_count: number; 
+      description: string;
+      geometry_type: string | null;
+    };
     
     // Check if svg_data exists
     if (!shape.svg_data) {
-      console.log(`Shape found in library but has no SVG data: ${shape.description}`);
-      // Return null to fall through to other generation methods
-      // The shape description can be used by AI generation as context
+      console.log(`[Library] Shape found but no SVG data: ${shape.description}`);
       return null;
     }
     
-    // Increment usage count (fire and forget)
+    // Increment usage count (fire and forget) - P5.5
     supabase
       .from('regents_shape_library')
       .update({ usage_count: (shape.usage_count || 0) + 1 })
       .eq('id', shape.id)
       .then(() => {});
     
-    console.log(`Found matching shape in library with SVG: ${shapeType}`);
+    console.log(`[Library] ✓ Match found: ${shape.geometry_type || shapeType} (score: ${bestScore})`);
     
     const svgData = shape.svg_data;
     
@@ -579,14 +697,16 @@ async function queryShapeLibrary(prompt: string, subject: string): Promise<strin
     const base64Svg = btoa(unescape(encodeURIComponent(svgData)));
     return `data:image/svg+xml;base64,${base64Svg}`;
   } catch (err) {
-    console.error("Error querying shape library:", err);
+    console.error("[Library] Error querying shape library:", err);
     return null;
   }
 }
 
+
 interface QuestionWithPrompt {
   questionNumber: number;
   imagePrompt: string;
+  geometry?: GeometryMetadata; // NEW: Structured geometry metadata from Phase 2
 }
 
 interface ValidationResult {
@@ -2315,69 +2435,153 @@ Style: Simple line art, clean educational diagram suitable for projection.`
       `Starting image generation for ${questions.length} questions (Simple SVG: ${shouldUseSimpleSVG}, Nano Banana: ${useNanoBanana})...`,
     );
 
-    const results: { questionNumber: number; imageUrl: string | null; validation?: ValidationResult | null }[] = [];
+    const results: { 
+      questionNumber: number; 
+      imageUrl: string | null; 
+      validation?: ValidationResult | null;
+      diagramSource: 'library' | 'geometry_svg' | 'coordinate_svg' | 'ai' | 'fallback' | 'none'; // P9.1
+    }[] = [];
+
+    // P9.6: Helper function to validate SVG before accepting it
+    const validateAndAcceptSVG = (svg: string | null, source: string): { accepted: boolean; svg: string | null } => {
+      if (!svg) return { accepted: false, svg: null };
+      
+      const svgValidation = validateSVGDataURL(svg);
+      
+      if (!svgValidation.isValid) {
+        console.error(`[${source}] SVG validation failed:`, svgValidation.errors);
+        if (svgValidation.warnings.length > 0) {
+          console.warn(`[${source}] SVG warnings:`, svgValidation.warnings);
+        }
+        return { accepted: false, svg: null };
+      }
+      
+      if (svgValidation.warnings.length > 0) {
+        console.warn(`[${source}] SVG warnings:`, svgValidation.warnings);
+      }
+      
+      console.log(`[${source}] ✓ SVG validation passed`);
+      return { accepted: true, svg };
+    };
 
     for (const q of questions) {
       console.log(`Generating image for question ${q.questionNumber}...`);
 
       let imageUrl: string | null = null;
       let validation: ValidationResult | null = null;
+      let diagramSource: 'library' | 'geometry_svg' | 'coordinate_svg' | 'ai' | 'fallback' | 'none' = 'none'; // P9.1: Track source
       const subject = detectSubjectArea(q.imagePrompt);
 
+      // ═══════════════════════════════════════════════════════════════════════
+      // 5-STEP WATERFALL DIAGRAM GENERATION PIPELINE (Phase 3)
+      // ═══════════════════════════════════════════════════════════════════════
+      // Each step is tried in order. If successful, skip remaining steps.
+      // Goal: 95%+ diagrams from Steps 1-2 (deterministic sources)
+      //
+      // Step 1: Regents Shape Library (pre-verified SVGs)
+      // Step 2: Structured Geometry Renderer (NEW - Phase 3)
+      // Step 3: Deterministic Coordinate Plane SVG (legacy)
+      // Step 4: AI Generation (Nano Banana) - for complex/3D only
+      // Step 5: Hardcoded Fallback Shapes (last resort)
+      // ═══════════════════════════════════════════════════════════════════════
+
       // STEP 1: Try Regents Shape Library first (fastest, most accurate)
-      console.log("Checking Regents Shape Library...");
-      imageUrl = await queryShapeLibrary(q.imagePrompt, subject);
-      if (imageUrl) {
-        console.log("Found matching shape in library!");
+      console.log("Step 1: Checking Regents Shape Library...");
+      const libraryResult = await queryShapeLibrary(q.imagePrompt, subject, q.geometry);
+      const libraryValidation = validateAndAcceptSVG(libraryResult, "Library");
+      if (libraryValidation.accepted) {
+        imageUrl = libraryValidation.svg;
+        console.log("✓ Found matching shape in library!");
         validation = { isValid: true, issues: [], shouldRetry: false };
+        diagramSource = 'library'; // P9.1
+      } else if (libraryResult) {
+        console.log("⚠ Library shape failed validation, trying next step...");
       }
 
-      // STEP 2: Try deterministic SVG generation (for coordinate plane problems)
-      if (!imageUrl && (shouldUseSimpleSVG || preferDeterministicSVG)) {
-        console.log("Using fast deterministic SVG generator (B&W, simple)...");
-        imageUrl = generateDeterministicCoordinatePlaneSVG(q.imagePrompt);
-        if (imageUrl) {
-          console.log("Deterministic SVG generated successfully");
-          validation = { isValid: true, issues: [], shouldRetry: false };
-        }
-      }
-
-      // STEP 3: Try GPT-5.2 for geometry SVG generation with DeepSeek R1 validation
-      if (!imageUrl && subject === "math") {
-        console.log("Attempting GPT-5.2 geometry generation with DeepSeek R1 validation...");
-        const gpt52Result = await generateGeometrySVGWithGPT52(q.imagePrompt);
-        if (gpt52Result) {
-          // Validate with DeepSeek R1
-          const deepseekValidation = await validateWithDeepSeekR1(q.imagePrompt, gpt52Result.svgCode);
-          if (deepseekValidation.isValid) {
-            imageUrl = gpt52Result.imageUrl;
+      // ═══════════════════════════════════════════════════════════════════════
+      // STEP 2: Try Structured Geometry Renderer (NEW - Phase 3)
+      // ═══════════════════════════════════════════════════════════════════════
+      if (!imageUrl && q.geometry) {
+        console.log(`Step 2: Rendering structured geometry (${q.geometry.type})...`);
+        try {
+          const geometryResult = renderGeometryToSVG(q.geometry);
+          const geometryValidation = validateAndAcceptSVG(geometryResult, "GeometrySVG");
+          if (geometryValidation.accepted) {
+            imageUrl = geometryValidation.svg;
+            console.log("✓ Structured geometry rendered successfully!");
             validation = { isValid: true, issues: [], shouldRetry: false };
-            console.log("GPT-5.2 geometry diagram validated by DeepSeek R1!");
+            diagramSource = 'geometry_svg'; // P9.1
+          } else if (geometryResult) {
+            console.log("⚠ Structured geometry SVG failed validation, trying next step...");
           } else {
-            console.log(`DeepSeek R1 rejected diagram: ${deepseekValidation.reason}`);
-            // Try regenerating once with the feedback
-            const retryResult = await generateGeometrySVGWithGPT52(q.imagePrompt, deepseekValidation.reason);
-            if (retryResult) {
-              const retryValidation = await validateWithDeepSeekR1(q.imagePrompt, retryResult.svgCode);
-              if (retryValidation.isValid) {
-                imageUrl = retryResult.imageUrl;
-                validation = { isValid: true, issues: ['Passed after DeepSeek feedback'], shouldRetry: false };
-                console.log("GPT-5.2 retry passed DeepSeek R1 validation!");
-              } else {
-                console.log("GPT-5.2 retry still failed validation, skipping AI diagram");
-              }
-            }
+            console.log("⚠ Structured geometry renderer returned null");
           }
+        } catch (error) {
+          console.error("✗ Structured geometry rendering failed:", error);
+          // Continue to next step
+        }
+      } else if (!imageUrl && !q.geometry) {
+        console.log("Step 2: Skipped (no geometry metadata)");
+      }
+
+      // STEP 3: Try deterministic SVG generation (for coordinate plane problems)
+      if (!imageUrl && (shouldUseSimpleSVG || preferDeterministicSVG)) {
+        console.log("Step 3: Using fast deterministic SVG generator (B&W, simple)...");
+        const coordinateResult = generateDeterministicCoordinatePlaneSVG(q.imagePrompt);
+        const coordinateValidation = validateAndAcceptSVG(coordinateResult, "CoordinateSVG");
+        if (coordinateValidation.accepted) {
+          imageUrl = coordinateValidation.svg;
+          console.log("✓ Deterministic SVG generated successfully");
+          validation = { isValid: true, issues: [], shouldRetry: false };
+          diagramSource = 'coordinate_svg'; // P9.1
+        } else if (coordinateResult) {
+          console.log("⚠ Coordinate SVG failed validation, trying next step...");
         }
       }
 
-      // STEP 4: Use hardcoded fallback shapes as last resort
+      // STEP 4: Use AI generation (Nano Banana) for complex/3D geometry
+      if (!imageUrl && useNanoBanana) {
+        const isCoordinatePlane = q.imagePrompt.toLowerCase().includes('coordinate') || 
+                                   q.imagePrompt.toLowerCase().includes('coordinate plane') ||
+                                   /\(-?\d+,\s*-?\d+\)/.test(q.imagePrompt);
+        const is3DGeometry = q.imagePrompt.toLowerCase().includes('plane') && 
+                            (q.imagePrompt.toLowerCase().includes('pillar') || 
+                             q.imagePrompt.toLowerCase().includes('support') ||
+                             q.imagePrompt.toLowerCase().includes('foundation') ||
+                             q.imagePrompt.toLowerCase().includes('3d') ||
+                             q.imagePrompt.toLowerCase().includes('three-dimensional'));
+        
+        if (is3DGeometry || !isCoordinatePlane) {
+          console.log("Step 4: Using AI generation for 3D/non-coordinate geometry...");
+          const result = await generateImageWithNanoBanana(q.imagePrompt);
+          const aiValidation = validateAndAcceptSVG(result.imageUrl, "AI");
+          if (aiValidation.accepted) {
+            imageUrl = aiValidation.svg;
+            validation = result.validation;
+            diagramSource = 'ai'; // P9.1
+          } else if (result.imageUrl) {
+            console.log("⚠ AI-generated SVG failed validation, trying next step...");
+            validation = result.validation;
+          }
+        } else {
+          console.log("Step 4: Skipped (coordinate plane - prefer deterministic)");
+        }
+      } else if (!imageUrl && !useNanoBanana) {
+        console.log("Step 4: Skipped (AI generation disabled)");
+      }
+
+      // STEP 5: Use hardcoded fallback shapes as last resort
       if (!imageUrl) {
-        console.log("Using hardcoded fallback shapes...");
-        imageUrl = getFallbackShape(q.imagePrompt);
-        if (imageUrl) {
-          console.log("Using hardcoded fallback shape");
+        console.log("Step 5: Trying hardcoded fallback shapes...");
+        const fallbackResult = getFallbackShape(q.imagePrompt);
+        const fallbackValidation = validateAndAcceptSVG(fallbackResult, "Fallback");
+        if (fallbackValidation.accepted) {
+          imageUrl = fallbackValidation.svg;
+          console.log("✓ Using hardcoded fallback shape");
           validation = { isValid: true, issues: ['Used fallback shape'], shouldRetry: false };
+          diagramSource = 'fallback'; // P9.1
+        } else if (fallbackResult) {
+          console.log("⚠ Fallback shape failed validation");
         }
       }
 
@@ -2385,6 +2589,7 @@ Style: Simple line art, clean educational diagram suitable for projection.`
         questionNumber: q.questionNumber,
         imageUrl,
         validation,
+        diagramSource, // P9.1: Include source in results
       });
 
       const validationStatus = validation
