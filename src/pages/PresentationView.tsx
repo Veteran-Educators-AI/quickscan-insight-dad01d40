@@ -618,6 +618,52 @@ export default function PresentationView() {
     toast.success('Slide deleted');
   };
 
+  const addSlide = (type: PresentationSlide['type'] = 'content') => {
+    if (!presentation) return;
+    
+    const newSlide: PresentationSlide = {
+      id: `slide-${Date.now()}`,
+      type,
+      title: type === 'title' ? 'New Title Slide' 
+           : type === 'question' ? 'Question' 
+           : type === 'summary' ? 'Summary'
+           : type === 'interactive' ? 'Interactive Activity'
+           : 'New Slide',
+      content: type === 'question' 
+        ? ['Think about this question carefully...'] 
+        : ['Add your first bullet point here'],
+      speakerNotes: '',
+      ...(type === 'question' && {
+        question: {
+          prompt: 'Enter your question here',
+          options: ['Option A', 'Option B', 'Option C', 'Option D'],
+          answer: 'A',
+          explanation: 'Explain why this is the correct answer'
+        }
+      }),
+      icon: type === 'question' ? 'question' 
+          : type === 'summary' ? 'sparkles'
+          : type === 'interactive' ? 'lightbulb'
+          : undefined,
+    };
+    
+    const insertIndex = currentSlide + 1;
+    const updatedSlides = [
+      ...presentation.slides.slice(0, insertIndex),
+      newSlide,
+      ...presentation.slides.slice(insertIndex)
+    ];
+    
+    const updatedPresentation = { ...presentation, slides: updatedSlides };
+    setPresentation(updatedPresentation);
+    sessionStorage.setItem('nycologic_presentation', JSON.stringify(updatedPresentation));
+    
+    // Navigate to the new slide
+    setCurrentSlide(insertIndex);
+    
+    toast.success('New slide added');
+  };
+
   const moveSlide = (fromIndex: number, direction: 'up' | 'down') => {
     if (!presentation) return;
     
@@ -1037,7 +1083,7 @@ export default function PresentationView() {
               </Button>
             </div>
             
-            <div className="overflow-y-auto h-[calc(100vh-60px)] p-3 space-y-3">
+            <div className="overflow-y-auto h-[calc(100vh-140px)] p-3 space-y-3">
               {presentation.slides.map((s, idx) => (
                 <div key={s.id} className="group relative">
                   <motion.button
@@ -1155,6 +1201,32 @@ export default function PresentationView() {
                   )}
                 </div>
               ))}
+            </div>
+            
+            {/* Add Slide Button - Always visible at bottom of sidebar */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-white/10 bg-black/80 backdrop-blur-sm">
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => addSlide('content')}
+                  className={cn(
+                    "flex-1 h-10 gap-2 text-sm font-medium transition-all",
+                    colors.accent.replace('text-', 'bg-').replace('-400', '-500'),
+                    "hover:opacity-90 text-black"
+                  )}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Slide
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => addSlide('question')}
+                  className="h-10 w-10 border-white/20 hover:bg-white/10 text-white/70 hover:text-white"
+                  title="Add Question Slide"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </motion.aside>
         )}
