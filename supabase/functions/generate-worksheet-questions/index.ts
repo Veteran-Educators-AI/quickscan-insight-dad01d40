@@ -319,10 +319,11 @@ VARIATION REQUIREMENT (CRITICAL - ANTI-COPYING MEASURE):
     const bloomInstruction = `ONLY generate questions for these Bloom's Taxonomy cognitive levels: ${allowedBloomLevels.join(', ')}. Do NOT include questions from other cognitive levels.`;
 
     // Build optional instructions for geometry and formulas
+    // IMPORTANT: Only generate diagrams if BOTH includeGeometry AND useAIImages are true
+    // If useAIImages is false, do NOT generate SVG diagrams either - this is the "no image generation" mode
     let geometryInstruction = '';
-    if (includeGeometry) {
-      if (useAIImages) {
-        geometryInstruction = `
+    if (includeGeometry && useAIImages) {
+      geometryInstruction = `
 8. For geometry-related questions, you MUST include an "imagePrompt" field. Write the prompt using this STRICT format:
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -397,22 +398,14 @@ DO NOT DO THESE THINGS IN YOUR imagePrompt
 - DO NOT add unnecessary arrows or decorations
 - DO NOT make it overly complex
 - DO NOT forget to specify label positions`;
-      } else {
-        geometryInstruction = `
-8. For geometry-related questions, you MUST include an "svg" field with a complete, valid SVG string that visually represents the geometric figure described in the question.
-   - The SVG should be self-contained with width="200" height="200" viewBox="0 0 200 200"
-   - Use clear colors: stroke="#1f2937" (dark gray) for lines, fill="none" or fill="#e5e7eb" for shapes
-   - Include labels for vertices, angles, or measurements using <text> elements
-   - Examples of shapes to draw:
-     * Triangles with labeled vertices (A, B, C)
-     * Circles with radius lines and center points
-     * Quadrilaterals (rectangles, squares, parallelograms, trapezoids)
-     * Coordinate grids with plotted points
-     * Angle diagrams with arc indicators
-     * 3D shapes like cubes, prisms, pyramids (using isometric projections)
-   - Make sure the SVG is clean, properly formatted, and renders correctly
-   - For coordinate geometry, include axis lines and grid marks`;
-      }
+    } else if (includeGeometry && !useAIImages) {
+      // When includeGeometry is on but useAIImages is off, just describe shapes in text - NO SVG generation
+      geometryInstruction = `
+8. For geometry-related questions, describe the shapes clearly in the question text itself.
+   - Use clear verbal descriptions of shapes (e.g., "A rectangle with length 5 cm and width 3 cm")
+   - Include all necessary measurements in the question text
+   - DO NOT include any "svg" or "imagePrompt" fields - this worksheet is text-only
+   - Students should be able to draw the shapes themselves based on your description`;
     }
 
     let formulasInstruction = '';
@@ -449,8 +442,8 @@ ${nextNum}. Include questions that require graph paper solutions:
    - Problems involving plotting points, lines, and curves on a coordinate plane
    - Graphing linear equations, quadratics, or other functions
    - Questions that ask students to "graph and show your work"
-   - Include SVG with a grid pattern (graph paper style) when appropriate
-   - For graph paper SVGs, use: light gray grid lines, bold axis lines with labels, and marked intervals`;
+   - Describe the graph clearly in text so students can draw it themselves
+   - DO NOT include any "svg" or "imagePrompt" fields - this worksheet is text-only`;
       }
     }
 
@@ -479,19 +472,18 @@ ${nextNum}. Include coordinate geometry problems:
    - Finding distance between points, midpoints, and slopes
    - Equations of lines (point-slope, slope-intercept forms)
    - Parallel and perpendicular lines in coordinate plane
-   - Proving geometric properties using coordinates (e.g., proving a quadrilateral is a parallelogram)
-   - Transformations on the coordinate plane
-   - Include SVG diagrams showing coordinate planes with plotted points and shapes when helpful`;
+   - Proving geometric properties using coordinates
+   - Describe all coordinates and shapes clearly in the question text
+   - DO NOT include any "svg" or "imagePrompt" fields - this worksheet is text-only`;
       }
     }
 
-    const imageFieldNote = includeGeometry 
-      ? useAIImages
-        ? `
+    // Only include imageFieldNote if AI images are enabled
+    const imageFieldNote = useAIImages && includeGeometry 
+      ? `
 If the question involves geometry and a diagram would help, include an "imagePrompt" field with a detailed description of the diagram. The imagePrompt field should ONLY be included when a visual diagram is genuinely helpful for the question.`
-        : `
-If the question involves geometry and a diagram would help, include an "svg" field with a complete SVG string. The svg field should ONLY be included when a visual diagram is genuinely helpful for the question.`
-      : '';
+      : `
+DO NOT include "svg" or "imagePrompt" fields. This is a TEXT-ONLY worksheet. Describe all shapes and diagrams verbally in the question text.`;
 
     // Hint instruction for students
     const hintInstruction = includeHints

@@ -4244,8 +4244,8 @@ QUALITY CHECK BEFORE FINISHING
               </p>
               <ul className="text-sm text-gray-600 space-y-2 list-disc ml-4">
                 <li>
-                  <strong>Generation time:</strong> Each image takes <span className="text-amber-600 font-semibold">5+ minutes</span> to generate. 
-                  For a full class set, this could take <span className="text-amber-600 font-semibold">30+ minutes</span> or more.
+                  <strong>Generation time:</strong> Each image takes <span className="text-amber-600 font-semibold">a few seconds</span> to generate. 
+                  For a full class set, this could take <span className="text-amber-600 font-semibold">5-10 minutes</span> depending on the number of students.
                 </li>
                 <li>
                   <strong>Accuracy concerns:</strong> AI-generated images may contain <span className="text-red-600 font-semibold">inaccuracies</span> such as 
