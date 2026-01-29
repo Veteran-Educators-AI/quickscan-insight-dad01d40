@@ -120,3 +120,6 @@ verify_jwt = false
 
 [functions.verify-student-magic-link]
 verify_jwt = false
+
+[functions.deepseek-reasoning]
+verify_jwt = false
