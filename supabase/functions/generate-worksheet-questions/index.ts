@@ -1255,22 +1255,67 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       // Check if response appears truncated (doesn't end with valid JSON array closing)
       if (!cleanContent.endsWith(']')) {
         console.warn('Detected truncated JSON response, attempting to recover...');
+        console.warn('Last 100 chars:', cleanContent.slice(-100));
         
-        // Try to find the last complete question object
-        const lastCompleteObjMatch = cleanContent.match(/^(\[[\s\S]*\})\s*,?\s*\{[^}]*$/);
-        if (lastCompleteObjMatch) {
-          // Close the array after the last complete object
-          cleanContent = lastCompleteObjMatch[1] + ']';
-          console.log('Recovered partial response with', (cleanContent.match(/\{/g) || []).length, 'questions');
+        // More robust recovery: find all complete objects and close the array
+        // Use bracket depth tracking to find complete objects
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+        let lastCompleteObjEnd = -1;
+        let objectCount = 0;
+        
+        for (let i = 0; i < cleanContent.length; i++) {
+          const char = cleanContent[i];
+          
+          if (escape) {
+            escape = false;
+            continue;
+          }
+          
+          if (char === '\\' && inString) {
+            escape = true;
+            continue;
+          }
+          
+          if (char === '"' && !escape) {
+            inString = !inString;
+            continue;
+          }
+          
+          if (!inString) {
+            if (char === '{') {
+              depth++;
+            } else if (char === '}') {
+              depth--;
+              if (depth === 1) { // Back to array level after closing an object
+                lastCompleteObjEnd = i;
+                objectCount++;
+              }
+            } else if (char === '[' && depth === 0) {
+              depth = 1; // Array start
+            }
+          }
+        }
+        
+        if (lastCompleteObjEnd > 0 && objectCount > 0) {
+          cleanContent = cleanContent.substring(0, lastCompleteObjEnd + 1) + ']';
+          console.log(`Recovered ${objectCount} complete question objects from truncated response`);
         } else {
-          // Try to find any complete array portion
-          const arrayMatch = cleanContent.match(/^\[[\s\S]*?\}(?=\s*,\s*\{|\s*\])/);
-          if (arrayMatch) {
-            cleanContent = arrayMatch[0] + ']';
-            console.log('Recovered minimal response');
+          // Fallback: try regex patterns
+          const lastCompleteObjMatch = cleanContent.match(/^(\[[\s\S]*\})\s*,?\s*\{[^}]*$/);
+          if (lastCompleteObjMatch) {
+            cleanContent = lastCompleteObjMatch[1] + ']';
+            console.log('Recovered partial response with regex');
           } else {
-            console.error('Cannot recover truncated response:', cleanContent.substring(0, 200));
-            throw new Error('AI response was truncated. Please try with fewer questions or a simpler topic.');
+            const arrayMatch = cleanContent.match(/^\[[\s\S]*?\}(?=\s*,\s*\{|\s*\])/);
+            if (arrayMatch) {
+              cleanContent = arrayMatch[0] + ']';
+              console.log('Recovered minimal response');
+            } else {
+              console.error('Cannot recover truncated response:', cleanContent.substring(0, 500));
+              throw new Error('AI response was truncated. Please try with fewer questions or a simpler topic.');
+            }
           }
         }
       }
@@ -1306,7 +1351,8 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       }));
     } catch (parseError) {
       console.error('Failed to parse AI response:', content.substring(0, 500));
-      console.error('Parse error:', parseError);
+      console.error('Parse error details:', parseError);
+      console.error('Response length:', content.length, 'chars');
       throw new Error('Failed to parse generated questions. The AI response may have been truncated. Please try again with fewer questions.');
     }
 
