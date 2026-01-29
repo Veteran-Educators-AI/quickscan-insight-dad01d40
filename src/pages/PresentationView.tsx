@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown, Cloud, CloudOff, Library, ImagePlus, Radio, Users, Wand2, Send, Type, Minus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Maximize2, Minimize2, Loader2, Sparkles, BookOpen, Lightbulb, HelpCircle, Award, Home, LayoutGrid, PanelLeftClose, Pencil, Save, Check, Plus, Trash2, GripVertical, ChevronUp, ChevronDown, Cloud, CloudOff, Library, ImagePlus, Radio, Users, Wand2, Send, Type, Minus, Eraser } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/auth';
 import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 import { SlideImageGenerator, GeneratedImageData } from '@/components/presentation/SlideImageGenerator';
 import { LiveSessionControls } from '@/components/presentation/LiveSessionControls';
+import { ImageRegionEraser } from '@/components/presentation/ImageRegionEraser';
 
 interface PresentationSlide {
   id: string;
@@ -104,6 +105,7 @@ export default function PresentationView() {
   const [showEnhancePanel, setShowEnhancePanel] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [customEnhancement, setCustomEnhancement] = useState('');
+  const [showEraser, setShowEraser] = useState(false);
   
   // Touch gesture states
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
@@ -1729,6 +1731,16 @@ export default function PresentationView() {
                                 </button>
                                 <button
                                   onClick={() => {
+                                    setShowEnhancePanel(false);
+                                    setShowEraser(true);
+                                  }}
+                                  className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all hover:scale-110 backdrop-blur-sm"
+                                  title="Erase elements from image"
+                                >
+                                  <Eraser className="w-5 h-5 text-white" />
+                                </button>
+                                <button
+                                  onClick={() => {
                                     handleImageGenerated({
                                       url: '',
                                       prompt: '',
@@ -1744,6 +1756,20 @@ export default function PresentationView() {
                                   <X className="w-5 h-5 text-white" />
                                 </button>
                               </div>
+                              
+                              {/* Eraser overlay */}
+                              {showEraser && slide.customImage?.url && (
+                                <ImageRegionEraser
+                                  imageUrl={slide.customImage.url}
+                                  onImageUpdated={(newUrl) => {
+                                    handleImageGenerated({
+                                      ...slide.customImage!,
+                                      url: newUrl,
+                                    });
+                                  }}
+                                  onClose={() => setShowEraser(false)}
+                                />
+                              )}
                               
                               {/* Enhancement panel - slides out below image */}
                               <AnimatePresence>

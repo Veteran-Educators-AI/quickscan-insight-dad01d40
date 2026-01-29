@@ -2198,7 +2198,26 @@ serve(async (req) => {
     if (body.action === "enhance" && body.imageUrl && body.enhancement) {
       console.log("Processing image enhancement request...");
       
-      const enhancedUrl = await enhanceExistingImage(body.imageUrl, body.enhancement);
+      // If maskRegions are provided, include them in the enhancement prompt
+      let enhancementPrompt = body.enhancement;
+      if (body.maskRegions && Array.isArray(body.maskRegions) && body.maskRegions.length > 0) {
+        const regionDescriptions = body.maskRegions.map((r: any, i: number) => {
+          const xPercent = Math.round(r.x * 100);
+          const yPercent = Math.round(r.y * 100);
+          const wPercent = Math.round(r.width * 100);
+          const hPercent = Math.round(r.height * 100);
+          return `Region ${i + 1}: starting at ${xPercent}% from left, ${yPercent}% from top, spanning ${wPercent}% wide and ${hPercent}% tall`;
+        }).join('; ');
+        
+        enhancementPrompt = `${body.enhancement}
+
+TARGET REGIONS TO MODIFY: ${regionDescriptions}
+
+Focus your modifications on these specific areas of the image while keeping everything else unchanged.`;
+        console.log("Enhancement with mask regions:", enhancementPrompt);
+      }
+      
+      const enhancedUrl = await enhanceExistingImage(body.imageUrl, enhancementPrompt);
       
       return new Response(
         JSON.stringify({ imageUrl: enhancedUrl, success: !!enhancedUrl }),
