@@ -87,6 +87,12 @@ CURRENCY FORMATTING (CRITICAL):
   • Examples: "The item costs $4.00" NOT "The item costs 4.00"
   • Examples: "He earned a profit of $25.50" NOT "He earned a profit of 25.50"
   • This helps students understand real-world financial context
+
+SVG CRITICAL RULES (if generating SVG):
+  • Keep SVG paths EXTREMELY simple - use basic shapes only
+  • Maximum 500 characters per SVG string
+  • Prefer simple geometric primitives (rect, circle, line, polygon) over complex paths
+  • If a diagram is complex, use imagePrompt instead of svg
   
 Write questions in a fluid, professional textbook style - complete sentences, clear mathematical language, and elegant formatting.
 
@@ -94,7 +100,7 @@ Return only valid JSON arrays when asked for questions.` },
         { role: 'user', content: prompt }
       ],
       temperature: 0.7,
-      max_tokens: 8000,
+      max_tokens: 12000,
     }),
   });
 
