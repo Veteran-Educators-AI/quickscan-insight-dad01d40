@@ -14,6 +14,7 @@ import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 import { SlideImageGenerator, GeneratedImageData } from '@/components/presentation/SlideImageGenerator';
 import { LiveSessionControls } from '@/components/presentation/LiveSessionControls';
 import { ImageRegionEraser } from '@/components/presentation/ImageRegionEraser';
+import { ImageAnnotationEditor } from '@/components/presentation/ImageAnnotationEditor';
 
 interface PresentationSlide {
   id: string;
@@ -106,6 +107,7 @@ export default function PresentationView() {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [customEnhancement, setCustomEnhancement] = useState('');
   const [showEraser, setShowEraser] = useState(false);
+  const [showAnnotationEditor, setShowAnnotationEditor] = useState(false);
   
   // Touch gesture states
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
@@ -1328,23 +1330,78 @@ export default function PresentationView() {
                         </div>
                       </div>
                       
-                      {/* Delete button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleImageGenerated({
-                            url: '',
-                            prompt: '',
-                            position: { x: 50, y: 50 },
-                            size: { width: 400, height: 300 },
-                            rotation: 0,
-                          });
-                        }}
-                        className="absolute -top-2 right-8 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center cursor-pointer hover:scale-125 hover:bg-red-600 transition-all shadow-lg"
-                        title="Remove image"
-                      >
-                        <X className="w-3.5 h-3.5 text-white" />
-                      </button>
+                      {/* Control buttons row */}
+                      <div className="absolute -top-3 right-0 flex items-center gap-1.5">
+                        {/* Annotate button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowAnnotationEditor(true);
+                          }}
+                          className="w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center cursor-pointer hover:scale-110 hover:bg-blue-600 transition-all shadow-lg"
+                          title="Add text & annotations"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-white" />
+                        </button>
+                        
+                        {/* Erase button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowEraser(true);
+                          }}
+                          className="w-7 h-7 bg-amber-500 rounded-full flex items-center justify-center cursor-pointer hover:scale-110 hover:bg-amber-600 transition-all shadow-lg"
+                          title="Erase elements"
+                        >
+                          <Eraser className="w-3.5 h-3.5 text-white" />
+                        </button>
+                        
+                        {/* Delete button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleImageGenerated({
+                              url: '',
+                              prompt: '',
+                              position: { x: 50, y: 50 },
+                              size: { width: 400, height: 300 },
+                              rotation: 0,
+                            });
+                          }}
+                          className="w-7 h-7 bg-red-500 rounded-full flex items-center justify-center cursor-pointer hover:scale-110 hover:bg-red-600 transition-all shadow-lg"
+                          title="Remove image"
+                        >
+                          <X className="w-3.5 h-3.5 text-white" />
+                        </button>
+                      </div>
+                      
+                      {/* Annotation Editor for title slide */}
+                      {showAnnotationEditor && slide.customImage?.url && (
+                        <ImageAnnotationEditor
+                          imageUrl={slide.customImage.url}
+                          onImageUpdated={(newUrl) => {
+                            handleImageGenerated({
+                              ...slide.customImage!,
+                              url: newUrl,
+                            });
+                          }}
+                          onClose={() => setShowAnnotationEditor(false)}
+                        />
+                      )}
+                      
+                      {/* Eraser for title slide */}
+                      {showEraser && slide.customImage?.url && (
+                        <ImageRegionEraser
+                          imageUrl={slide.customImage.url}
+                          onImageUpdated={(newUrl) => {
+                            handleImageGenerated({
+                              ...slide.customImage!,
+                              url: newUrl,
+                            });
+                          }}
+                          onClose={() => setShowEraser(false)}
+                        />
+                      )}
                       
                       {/* Rotation angle display */}
                       {isRotatingImage && (
@@ -1732,6 +1789,16 @@ export default function PresentationView() {
                                 <button
                                   onClick={() => {
                                     setShowEnhancePanel(false);
+                                    setShowAnnotationEditor(true);
+                                  }}
+                                  className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all hover:scale-110 backdrop-blur-sm"
+                                  title="Add text & annotations"
+                                >
+                                  <Pencil className="w-5 h-5 text-white" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setShowEnhancePanel(false);
                                     setShowEraser(true);
                                   }}
                                   className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all hover:scale-110 backdrop-blur-sm"
@@ -1756,6 +1823,20 @@ export default function PresentationView() {
                                   <X className="w-5 h-5 text-white" />
                                 </button>
                               </div>
+                              
+                              {/* Annotation Editor overlay */}
+                              {showAnnotationEditor && slide.customImage?.url && (
+                                <ImageAnnotationEditor
+                                  imageUrl={slide.customImage.url}
+                                  onImageUpdated={(newUrl) => {
+                                    handleImageGenerated({
+                                      ...slide.customImage!,
+                                      url: newUrl,
+                                    });
+                                  }}
+                                  onClose={() => setShowAnnotationEditor(false)}
+                                />
+                              )}
                               
                               {/* Eraser overlay */}
                               {showEraser && slide.customImage?.url && (
