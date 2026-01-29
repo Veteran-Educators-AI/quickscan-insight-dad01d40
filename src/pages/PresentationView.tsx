@@ -108,6 +108,7 @@ export default function PresentationView() {
   const [customEnhancement, setCustomEnhancement] = useState('');
   const [showEraser, setShowEraser] = useState(false);
   const [showAnnotationEditor, setShowAnnotationEditor] = useState(false);
+  const [showFullscreenImage, setShowFullscreenImage] = useState(false);
   
   // Touch gesture states
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
@@ -295,7 +296,9 @@ export default function PresentationView() {
           }
           break;
         case 'Escape':
-          if (document.fullscreenElement) {
+          if (showFullscreenImage) {
+            setShowFullscreenImage(false);
+          } else if (document.fullscreenElement) {
             document.exitFullscreen();
           } else if (showEnhancePanel) {
             setShowEnhancePanel(false);
@@ -325,7 +328,7 @@ export default function PresentationView() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentSlide, nextSlide, prevSlide, navigate, showEnhancePanel]);
+  }, [currentSlide, nextSlide, prevSlide, navigate, showEnhancePanel, showFullscreenImage]);
 
   const toggleFullscreen = async () => {
     if (!document.fullscreenElement) {
@@ -1404,6 +1407,18 @@ export default function PresentationView() {
                       
                       {/* Control buttons row */}
                       <div className="absolute -top-3 right-0 flex items-center gap-1.5">
+                        {/* Fullscreen button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowFullscreenImage(true);
+                          }}
+                          className="w-7 h-7 bg-white/20 rounded-full flex items-center justify-center cursor-pointer hover:scale-110 hover:bg-white/30 transition-all shadow-lg backdrop-blur-sm"
+                          title="View fullscreen"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5 text-white" />
+                        </button>
+                        
                         {/* Annotate button */}
                         <button
                           onClick={(e) => {
@@ -1842,6 +1857,13 @@ export default function PresentationView() {
                               {/* Top buttons row */}
                               <div className="absolute top-2 right-2 flex gap-2">
                                 <button
+                                  onClick={() => setShowFullscreenImage(true)}
+                                  className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all hover:scale-110 backdrop-blur-sm"
+                                  title="View fullscreen"
+                                >
+                                  <Maximize2 className="w-5 h-5 text-white" />
+                                </button>
+                                <button
                                   onClick={() => setShowImageGenerator(true)}
                                   className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all hover:scale-110 backdrop-blur-sm"
                                   title="Replace image"
@@ -2186,6 +2208,43 @@ export default function PresentationView() {
           {currentSlide + 1} of {totalSlides}
         </p>
       </footer>
+
+      {/* Fullscreen Image Viewer */}
+      <AnimatePresence>
+        {showFullscreenImage && slide?.customImage?.url && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
+            onClick={() => setShowFullscreenImage(false)}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setShowFullscreenImage(false)}
+              className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-all z-10"
+            >
+              <X className="w-6 h-6 text-white" />
+            </button>
+            
+            {/* Fullscreen image */}
+            <motion.img
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              src={slide.customImage.url}
+              alt="Fullscreen view"
+              className="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            
+            {/* Image info */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg text-white/70 text-sm">
+              Click anywhere or press ESC to close
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Slide Image Generator Dialog */}
       <SlideImageGenerator
