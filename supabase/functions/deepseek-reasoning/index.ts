@@ -102,8 +102,8 @@ Provide:
         throw new Error("Invalid task type");
     }
 
-    // Call DeepSeek API - using deepseek-chat for standard, deepseek-reasoner for R1 model
-    // Try deepseek-chat first as it's more widely available
+    // Call DeepSeek API - using deepseek-reasoner (R1) for advanced chain-of-thought reasoning
+    // R1 model provides superior accuracy for mathematical and geometric validation
     const response = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
@@ -111,12 +111,12 @@ Provide:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "deepseek-chat", // Use deepseek-chat; change to "deepseek-reasoner" for R1 if available
+        model: "deepseek-reasoner", // R1 model for chain-of-thought reasoning
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: 4000,
+        max_tokens: 8000, // R1 needs more tokens for reasoning chain
         temperature: 0.1, // Low temperature for precise reasoning
       }),
     });
