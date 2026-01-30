@@ -432,6 +432,43 @@ const FALLBACK_SHAPES: Record<string, (params?: any) => string> = {
     <circle cx="240" cy="150" r="20" stroke="#000000" stroke-width="2" fill="none"/>
     <text x="240" y="155" font-family="Arial" font-size="14" text-anchor="middle" font-weight="bold">H</text>
     <text x="150" y="250" font-family="Arial" font-size="16" text-anchor="middle">H₂O</text>
+  </svg>`,
+
+  // Generic coordinate plane (blank for any problem)
+  coordinate_plane: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <g stroke="#e0e0e0" stroke-width="1">
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="${30 + i * 24}" y1="30" x2="${30 + i * 24}" y2="270"/>`).join('\n      ')}
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="30" y1="${270 - i * 24}" x2="270" y2="${270 - i * 24}"/>`).join('\n      ')}
+    </g>
+    <g stroke="#000000" stroke-width="2">
+      <line x1="25" y1="150" x2="280" y2="150"/>
+      <polygon points="280,150 272,146 272,154" fill="#000000"/>
+      <line x1="150" y1="275" x2="150" y2="20"/>
+      <polygon points="150,20 146,28 154,28" fill="#000000"/>
+    </g>
+    <g font-family="Arial" font-size="11" fill="#000000">
+      <text x="275" y="165" font-style="italic">x</text>
+      <text x="155" y="18" font-style="italic">y</text>
+      <text x="155" y="165">O</text>
+    </g>
+  </svg>`,
+
+  // Number line
+  number_line: () => `<svg width="300" height="120" viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="120" fill="#ffffff"/>
+    <line x1="20" y1="60" x2="280" y2="60" stroke="#000000" stroke-width="2"/>
+    <polygon points="280,60 272,56 272,64" fill="#000000"/>
+    ${Array.from({ length: 11 }, (_, i) => `<line x1="${30 + i * 24}" y1="55" x2="${30 + i * 24}" y2="65" stroke="#000000" stroke-width="2"/>`).join('\n    ')}
+    ${Array.from({ length: 11 }, (_, i) => `<text x="${30 + i * 24}" y="80" font-family="Arial" font-size="11" text-anchor="middle">${i - 5}</text>`).join('\n    ')}
+  </svg>`,
+
+  // Generic shape placeholder
+  generic_shape: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <rect x="50" y="50" width="200" height="200" stroke="#000000" stroke-width="2" fill="none" stroke-dasharray="8,4"/>
+    <text x="150" y="150" font-family="Arial" font-size="14" text-anchor="middle" fill="#666666">[Diagram]</text>
+    <text x="150" y="170" font-family="Arial" font-size="10" text-anchor="middle" fill="#999999">Draw your figure here</text>
   </svg>`
 };
 
