@@ -307,31 +307,31 @@ function convertExponents(text: string): string {
 
 /**
  * Converts plain text subscripts (like x_1 or a_n) to subscript Unicode
- * IMPORTANT: Only applies to single-letter variables to avoid corrupting words like "needed_2"
+ * IMPORTANT: Only applies to standalone single-letter variables to avoid corrupting 
+ * words like "roses_2", "PM_2", "needed_2", etc.
  */
 function convertSubscripts(text: string): string {
-  // Pattern 1: Single letter followed by _{content} - e.g., x_{12} -> x₁₂
-  let result = text.replace(/\b([a-zA-Z])_{([^}]+)}/g, (match, letter, content) => {
+  let result = text;
+  
+  // Pattern 1: Single letter followed by _{content} with explicit braces - e.g., x_{12} -> x₁₂
+  // Only match if preceded by whitespace, punctuation, or start of string (NOT another letter)
+  result = result.replace(/(?<![a-zA-Z])([a-zA-Z])_{([^}]+)}/g, (match, letter, content) => {
     const subscripted = content.split('').map((char: string) => subscripts[char] || char).join('');
     return letter + subscripted;
   });
   
-  // Pattern 2: Single letter followed by _digit(s) - e.g., x_2 -> x₂, y_12 -> y₁₂
-  // Must be preceded by word boundary or space to avoid "needed_2" becoming "needed₂"
-  result = result.replace(/(?<=\s|^)([a-zA-Z])_(\d+)(?=\s|$|[,.:;!?)])/g, (match, letter, digits) => {
+  // Pattern 2: Single letter followed by _digit(s) - e.g., x_2 -> x₂
+  // CRITICAL: Must NOT be preceded by a letter (to avoid "roses_2" -> "roses₂")
+  // Must be preceded by whitespace, punctuation, math operators, or start of string
+  result = result.replace(/(?<![a-zA-Z])([a-zA-Z])_(\d+)(?![a-zA-Z])/g, (match, letter, digits) => {
     const subscripted = digits.split('').map((char: string) => subscripts[char] || char).join('');
     return letter + subscripted;
   });
   
-  // Pattern 3: Common math notation - single letter variable with subscript in math context
-  // e.g., "solve for x_1" or "(x_2 + y_3)"
-  result = result.replace(/([a-zA-Z])_(\d+|[a-z])(?=[\s+\-*/=<>()[\],.:;]|$)/gi, (match, letter, sub, offset) => {
-    // Check if the character before is a letter (making it part of a word)
-    const prevChar = result[offset - 1];
-    if (prevChar && /[a-zA-Z]/.test(prevChar)) {
-      return match; // Don't convert - it's part of a word like "needed_2"
-    }
-    const subscripted = sub.split('').map((char: string) => subscripts[char] || char).join('');
+  // Pattern 3: Single letter variable with letter subscript in math context - e.g., a_n, x_i
+  // Only match isolated single-letter variables
+  result = result.replace(/(?<![a-zA-Z])([a-zA-Z])_([a-z])(?![a-zA-Z])/gi, (match, letter, sub) => {
+    const subscripted = subscripts[sub.toLowerCase()] || sub;
     return letter + subscripted;
   });
   
@@ -842,28 +842,34 @@ export function sanitizeForPDF(text: string): string {
     [/ˣ/g, '^x'],
     [/ʸ/g, '^y'],
     
-    // Subscript numbers - convert to _n format
-    [/₀/g, '_0'],
-    [/₁/g, '_1'],
-    [/₂/g, '_2'],
-    [/₃/g, '_3'],
-    [/₄/g, '_4'],
-    [/₅/g, '_5'],
-    [/₆/g, '_6'],
-    [/₇/g, '_7'],
-    [/₈/g, '_8'],
-    [/₉/g, '_9'],
+    // Subscript numbers - convert to _n format ONLY for single-letter contexts
+    // These patterns check context to avoid "roses_2" type issues
+    [/(?<![a-zA-Z])([a-zA-Z])₀/g, '$1_0'],
+    [/(?<![a-zA-Z])([a-zA-Z])₁/g, '$1_1'],
+    [/(?<![a-zA-Z])([a-zA-Z])₂/g, '$1_2'],
+    [/(?<![a-zA-Z])([a-zA-Z])₃/g, '$1_3'],
+    [/(?<![a-zA-Z])([a-zA-Z])₄/g, '$1_4'],
+    [/(?<![a-zA-Z])([a-zA-Z])₅/g, '$1_5'],
+    [/(?<![a-zA-Z])([a-zA-Z])₆/g, '$1_6'],
+    [/(?<![a-zA-Z])([a-zA-Z])₇/g, '$1_7'],
+    [/(?<![a-zA-Z])([a-zA-Z])₈/g, '$1_8'],
+    [/(?<![a-zA-Z])([a-zA-Z])₉/g, '$1_9'],
+    // For subscripts attached to multi-letter words, just remove them entirely
+    [/([a-zA-Z]{2,})[₀₁₂₃₄₅₆₇₈₉]+/g, '$1'],
+    // Subscript operators and letters (these are rare enough to handle generically)
     [/₊/g, '_+'],
     [/₋/g, '_-'],
     [/₌/g, '_='],
     [/₍/g, '_('],
     [/₎/g, '_)'],
-    [/ₐ/g, '_a'],
-    [/ₑ/g, '_e'],
-    [/ᵢ/g, '_i'],
-    [/ₙ/g, '_n'],
-    [/ₓ/g, '_x'],
-    [/ᵧ/g, '_y'],
+    [/(?<![a-zA-Z])([a-zA-Z])ₐ/g, '$1_a'],
+    [/(?<![a-zA-Z])([a-zA-Z])ₑ/g, '$1_e'],
+    [/(?<![a-zA-Z])([a-zA-Z])ᵢ/g, '$1_i'],
+    [/(?<![a-zA-Z])([a-zA-Z])ₙ/g, '$1_n'],
+    [/(?<![a-zA-Z])([a-zA-Z])ₓ/g, '$1_x'],
+    [/(?<![a-zA-Z])([a-zA-Z])ᵧ/g, '$1_y'],
+    // Remove any remaining orphan subscripts from words
+    [/([a-zA-Z]{2,})[ₐₑᵢₙₓᵧ]/g, '$1'],
     
     // Unicode fractions - convert to a/b format
     [/½/g, '1/2'],
