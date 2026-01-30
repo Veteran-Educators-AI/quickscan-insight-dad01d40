@@ -1052,8 +1052,59 @@ export function fixEncodingCorruption(text: string): string {
   
   return result;
 }
-
 export { mathSymbols, superscripts, subscripts, fractions };
+
+/**
+ * Sanitize text for Word document export
+ * Unlike sanitizeForPDF, this preserves Unicode symbols since Word handles them natively.
+ * It still fixes encoding corruption and cleans up problematic patterns.
+ */
+export function sanitizeForWord(text: string, skipPreProcessing = false): string {
+  if (!text) return '';
+  
+  let result = text;
+  
+  // If skipPreProcessing is false, apply encoding fix and math rendering
+  // This is the default behavior when called directly
+  if (!skipPreProcessing) {
+    // First fix any encoding corruption - this restores proper Unicode from mojibake
+    result = fixEncodingCorruption(result);
+    
+    // Render math symbols properly
+    result = renderMathText(result);
+  }
+  
+  // Fix common Word-specific issues
+  const wordCleanupPatterns: [RegExp, string][] = [
+    // Remove control characters that cause issues in Word
+    [/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ''],
+    
+    // Fix double spaces
+    [/\s+/g, ' '],
+    
+    // Fix em-dashes and en-dashes to regular dashes for consistency
+    [/—/g, '-'],
+    [/–/g, '-'],
+    
+    // Fix smart quotes to regular quotes
+    [/[""]/g, '"'],
+    [/['']/g, "'"],
+    
+    // Clean up orphan subscripts from multi-letter words (same logic as PDF)
+    [/([a-zA-Z]{2,})[₀₁₂₃₄₅₆₇₈₉]+/g, '$1'],
+    [/([a-zA-Z]{2,})[ₐₑᵢₙₓᵧ]/g, '$1'],
+    
+    // Remove any Â artifacts that slipped through
+    [/Â(?=\s|[₀₁₂₃₄₅₆₇₈₉])/g, ''],
+    [/Â$/g, ''],
+  ];
+  
+  for (const [pattern, replacement] of wordCleanupPatterns) {
+    result = result.replace(pattern, replacement);
+  }
+  
+  return result.trim();
+}
 
 /**
  * Cleans text for print-safe output by removing problematic characters

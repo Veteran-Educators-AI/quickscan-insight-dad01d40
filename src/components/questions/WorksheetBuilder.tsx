@@ -60,7 +60,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useFeatureTracking } from "@/hooks/useFeatureTracking";
 import { handleApiError, checkResponseForApiError } from "@/lib/apiErrorHandler";
-import { renderMathText, sanitizeForPDF, fixEncodingCorruption } from "@/lib/mathRenderer";
+import { renderMathText, sanitizeForPDF, sanitizeForWord, fixEncodingCorruption } from "@/lib/mathRenderer";
 import { MathSymbolPreview } from "./MathSymbolPreview";
 import { CanvasDrawingTool } from "./CanvasDrawingTool";
 import { AIImageReviewDialog } from "./AIImageReviewDialog";
@@ -2829,7 +2829,7 @@ export function WorksheetBuilder({
 
       // Questions
       for (const question of compiledQuestions) {
-        const sanitizedQuestion = sanitizeForPDF(renderMathText(fixEncodingCorruption(question.question)));
+        const sanitizedQuestion = sanitizeForWord(question.question);
         const difficultyText = question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1);
         const bloomLabel = question.bloomLevel
           ? question.bloomLevel.charAt(0).toUpperCase() + question.bloomLevel.slice(1)
