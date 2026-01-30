@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
+import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 
 export interface LiveSession {
   id: string;
@@ -73,11 +74,13 @@ function generateSessionCode(): string {
 
 export function useLiveSession() {
   const { user } = useAuth();
+  const { pushToSisterApp } = usePushToSisterApp();
   const [session, setSession] = useState<LiveSession | null>(null);
   const [participants, setParticipants] = useState<SessionParticipant[]>([]);
   const [activeQuestion, setActiveQuestion] = useState<SessionQuestion | null>(null);
   const [answers, setAnswers] = useState<SessionAnswer[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [allSessionAnswers, setAllSessionAnswers] = useState<SessionAnswer[]>([]);
 
   // Start a new live session
   const startSession = useCallback(async (
@@ -204,11 +207,27 @@ export function useLiveSession() {
     }
   }, [activeQuestion]);
 
-  // End the session
+  // End the session and sync results to sister app
   const endSession = useCallback(async () => {
     if (!session) return;
 
     try {
+      // Fetch all answers for this session before ending
+      const { data: sessionQuestions } = await supabase
+        .from('live_session_questions')
+        .select('id')
+        .eq('session_id', session.id);
+
+      let allAnswers: SessionAnswer[] = [];
+      if (sessionQuestions && sessionQuestions.length > 0) {
+        const questionIds = sessionQuestions.map(q => q.id);
+        const { data: answersData } = await supabase
+          .from('live_session_answers')
+          .select('*')
+          .in('question_id', questionIds);
+        allAnswers = (answersData || []) as SessionAnswer[];
+      }
+
       const { error } = await supabase
         .from('live_presentation_sessions')
         .update({ 
@@ -224,16 +243,59 @@ export function useLiveSession() {
       if (nonParticipants.length > 0 && session.deduction_for_non_participation > 0) {
         toast.info(`${nonParticipants.length} student(s) didn't participate and will lose ${session.deduction_for_non_participation} credit`);
       }
+
+      // Push session results to sister app
+      try {
+        const participantResults = participants.map(p => ({
+          student_id: p.student_id,
+          student_name: p.student ? `${p.student.first_name} ${p.student.last_name}` : 'Unknown',
+          total_questions_answered: p.total_questions_answered,
+          correct_answers: p.correct_answers,
+          accuracy: p.total_questions_answered > 0 
+            ? Math.round((p.correct_answers / p.total_questions_answered) * 100) 
+            : 0,
+          credit_awarded: p.credit_awarded,
+          participated: p.total_questions_answered > 0,
+          answers: allAnswers
+            .filter(a => a.participant_id === p.id)
+            .map(a => ({
+              selected_answer: a.selected_answer,
+              is_correct: a.is_correct,
+              time_taken_seconds: a.time_taken_seconds,
+            })),
+        }));
+
+        await pushToSisterApp({
+          class_id: session.class_id,
+          title: session.title,
+          description: `Live session on ${session.topic}`,
+          // @ts-ignore - extended type for live_session_completed
+          type: 'live_session_completed',
+          topic_name: session.topic,
+          session_code: session.session_code,
+          participation_mode: session.participation_mode,
+          credit_for_participation: session.credit_for_participation,
+          deduction_for_non_participation: session.deduction_for_non_participation,
+          total_participants: participants.length,
+          active_participants: participants.filter(p => p.total_questions_answered > 0).length,
+          participant_results: participantResults,
+        });
+        console.log('Live session results synced to sister app');
+      } catch (syncError) {
+        console.error('Failed to sync session results to sister app:', syncError);
+        // Don't fail the session end if sync fails
+      }
       
       toast.success('Live session ended');
       setSession(null);
       setParticipants([]);
       setActiveQuestion(null);
+      setAllSessionAnswers([]);
     } catch (error) {
       console.error('Error ending session:', error);
       toast.error('Failed to end session');
     }
-  }, [session, participants]);
+  }, [session, participants, pushToSisterApp]);
 
   // Subscribe to real-time updates for teacher
   useEffect(() => {
