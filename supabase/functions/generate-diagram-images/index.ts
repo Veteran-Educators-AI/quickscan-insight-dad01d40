@@ -1627,8 +1627,20 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
 }
 
 // Detect subject area from prompt for subject-specific diagram styles
-function detectSubjectArea(prompt: string): 'math' | 'physics' | 'chemistry' | 'biology' | 'general' {
+function detectSubjectArea(prompt: string): 'math' | 'physics' | 'chemistry' | 'biology' | 'financial' | 'general' {
   const lowerPrompt = prompt.toLowerCase();
+  
+  // Financial/Business indicators - Check FIRST to avoid false positives with "interest" (could be physics)
+  const financialKeywords = [
+    'bond', 'bonds', 'stock', 'stocks', 'investment', 'interest rate', 'coupon rate',
+    'face value', 'maturity', 'yield', 'dividend', 'mortgage', 'loan', 'principal',
+    'annuity', 'depreciation', 'profit', 'revenue', 'cost', 'price', 'market value',
+    'compound interest', 'simple interest', 'amortization', 'budget', 'finance',
+    'financial', 'investor', 'portfolio', 'tax', 'inflation', 'currency', 'dollar'
+  ];
+  if (financialKeywords.some(kw => lowerPrompt.includes(kw))) {
+    return 'financial';
+  }
   
   // Physics indicators
   const physicsKeywords = [
@@ -1675,7 +1687,7 @@ function detectSubjectArea(prompt: string): 'math' | 'physics' | 'chemistry' | '
 }
 
 // Get subject-specific SVG generation prompt based on the Universal Diagram Component methodology
-function getSubjectSpecificPrompt(prompt: string, subject: 'math' | 'physics' | 'chemistry' | 'biology' | 'general'): string {
+function getSubjectSpecificPrompt(prompt: string, subject: 'math' | 'physics' | 'chemistry' | 'biology' | 'financial' | 'general'): string {
   const baseRequirements = `
 SVG TECHNICAL REQUIREMENTS (MANDATORY):
 - Use viewBox="0 0 300 300" for consistent scaling
@@ -1765,6 +1777,22 @@ MATH DIAGRAM STYLE GUIDE (Geometric/Coordinate):
 - Right angle markers: small squares at corners
 - Construction lines: stroke-dasharray="5,5"
 - Measurements: positioned <text> elements with appropriate font-size
+
+${baseRequirements}
+
+Return ONLY valid SVG code, no explanation.`;
+
+    case 'financial':
+      // Financial topics don't need geometry diagrams - return minimal prompt
+      return `Create a simple informational icon/diagram for financial education.
+
+TOPIC: ${prompt}
+
+STYLE GUIDE:
+- Simple, clean icon style (NO geometric shapes like triangles, circles, arcs)
+- Use dollar signs, graph bars, or simple charts if appropriate
+- Minimalist line-art with professional appearance
+- Black and white only
 
 ${baseRequirements}
 
@@ -2503,12 +2531,19 @@ Style: Simple line art, clean educational diagram suitable for projection.`
       }
 
       // STEP 4: Use hardcoded fallback shapes as last resort
+      // IMPORTANT: Only use fallback shapes for math/physics subjects
+      // Do NOT show geometry shapes for financial, biology, chemistry, or general subjects
       if (!imageUrl) {
-        console.log("Using hardcoded fallback shapes...");
-        imageUrl = getFallbackShape(q.imagePrompt);
-        if (imageUrl) {
-          console.log("Using hardcoded fallback shape");
-          validation = { isValid: true, issues: ['Used fallback shape'], shouldRetry: false };
+        // Only provide fallback shapes for subjects where geometric diagrams make sense
+        if (subject === 'math' || subject === 'physics') {
+          console.log("Using hardcoded fallback shapes for math/physics...");
+          imageUrl = getFallbackShape(q.imagePrompt);
+          if (imageUrl) {
+            console.log("Using hardcoded fallback shape");
+            validation = { isValid: true, issues: ['Used fallback shape'], shouldRetry: false };
+          }
+        } else {
+          console.log(`Skipping fallback shapes for subject: ${subject} (not math/physics)`);
         }
       }
 

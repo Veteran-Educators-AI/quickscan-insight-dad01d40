@@ -439,28 +439,41 @@ export function formatCurrency(text: string): string {
   
   let result = text;
   
+  // CRITICAL: Skip if text already has properly formatted currency with thousands separators
+  // Numbers like $5,000.00 or $1,000,000.00 should be left alone
+  // This pattern detects if we have $ followed by digits with commas (valid currency)
+  const hasFormattedCurrency = /\$\d{1,3}(,\d{3})+(\.\d{2})?/.test(result);
+  
   // Pattern 1: Numbers with exactly 2 decimal places that don't already have $ (e.g., "4.00", "12.50", "100.99")
-  // Exclude measurements, percentages, and other non-currency decimals
-  result = result.replace(/(?<!\$)(?<!\d)\b(\d{1,})\.(00|[0-9]{2})\b(?!\s*(?:dollars?|cents?|%|degrees?|°|cm|m|ft|in|kg|lb|g|oz|ml|L|hours?|minutes?|seconds?|years?|months?|days?|miles?|km))(?!\d)/gi, (match, whole, cents) => {
-    return `$${whole}.${cents}`;
-  });
+  // IMPORTANT: Skip numbers with commas (they're already formatted as currency like 5,000.00)
+  // Also exclude measurements, percentages, and other non-currency decimals
+  if (!hasFormattedCurrency) {
+    result = result.replace(/(?<!\$)(?<!\d)(?<!,)\b(\d{1,3})\.(\d{2})\b(?!\s*(?:dollars?|cents?|%|degrees?|°|cm|m|ft|in|kg|lb|g|oz|ml|L|hours?|minutes?|seconds?|years?|months?|days?|miles?|km))(?!\d)/gi, (match, whole, cents) => {
+      return `$${whole}.${cents}`;
+    });
+  }
   
   // Pattern 2: Whole numbers followed by "dollars" or "cents" - add $ sign if missing
+  // But skip if already has $ sign
   result = result.replace(/(?<!\$)\b(\d+)\s+(dollars?)\b/gi, '$$$1 $2');
   result = result.replace(/(?<!\$)\b(\d+)\s+(cents?)\b/gi, '$1 $2'); // cents stay as is
   
   // Pattern 3: Numbers in context phrases like "costs 5" or "price of 10" 
-  // Add $ and format properly
-  result = result.replace(/\b(costs?|priced? at|charges?|pays?|earns?|spends?|saves?|sells? for|bought for|sold for|worth)\s+(?<!\$)(\d+(?:\.\d{2})?)\b(?!\s*(?:dollars?|cents?|%))/gi, 
+  // Add $ and format properly - but skip if there's already a $ or comma in the number
+  result = result.replace(/\b(costs?|priced? at|charges?|pays?|earns?|spends?|saves?|sells? for|bought for|sold for|worth)\s+(?<!\$)(\d{1,3})(?!\d|,)(?:\.\d{2})?\b(?!\s*(?:dollars?|cents?|%))/gi, 
     (match, verb, amount) => {
+      // Don't modify if the original match contains comma (already formatted)
+      if (match.includes(',')) return match;
       const formattedAmount = amount.includes('.') ? amount : `${amount}.00`;
       return `${verb} $${formattedAmount}`;
     }
   );
   
   // Pattern 4: "of X" patterns like "profit of 25" -> "profit of $25.00"
-  result = result.replace(/\b(profit|revenue|income|savings?|balance|total|discount|fee|tax|tip|cost|price|amount|loss)\s+of\s+(?<!\$)(\d+(?:\.\d{2})?)\b(?!\s*(?:dollars?|cents?|%))/gi,
+  // Skip numbers with commas
+  result = result.replace(/\b(profit|revenue|income|savings?|balance|total|discount|fee|tax|tip|cost|price|amount|loss)\s+of\s+(?<!\$)(\d{1,3})(?!\d|,)(?:\.\d{2})?\b(?!\s*(?:dollars?|cents?|%))/gi,
     (match, noun, amount) => {
+      if (match.includes(',')) return match;
       const formattedAmount = amount.includes('.') ? amount : `${amount}.00`;
       return `${noun} of $${formattedAmount}`;
     }
@@ -468,21 +481,23 @@ export function formatCurrency(text: string): string {
   
   // Pattern 5: Standalone currency amounts at end of sentence or before punctuation
   // e.g., "The answer is 25.50." -> "The answer is $25.50."
-  result = result.replace(/\b(?:is|was|equals?|=|totals?|makes?)\s+(?<!\$)(\d+\.\d{2})(?=\s*[.,;:?!]|\s*$)/gi,
+  // Skip numbers with commas (already formatted)
+  result = result.replace(/\b(?:is|was|equals?|=|totals?|makes?)\s+(?<!\$)(\d{1,3}\.\d{2})(?=\s*[.,;:?!]|\s*$)/gi,
     (match, amount) => {
+      if (match.includes(',')) return match;
       return match.replace(amount, `$${amount}`);
     }
   );
   
-  // Pattern 6: Add "dollars" after standalone $ amounts that don't have it
-  // Only add if the amount is followed by a period, comma, or end of sentence
-  // and doesn't already have "dollars" or "cents" after it
-  result = result.replace(/(\$\d+\.\d{2})(?=\s*[.,;:?!]|\s*$)(?!\s*(?:dollars?|cents?|each|per|for))/gi,
-    (match) => `${match} dollars`
-  );
+  // REMOVED: Pattern 6 that added "dollars" after $ amounts
+  // This was adding unnecessary verbosity
   
   // Cleanup: Remove double dollar signs if any were introduced
   result = result.replace(/\$\$/g, '$');
+  
+  // Cleanup: Fix any accidental $X,$XXX patterns (comma after first digit group)
+  // This catches cases like "$5,$000.00" and fixes to "$5,000.00"
+  result = result.replace(/\$(\d{1,3}),\$(\d{3})/g, '$$$1,$2');
   
   return result;
 }
