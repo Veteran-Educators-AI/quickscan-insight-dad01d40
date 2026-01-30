@@ -23,7 +23,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useFeatureTracking } from '@/hooks/useFeatureTracking';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
-import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
+import { fixEncodingCorruption, renderMathText, sanitizeForPDF, sanitizeForWord } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun, PageOrientation, BorderStyle, AlignmentType, convertInchesToTwip, ImageRun } from 'docx';
 
@@ -43,6 +43,7 @@ type FormLetter = typeof FORM_LETTERS[number];
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
 const formatPdfText = (text: string) => sanitizeForPDF(renderMathText(fixEncodingCorruption(text)));
+const formatWordText = (text: string) => sanitizeForWord(text);
 
 interface Student {
   id: string;
@@ -831,7 +832,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
           for (let warmUpIdx = 0; warmUpIdx < questions.warmUp.length; warmUpIdx++) {
             const q = questions.warmUp[warmUpIdx];
-            const sanitizedQuestion = formatPdfText(q.question);
+            const sanitizedQuestion = formatWordText(q.question);
             const shapeKey = `${assignedForm}-${student.recommendedLevel}-warmUp-${warmUpIdx}`;
             const altWarmUpKey = `${cacheKey}-warmUp-${warmUpIdx}`;
             const generatedShapeUrl = geometryShapes[shapeKey] || geometryShapes[altWarmUpKey];
@@ -958,7 +959,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
           for (let idx = 0; idx < questions.main.length; idx++) {
             const q = questions.main[idx];
-            const sanitizedQuestion = formatPdfText(q.question);
+            const sanitizedQuestion = formatWordText(q.question);
             const shapeKey = `${assignedForm}-${student.recommendedLevel}-main-${idx}`;
             const generatedShapeUrl = geometryShapes[shapeKey];
             const hasShape = ((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl;
