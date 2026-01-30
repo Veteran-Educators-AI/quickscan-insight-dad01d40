@@ -3559,47 +3559,30 @@ QUALITY CHECK BEFORE FINISHING
 
           {includeGeometry && (
             <div className="ml-6 space-y-3">
-              {/* Prefer Deterministic SVG Toggle */}
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <Label htmlFor="preferDeterministicSVG" className="text-sm font-medium text-emerald-900 cursor-pointer flex items-center gap-2">
-                      ✓ Guaranteed Accurate Diagrams
-                      <Badge variant="secondary" className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5">Recommended</Badge>
-                    </Label>
-                    <p className="text-xs text-emerald-700 mt-0.5">
-                      Use programmatic SVG for coordinate planes — 100% correct axis labels every time
-                    </p>
-                  </div>
-                  <Switch
-                    id="preferDeterministicSVG"
-                    checked={preferDeterministicSVG}
-                    onCheckedChange={(checked) => {
-                      setPreferDeterministicSVG(checked);
-                      if (checked) setUseAIImages(false); // Mutually exclusive
-                    }}
-                  />
-                </div>
+              {/* Info box about text-based geometry */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <p className="text-sm text-slate-700">
+                  <strong>Default:</strong> Geometry questions will include detailed verbal descriptions 
+                  of shapes that students can draw themselves. This provides <strong>maximum workspace</strong> for 
+                  showing work clearly.
+                </p>
               </div>
 
-              {/* AI-Generated Images Toggle */}
+              {/* AI-Generated Images Toggle - Optional */}
               <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <Label htmlFor="useAIImages" className="text-sm font-medium text-cyan-900 cursor-pointer flex items-center gap-2">
-                      Use AI-Generated Images
-                      {!preferDeterministicSVG && (
-                        <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 px-1.5">May have errors</Badge>
-                      )}
+                      Generate AI Diagrams (Optional)
+                      <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 px-1.5">Slower</Badge>
                     </Label>
                     <p className="text-xs text-cyan-700 mt-0.5">
-                      Generate realistic images using AI (may occasionally have axis labeling issues)
+                      Add AI-generated images. Takes a few seconds per image; full class set may take 5-10 mins.
                     </p>
                   </div>
                   <Switch
                     id="useAIImages"
                     checked={useAIImages}
-                    disabled={preferDeterministicSVG}
                     onCheckedChange={() => handleImageToggle('aiImages', useAIImages)}
                   />
                 </div>

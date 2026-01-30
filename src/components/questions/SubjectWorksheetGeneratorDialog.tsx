@@ -289,6 +289,9 @@ export function SubjectWorksheetGeneratorDialog({
           difficulty: selectedLevels.has('advanced') ? 3 : selectedLevels.has('intermediate') ? 2 : 1,
           isDiagnostic: false,
           subjectContext: context,
+          // Default to NO image generation - text-only with generous workspace for student work
+          useAIImages: includeImages,
+          includeGeometry: supportsGeometry && includeGeometry,
         },
       });
 
