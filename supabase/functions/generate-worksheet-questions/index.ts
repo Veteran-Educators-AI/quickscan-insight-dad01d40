@@ -764,6 +764,24 @@ TOPICS:
 ${topicsList}
 
 ═══════════════════════════════════════════════════════════════════════════════
+STUDENT WORKSPACE REQUIREMENTS (CRITICAL FOR AI SCANNING):
+═══════════════════════════════════════════════════════════════════════════════
+
+IMPORTANT: Design questions that allow GENEROUS WORKSPACE for students to show their work clearly.
+- Questions should be structured so students have PLENTY OF ROOM to write out all steps
+- Avoid questions that require tiny, cramped work areas
+- Multi-step problems should be phrased to encourage showing work STEP BY STEP
+- For geometry: describe shapes verbally rather than requiring diagram interpretation
+- Each problem should have a clear "final answer" that students can box or circle
+- Leave mental space for: initial setup, intermediate calculations, final answer
+
+This enables the AI grading system to:
+1. Clearly see each step of student work
+2. Identify where errors occur in the problem-solving process
+3. Provide targeted feedback on specific misconceptions
+4. Award appropriate partial credit for shown work
+
+═══════════════════════════════════════════════════════════════════════════════
 BLOOM'S TAXONOMY STRUCTURE (MANDATORY - Follow this progression):
 ═══════════════════════════════════════════════════════════════════════════════
 
