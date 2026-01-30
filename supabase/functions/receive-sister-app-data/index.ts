@@ -43,10 +43,10 @@ const corsHeaders = {
 // data: Flexible object containing event-specific information
 // -----------------------------------------------------------------------------
 interface IncomingData {
-  action: 'grade_completed' | 'activity_completed' | 'reward_earned' | 'level_up' | 'achievement_unlocked' | 'batch_sync' | 'behavior_deduction';
-  student_id?: string; // Optional for batch_sync
+  action: 'grade_completed' | 'activity_completed' | 'reward_earned' | 'level_up' | 'achievement_unlocked' | 'batch_sync' | 'behavior_deduction' | 'live_session_completed';
+  student_id?: string; // Optional for batch_sync and live_session_completed
   data?: {
-    activity_type?: string;      // e.g., "quiz", "game", "practice"
+    activity_type?: string;      // e.g., "quiz", "game", "practice", "live_presentation"
     activity_name?: string;      // e.g., "Algebra Challenge Level 5"
     score?: number;              // 0-100 score if applicable
     xp_earned?: number;          // Experience points earned
@@ -55,6 +55,14 @@ interface IncomingData {
     achievement_name?: string;   // Name of achievement (for achievement_unlocked)
     topic_name?: string;         // Math topic associated with the activity
     timestamp?: string;          // When the event occurred (ISO string)
+    // Live session specific fields
+    session_code?: string;
+    participation_mode?: string;
+    credit_for_participation?: number;
+    deduction_for_non_participation?: number;
+    total_participants?: number;
+    active_participants?: number;
+    participant_results?: LiveSessionParticipantResult[];
     [key: string]: unknown;      // Allow additional custom fields
   };
   // Batch sync fields (when action === 'batch_sync')
@@ -68,6 +76,21 @@ interface IncomingData {
     total_misconceptions: number;
     weak_topics_identified: number;
   };
+}
+
+interface LiveSessionParticipantResult {
+  student_id: string;
+  student_name: string;
+  total_questions_answered: number;
+  correct_answers: number;
+  accuracy: number;
+  credit_awarded: number;
+  participated: boolean;
+  answers: {
+    selected_answer: string;
+    is_correct: boolean | null;
+    time_taken_seconds: number | null;
+  }[];
 }
 
 interface StudentLearningProfile {
@@ -223,11 +246,19 @@ serve(async (req) => {
       );
     }
 
-    // For batch_sync, validate differently
+    // For batch_sync and live_session_completed, validate differently
     if (body.action === 'batch_sync') {
       if (!body.student_profiles || body.student_profiles.length === 0) {
         return new Response(
           JSON.stringify({ success: false, error: 'batch_sync requires student_profiles array' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } else if (body.action === 'live_session_completed') {
+      // live_session_completed doesn't need student_id, uses participant_results array
+      if (!body.data?.participant_results) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'live_session_completed requires data.participant_results array' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -244,7 +275,95 @@ serve(async (req) => {
     let processedResult: any = null;
     let logEntry: any = null;
 
-    if (body.action === 'batch_sync') {
+    if (body.action === 'live_session_completed') {
+      // ---------------------------------------------------------------------
+      // LIVE SESSION PROCESSING
+      // ---------------------------------------------------------------------
+      // Process live presentation session results from sister app
+      // Saves participation data for each student
+      // ---------------------------------------------------------------------
+      console.log('Processing live session completed:', body.data);
+      
+      const participantResults = body.data?.participant_results || [];
+      let participantsProcessed = 0;
+      let gradesCreated = 0;
+
+      for (const participant of participantResults) {
+        participantsProcessed++;
+        
+        // Log each participant's results
+        await supabaseAdmin.from('sister_app_sync_log').insert({
+          teacher_id: keyRecord.teacher_id,
+          student_id: participant.student_id,
+          action: 'live_session_participation',
+          data: {
+            activity_name: body.data?.activity_name,
+            topic_name: body.data?.topic_name,
+            student_name: participant.student_name,
+            total_questions_answered: participant.total_questions_answered,
+            correct_answers: participant.correct_answers,
+            accuracy: participant.accuracy,
+            credit_awarded: participant.credit_awarded,
+            participated: participant.participated,
+            answers: participant.answers,
+            session_code: body.data?.session_code,
+          },
+          source_app: 'scholar_app',
+          processed: true,
+          processed_at: new Date().toISOString(),
+        });
+
+        // If participated, create a grade entry for tracking
+        if (participant.participated && participant.total_questions_answered > 0) {
+          const { error: gradeError } = await supabaseAdmin
+            .from('grade_history')
+            .insert({
+              student_id: participant.student_id,
+              teacher_id: keyRecord.teacher_id,
+              topic_name: body.data?.topic_name || 'Live Session',
+              grade: participant.accuracy,
+              grade_justification: `Live session participation: ${participant.correct_answers}/${participant.total_questions_answered} correct (${body.data?.activity_name || 'Session'})`,
+            });
+
+          if (!gradeError) {
+            gradesCreated++;
+          } else {
+            console.error('Error saving live session grade:', gradeError);
+          }
+        }
+      }
+
+      // Log the session summary
+      const { data: summaryLog } = await supabaseAdmin
+        .from('sister_app_sync_log')
+        .insert({
+          teacher_id: keyRecord.teacher_id,
+          action: 'live_session_completed',
+          data: {
+            activity_name: body.data?.activity_name,
+            topic_name: body.data?.topic_name,
+            session_code: body.data?.session_code,
+            total_participants: body.data?.total_participants,
+            active_participants: body.data?.active_participants,
+            participants_processed: participantsProcessed,
+            grades_created: gradesCreated,
+          },
+          source_app: 'scholar_app',
+          processed: true,
+          processed_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      logEntry = summaryLog;
+      processedResult = {
+        live_session_processed: true,
+        participants_synced: participantsProcessed,
+        grades_created: gradesCreated,
+        message: `Processed ${participantsProcessed} participant results from live session`,
+      };
+
+    } else if (body.action === 'batch_sync') {
       // ---------------------------------------------------------------------
       // BATCH SYNC PROCESSING
       // ---------------------------------------------------------------------

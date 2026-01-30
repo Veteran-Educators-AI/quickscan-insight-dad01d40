@@ -35,7 +35,7 @@ const corsHeaders = {
  * Contains class info, assignment details, and student grade data
  */
 interface PushRequest {
-  type?: 'ping' | 'grade' | 'behavior' | 'student_created';   // Request type
+  type?: 'ping' | 'grade' | 'behavior' | 'student_created' | 'live_session_completed';   // Request type
   class_id?: string;         // The class this data belongs to
   class_name?: string;       // The class name
   title?: string;            // Assignment or activity title
@@ -59,6 +59,29 @@ interface PushRequest {
   coin_deduction?: number;   // Coins to remove for behavior
   reason?: string;           // Reason for deduction
   notes?: string;            // Additional notes
+  // Live session fields
+  session_code?: string;           // Session join code
+  participation_mode?: string;     // 'individual' or 'pairs'
+  credit_for_participation?: number;
+  deduction_for_non_participation?: number;
+  total_participants?: number;
+  active_participants?: number;
+  participant_results?: ParticipantResult[];
+}
+
+interface ParticipantResult {
+  student_id: string;
+  student_name: string;
+  total_questions_answered: number;
+  correct_answers: number;
+  accuracy: number;
+  credit_awarded: number;
+  participated: boolean;
+  answers: {
+    selected_answer: string;
+    is_correct: boolean | null;
+    time_taken_seconds: number | null;
+  }[];
 }
 
 /**
@@ -128,6 +151,31 @@ function convertToStudentCreatedFormat(requestData: PushRequest) {
       email: requestData.student_email,
       class_id: requestData.class_id,
       class_name: requestData.class_name,
+      timestamp: new Date().toISOString(),
+    }
+  };
+}
+
+/**
+ * Convert live session completed request to sister app format
+ * Sends full participation and answer data for all students
+ */
+function convertToLiveSessionFormat(requestData: PushRequest) {
+  return {
+    action: 'live_session_completed' as const,
+    data: {
+      activity_type: 'live_presentation',
+      activity_name: requestData.title,
+      topic_name: requestData.topic_name,
+      description: requestData.description,
+      class_id: requestData.class_id,
+      session_code: requestData.session_code,
+      participation_mode: requestData.participation_mode,
+      credit_for_participation: requestData.credit_for_participation,
+      deduction_for_non_participation: requestData.deduction_for_non_participation,
+      total_participants: requestData.total_participants,
+      active_participants: requestData.active_participants,
+      participant_results: requestData.participant_results || [],
       timestamp: new Date().toISOString(),
     }
   };
@@ -207,6 +255,10 @@ serve(async (req) => {
       // Handle new student creation - sync roster
       console.log('Processing student creation request');
       sisterAppPayload = convertToStudentCreatedFormat(requestData);
+    } else if (requestData.type === 'live_session_completed') {
+      // Handle live session results
+      console.log('Processing live session completed request');
+      sisterAppPayload = convertToLiveSessionFormat(requestData);
     } else {
       // Handle grade completion (default)
       sisterAppPayload = convertToSisterAppFormat(requestData);
