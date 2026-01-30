@@ -9,13 +9,14 @@ interface GenerationTimeEstimatorProps {
   studentCount?: number;
 }
 
-// Time estimates in seconds
+// Time estimates in seconds - optimized for realistic generation times
+// Target: most generations complete in under 5 minutes, max ~10 minutes
 const TIME_ESTIMATES = {
-  basePerQuestion: 2, // Base time per question (text only)
-  imagePerQuestion: 8, // Additional time for AI image generation
-  svgPerQuestion: 3, // Additional time for SVG diagram generation
-  overhead: 3, // Network/processing overhead
-  overheadPerSheet: 0.5, // Additional overhead per student sheet
+  basePerQuestion: 0.8, // Base time per question (text only) - AI is fast
+  imagePerQuestion: 2, // Additional time for AI image generation
+  svgPerQuestion: 1, // Additional time for SVG diagram generation  
+  overhead: 2, // Network/processing overhead
+  overheadPerSheet: 0.1, // Minimal overhead per student sheet (cached per level)
 };
 
 export function GenerationTimeEstimator({

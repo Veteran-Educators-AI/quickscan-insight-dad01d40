@@ -12,10 +12,10 @@ interface GenerationProgressCounterProps {
 
 // Time estimates in seconds (should match GenerationTimeEstimator)
 const TIME_ESTIMATES = {
-  basePerQuestion: 2,
-  imagePerQuestion: 8,
-  svgPerQuestion: 3,
-  overhead: 3,
+  basePerQuestion: 0.8,
+  imagePerQuestion: 2,
+  svgPerQuestion: 1,
+  overhead: 2,
 };
 
 export function GenerationProgressCounter({
