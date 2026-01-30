@@ -318,11 +318,31 @@ VARIATION REQUIREMENT (CRITICAL - ANTI-COPYING MEASURE):
       : ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'];
     const bloomInstruction = `ONLY generate questions for these Bloom's Taxonomy cognitive levels: ${allowedBloomLevels.join(', ')}. Do NOT include questions from other cognitive levels.`;
 
+    // Detect if this is a geometry/physics subject that actually needs diagrams
+    const geometrySubjects = ['geometry', 'physics', 'algebra1', 'algebra2', 'precalculus'];
+    const isGeometrySubject = topics.some(t => 
+      geometrySubjects.some(gs => 
+        t.subject?.toLowerCase().includes(gs) || 
+        t.category?.toLowerCase().includes('geometry') ||
+        t.category?.toLowerCase().includes('triangle') ||
+        t.category?.toLowerCase().includes('coordinate')
+      )
+    );
+    
+    // Financial Math and other non-geometry subjects should NEVER get diagrams
+    const noImageSubjects = ['financial', 'finance', 'economics', 'history', 'government', 'english', 'ela'];
+    const isNoImageSubject = topics.some(t => 
+      noImageSubjects.some(ns => 
+        t.subject?.toLowerCase().includes(ns) || 
+        t.category?.toLowerCase().includes(ns)
+      )
+    );
+
     // Build optional instructions for geometry and formulas
-    // IMPORTANT: Only generate diagrams if BOTH includeGeometry AND useAIImages are true
+    // IMPORTANT: Only generate diagrams if it's a geometry subject AND includeGeometry AND useAIImages are true
     // If useAIImages is false, do NOT generate SVG diagrams either - this is the "no image generation" mode
     let geometryInstruction = '';
-    if (includeGeometry && useAIImages) {
+    if (includeGeometry && useAIImages && isGeometrySubject && !isNoImageSubject) {
       geometryInstruction = `
 8. For geometry-related questions, you MUST include an "imagePrompt" field. Write the prompt using this STRICT format:
 
@@ -478,8 +498,8 @@ ${nextNum}. Include coordinate geometry problems:
       }
     }
 
-    // Only include imageFieldNote if AI images are enabled
-    const imageFieldNote = useAIImages && includeGeometry 
+    // Only include imageFieldNote if AI images are enabled AND it's a geometry subject
+    const imageFieldNote = useAIImages && includeGeometry && isGeometrySubject && !isNoImageSubject
       ? `
 If the question involves geometry and a diagram would help, include an "imagePrompt" field with a detailed description of the diagram. The imagePrompt field should ONLY be included when a visual diagram is genuinely helpful for the question.`
       : `
@@ -602,7 +622,7 @@ WARM-UP MODE (Confidence Building):
     "topic": "Topic Name",
     "standard": "G.CO.A.1",
     "question": "The full question text here",
-    "difficulty": "${allowedDifficulties[0]}"${hintExample}${answerExample}${includeGeometry ? ',\n    "svg": "<svg width=\\"200\\" height=\\"200\\" viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>"' : ''}
+    "difficulty": "${allowedDifficulties[0]}"${hintExample}${answerExample}${includeGeometry && isGeometrySubject && !isNoImageSubject ? ',\n    "svg": "<svg width=\\"200\\" height=\\"200\\" viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>"' : ''}
   }
 ]`;
 
