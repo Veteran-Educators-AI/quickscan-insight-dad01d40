@@ -148,28 +148,74 @@ const FALLBACK_SHAPES: Record<string, (params?: any) => string> = {
     <text x="180" y="145" font-family="Arial" font-size="10">r = 3</text>
   </svg>`,
 
-  // Simple circle (no coordinate plane)
-  simple_circle: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+  // Simple circle with SECTOR - parameterized by angle
+  simple_circle: (params?: { angle?: number; radius?: number; label?: string }) => {
+    const angle = params?.angle || 90;
+    const r = 100;
+    const cx = 150, cy = 150;
+    // Calculate arc endpoint
+    const angleRad = (angle * Math.PI) / 180;
+    const endX = cx + r * Math.cos(angleRad);
+    const endY = cy - r * Math.sin(angleRad); // SVG Y is inverted
+    const largeArc = angle > 180 ? 1 : 0;
+    
+    return `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
-    <circle cx="150" cy="150" r="100" stroke="#000000" stroke-width="2" fill="none"/>
-    <circle cx="150" cy="150" r="4" fill="#000000"/>
-    <line x1="150" y1="150" x2="250" y2="150" stroke="#000000" stroke-width="1.5" stroke-dasharray="4,2"/>
-    <text x="150" y="140" font-family="Arial" font-size="12" text-anchor="middle" font-weight="bold">O</text>
-    <text x="200" y="140" font-family="Arial" font-size="11">r</text>
-  </svg>`,
+    <circle cx="${cx}" cy="${cy}" r="${r}" stroke="#000000" stroke-width="2" fill="none"/>
+    <!-- Sector -->
+    <path d="M ${cx} ${cy} L ${cx + r} ${cy} A ${r} ${r} 0 ${largeArc} 0 ${endX.toFixed(1)} ${endY.toFixed(1)} Z" stroke="#000000" stroke-width="2" fill="#e3f2fd"/>
+    <!-- Center point -->
+    <circle cx="${cx}" cy="${cy}" r="4" fill="#000000"/>
+    <!-- Radius lines -->
+    <line x1="${cx}" y1="${cy}" x2="${cx + r}" y2="${cy}" stroke="#000000" stroke-width="1.5"/>
+    <line x1="${cx}" y1="${cy}" x2="${endX.toFixed(1)}" y2="${endY.toFixed(1)}" stroke="#000000" stroke-width="1.5"/>
+    <!-- Angle arc indicator -->
+    <path d="M ${cx + 25} ${cy} A 25 25 0 ${largeArc} 0 ${cx + 25 * Math.cos(angleRad)} ${cy - 25 * Math.sin(angleRad)}" stroke="#000000" stroke-width="1" fill="none"/>
+    <!-- Labels -->
+    <text x="${cx}" y="${cy - 8}" font-family="Arial" font-size="12" text-anchor="middle" font-weight="bold">O</text>
+    <text x="${cx + 40}" y="${cy - 10}" font-family="Arial" font-size="11">${angle}°</text>
+    <text x="${cx + r/2}" y="${cy + 15}" font-family="Arial" font-size="11">r</text>
+  </svg>`;
+  },
 
-  // Arc / Semicircle
-  arc: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+  // Arc with specific angle - parameterized
+  arc: (params?: { angle?: number; startAngle?: number }) => {
+    const angle = params?.angle || 180;
+    const startAngle = params?.startAngle || 0;
+    const r = 100;
+    const cx = 150, cy = 150;
+    // Calculate arc endpoints
+    const startRad = (startAngle * Math.PI) / 180;
+    const endRad = ((startAngle + angle) * Math.PI) / 180;
+    const startX = cx + r * Math.cos(startRad);
+    const startY = cy - r * Math.sin(startRad);
+    const endX = cx + r * Math.cos(endRad);
+    const endY = cy - r * Math.sin(endRad);
+    const largeArc = angle > 180 ? 1 : 0;
+    
+    return `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
-    <path d="M 50 200 A 100 100 0 0 1 250 200" stroke="#000000" stroke-width="2" fill="none"/>
-    <line x1="50" y1="200" x2="250" y2="200" stroke="#000000" stroke-width="2"/>
-    <circle cx="50" cy="200" r="4" fill="#000000"/>
-    <circle cx="250" cy="200" r="4" fill="#000000"/>
-    <circle cx="150" cy="200" r="4" fill="#000000"/>
-    <text x="35" y="215" font-family="Arial" font-size="12" font-weight="bold">A</text>
-    <text x="255" y="215" font-family="Arial" font-size="12" font-weight="bold">B</text>
-    <text x="145" y="215" font-family="Arial" font-size="12" font-weight="bold">O</text>
-  </svg>`,
+    <!-- Full circle outline (faint) -->
+    <circle cx="${cx}" cy="${cy}" r="${r}" stroke="#cccccc" stroke-width="1" fill="none" stroke-dasharray="4,4"/>
+    <!-- Arc (bold) -->
+    <path d="M ${startX.toFixed(1)} ${startY.toFixed(1)} A ${r} ${r} 0 ${largeArc} 0 ${endX.toFixed(1)} ${endY.toFixed(1)}" stroke="#000000" stroke-width="3" fill="none"/>
+    <!-- Radii to endpoints -->
+    <line x1="${cx}" y1="${cy}" x2="${startX.toFixed(1)}" y2="${startY.toFixed(1)}" stroke="#000000" stroke-width="1.5" stroke-dasharray="4,2"/>
+    <line x1="${cx}" y1="${cy}" x2="${endX.toFixed(1)}" y2="${endY.toFixed(1)}" stroke="#000000" stroke-width="1.5" stroke-dasharray="4,2"/>
+    <!-- Center point -->
+    <circle cx="${cx}" cy="${cy}" r="4" fill="#000000"/>
+    <!-- Endpoint markers -->
+    <circle cx="${startX.toFixed(1)}" cy="${startY.toFixed(1)}" r="4" fill="#000000"/>
+    <circle cx="${endX.toFixed(1)}" cy="${endY.toFixed(1)}" r="4" fill="#000000"/>
+    <!-- Angle indicator -->
+    <path d="M ${cx + 30 * Math.cos(startRad)} ${cy - 30 * Math.sin(startRad)} A 30 30 0 ${largeArc} 0 ${cx + 30 * Math.cos(endRad)} ${cy - 30 * Math.sin(endRad)}" stroke="#000000" stroke-width="1" fill="none"/>
+    <!-- Labels -->
+    <text x="${cx - 10}" y="${cy + 5}" font-family="Arial" font-size="12" font-weight="bold">O</text>
+    <text x="${(cx + 45 * Math.cos((startRad + endRad) / 2)).toFixed(0)}" y="${(cy - 45 * Math.sin((startRad + endRad) / 2)).toFixed(0)}" font-family="Arial" font-size="11">${angle}°</text>
+    <text x="${startX.toFixed(0)}" y="${(parseFloat(startY.toFixed(0)) - 8)}" font-family="Arial" font-size="11" font-weight="bold">A</text>
+    <text x="${endX.toFixed(0)}" y="${(parseFloat(endY.toFixed(0)) - 8)}" font-family="Arial" font-size="11" font-weight="bold">B</text>
+  </svg>`;
+  },
 
   // Inscribed angle / chord
   chord: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
@@ -468,15 +514,53 @@ function matchFallbackShape(prompt: string): string | null {
   return null;
 }
 
-// Get fallback shape SVG as data URL
+// Get fallback shape SVG as data URL - with parameter extraction
 function getFallbackShape(prompt: string): string | null {
   const shapeKey = matchFallbackShape(prompt);
   if (shapeKey && FALLBACK_SHAPES[shapeKey]) {
-    const svg = FALLBACK_SHAPES[shapeKey]();
+    // Extract parameters from prompt for parameterized shapes
+    const params = extractShapeParams(prompt, shapeKey);
+    const svg = FALLBACK_SHAPES[shapeKey](params);
     const base64Svg = btoa(unescape(encodeURIComponent(svg)));
     return `data:image/svg+xml;base64,${base64Svg}`;
   }
   return null;
+}
+
+// Extract shape parameters from prompt text
+function extractShapeParams(prompt: string, shapeKey: string): any {
+  const params: any = {};
+  const lowerPrompt = prompt.toLowerCase();
+  
+  // Extract angle (e.g., "100°", "100 degrees", "central angle of 100")
+  const angleMatch = prompt.match(/(\d+)\s*(?:°|degrees?|deg)/i) ||
+                     prompt.match(/central\s*(?:angle|∠)\s*(?:of\s*)?(\d+)/i) ||
+                     prompt.match(/angle\s*(?:of\s*)?(\d+)/i);
+  if (angleMatch) {
+    params.angle = parseInt(angleMatch[1]);
+  }
+  
+  // For arc problems with time (clock), convert to degrees
+  // 60 minutes = 360°, so 1 minute = 6°
+  const minuteMatch = prompt.match(/(\d+)[- ]?minute/i);
+  if (minuteMatch && (lowerPrompt.includes('clock') || lowerPrompt.includes('minute hand'))) {
+    const minutes = parseInt(minuteMatch[1]);
+    params.angle = minutes * 6; // Convert minutes to degrees
+    params.startAngle = 90; // Clock starts at 12 o'clock (90° in standard position)
+  }
+  
+  // Extract radius
+  const radiusMatch = prompt.match(/radius\s*(?:of\s*)?(\d+(?:\.\d+)?)/i);
+  if (radiusMatch) {
+    params.radius = parseFloat(radiusMatch[1]);
+  }
+  
+  // For sector vs arc, default appropriately
+  if (shapeKey === 'simple_circle' && lowerPrompt.includes('sector')) {
+    params.isSector = true;
+  }
+  
+  return params;
 }
 
 // Query the Regents Shape Library for matching shapes
