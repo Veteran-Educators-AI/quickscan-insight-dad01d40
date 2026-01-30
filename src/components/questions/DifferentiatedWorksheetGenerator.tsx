@@ -440,6 +440,18 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   } | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   
+  // Subjects that should NEVER have geometry shapes/diagrams
+  const noShapeSubjectKeywords = ['financial', 'finance', 'economics', 'history', 'government', 'english', 'ela', 'bond', 'investment', 'insurance', 'retirement'];
+  
+  const isNoShapeSubject = customTopics.some((t) => {
+    const topicName = t.topicName?.toLowerCase() || "";
+    const standard = t.standard?.toLowerCase() || "";
+    return noShapeSubjectKeywords.some(ns => topicName.includes(ns) || standard.includes(ns));
+  }) || selectedTopics.some((topic) => {
+    const topicLower = topic?.toLowerCase() || "";
+    return noShapeSubjectKeywords.some(ns => topicLower.includes(ns));
+  });
+  
   // Selective regeneration state
   const [regeneratingKey, setRegeneratingKey] = useState<string | null>(null);
   const [selectedRegenerateKeys, setSelectedRegenerateKeys] = useState<Set<string>>(new Set());
@@ -836,7 +848,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             const shapeKey = `${assignedForm}-${student.recommendedLevel}-warmUp-${warmUpIdx}`;
             const altWarmUpKey = `${cacheKey}-warmUp-${warmUpIdx}`;
             const generatedShapeUrl = geometryShapes[shapeKey] || geometryShapes[altWarmUpKey];
-            const hasShape = ((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl;
+            const hasShape = !isNoShapeSubject && (((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl);
             children.push(
               new Paragraph({
                 children: [
@@ -849,7 +861,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             );
 
             // Add geometry image if available (for warm-up) - check generated shapes first
-            if (generatedShapeUrl || ((q.imageUrl || q.svg) && includeGeometry)) {
+            if (!isNoShapeSubject && (generatedShapeUrl || ((q.imageUrl || q.svg) && includeGeometry))) {
               try {
                 let imageData = generatedShapeUrl || q.imageUrl || '';
                 if (!imageData && q.svg && !q.imageUrl) {
@@ -962,7 +974,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             const sanitizedQuestion = formatWordText(q.question);
             const shapeKey = `${assignedForm}-${student.recommendedLevel}-main-${idx}`;
             const generatedShapeUrl = geometryShapes[shapeKey];
-            const hasShape = ((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl;
+            const hasShape = !isNoShapeSubject && (((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl);
 
             children.push(
               new Paragraph({
@@ -980,7 +992,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             const altShapeKey = `${cacheKey}-main-${idx}`;
             const finalShapeUrl = generatedShapeUrl || geometryShapes[altShapeKey];
             
-            if (finalShapeUrl || ((q.imageUrl || q.svg) && includeGeometry)) {
+            if (!isNoShapeSubject && (finalShapeUrl || ((q.imageUrl || q.svg) && includeGeometry))) {
               try {
                 let imageData = '';
                 
@@ -1515,7 +1527,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               // Add geometry diagram if available for warm-up (check on-demand shapes first)
               const warmUpShapeKey = `${cacheKey}-warmUp-${warmUpIdx}`;
               const warmUpGeneratedShapeUrl = geometryShapes[warmUpShapeKey];
-              const hasWarmUpShape = warmUpGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry);
+              const hasWarmUpShape = !isNoShapeSubject && (warmUpGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry));
               
               if (hasWarmUpShape) {
                 try {
@@ -1702,7 +1714,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             // Add geometry diagram if available (check on-demand shapes first)
             const mainShapeKey = `${cacheKey}-main-${questionIdx}`;
             const mainGeneratedShapeUrl = geometryShapes[mainShapeKey];
-            const hasMainShape = mainGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry);
+            const hasMainShape = !isNoShapeSubject && (mainGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry));
             
             if (hasMainShape) {
               try {
@@ -2833,8 +2845,8 @@ QUALITY CHECK BEFORE FINISHING
                         </Tooltip>
                       </TooltipProvider>
                     </div>
-                    {/* Show geometry shapes in preview - from question or generated */}
-                    {((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-warmUp-${idx}`] ? (
+                    {/* Show geometry shapes in preview - from question or generated - only for geometry subjects */}
+                    {!isNoShapeSubject && (((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-warmUp-${idx}`]) ? (
                       <div className="mt-2 flex flex-col items-center gap-2">
                         <div className="relative">
                           {geometryShapes[`${cacheKey}-warmUp-${idx}`] ? (
@@ -2871,7 +2883,7 @@ QUALITY CHECK BEFORE FINISHING
                           Regenerate Diagram
                         </Button>
                       </div>
-                    ) : includeGeometry && (
+                    ) : includeGeometry && !isNoShapeSubject && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -2991,8 +3003,8 @@ QUALITY CHECK BEFORE FINISHING
                         </Tooltip>
                       </TooltipProvider>
                     </div>
-                    {/* Show geometry shapes in preview - from question or generated */}
-                    {((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-main-${idx}`] ? (
+                    {/* Show geometry shapes in preview - from question or generated - only for geometry subjects */}
+                    {!isNoShapeSubject && (((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-main-${idx}`]) ? (
                       <div className="mt-2 flex flex-col items-center gap-2">
                         <div className="relative">
                           {geometryShapes[`${cacheKey}-main-${idx}`] ? (
@@ -3128,8 +3140,8 @@ QUALITY CHECK BEFORE FINISHING
                     {/* Answer space with Generate Shape button */}
                     <div className="mt-3 border-t pt-2">
                       <div className="h-16 border border-dashed rounded bg-gray-50 relative flex items-center justify-center">
-                        {/* Show Generate Shape button if no shape exists and geometry is enabled */}
-                        {includeGeometry && !q.imageUrl && !q.svg && !geometryShapes[`${cacheKey}-main-${idx}`] && (
+                        {/* Show Generate Shape button if no shape exists and geometry is enabled - only for geometry subjects */}
+                        {includeGeometry && !isNoShapeSubject && !q.imageUrl && !q.svg && !geometryShapes[`${cacheKey}-main-${idx}`] && (
                           <Button
                             variant="outline"
                             size="sm"
