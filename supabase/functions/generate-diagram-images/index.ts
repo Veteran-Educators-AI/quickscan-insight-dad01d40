@@ -548,7 +548,17 @@ function matchFallbackShape(prompt: string): string | null {
     return 'molecule';
   }
   
-  return null;
+  // Coordinate plane / graph paper fallbacks
+  if (lowerPrompt.includes('coordinate') || lowerPrompt.includes('graph') || lowerPrompt.includes('axis') || lowerPrompt.includes('axes')) {
+    return 'coordinate_plane';
+  }
+  if (lowerPrompt.includes('number line')) {
+    return 'number_line';
+  }
+  
+  // ALWAYS return a fallback - never return null
+  // This ensures generation never fails
+  return 'generic_shape';
 }
 
 // Get fallback shape SVG as data URL - with parameter extraction
