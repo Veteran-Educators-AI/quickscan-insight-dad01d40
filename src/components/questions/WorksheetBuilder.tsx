@@ -82,6 +82,8 @@ import {
   TableCell,
   WidthType,
   VerticalAlign,
+  Header,
+  Footer,
 } from "docx";
 import { getFormulasForTopics, type FormulaCategory } from "@/data/formulaReference";
 import { ScrapPaperGenerator } from "@/components/print/ScrapPaperGenerator";
@@ -2798,135 +2800,120 @@ export function WorksheetBuilder({
     try {
       const children: (Paragraph | Table)[] = [];
 
-      // Generate QR code for student identification (if enabled)
+      // Generate QR code for student identification (if enabled) - appears on EVERY page
       let qrCodeBuffer: ArrayBuffer | null = null;
+      const worksheetId = `ws_${Date.now().toString(36)}`;
       try {
         const { fetchQRCodeAsArrayBuffer } = await import('@/lib/qrCodeUtils');
         // Generate a worksheet-level QR code with a unique ID
-        const worksheetId = `ws_${Date.now().toString(36)}`;
         qrCodeBuffer = await fetchQRCodeAsArrayBuffer(worksheetId, 1, 1);
       } catch (qrError) {
         console.error('Error generating QR code for Word document:', qrError);
       }
 
-      // Header with QR code in top-right corner
+      // Create page header with QR code that repeats on EVERY page
+      let pageHeader: Header | undefined;
       if (qrCodeBuffer) {
-        // Create a table-based layout for header with QR code on right
-        const headerTable = new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          borders: {
-            top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-            bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-            left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-            right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-            insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-            insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-          },
-          rows: [
-            new TableRow({
-              children: [
-                new TableCell({
+        pageHeader = new Header({
+          children: [
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              borders: {
+                top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+              },
+              rows: [
+                new TableRow({
                   children: [
-                    new Paragraph({
+                    new TableCell({
                       children: [
-                        new TextRun({
-                          text: worksheetTitle,
-                          bold: true,
-                          size: 36, // 18pt
+                        new Paragraph({
+                          children: [
+                            new TextRun({
+                              text: worksheetTitle,
+                              bold: true,
+                              size: 24, // 12pt in header
+                            }),
+                          ],
                         }),
                       ],
+                      width: { size: 75, type: WidthType.PERCENTAGE },
+                      verticalAlign: VerticalAlign.CENTER,
+                      borders: {
+                        top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                      },
                     }),
-                    ...(teacherName ? [
-                      new Paragraph({
-                        children: [
-                          new TextRun({
-                            text: `Teacher: ${teacherName}`,
-                            size: 24, // 12pt
-                          }),
-                        ],
-                        spacing: { before: 100 },
-                      }),
-                    ] : []),
-                  ],
-                  width: { size: 80, type: WidthType.PERCENTAGE },
-                  verticalAlign: VerticalAlign.CENTER,
-                  borders: {
-                    top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                    bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                    left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                    right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                  },
-                }),
-                new TableCell({
-                  children: [
-                    new Paragraph({
+                    new TableCell({
                       children: [
-                        new ImageRun({
-                          data: qrCodeBuffer,
-                          transformation: {
-                            width: 70,
-                            height: 70,
-                          },
-                          type: "png",
+                        new Paragraph({
+                          children: [
+                            new ImageRun({
+                              data: qrCodeBuffer,
+                              transformation: { width: 55, height: 55 },
+                              type: "png",
+                            }),
+                          ],
+                          alignment: AlignmentType.RIGHT,
+                        }),
+                        new Paragraph({
+                          children: [
+                            new TextRun({ text: "Scan to grade", size: 12, color: "666666" }),
+                          ],
+                          alignment: AlignmentType.RIGHT,
                         }),
                       ],
-                      alignment: AlignmentType.RIGHT,
-                    }),
-                    new Paragraph({
-                      children: [
-                        new TextRun({
-                          text: "Scan to ID",
-                          size: 12,
-                          color: "666666",
-                        }),
-                      ],
-                      alignment: AlignmentType.RIGHT,
+                      width: { size: 25, type: WidthType.PERCENTAGE },
+                      verticalAlign: VerticalAlign.CENTER,
+                      borders: {
+                        top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                      },
                     }),
                   ],
-                  width: { size: 20, type: WidthType.PERCENTAGE },
-                  verticalAlign: VerticalAlign.CENTER,
-                  borders: {
-                    top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                    bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                    left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                    right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                  },
                 }),
               ],
             }),
           ],
         });
-        children.push(headerTable);
-      } else {
-        // Fallback: Header without QR code
+      }
+
+      // Main document title (larger, on first page content area)
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: worksheetTitle,
+              bold: true,
+              size: 36, // 18pt
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 100 },
+        }),
+      );
+
+      if (teacherName) {
         children.push(
           new Paragraph({
             children: [
               new TextRun({
-                text: worksheetTitle,
-                bold: true,
-                size: 36, // 18pt
+                text: `Teacher: ${teacherName}`,
+                size: 24, // 12pt
               }),
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
+            spacing: { after: 150 },
           }),
         );
-
-        if (teacherName) {
-          children.push(
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `Teacher: ${teacherName}`,
-                  size: 24, // 12pt
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 150 },
-            }),
-          );
-        }
       }
 
       // Student info line
@@ -3213,13 +3200,14 @@ export function WorksheetBuilder({
             properties: {
               page: {
                 margin: {
-                  top: convertInchesToTwip(marginMm / 25.4),
+                  top: convertInchesToTwip(marginMm / 25.4 + 0.5), // Extra top margin for header
                   bottom: convertInchesToTwip(marginMm / 25.4),
                   left: convertInchesToTwip(marginMm / 25.4),
                   right: convertInchesToTwip(marginMm / 25.4),
                 },
               },
             },
+            headers: pageHeader ? { default: pageHeader } : undefined,
             children,
           },
         ],
