@@ -1,14 +1,13 @@
 import * as pdfjsLib from "pdfjs-dist";
+// @ts-ignore - Vite handles the ?url suffix for static asset import
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-// Configure PDF.js worker using local bundled worker via import.meta.url
-// This ensures version consistency between the library and worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).toString();
+// Configure PDF.js worker using Vite's ?url import suffix
+// This ensures the worker is properly bundled and versioned
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 console.log("[pdfUtils] PDF.js version:", pdfjsLib.version);
-console.log("[pdfUtils] Worker source:", pdfjsLib.GlobalWorkerOptions.workerSrc);
+console.log("[pdfUtils] Worker source:", pdfWorkerUrl);
 
 /**
  * Convert a PDF file to an array of image data URLs (one per page)
