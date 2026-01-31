@@ -25,7 +25,7 @@ import { useFeatureTracking } from '@/hooks/useFeatureTracking';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
 import { fixEncodingCorruption, renderMathText, sanitizeForPDF, sanitizeForWord } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
-import { Document, Packer, Paragraph, TextRun, PageOrientation, BorderStyle, AlignmentType, convertInchesToTwip, ImageRun, Table, TableRow, TableCell, WidthType, VerticalAlign } from 'docx';
+import { Document, Packer, Paragraph, TextRun, PageOrientation, BorderStyle, AlignmentType, convertInchesToTwip, ImageRun, Table, TableRow, TableCell, WidthType, VerticalAlign, Header, Footer } from 'docx';
 
 interface WorksheetPreset {
   id: string;
@@ -765,7 +765,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
         const children: any[] = [];
         const topicsLabel = selectedTopics.length > 0 ? selectedTopics.join(', ') : 'Math Practice';
 
-        // Generate QR code for student identification
+        // Generate QR code for student identification - appears on EVERY page
         let qrCodeBuffer: ArrayBuffer | null = null;
         try {
           const { fetchQRCodeAsArrayBuffer } = await import('@/lib/qrCodeUtils');
@@ -774,114 +774,108 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           console.error('Error generating QR code for Word document:', qrError);
         }
 
-        // Header with QR code
+        // Create page header with QR code that repeats on EVERY page for this student
+        let pageHeader: Header | undefined;
         if (qrCodeBuffer) {
-          const headerTable = new Table({
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            borders: {
-              top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-              bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-              left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-              right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-              insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-              insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-            },
-            rows: [
-              new TableRow({
-                children: [
-                  new TableCell({
+          pageHeader = new Header({
+            children: [
+              new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                },
+                rows: [
+                  new TableRow({
                     children: [
-                      new Paragraph({
+                      new TableCell({
                         children: [
-                          new TextRun({
-                            text: `Level ${student.recommendedLevel} - ${getLevelDescription(student.recommendedLevel)}${numForms > 1 ? ` | Form ${assignedForm}` : ''}`,
-                            bold: true,
-                            size: 32,
+                          new Paragraph({
+                            children: [
+                              new TextRun({
+                                text: `${student.first_name} ${student.last_name} - Level ${student.recommendedLevel}`,
+                                bold: true,
+                                size: 20,
+                              }),
+                            ],
                           }),
                         ],
+                        width: { size: 75, type: WidthType.PERCENTAGE },
+                        verticalAlign: VerticalAlign.CENTER,
+                        borders: {
+                          top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        },
                       }),
-                      new Paragraph({
+                      new TableCell({
                         children: [
-                          new TextRun({
-                            text: `${topicsLabel.length > 50 ? topicsLabel.substring(0, 47) + '...' : topicsLabel} - Diagnostic Worksheet`,
-                            size: 24,
+                          new Paragraph({
+                            children: [
+                              new ImageRun({
+                                data: qrCodeBuffer,
+                                transformation: { width: 55, height: 55 },
+                                type: "png",
+                              }),
+                            ],
+                            alignment: AlignmentType.RIGHT,
+                          }),
+                          new Paragraph({
+                            children: [
+                              new TextRun({ text: "Scan to grade", size: 12, color: "666666" }),
+                            ],
+                            alignment: AlignmentType.RIGHT,
                           }),
                         ],
-                        spacing: { before: 100 },
+                        width: { size: 25, type: WidthType.PERCENTAGE },
+                        verticalAlign: VerticalAlign.CENTER,
+                        borders: {
+                          top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        },
                       }),
                     ],
-                    width: { size: 80, type: WidthType.PERCENTAGE },
-                    verticalAlign: VerticalAlign.CENTER,
-                    borders: {
-                      top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                      bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                      left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                      right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                    },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        children: [
-                          new ImageRun({
-                            data: qrCodeBuffer,
-                            transformation: { width: 70, height: 70 },
-                            type: "png",
-                          }),
-                        ],
-                        alignment: AlignmentType.RIGHT,
-                      }),
-                      new Paragraph({
-                        children: [
-                          new TextRun({ text: "Scan to ID", size: 12, color: "666666" }),
-                        ],
-                        alignment: AlignmentType.RIGHT,
-                      }),
-                    ],
-                    width: { size: 20, type: WidthType.PERCENTAGE },
-                    verticalAlign: VerticalAlign.CENTER,
-                    borders: {
-                      top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                      bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                      left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                      right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-                    },
                   }),
                 ],
               }),
             ],
           });
-          children.push(headerTable);
-        } else {
-          // Fallback: Header without QR code
-          children.push(
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `Level ${student.recommendedLevel} - ${getLevelDescription(student.recommendedLevel)}${numForms > 1 ? ` | Form ${assignedForm}` : ''}`,
-                  bold: true,
-                  size: 32, // 16pt
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { before: 200, after: 100 },
-            })
-          );
-
-          // Topic subtitle
-          children.push(
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `${topicsLabel.length > 50 ? topicsLabel.substring(0, 47) + '...' : topicsLabel} - Diagnostic Worksheet`,
-                  size: 24, // 12pt
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 200 },
-            })
-          );
         }
+
+        // Main document header in content area (larger, on first page)
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Level ${student.recommendedLevel} - ${getLevelDescription(student.recommendedLevel)}${numForms > 1 ? ` | Form ${assignedForm}` : ''}`,
+                bold: true,
+                size: 32,
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 100 },
+          })
+        );
+
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `${topicsLabel.length > 50 ? topicsLabel.substring(0, 47) + '...' : topicsLabel} - Diagnostic Worksheet`,
+                size: 24,
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          })
+        );
 
         // Student info line
         children.push(
@@ -1276,11 +1270,12 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
         }
 
         // Add section with page break for each student (except last)
+        // Include page header with QR code that repeats on ALL pages for this student
         sections.push({
           properties: {
             page: {
               margin: {
-                top: convertInchesToTwip(0.75),
+                top: convertInchesToTwip(1.0), // Extra top margin for header
                 right: convertInchesToTwip(0.75),
                 bottom: convertInchesToTwip(0.75),
                 left: convertInchesToTwip(0.75),
@@ -1292,6 +1287,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               },
             },
           },
+          headers: pageHeader ? { default: pageHeader } : undefined,
           children: children,
         });
 
