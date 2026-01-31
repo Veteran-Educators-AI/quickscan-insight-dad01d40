@@ -487,13 +487,7 @@ export function WorksheetBuilder({
   const [showDrawingTool, setShowDrawingTool] = useState(false);
   const [drawingQuestionNumber, setDrawingQuestionNumber] = useState<number | null>(null);
 
-  // Push to NYCLogic AI state
-  const [showPushDialog, setShowPushDialog] = useState(false);
-  const [pushXpReward, setPushXpReward] = useState(50);
-  const [pushCoinReward, setPushCoinReward] = useState(25);
-  const [pushDueDate, setPushDueDate] = useState("");
-  const [isPushing, setIsPushing] = useState(false);
-  // Push button now uses direct database insert - no hook needed
+  // Note: Push to NYCLogic AI removed - Scholar only accepts analysis/recommendations, not worksheets
 
   // AI Image Review state
   const [showImageReviewDialog, setShowImageReviewDialog] = useState(false);
@@ -4728,15 +4722,8 @@ export function WorksheetBuilder({
                 )}
               </div>
 
-              {/* Push to NYCLogic AI Button */}
-              <Button
-                variant="outline"
-                className="w-full bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 border-purple-200 dark:border-purple-800 hover:from-purple-100 hover:to-indigo-100 dark:hover:from-purple-950/30 dark:hover:to-indigo-950/30"
-                onClick={() => setShowPushDialog(true)}
-              >
-                <Send className="h-4 w-4 mr-2 text-purple-600" />
-                <span className="text-purple-700 dark:text-purple-300">Push to NYCLogic AI</span>
-              </Button>
+              {/* Note: NYClogic Scholar only accepts analysis/recommendations, not worksheets */}
+              {/* Use the Scan page BatchReport to push student analysis to Scholar */}
 
               {/* Diagnostic: Record Results Note */}
               {worksheetMode === "diagnostic" && (
@@ -5605,145 +5592,7 @@ export function WorksheetBuilder({
         </DialogContent>
       </Dialog>
 
-      {/* Push to NYClogic Scholar Ai Dialog */}
-      <Dialog open={showPushDialog} onOpenChange={setShowPushDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Send className="h-5 w-5 text-purple-600" />
-              Push to NYClogic Scholar Ai
-            </DialogTitle>
-            <DialogDescription>
-              Send this worksheet as an assignment to students on NYClogic Scholar Ai. Configure XP and coin rewards.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            {/* Worksheet Info */}
-            <div className="p-3 bg-muted/50 rounded-lg">
-              <p className="text-sm font-medium">{worksheetTitle}</p>
-              <p className="text-xs text-muted-foreground">
-                {compiledQuestions.length} questions • {selectedQuestions.map((q) => q.topicName).join(", ")}
-              </p>
-            </div>
-
-            {/* XP Reward */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-yellow-500" />
-                XP Reward
-              </Label>
-              <div className="flex items-center gap-3">
-                <Slider
-                  value={[pushXpReward]}
-                  onValueChange={(value) => setPushXpReward(value[0])}
-                  min={10}
-                  max={200}
-                  step={10}
-                  className="flex-1"
-                />
-                <span className="text-sm font-medium w-16 text-right">{pushXpReward} XP</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Experience points students earn for completing this assignment
-              </p>
-            </div>
-
-            {/* Coin Reward */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Coins className="h-4 w-4 text-amber-500" />
-                Coin Reward
-              </Label>
-              <div className="flex items-center gap-3">
-                <Slider
-                  value={[pushCoinReward]}
-                  onValueChange={(value) => setPushCoinReward(value[0])}
-                  min={5}
-                  max={100}
-                  step={5}
-                  className="flex-1"
-                />
-                <span className="text-sm font-medium w-16 text-right">{pushCoinReward} 🪙</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Coins students can spend in the NYClogic Scholar Ai store</p>
-            </div>
-
-            {/* Due Date (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="dueDate">Due Date (Optional)</Label>
-              <Input
-                id="dueDate"
-                type="datetime-local"
-                value={pushDueDate}
-                onChange={(e) => setPushDueDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setShowPushDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                setIsPushing(true);
-                try {
-                  const standardCode = selectedQuestions.length > 0 ? selectedQuestions[0].standard : undefined;
-                  const topicName = selectedQuestions.map((q) => q.topicName).join(", ");
-
-                  // Save directly to shared_assignments table instead of calling external API
-                  const { error } = await supabase.from("shared_assignments").insert({
-                    teacher_id: user?.id,
-                    title: worksheetTitle,
-                    description: `${compiledQuestions.length} question worksheet covering: ${topicName}`,
-                    topics: JSON.parse(JSON.stringify(selectedQuestions)),
-                    questions: JSON.parse(JSON.stringify(compiledQuestions)),
-                    xp_reward: pushXpReward,
-                    coin_reward: pushCoinReward,
-                    due_at: pushDueDate || null,
-                    source_app: "nyclogic_ai",
-                    status: "active",
-                  });
-
-                  if (error) {
-                    throw error;
-                  }
-
-                  toast({
-                    title: "Pushed to NYClogic Scholar Ai!",
-                    description: `"${worksheetTitle}" is now available as an assignment with ${pushXpReward} XP and ${pushCoinReward} coins.`,
-                  });
-                  setShowPushDialog(false);
-                } catch (error) {
-                  console.error("Push error:", error);
-                  toast({
-                    title: "Push failed",
-                    description: error instanceof Error ? error.message : "An unexpected error occurred.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setIsPushing(false);
-                }
-              }}
-              disabled={isPushing}
-              className="bg-purple-600 hover:bg-purple-700"
-            >
-              {isPushing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Pushing...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Push Assignment
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Note: Push to NYClogic Scholar dialog removed - Scholar only accepts analysis/recommendations */}
 
       {/* Canvas Drawing Tool */}
       <CanvasDrawingTool
