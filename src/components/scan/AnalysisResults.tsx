@@ -20,6 +20,7 @@ import { RecommendedNextSteps } from './RecommendedNextSteps';
 import { TeacherVerificationPanel } from './TeacherVerificationPanel';
 import { TrainingConfidenceIndicator } from './TrainingConfidenceIndicator';
 import { AIAnalysisCritiqueDialog } from './AIAnalysisCritiqueDialog';
+import { OCRCorrectionPanel } from './OCRCorrectionPanel';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 
 interface RubricScore {
@@ -308,6 +309,18 @@ export function AnalysisResults({
           studentId={studentId || undefined}
           onVerificationComplete={(interpretations) => {
             console.log('Verification complete:', interpretations);
+          }}
+        />
+      )}
+
+      {/* OCR Correction Panel - Allow teachers to fix misread numbers/text */}
+      {result.ocrText && (
+        <OCRCorrectionPanel
+          ocrText={result.ocrText}
+          attemptId={attemptId || undefined}
+          studentId={studentId || undefined}
+          onOCRCorrected={(corrections) => {
+            console.log('OCR corrections applied:', corrections);
           }}
         />
       )}

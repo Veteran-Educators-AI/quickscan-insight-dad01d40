@@ -2,11 +2,14 @@ import { useState, useCallback } from 'react';
 import jsQR from 'jsqr';
 import { parseStudentQRCode } from '@/components/print/StudentQRCode';
 import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
+import { parseUnifiedStudentQRCode } from '@/components/print/StudentPageQRCode';
 
 interface QRScanResult {
   studentId: string;
   questionId?: string;
-  type: 'student-only' | 'student-question';
+  pageNumber?: number;
+  totalPages?: number;
+  type: 'student-only' | 'student-question' | 'student-page';
 }
 
 // Legacy result type for backward compatibility
@@ -87,7 +90,15 @@ export function useQRCodeScanner() {
                 if (code && code.data) {
                   console.log('QR code found in region:', region, 'Content:', code.data);
                   
-                  // Try the new unified parser first (handles both v1 and v2)
+                  // Try the unified parser first (handles v1, v2, and v3)
+                  const unifiedParsed = parseUnifiedStudentQRCode(code.data);
+                  if (unifiedParsed) {
+                    console.log('Successfully parsed unified QR code:', unifiedParsed);
+                    resolve(unifiedParsed);
+                    return;
+                  }
+                  
+                  // Try the v2 parser for backward compatibility
                   const parsed = parseAnyStudentQRCode(code.data);
                   if (parsed) {
                     console.log('Successfully parsed QR code:', parsed);
