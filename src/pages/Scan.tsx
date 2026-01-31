@@ -2203,11 +2203,30 @@ export default function Scan() {
                   <ScannerImportMode
                     onPagesReady={async (pages) => {
                       setScannerImportPages(pages);
+                      
                       // Add all pages to batch for processing (with filename for topic grouping)
-                      pages.forEach(page => {
-                        batch.addImage(page.dataUrl, undefined, undefined, page.filename);
-                      });
-                      toast.success(`${pages.length} pages added for analysis`);
+                      // If a class is selected with students, use auto-identification
+                      if (selectedClassId && students.length > 0) {
+                        toast.info(`Processing ${pages.length} pages with student identification...`);
+                        for (const page of pages) {
+                          await batch.addImageWithAutoIdentify(page.dataUrl, students);
+                        }
+                        toast.success(`${pages.length} pages added and students identified`);
+                        
+                        // Auto-group pages by the same student (handles front/back automatically)
+                        const groupResult = batch.groupPagesByStudent();
+                        if (groupResult.pagesLinked > 0) {
+                          toast.success(`Auto-linked ${groupResult.pagesLinked} front/back pages for ${groupResult.studentsGrouped} students`, {
+                            icon: <FileStack className="h-4 w-4" />,
+                          });
+                        }
+                      } else {
+                        // No class selected - add pages without identification
+                        pages.forEach(page => {
+                          batch.addImage(page.dataUrl, undefined, undefined, page.filename);
+                        });
+                        toast.success(`${pages.length} pages added for analysis`);
+                      }
                       
                       // Auto-group by worksheet topic if filenames indicate multi-page papers
                       if (pages.length >= 2) {
