@@ -124,7 +124,7 @@ export interface BatchSummary {
 interface UseBatchAnalysisReturn {
   items: BatchItem[];
   addImage: (imageDataUrl: string, studentId?: string, studentName?: string, filename?: string) => string;
-  addImageWithAutoIdentify: (imageDataUrl: string, studentRoster?: Student[]) => Promise<string>;
+  addImageWithAutoIdentify: (imageDataUrl: string, studentRoster?: Student[], filename?: string) => Promise<string>;
   addPdfPagesWithAutoGrouping: (
     pages: string[],
     studentRoster: Student[],
@@ -383,12 +383,15 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   }, []);
 
   // Add image and auto-identify if roster provided
-  const addImageWithAutoIdentify = useCallback(async (imageDataUrl: string, studentRoster?: Student[]): Promise<string> => {
+  const addImageWithAutoIdentify = useCallback(async (imageDataUrl: string, studentRoster?: Student[], filename?: string): Promise<string> => {
     const id = crypto.randomUUID();
+    const worksheetTopic = filename ? parseWorksheetTopic(filename) : undefined;
     const newItem: BatchItem = {
       id,
       imageDataUrl,
       status: studentRoster && studentRoster.length > 0 ? 'identifying' : 'pending',
+      filename,
+      worksheetTopic,
     };
     
     setItems(prev => [...prev, newItem]);
@@ -397,7 +400,8 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     if (studentRoster && studentRoster.length > 0) {
       try {
         const result = await identifyStudent(newItem, studentRoster);
-        setItems(prev => prev.map(item => item.id === id ? result : item));
+        // Preserve filename and worksheetTopic in the result
+        setItems(prev => prev.map(item => item.id === id ? { ...result, filename, worksheetTopic } : item));
       } catch (err) {
         console.error('Auto-identify failed:', err);
         setItems(prev => prev.map(item => 
@@ -407,7 +411,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     }
 
     return id;
-  }, []);
+  }, [parseWorksheetTopic]);
 
   // Add multiple PDF pages with automatic student separation based on handwriting/name detection
   const addPdfPagesWithAutoGrouping = useCallback(async (
