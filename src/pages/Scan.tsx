@@ -124,8 +124,8 @@ export default function Scan() {
   const [resultsSaved, setResultsSaved] = useState(false);
   const [multiQuestionResults, setMultiQuestionResults] = useState<Record<string, any>>({});
   
-  // QR code detection state - now supports student-only QR codes
-  const [detectedQR, setDetectedQR] = useState<{ studentId: string; questionId?: string; type: 'student-only' | 'student-question' } | null>(null);
+  // QR code detection state - now supports student-only, student-question, and student-page QR codes
+  const [detectedQR, setDetectedQR] = useState<{ studentId: string; questionId?: string; pageNumber?: number; totalPages?: number; type: 'student-only' | 'student-question' | 'student-page' } | null>(null);
   
   // Auto-identified student state
   const [autoIdentifiedStudent, setAutoIdentifiedStudent] = useState<{

@@ -1,5 +1,6 @@
 import { StudentQRCode } from './StudentQRCode';
 import { StudentOnlyQRCode } from './StudentOnlyQRCode';
+import { StudentPageQRCode } from './StudentPageQRCode';
 import { renderMathText } from '@/lib/mathRenderer';
 
 interface Student {
@@ -49,7 +50,9 @@ interface PrintableWorksheetProps {
   topicName?: string;
   standard?: string;
   teacherName?: string;
-  aiOptimizedLayout?: boolean; // New: Enable AI-optimized bounded answer zones
+  aiOptimizedLayout?: boolean; // Enable AI-optimized bounded answer zones
+  pageNumber?: number; // For multi-page worksheets - current page
+  totalPages?: number; // For multi-page worksheets - total pages
 }
 
 export function PrintableWorksheet({ 
@@ -63,6 +66,8 @@ export function PrintableWorksheet({
   standard,
   teacherName,
   aiOptimizedLayout = true, // Default to AI-optimized for all diagnostic worksheets
+  pageNumber = 1,
+  totalPages = 1,
 }: PrintableWorksheetProps) {
   const levelInfo = studentLevel ? LEVEL_COLORS[studentLevel] : null;
   const levelDescription = studentLevel ? LEVEL_DESCRIPTIONS[studentLevel] : null;
@@ -260,24 +265,36 @@ export function PrintableWorksheet({
           </div>
           
           {/* Student Identification QR Code - Top Right Corner */}
+          {/* Uses page-aware QR for multi-page documents (front/back identification) */}
           {showQRCodes && (
             <div style={{ 
               flexShrink: 0, 
               textAlign: 'center',
               marginLeft: '1rem',
             }}>
-              <StudentOnlyQRCode studentId={student.id} size={70} />
-              <p style={{ 
-                fontSize: '0.6rem', 
-                color: '#6b7280', 
-                marginTop: '0.15rem', 
-                fontWeight: 600,
-                fontFamily: 'Helvetica, Arial, sans-serif',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}>
-                Student ID
-              </p>
+              {totalPages > 1 ? (
+                <StudentPageQRCode 
+                  studentId={student.id} 
+                  pageNumber={pageNumber}
+                  totalPages={totalPages}
+                  size={65} 
+                />
+              ) : (
+                <>
+                  <StudentOnlyQRCode studentId={student.id} size={70} />
+                  <p style={{ 
+                    fontSize: '0.6rem', 
+                    color: '#6b7280', 
+                    marginTop: '0.15rem', 
+                    fontWeight: 600,
+                    fontFamily: 'Helvetica, Arial, sans-serif',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Student ID
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>

@@ -7,6 +7,7 @@ import { useDuplicateWorkDetection } from '@/hooks/useDuplicateWorkDetection';
 import jsQR from 'jsqr';
 import { parseStudentQRCode } from '@/components/print/StudentQRCode';
 import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
+import { parseUnifiedStudentQRCode } from '@/components/print/StudentPageQRCode';
 import { toast } from 'sonner';
 
 const BATCH_STORAGE_KEY = 'scan-genius-batch-data';
@@ -58,7 +59,13 @@ export interface Student {
 export interface IdentificationResult {
   qrCodeDetected: boolean;
   qrCodeContent: string | null;
-  parsedQRCode?: { studentId: string; questionId?: string; type?: 'student-only' | 'student-question' } | null;
+  parsedQRCode?: { 
+    studentId: string; 
+    questionId?: string; 
+    pageNumber?: number;
+    totalPages?: number;
+    type?: 'student-only' | 'student-question' | 'student-page';
+  } | null;
   handwrittenName: string | null;
   matchedStudentId: string | null;
   matchedStudentName: string | null;
@@ -89,6 +96,9 @@ export interface BatchItem {
   pageType?: 'new' | 'continuation';
   continuationOf?: string; // ID of the primary page this is a continuation of
   continuationPages?: string[]; // IDs of pages that are continuations of this paper
+  // QR-detected page info for front/back identification
+  pageNumber?: number;
+  totalPages?: number;
   // Handwriting similarity info
   handwritingSimilarity?: HandwritingSimilarity;
   // Flag when a continuation is converted to separate paper for individual grading
@@ -427,7 +437,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       const pageDataUrl = pages[i];
       const pageId = crypto.randomUUID();
       
-      onProgress?.(i + 1, pages.length, i === 0 ? 'Identifying first student...' : 'Comparing handwriting...');
+      onProgress?.(i + 1, pages.length, i === 0 ? 'Scanning for QR codes...' : 'Processing page...');
       
       // Create base item
       const baseItem: BatchItem = {
@@ -436,8 +446,79 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         status: 'pending',
       };
       
+      // First, try QR code detection for page-based grouping
+      const qrResult = await scanQRCodeFromImage(pageDataUrl);
+      
+      if (qrResult && qrResult.type === 'student-page' && qrResult.pageNumber !== undefined) {
+        // We have page number info from QR code - use it for grouping
+        const matchedStudent = studentRoster.find(s => s.id === qrResult.studentId);
+        
+        // Check if this is a continuation of a previous page for the same student
+        const existingGroup = studentGroups.find(g => g.studentId === qrResult.studentId);
+        
+        if (existingGroup && qrResult.pageNumber > 1) {
+          // This is a continuation page (e.g., page 2, back of paper)
+          pagesLinked++;
+          existingGroup.pageIds.push(pageId);
+          
+          newItems.push({
+            ...baseItem,
+            pageType: 'continuation',
+            continuationOf: existingGroup.primaryId,
+            pageNumber: qrResult.pageNumber,
+            totalPages: qrResult.totalPages,
+            studentId: matchedStudent?.id || existingGroup.studentId,
+            studentName: matchedStudent ? `${matchedStudent.first_name} ${matchedStudent.last_name}` : existingGroup.studentName,
+            autoAssigned: true,
+            identification: {
+              qrCodeDetected: true,
+              qrCodeContent: JSON.stringify(qrResult),
+              parsedQRCode: qrResult,
+              handwrittenName: null,
+              matchedStudentId: matchedStudent?.id || null,
+              matchedStudentName: matchedStudent ? `${matchedStudent.first_name} ${matchedStudent.last_name}` : null,
+              confidence: 'high',
+            },
+          });
+          currentGroup = existingGroup;
+        } else {
+          // First page or new student
+          if (matchedStudent) studentsIdentified++;
+          
+          currentGroup = {
+            primaryId: pageId,
+            studentId: matchedStudent?.id,
+            studentName: matchedStudent ? `${matchedStudent.first_name} ${matchedStudent.last_name}` : undefined,
+            pageIds: [pageId],
+          };
+          
+          newItems.push({
+            ...baseItem,
+            pageType: 'new',
+            pageNumber: qrResult.pageNumber,
+            totalPages: qrResult.totalPages,
+            studentId: matchedStudent?.id,
+            studentName: matchedStudent ? `${matchedStudent.first_name} ${matchedStudent.last_name}` : undefined,
+            autoAssigned: !!matchedStudent,
+            identification: {
+              qrCodeDetected: true,
+              qrCodeContent: JSON.stringify(qrResult),
+              parsedQRCode: qrResult,
+              handwrittenName: null,
+              matchedStudentId: matchedStudent?.id || null,
+              matchedStudentName: matchedStudent ? `${matchedStudent.first_name} ${matchedStudent.last_name}` : null,
+              confidence: matchedStudent ? 'high' : 'low',
+            },
+          });
+          studentGroups.push(currentGroup);
+        }
+        continue;
+      }
+      
+      // Fall back to handwriting-based grouping
       if (i === 0) {
         // First page - always identify student
+        onProgress?.(i + 1, pages.length, 'Identifying first student...');
         try {
           const identResult = await identifyStudent(baseItem, studentRoster);
           
@@ -682,8 +763,8 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     clearDuplicateCache();
   }, [clearDuplicateCache]);
 
-  // Local QR code scanning function - supports both student-only and student+question QR codes
-  const scanQRCodeFromImage = async (imageDataUrl: string): Promise<{ studentId: string; questionId?: string; type: 'student-only' | 'student-question' } | null> => {
+  // Local QR code scanning function - supports student-only, student+question, and student+page QR codes
+  const scanQRCodeFromImage = async (imageDataUrl: string): Promise<{ studentId: string; questionId?: string; pageNumber?: number; totalPages?: number; type: 'student-only' | 'student-question' | 'student-page' } | null> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
@@ -733,17 +814,24 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
             });
             
             if (code) {
-              // Try unified parser first (handles both v1 and v2)
+              // Try unified parser first (handles v1, v2, and v3 with page numbers)
+              const fullUnified = parseUnifiedStudentQRCode(code.data);
+              if (fullUnified) {
+                resolve(fullUnified);
+                return;
+              }
+              
+              // Fallback to v2 parser
               const unified = parseAnyStudentQRCode(code.data);
               if (unified) {
                 resolve(unified);
                 return;
               }
               
-              // Fallback to legacy parser
+              // Fallback to legacy v1 parser
               const parsed = parseStudentQRCode(code.data);
               if (parsed) {
-                resolve({ ...parsed, type: 'student-question' });
+                resolve({ ...parsed, type: 'student-question' as const });
                 return;
               }
             }
@@ -799,6 +887,8 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
               studentId: matchedStudent.id,
               studentName: `${matchedStudent.first_name} ${matchedStudent.last_name}`,
               questionId: qrResult.questionId,
+              pageNumber: qrResult.pageNumber,
+              totalPages: qrResult.totalPages,
               autoAssigned: true,
               identification: {
                 qrCodeDetected: true,
