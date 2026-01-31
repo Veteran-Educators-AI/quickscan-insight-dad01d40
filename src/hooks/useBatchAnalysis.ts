@@ -385,6 +385,8 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   // Add image and auto-identify if roster provided
   const addImageWithAutoIdentify = useCallback(async (imageDataUrl: string, studentRoster?: Student[]): Promise<string> => {
     const id = crypto.randomUUID();
+    console.log(`[addImageWithAutoIdentify] Adding image, roster size: ${studentRoster?.length ?? 0}`);
+    
     const newItem: BatchItem = {
       id,
       imageDataUrl,
@@ -396,10 +398,13 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     // Auto-identify if roster is provided
     if (studentRoster && studentRoster.length > 0) {
       try {
+        console.log(`[addImageWithAutoIdentify] Starting identification for image ${id}`);
         const result = await identifyStudent(newItem, studentRoster);
+        console.log(`[addImageWithAutoIdentify] Identification complete for ${id}: ${result.studentName || 'no match'}`);
         setItems(prev => prev.map(item => item.id === id ? result : item));
-      } catch (err) {
-        console.error('Auto-identify failed:', err);
+      } catch (err: any) {
+        console.error('[addImageWithAutoIdentify] Auto-identify failed:', err);
+        // The page was already added, just update status to pending
         setItems(prev => prev.map(item => 
           item.id === id ? { ...item, status: 'pending' } : item
         ));
@@ -415,7 +420,19 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     studentRoster: Student[],
     onProgress?: (current: number, total: number, status: string) => void
   ): Promise<{ pagesAdded: number; studentsIdentified: number; pagesLinked: number }> => {
-    if (pages.length === 0) return { pagesAdded: 0, studentsIdentified: 0, pagesLinked: 0 };
+    console.log(`[addPdfPagesWithAutoGrouping] Starting with ${pages.length} pages and ${studentRoster.length} students`);
+    
+    if (pages.length === 0) {
+      console.log('[addPdfPagesWithAutoGrouping] No pages to process');
+      return { pagesAdded: 0, studentsIdentified: 0, pagesLinked: 0 };
+    }
+
+    if (studentRoster.length === 0) {
+      console.warn('[addPdfPagesWithAutoGrouping] No students in roster - pages will be added without identification');
+    } else {
+      console.log('[addPdfPagesWithAutoGrouping] Roster sample:', 
+        studentRoster.slice(0, 3).map(s => `${s.first_name} ${s.last_name} (${s.id})`));
+    }
 
     setIsIdentifying(true);
     
@@ -433,10 +450,13 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     let pagesLinked = 0;
     const newItems: BatchItem[] = [];
 
+    try {
+
     for (let i = 0; i < pages.length; i++) {
       const pageDataUrl = pages[i];
       const pageId = crypto.randomUUID();
       
+      console.log(`[addPdfPagesWithAutoGrouping] Processing page ${i + 1}/${pages.length}`);
       onProgress?.(i + 1, pages.length, i === 0 ? 'Scanning for QR codes...' : 'Processing page...');
       
       // Create base item
@@ -447,7 +467,15 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       };
       
       // First, try QR code detection for page-based grouping
-      const qrResult = await scanQRCodeFromImage(pageDataUrl);
+      let qrResult = null;
+      try {
+        qrResult = await scanQRCodeFromImage(pageDataUrl);
+        if (qrResult) {
+          console.log(`[addPdfPagesWithAutoGrouping] QR code found:`, qrResult.type, qrResult.studentId);
+        }
+      } catch (qrError) {
+        console.warn('[addPdfPagesWithAutoGrouping] QR scan failed:', qrError);
+      }
       
       if (qrResult && qrResult.type === 'student-page' && qrResult.pageNumber !== undefined) {
         // We have page number info from QR code - use it for grouping
@@ -724,15 +752,36 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       return item;
     });
 
+    console.log(`[addPdfPagesWithAutoGrouping] Complete: ${finalItems.length} pages, ${studentsIdentified} identified, ${pagesLinked} linked`);
+    
     // Add all items to the batch
     setItems(prev => [...prev, ...finalItems]);
     setIsIdentifying(false);
 
     return {
-      pagesAdded: pages.length,
+      pagesAdded: finalItems.length,
       studentsIdentified,
       pagesLinked,
     };
+    } catch (outerError: any) {
+      console.error('[addPdfPagesWithAutoGrouping] Outer error:', outerError);
+      toast.error('Error processing PDF pages', {
+        description: outerError?.message || 'Some pages may not have been added. Please try again.',
+      });
+      
+      // Still try to add any pages that were successfully processed
+      if (newItems.length > 0) {
+        console.log(`[addPdfPagesWithAutoGrouping] Saving ${newItems.length} pages despite error`);
+        setItems(prev => [...prev, ...newItems]);
+      }
+      
+      setIsIdentifying(false);
+      return {
+        pagesAdded: newItems.length,
+        studentsIdentified,
+        pagesLinked,
+      };
+    }
   }, []);
 
   const removeImage = useCallback((id: string) => {
@@ -938,6 +987,9 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
   const identifyStudent = async (item: BatchItem, studentRoster: Student[]): Promise<BatchItem> => {
     try {
+      console.log(`[identifyStudent] Starting identification with ${studentRoster.length} students in roster`);
+      console.log(`[identifyStudent] Roster sample:`, studentRoster.slice(0, 3).map(s => `${s.first_name} ${s.last_name}`));
+      
       const { data, error } = await supabase.functions.invoke('analyze-student-work', {
         body: {
           imageBase64: item.imageDataUrl,
@@ -951,10 +1003,18 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         },
       });
 
-      if (error) throw new Error(error.message);
-      if (!data?.success) throw new Error(data?.error || 'Identification failed');
+      if (error) {
+        console.error('[identifyStudent] Edge function error:', error);
+        throw new Error(error.message);
+      }
+      
+      if (!data?.success) {
+        console.error('[identifyStudent] Identification failed:', data?.error);
+        throw new Error(data?.error || 'Identification failed');
+      }
 
       const identification = data.identification as IdentificationResult;
+      console.log(`[identifyStudent] Result: matched=${identification.matchedStudentName}, confidence=${identification.confidence}`);
       
       return {
         ...item,
@@ -965,8 +1025,13 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         questionId: identification.matchedQuestionId || item.questionId,
         autoAssigned: !!identification.matchedStudentId,
       };
-    } catch (err) {
-      console.error('Identification error:', err);
+    } catch (err: any) {
+      console.error('[identifyStudent] Error:', err?.message || err);
+      // Show a toast for visibility
+      toast.error(`Student identification failed: ${err?.message || 'Unknown error'}`, {
+        description: 'The page was added but not matched to a student. You can manually assign it.',
+        duration: 5000,
+      });
       return {
         ...item,
         status: 'pending',
