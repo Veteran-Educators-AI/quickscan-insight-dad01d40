@@ -142,8 +142,38 @@ export async function pdfToImages(
 }
 
 /**
+ * Known PDF MIME types - different browsers/OS may report different types
+ */
+const PDF_MIME_TYPES = [
+  "application/pdf",
+  "application/x-pdf",
+  "application/acrobat",
+  "application/vnd.pdf",
+  "text/pdf",
+  "text/x-pdf",
+];
+
+/**
  * Check if a file is a PDF
+ * Checks both MIME type and file extension for maximum compatibility
  */
 export function isPdfFile(file: File): boolean {
-  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  // Check file extension first (most reliable)
+  if (file.name.toLowerCase().endsWith(".pdf")) {
+    return true;
+  }
+  
+  // Check against known PDF MIME types
+  const mimeType = file.type.toLowerCase();
+  if (PDF_MIME_TYPES.includes(mimeType)) {
+    return true;
+  }
+  
+  // Some systems report PDFs as generic binary - check by extension as fallback
+  // (already covered above, but this makes the logic explicit)
+  if (mimeType === "application/octet-stream" && file.name.toLowerCase().endsWith(".pdf")) {
+    return true;
+  }
+  
+  return false;
 }

@@ -589,10 +589,9 @@ export default function Scan() {
     if (files.length === 0) return;
 
     // Filter valid files (images and PDFs)
+    // Use isPdfFile helper for consistent PDF detection across all MIME types
     const validFiles = files.filter(file => 
-      file.type.startsWith('image/') || 
-      file.type === 'application/pdf' || 
-      file.name.toLowerCase().endsWith('.pdf')
+      file.type.startsWith('image/') || isPdfFile(file)
     );
 
     if (validFiles.length === 0) {
