@@ -582,6 +582,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
       // Check if we have custom topics from standards menu (new diagnostic mode)
       const isNewDiagnosticFromStandards = customTopics.length > 0;
+      
+      // For new topics, ALL students start at the same intermediate level (C)
+      // This ensures fair differentiation only after we see their performance
+      const defaultStartingLevel: AdvancementLevel = 'C';
 
       // Merge students with their most recent diagnostic result and adaptive levels
       const studentsWithDiagnostics: StudentWithDiagnostic[] = (studentsData || []).map(student => {
@@ -596,10 +600,20 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
         const adaptiveStudent = adaptiveStudents.find(s => s.studentId === student.id);
         const hasPerformanceData = adaptiveStudent?.hasPerformanceData ?? false;
         
-        // Use adaptive level if enabled and available, otherwise fall back to diagnostic
-        const recommendedLevel = (useAdaptiveDifficulty && adaptiveLevel) 
-          ? adaptiveLevel 
-          : (latestDiagnostic?.recommended_level as AdvancementLevel) || 'C';
+        // For NEW topics from standards menu: ALL students start at intermediate level (C)
+        // Only use performance-based differentiation for follow-up worksheets
+        let recommendedLevel: AdvancementLevel;
+        
+        if (isNewDiagnosticFromStandards) {
+          // New topic = everyone starts equal at intermediate level
+          recommendedLevel = defaultStartingLevel;
+        } else if (useAdaptiveDifficulty && adaptiveLevel) {
+          // Use adaptive level based on past performance for this topic
+          recommendedLevel = adaptiveLevel;
+        } else {
+          // Fall back to diagnostic or default
+          recommendedLevel = (latestDiagnostic?.recommended_level as AdvancementLevel) || defaultStartingLevel;
+        }
         
         // For new diagnostics from standards, pre-select all students
         // For follow-up worksheets, only select students with existing data
