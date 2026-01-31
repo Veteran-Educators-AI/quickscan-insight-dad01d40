@@ -1,20 +1,14 @@
 import * as pdfjsLib from "pdfjs-dist";
 
-// Configure PDF.js worker - use cdnjs for maximum reliability
-// cdnjs has better global CDN coverage than unpkg
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+// Configure PDF.js worker using local bundled worker via import.meta.url
+// This ensures version consistency between the library and worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString();
 
-// Fallback worker setup in case primary CDN fails
-const setupWorkerFallback = async () => {
-  try {
-    // Test if worker loads correctly by checking version
-    const testDoc = await pdfjsLib.getDocument({ data: new Uint8Array([]) }).promise.catch(() => null);
-  } catch (e: any) {
-    // If worker fails, try alternative CDN
-    console.warn("[pdfUtils] Primary worker CDN failed, trying fallback...");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-  }
-};
+console.log("[pdfUtils] PDF.js version:", pdfjsLib.version);
+console.log("[pdfUtils] Worker source:", pdfjsLib.GlobalWorkerOptions.workerSrc);
 
 /**
  * Convert a PDF file to an array of image data URLs (one per page)
