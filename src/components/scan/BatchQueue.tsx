@@ -1058,7 +1058,7 @@ export function BatchQueue({
     <MultiAnalysisBreakdownDialog
       open={!!breakdownDialogItem}
       onOpenChange={(open) => !open && setBreakdownDialogItem(null)}
-      studentName={breakdownDialogItem?.studentName}
+      studentName={breakdownDialogItem ? getItemDisplayName(breakdownDialogItem) : undefined}
       result={breakdownDialogItem?.result || null}
       itemId={breakdownDialogItem?.id}
       onSelectRun={onSelectRunAsGrade}
@@ -1070,6 +1070,7 @@ export function BatchQueue({
       onOpenChange={(open) => !open && setManualLinkItem(null)}
       continuationItem={manualLinkItem}
       items={items}
+      students={students}
       onLink={(continuationId, primaryId) => {
         onLinkContinuation?.(continuationId, primaryId);
         setManualLinkItem(null);
