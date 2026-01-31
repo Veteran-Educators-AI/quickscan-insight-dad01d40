@@ -2179,6 +2179,7 @@ export default function Scan() {
                     summary={batch.summary}
                     classId={selectedClassId || undefined}
                     questionId={selectedQuestionIds[0] || undefined}
+                    students={students}
                     onExport={exportPDF}
                     onSaveComplete={() => {
                       toast.success('All grades saved to gradebook');

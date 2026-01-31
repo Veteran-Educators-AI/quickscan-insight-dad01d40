@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,16 +6,25 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 import { Fingerprint, Link, Unlink, ChevronLeft, ChevronRight, Check, X, FileStack } from 'lucide-react';
 import { BatchItem } from '@/hooks/useBatchAnalysis';
+import { useStudentNames } from '@/lib/StudentNameContext';
 
 interface LinkedGroup {
   primary: BatchItem;
   continuations: BatchItem[];
 }
 
+interface StudentInfo {
+  id: string;
+  first_name: string;
+  last_name: string;
+  student_id: string | null;
+}
+
 interface HandwritingComparisonDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   items: BatchItem[];
+  students?: StudentInfo[];
   onConfirmGroup: (primaryId: string, continuationIds: string[]) => void;
   onUnlinkPage: (continuationId: string) => void;
 }
@@ -24,10 +33,23 @@ export function HandwritingComparisonDialog({
   open,
   onOpenChange,
   items,
+  students,
   onConfirmGroup,
   onUnlinkPage,
 }: HandwritingComparisonDialogProps) {
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
+  const { getDisplayName } = useStudentNames();
+
+  // Helper to get student display name (pseudonym if available) from a batch item
+  const getItemDisplayName = useCallback((item: BatchItem): string => {
+    if (item.studentId && students && students.length > 0) {
+      const student = students.find(s => s.id === item.studentId);
+      if (student) {
+        return getDisplayName(student.id, student.first_name, student.last_name);
+      }
+    }
+    return item.studentName || 'Unassigned Student';
+  }, [students, getDisplayName]);
 
   // Build linked groups from items
   const linkedGroups: LinkedGroup[] = items
@@ -130,7 +152,7 @@ export function HandwritingComparisonDialog({
             {/* Student info */}
             <div className="flex items-center gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
               <span className="font-medium">
-                {currentGroup.primary.studentName || 'Unassigned Student'}
+                {getItemDisplayName(currentGroup.primary)}
               </span>
               <Badge variant="outline">
                 {currentGroup.continuations.length + 1} pages

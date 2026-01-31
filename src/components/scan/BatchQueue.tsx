@@ -36,6 +36,7 @@ import { ManualLinkDialog } from './ManualLinkDialog';
 import { BatchImageZoomDialog } from './BatchImageZoomDialog';
 import { AddUnknownStudentDialog } from './AddUnknownStudentDialog';
 import { SaveToDriveDialog } from './SaveToDriveDialog';
+import { useStudentNames } from '@/lib/StudentNameContext';
 import {
   DndContext,
   closestCenter,
@@ -182,6 +183,19 @@ export function BatchQueue({
   const [addStudentForItem, setAddStudentForItem] = useState<string | null>(null);
   const [showRestoredBanner, setShowRestoredBanner] = useState(isRestoredFromStorage);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { getDisplayName } = useStudentNames();
+
+  // Helper to get the display name for a batch item (uses pseudonym if student is in roster)
+  const getItemDisplayName = useCallback((item: BatchItem): string => {
+    if (item.studentId) {
+      const student = students.find(s => s.id === item.studentId);
+      if (student) {
+        return getDisplayName(student.id, student.first_name, student.last_name);
+      }
+    }
+    // Fallback to stored studentName if not in roster
+    return item.studentName || 'Unassigned';
+  }, [students, getDisplayName]);
   
   // Find first unanalyzed paper index
   const firstUnanalyzedIndex = items.findIndex(item => item.status === 'pending' || item.status === 'identifying');
@@ -555,20 +569,21 @@ export function BatchQueue({
                           onValueChange={(value) => {
                             const student = students.find(s => s.id === value);
                             if (student) {
+                              const displayName = getDisplayName(student.id, student.first_name, student.last_name);
                               onAssignStudent(
                                 item.id, 
                                 student.id, 
-                                `${student.first_name} ${student.last_name}`
+                                displayName
                               );
                             }
                           }}
                         >
                           <SelectTrigger className="h-9 flex-1">
                             <SelectValue placeholder="Assign student...">
-                              {item.studentName && (
+                              {item.studentId && (
                                 <span className="flex items-center gap-2">
                                   <UserCircle className="h-4 w-4" />
-                                  {item.studentName}
+                                  {getItemDisplayName(item)}
                                 </span>
                               )}
                             </SelectValue>
@@ -580,6 +595,7 @@ export function BatchQueue({
                                 students.map((student) => {
                                   const isCurrentItem = item.studentId === student.id;
                                   const isAssignedElsewhere = !isCurrentItem && assignedStudentIds.includes(student.id);
+                                  const displayName = getDisplayName(student.id, student.first_name, student.last_name);
                                   
                                   return (
                                     <SelectItem 
@@ -587,7 +603,7 @@ export function BatchQueue({
                                       value={student.id}
                                       className={isAssignedElsewhere ? 'opacity-50' : ''}
                                     >
-                                      {student.last_name}, {student.first_name}
+                                      {displayName}
                                       {student.student_id && ` (${student.student_id})`}
                                       {isCurrentItem && ' ✓'}
                                       {isAssignedElsewhere && ' (assigned)'}
@@ -708,7 +724,7 @@ export function BatchQueue({
                       <div className="flex items-center gap-2">
                         <UserCircle className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm font-medium truncate">
-                          {item.studentName || 'Unassigned'}
+                          {getItemDisplayName(item)}
                         </span>
                         {item.autoAssigned && (
                           <TooltipProvider>
@@ -950,6 +966,7 @@ export function BatchQueue({
       open={showComparisonDialog}
       onOpenChange={setShowComparisonDialog}
       items={items}
+      students={students}
       onConfirmGroup={(primaryId, continuationIds) => {
         // Group is already confirmed, just close
         setShowComparisonDialog(false);
@@ -1065,7 +1082,7 @@ export function BatchQueue({
         open={zoomPreviewIndex !== null}
         onOpenChange={(open) => !open && setZoomPreviewIndex(null)}
         imageUrl={items[zoomPreviewIndex].imageDataUrl}
-        studentName={items[zoomPreviewIndex].studentName || 'Unassigned'}
+        studentName={getItemDisplayName(items[zoomPreviewIndex])}
         paperIndex={zoomPreviewIndex}
         totalPapers={items.length}
         misconceptions={items[zoomPreviewIndex].result?.misconceptions}
