@@ -560,7 +560,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
     for await (const entry of (handle as any).values()) {
       if (entry.kind === "file" && !existingNames.has(entry.name)) {
         const file = await entry.getFile();
-        if (file.type.startsWith("image/") || file.type === "application/pdf") {
+        if (file.type.startsWith("image/") || file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
           newFiles.push(file);
         }
       }
@@ -574,14 +574,65 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
       newFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
       const processedPages: ScanPage[] = [];
+      let processedCount = 0;
+      let totalItems = newFiles.length;
+
       for (let i = 0; i < newFiles.length; i++) {
-        const page = await processImage(newFiles[i], pages.length + i, newFiles.length);
-        processedPages.push(page);
+        const file = newFiles[i];
+
+        // Check if this is a PDF file and handle accordingly
+        if (isPdfFile(file)) {
+          toast.info(`Converting PDF: ${file.name}...`);
+          try {
+            const pdfImages = await pdfToImages(file);
+
+            if (pdfImages.length === 0) {
+              toast.error(`PDF has no pages: ${file.name}`);
+              continue;
+            }
+
+            // Adjust total count for PDF pages
+            totalItems = totalItems - 1 + pdfImages.length;
+
+            for (let pageIdx = 0; pageIdx < pdfImages.length; pageIdx++) {
+              const pageDataUrl = pdfImages[pageIdx];
+              const page = await processImageFromDataUrl(
+                pageDataUrl,
+                `${file.name}-page${pageIdx + 1}`,
+                processedCount,
+                totalItems,
+              );
+              processedPages.push(page);
+              processedCount++;
+            }
+            toast.success(`Converted ${pdfImages.length} pages from ${file.name}`);
+          } catch (pdfErr: unknown) {
+            console.error("Error processing PDF from folder:", pdfErr);
+            const errorMessage = pdfErr instanceof Error ? pdfErr.message : "Unknown error";
+            toast.error(`Failed to process PDF: ${file.name}. ${errorMessage}`);
+          }
+        } else {
+          // Regular image file
+          const page = await processImage(file, processedCount, totalItems);
+          processedPages.push(page);
+          processedCount++;
+        }
       }
 
       setPages((prev) => [...prev, ...processedPages]);
       setIsProcessing(false);
-      toast.success(`Added ${newFiles.length} new scans from folder`);
+      
+      if (processedPages.length > 0) {
+        const autoRotatedCount = processedPages.filter((p) => p.autoRotated).length;
+        toast.success(
+          `Added ${processedPages.length} new scans from folder${autoRotatedCount > 0 ? ` (${autoRotatedCount} auto-rotated)` : ""}`,
+        );
+        
+        // Play sound notification if enabled
+        if (isSoundEnabled()) {
+          playNotificationSound();
+        }
+      }
     }
   };
 
@@ -611,17 +662,55 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
       driveFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
     }
 
-    toast.info(`Processing ${driveFiles.length} scanned pages from Drive...`);
+    toast.info(`Processing ${driveFiles.length} file(s) from Drive...`);
 
     try {
       const newPages: ScanPage[] = [];
+      let processedCount = 0;
+      let totalItems = driveFiles.length;
 
       for (let i = 0; i < driveFiles.length; i++) {
         const { blob, name } = driveFiles[i];
         // Convert blob to File for consistent processing
         const file = new File([blob], name, { type: blob.type });
-        const page = await processImage(file, i, driveFiles.length);
-        newPages.push(page);
+
+        // Check if this is a PDF file and handle accordingly
+        if (isPdfFile(file)) {
+          toast.info(`Converting PDF: ${name}...`);
+          try {
+            const pdfImages = await pdfToImages(file);
+
+            if (pdfImages.length === 0) {
+              toast.error(`PDF has no pages: ${name}`);
+              continue;
+            }
+
+            // Adjust total count for PDF pages
+            totalItems = totalItems - 1 + pdfImages.length;
+
+            for (let pageIdx = 0; pageIdx < pdfImages.length; pageIdx++) {
+              const pageDataUrl = pdfImages[pageIdx];
+              const page = await processImageFromDataUrl(
+                pageDataUrl,
+                `${name}-page${pageIdx + 1}`,
+                processedCount,
+                totalItems,
+              );
+              newPages.push(page);
+              processedCount++;
+            }
+            toast.success(`Converted ${pdfImages.length} pages from ${name}`);
+          } catch (pdfErr: unknown) {
+            console.error("Error processing PDF from Drive:", pdfErr);
+            const errorMessage = pdfErr instanceof Error ? pdfErr.message : "Unknown error";
+            toast.error(`Failed to process PDF: ${name}. ${errorMessage}`);
+          }
+        } else {
+          // Regular image file
+          const page = await processImage(file, processedCount, totalItems);
+          newPages.push(page);
+          processedCount++;
+        }
       }
 
       // Append to existing pages
@@ -659,7 +748,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
       setIsProcessing(true);
       setProcessProgress(0);
 
-      toast.info(`Auto-importing ${syncedFiles.length} new scans from Drive...`);
+      toast.info(`Auto-importing ${syncedFiles.length} new file(s) from Drive...`);
 
       try {
         const newPages: ScanPage[] = [];
@@ -669,11 +758,50 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
           ? [...syncedFiles].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
           : syncedFiles;
 
+        let processedCount = 0;
+        let totalItems = sortedFiles.length;
+
         for (let i = 0; i < sortedFiles.length; i++) {
           const { blob, name } = sortedFiles[i];
           const file = new File([blob], name, { type: blob.type });
-          const page = await processImage(file, i, sortedFiles.length);
-          newPages.push(page);
+
+          // Check if this is a PDF file and handle accordingly
+          if (isPdfFile(file)) {
+            toast.info(`Converting PDF: ${name}...`);
+            try {
+              const pdfImages = await pdfToImages(file);
+
+              if (pdfImages.length === 0) {
+                toast.error(`PDF has no pages: ${name}`);
+                continue;
+              }
+
+              // Adjust total count for PDF pages
+              totalItems = totalItems - 1 + pdfImages.length;
+
+              for (let pageIdx = 0; pageIdx < pdfImages.length; pageIdx++) {
+                const pageDataUrl = pdfImages[pageIdx];
+                const page = await processImageFromDataUrl(
+                  pageDataUrl,
+                  `${name}-page${pageIdx + 1}`,
+                  processedCount,
+                  totalItems,
+                );
+                newPages.push(page);
+                processedCount++;
+              }
+              toast.success(`Converted ${pdfImages.length} pages from ${name}`);
+            } catch (pdfErr: unknown) {
+              console.error("Error processing PDF from auto-sync:", pdfErr);
+              const errorMessage = pdfErr instanceof Error ? pdfErr.message : "Unknown error";
+              toast.error(`Failed to process PDF: ${name}. ${errorMessage}`);
+            }
+          } else {
+            // Regular image file
+            const page = await processImage(file, processedCount, totalItems);
+            newPages.push(page);
+            processedCount++;
+          }
         }
 
         setPages((prev) => {
@@ -693,7 +821,7 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
         setProcessProgress(0);
       }
     },
-    [settings.autoOrder, processImage],
+    [settings.autoOrder, processImage, processImageFromDataUrl],
   );
 
   // Handle auto-sync folder configuration
