@@ -42,7 +42,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { resizeImage, blobToBase64, applyPhotocopyFilter } from "@/lib/imageUtils";
-import { pdfToImages, isPdfFile } from "@/lib/pdfUtils";
+import { pdfToImages, isPdfFile, isFilePdf } from "@/lib/pdfUtils";
 import { GoogleDriveImport } from "./GoogleDriveImport";
 import { GoogleDriveAutoSyncConfig } from "./GoogleDriveAutoSyncConfig";
 import { HotFolderAlert } from "./HotFolderAlert";
@@ -330,22 +330,24 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
       const newPages: ScanPage[] = [];
       let totalItems = 0;
 
-      // First pass: count total items (including PDF pages)
+      // First pass: detect PDFs using async detection for better accuracy
+      const fileTypes: Map<File, boolean> = new Map();
       for (const file of fileArray) {
-        if (isPdfFile(file)) {
-          // We'll count PDF pages during processing
-          totalItems += 1; // Placeholder, will adjust
-        } else {
-          totalItems += 1;
-        }
+        // Use async detection for reliable PDF identification
+        const isPdf = await isFilePdf(file);
+        fileTypes.set(file, isPdf);
+        totalItems += 1;
+        
+        console.log(`[handleFileSelect] File: "${file.name}", type: "${file.type}", isPdf: ${isPdf}`);
       }
 
       let processedCount = 0;
 
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
+        const isPdf = fileTypes.get(file) ?? false;
 
-        if (isPdfFile(file)) {
+        if (isPdf) {
           // Convert PDF to images
           toast.info(`Converting PDF: ${file.name}...`);
           try {
@@ -560,7 +562,9 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
     for await (const entry of (handle as any).values()) {
       if (entry.kind === "file" && !existingNames.has(entry.name)) {
         const file = await entry.getFile();
-        if (file.type.startsWith("image/") || file.type === "application/pdf") {
+        // Check if it's an image or PDF using improved detection
+        const isPdf = await isFilePdf(file);
+        if (file.type.startsWith("image/") || isPdf) {
           newFiles.push(file);
         }
       }
@@ -575,13 +579,35 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
 
       const processedPages: ScanPage[] = [];
       for (let i = 0; i < newFiles.length; i++) {
-        const page = await processImage(newFiles[i], pages.length + i, newFiles.length);
-        processedPages.push(page);
+        const file = newFiles[i];
+        const isPdf = await isFilePdf(file);
+        
+        if (isPdf) {
+          // Process PDF file
+          try {
+            const pdfImages = await pdfToImages(file);
+            for (let pageIdx = 0; pageIdx < pdfImages.length; pageIdx++) {
+              const page = await processImageFromDataUrl(
+                pdfImages[pageIdx],
+                `${file.name}-page${pageIdx + 1}`,
+                processedPages.length + pages.length,
+                newFiles.length,
+              );
+              processedPages.push(page);
+            }
+          } catch (pdfErr) {
+            console.error("Error processing PDF from folder:", pdfErr);
+            toast.error(`Failed to process PDF: ${file.name}`);
+          }
+        } else {
+          const page = await processImage(file, pages.length + i, newFiles.length);
+          processedPages.push(page);
+        }
       }
 
       setPages((prev) => [...prev, ...processedPages]);
       setIsProcessing(false);
-      toast.success(`Added ${newFiles.length} new scans from folder`);
+      toast.success(`Added ${processedPages.length} new scans from folder`);
     }
   };
 

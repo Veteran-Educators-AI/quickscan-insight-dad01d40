@@ -142,8 +142,90 @@ export async function pdfToImages(
 }
 
 /**
+ * Known PDF MIME types - different browsers and systems can report different types
+ */
+const PDF_MIME_TYPES = [
+  "application/pdf",
+  "application/x-pdf",
+  "application/acrobat",
+  "application/vnd.pdf",
+  "text/pdf",
+  "text/x-pdf",
+  "application/force-download", // Sometimes used by servers for downloads
+];
+
+/**
  * Check if a file is a PDF
+ * Checks multiple MIME types and file extension for robust detection
  */
 export function isPdfFile(file: File): boolean {
-  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  const mimeType = file.type?.toLowerCase() || "";
+  const fileName = file.name?.toLowerCase() || "";
+  const hasExtension = fileName.endsWith(".pdf");
+  const hasMimeType = PDF_MIME_TYPES.includes(mimeType);
+  
+  // Also check if MIME type starts with "application/" and contains "pdf"
+  const mimeContainsPdf = mimeType.includes("pdf");
+  
+  const isPdf = hasExtension || hasMimeType || mimeContainsPdf;
+  
+  console.log(`[isPdfFile] Checking file: "${file.name}"`, {
+    mimeType,
+    hasExtension,
+    hasMimeType,
+    mimeContainsPdf,
+    result: isPdf,
+    fileSize: file.size,
+  });
+  
+  return isPdf;
+}
+
+/**
+ * Detect if a file is a PDF by checking its magic bytes (file signature)
+ * This is more reliable than MIME type detection
+ */
+export async function detectPdfByMagicBytes(file: File): Promise<boolean> {
+  try {
+    // PDF files start with "%PDF-" (hex: 25 50 44 46 2D)
+    const header = await file.slice(0, 5).arrayBuffer();
+    const bytes = new Uint8Array(header);
+    
+    // Check for PDF magic bytes: %PDF-
+    const isPdf = bytes[0] === 0x25 && // %
+                  bytes[1] === 0x50 && // P
+                  bytes[2] === 0x44 && // D
+                  bytes[3] === 0x46 && // F
+                  bytes[4] === 0x2D;   // -
+    
+    console.log(`[detectPdfByMagicBytes] File "${file.name}": ${isPdf ? "IS PDF" : "NOT PDF"}`, {
+      firstBytes: Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' '),
+    });
+    
+    return isPdf;
+  } catch (error) {
+    console.error(`[detectPdfByMagicBytes] Error reading file "${file.name}":`, error);
+    return false;
+  }
+}
+
+/**
+ * Smart PDF detection that combines MIME type, extension, and magic byte detection
+ * Use this for more reliable detection when processing files
+ */
+export async function isFilePdf(file: File): Promise<boolean> {
+  // First do quick check with MIME type and extension
+  if (isPdfFile(file)) {
+    return true;
+  }
+  
+  // If quick check fails, try magic byte detection as fallback
+  // This catches cases where the file is renamed or has wrong MIME type
+  const hasPdfMagicBytes = await detectPdfByMagicBytes(file);
+  
+  if (hasPdfMagicBytes) {
+    console.log(`[isFilePdf] File "${file.name}" detected as PDF via magic bytes despite MIME type: ${file.type}`);
+  }
+  
+  return hasPdfMagicBytes;
 }
