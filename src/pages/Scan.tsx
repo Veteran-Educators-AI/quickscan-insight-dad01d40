@@ -740,8 +740,11 @@ export default function Scan() {
             }
             totalPages++;
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error('Error processing dropped file:', err);
+          toast.error(`Failed to process ${file.name}`, {
+            description: err?.message || 'Unknown error occurred',
+          });
         }
       }
 
