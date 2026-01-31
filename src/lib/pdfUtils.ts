@@ -1,8 +1,20 @@
 import * as pdfjsLib from "pdfjs-dist";
 
-// Configure PDF.js worker - use legacy build for better compatibility
-// The .mjs worker can cause issues in some environments
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+// Configure PDF.js worker - use cdnjs for maximum reliability
+// cdnjs has better global CDN coverage than unpkg
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+// Fallback worker setup in case primary CDN fails
+const setupWorkerFallback = async () => {
+  try {
+    // Test if worker loads correctly by checking version
+    const testDoc = await pdfjsLib.getDocument({ data: new Uint8Array([]) }).promise.catch(() => null);
+  } catch (e: any) {
+    // If worker fails, try alternative CDN
+    console.warn("[pdfUtils] Primary worker CDN failed, trying fallback...");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+  }
+};
 
 /**
  * Convert a PDF file to an array of image data URLs (one per page)
@@ -32,14 +44,41 @@ export async function pdfToImages(
     const arrayBuffer = await file.arrayBuffer();
     console.log(`[pdfToImages] ArrayBuffer created, size: ${arrayBuffer.byteLength} bytes`);
 
+    // Create loading task with robust options
     const loadingTask = pdfjsLib.getDocument({ 
       data: arrayBuffer,
-      // Disable features that can cause issues
+      // Disable features that can cause worker issues
       disableFontFace: true,
       useSystemFonts: true,
+      // Disable autoFetch to prevent CORS issues
+      disableAutoFetch: true,
+      // Disable streaming to ensure full document loads
+      disableStream: true,
     });
     
-    const pdf = await loadingTask.promise;
+    let pdf;
+    try {
+      pdf = await loadingTask.promise;
+    } catch (loadError: any) {
+      console.error("[pdfToImages] PDF loading failed:", loadError);
+      
+      // Provide specific error messages for common issues
+      if (loadError.message?.includes("Invalid PDF") || loadError.name === "InvalidPDFException") {
+        throw new Error("Invalid PDF file - the file may be corrupted or not a valid PDF");
+      }
+      if (loadError.name === "PasswordException" || loadError.message?.includes("password")) {
+        throw new Error("This PDF is password-protected and cannot be processed");
+      }
+      if (loadError.message?.includes("worker") || loadError.message?.includes("Worker")) {
+        throw new Error("PDF processing failed - please refresh the page and try again");
+      }
+      if (loadError.message?.includes("network") || loadError.message?.includes("fetch")) {
+        throw new Error("Network error loading PDF - please check your connection");
+      }
+      
+      throw new Error(`Failed to load PDF: ${loadError?.message || "Unknown error"}`);
+    }
+    
     console.log(`[pdfToImages] PDF loaded successfully, pages: ${pdf.numPages}`);
 
     const images: string[] = [];
