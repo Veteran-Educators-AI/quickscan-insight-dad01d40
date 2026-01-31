@@ -86,10 +86,10 @@ export function ScanSettings() {
             </div>
             <div>
               <Label htmlFor="auto-handwriting-grouping" className="font-medium">
-                Auto-Group Multi-Page Papers
+                Auto-Separate PDF by Student
               </Label>
               <p className="text-xs text-muted-foreground">
-                Automatically detect and link sequential pages with similar handwriting when importing from scanner
+                When importing multi-page PDFs, automatically detect handwriting changes and student names to group pages by student
               </p>
             </div>
           </div>
@@ -105,7 +105,7 @@ export function ScanSettings() {
           <div className="flex items-center gap-2 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg text-sm">
             <Fingerprint className="h-4 w-4 text-blue-500 shrink-0" />
             <p className="text-muted-foreground">
-              <span className="font-medium text-foreground">Smart grouping:</span> Sequential pages with matching handwriting will be automatically linked as one multi-page paper.
+              <span className="font-medium text-foreground">Smart separation:</span> Multi-page PDFs will be automatically separated by student using handwriting detection and name recognition.
             </p>
           </div>
         )}

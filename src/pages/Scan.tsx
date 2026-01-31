@@ -641,6 +641,8 @@ export default function Scan() {
     } else {
       // Multiple files or in scanner mode - process as batch with progress
       let totalPages = 0;
+      let totalStudentsIdentified = 0;
+      let totalPagesLinked = 0;
       
       // Initialize progress
       setDropProcessing({
@@ -651,6 +653,13 @@ export default function Scan() {
         totalPages: 0,
         fileName: '',
       });
+
+      // Get the active student roster
+      const activeRoster = singleScanStudents.length > 0 
+        ? singleScanStudents 
+        : students.length > 0 
+          ? students 
+          : [];
 
       for (let fileIndex = 0; fileIndex < validFiles.length; fileIndex++) {
         const file = validFiles[fileIndex];
@@ -674,23 +683,43 @@ export default function Scan() {
               totalPages: images.length,
             } : null);
             
-            for (let pageIndex = 0; pageIndex < images.length; pageIndex++) {
-              const dataUrl = images[pageIndex];
+            // Use auto-grouping if we have a roster with students AND setting is enabled
+            if (activeRoster.length > 0 && images.length > 1 && qrScanSettings.autoHandwritingGroupingEnabled) {
+              // Use the new auto-grouping function for multi-page PDFs
+              const result = await batch.addPdfPagesWithAutoGrouping(
+                images,
+                activeRoster,
+                (current, total, status) => {
+                  setDropProcessing(prev => prev ? {
+                    ...prev,
+                    currentPage: current,
+                    totalPages: total,
+                    fileName: `${file.name} - ${status}`,
+                  } : null);
+                }
+              );
               
-              // Update page progress
-              setDropProcessing(prev => prev ? {
-                ...prev,
-                currentPage: pageIndex + 1,
-              } : null);
-              
-              if (singleScanClassId && singleScanStudents.length > 0) {
-                await batch.addImageWithAutoIdentify(dataUrl, singleScanStudents);
-              } else if (selectedClassId && students.length > 0) {
-                await batch.addImageWithAutoIdentify(dataUrl, students);
-              } else {
-                batch.addImage(dataUrl);
+              totalPages += result.pagesAdded;
+              totalStudentsIdentified += result.studentsIdentified;
+              totalPagesLinked += result.pagesLinked;
+            } else {
+              // Single page PDF or no roster - process normally
+              for (let pageIndex = 0; pageIndex < images.length; pageIndex++) {
+                const dataUrl = images[pageIndex];
+                
+                // Update page progress
+                setDropProcessing(prev => prev ? {
+                  ...prev,
+                  currentPage: pageIndex + 1,
+                } : null);
+                
+                if (activeRoster.length > 0) {
+                  await batch.addImageWithAutoIdentify(dataUrl, activeRoster);
+                } else {
+                  batch.addImage(dataUrl);
+                }
+                totalPages++;
               }
-              totalPages++;
             }
           } else {
             // Update progress for image
@@ -704,10 +733,8 @@ export default function Scan() {
             
             const resizedBlob = await resizeImage(file);
             const dataUrl = await blobToBase64(resizedBlob);
-            if (singleScanClassId && singleScanStudents.length > 0) {
-              await batch.addImageWithAutoIdentify(dataUrl, singleScanStudents);
-            } else if (selectedClassId && students.length > 0) {
-              await batch.addImageWithAutoIdentify(dataUrl, students);
+            if (activeRoster.length > 0) {
+              await batch.addImageWithAutoIdentify(dataUrl, activeRoster);
             } else {
               batch.addImage(dataUrl);
             }
@@ -722,7 +749,25 @@ export default function Scan() {
       
       if (totalPages > 0) {
         setScanMode('scanner');
-        toast.success(`Added ${totalPages} page(s) to batch`);
+        
+        // Build descriptive success message
+        let message = `Added ${totalPages} page(s) to batch`;
+        const details: string[] = [];
+        
+        if (totalStudentsIdentified > 0) {
+          details.push(`${totalStudentsIdentified} student(s) identified`);
+        }
+        if (totalPagesLinked > 0) {
+          details.push(`${totalPagesLinked} page(s) auto-linked`);
+        }
+        
+        if (details.length > 0) {
+          toast.success(message, {
+            description: details.join(', '),
+          });
+        } else {
+          toast.success(message);
+        }
       }
     }
   }, [scanMode, batch, selectedClassId, singleScanClassId, students, singleScanStudents]);

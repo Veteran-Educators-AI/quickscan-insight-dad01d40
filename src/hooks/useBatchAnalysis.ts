@@ -115,6 +115,11 @@ interface UseBatchAnalysisReturn {
   items: BatchItem[];
   addImage: (imageDataUrl: string, studentId?: string, studentName?: string, filename?: string) => string;
   addImageWithAutoIdentify: (imageDataUrl: string, studentRoster?: Student[]) => Promise<string>;
+  addPdfPagesWithAutoGrouping: (
+    pages: string[],
+    studentRoster: Student[],
+    onProgress?: (current: number, total: number, status: string) => void
+  ) => Promise<{ pagesAdded: number; studentsIdentified: number; pagesLinked: number }>;
   removeImage: (id: string) => void;
   updateItemStudent: (itemId: string, studentId: string, studentName: string) => void;
   reorderItems: (activeId: string, overId: string) => void;
@@ -392,6 +397,261 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     }
 
     return id;
+  }, []);
+
+  // Add multiple PDF pages with automatic student separation based on handwriting/name detection
+  const addPdfPagesWithAutoGrouping = useCallback(async (
+    pages: string[],
+    studentRoster: Student[],
+    onProgress?: (current: number, total: number, status: string) => void
+  ): Promise<{ pagesAdded: number; studentsIdentified: number; pagesLinked: number }> => {
+    if (pages.length === 0) return { pagesAdded: 0, studentsIdentified: 0, pagesLinked: 0 };
+
+    setIsIdentifying(true);
+    
+    // Structure to track student groups as we process pages
+    interface StudentGroup {
+      primaryId: string;
+      studentId?: string;
+      studentName?: string;
+      pageIds: string[];
+    }
+    
+    const studentGroups: StudentGroup[] = [];
+    let currentGroup: StudentGroup | null = null;
+    let studentsIdentified = 0;
+    let pagesLinked = 0;
+    const newItems: BatchItem[] = [];
+
+    for (let i = 0; i < pages.length; i++) {
+      const pageDataUrl = pages[i];
+      const pageId = crypto.randomUUID();
+      
+      onProgress?.(i + 1, pages.length, i === 0 ? 'Identifying first student...' : 'Comparing handwriting...');
+      
+      // Create base item
+      const baseItem: BatchItem = {
+        id: pageId,
+        imageDataUrl: pageDataUrl,
+        status: 'pending',
+      };
+      
+      if (i === 0) {
+        // First page - always identify student
+        try {
+          const identResult = await identifyStudent(baseItem, studentRoster);
+          
+          currentGroup = {
+            primaryId: pageId,
+            studentId: identResult.studentId,
+            studentName: identResult.studentName,
+            pageIds: [pageId],
+          };
+          
+          if (identResult.studentId) studentsIdentified++;
+          
+          newItems.push({
+            ...identResult,
+            pageType: 'new',
+          });
+          studentGroups.push(currentGroup);
+        } catch (err) {
+          console.error('First page identification failed:', err);
+          currentGroup = {
+            primaryId: pageId,
+            pageIds: [pageId],
+          };
+          newItems.push({
+            ...baseItem,
+            pageType: 'new',
+          });
+          studentGroups.push(currentGroup);
+        }
+      } else {
+        // Subsequent pages - check handwriting similarity with previous page
+        const previousItem = newItems[i - 1];
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('detect-handwriting-similarity', {
+            body: {
+              image1Base64: previousItem.imageDataUrl,
+              image2Base64: pageDataUrl,
+            },
+          });
+
+          if (!error && data?.success && data?.similarity) {
+            const similarity = data.similarity;
+            
+            const handwritingSimilarity: HandwritingSimilarity = {
+              isSameStudent: similarity.isSameStudent,
+              confidence: similarity.confidence,
+              similarityScore: similarity.similarityScore,
+              reasoning: similarity.reasoning,
+            };
+            
+            if (similarity.isSameStudent && (similarity.confidence === 'high' || similarity.confidence === 'medium')) {
+              // Same student - link as continuation
+              pagesLinked++;
+              currentGroup!.pageIds.push(pageId);
+              
+              newItems.push({
+                ...baseItem,
+                pageType: 'continuation',
+                continuationOf: currentGroup!.primaryId,
+                handwritingSimilarity,
+                studentId: currentGroup!.studentId,
+                studentName: currentGroup!.studentName,
+                autoAssigned: !!currentGroup!.studentId,
+              });
+            } else {
+              // Different student - start new group
+              onProgress?.(i + 1, pages.length, 'New student detected, identifying...');
+              
+              try {
+                const identResult = await identifyStudent(baseItem, studentRoster);
+                
+                currentGroup = {
+                  primaryId: pageId,
+                  studentId: identResult.studentId,
+                  studentName: identResult.studentName,
+                  pageIds: [pageId],
+                };
+                
+                if (identResult.studentId) studentsIdentified++;
+                
+                newItems.push({
+                  ...identResult,
+                  pageType: 'new',
+                  handwritingSimilarity,
+                });
+                studentGroups.push(currentGroup);
+              } catch (err) {
+                console.error('Student identification failed:', err);
+                currentGroup = {
+                  primaryId: pageId,
+                  pageIds: [pageId],
+                };
+                newItems.push({
+                  ...baseItem,
+                  pageType: 'new',
+                  handwritingSimilarity,
+                });
+                studentGroups.push(currentGroup);
+              }
+            }
+          } else {
+            // Handwriting comparison failed - try to identify as new student
+            onProgress?.(i + 1, pages.length, 'Identifying student...');
+            
+            try {
+              const identResult = await identifyStudent(baseItem, studentRoster);
+              
+              // Check if this matches the current group's student
+              if (currentGroup?.studentId && identResult.studentId === currentGroup.studentId) {
+                // Same student by name - link as continuation
+                pagesLinked++;
+                currentGroup.pageIds.push(pageId);
+                
+                newItems.push({
+                  ...identResult,
+                  pageType: 'continuation',
+                  continuationOf: currentGroup.primaryId,
+                });
+              } else if (identResult.studentId) {
+                // Different student
+                studentsIdentified++;
+                currentGroup = {
+                  primaryId: pageId,
+                  studentId: identResult.studentId,
+                  studentName: identResult.studentName,
+                  pageIds: [pageId],
+                };
+                
+                newItems.push({
+                  ...identResult,
+                  pageType: 'new',
+                });
+                studentGroups.push(currentGroup);
+              } else {
+                // Could not identify - assume new paper
+                currentGroup = {
+                  primaryId: pageId,
+                  pageIds: [pageId],
+                };
+                newItems.push({
+                  ...identResult,
+                  pageType: 'new',
+                });
+                studentGroups.push(currentGroup);
+              }
+            } catch (err) {
+              // Fallback - add as new paper
+              currentGroup = {
+                primaryId: pageId,
+                pageIds: [pageId],
+              };
+              newItems.push({
+                ...baseItem,
+                pageType: 'new',
+              });
+              studentGroups.push(currentGroup);
+            }
+          }
+        } catch (err) {
+          console.error('Handwriting comparison failed:', err);
+          // Fallback - try identification
+          try {
+            const identResult = await identifyStudent(baseItem, studentRoster);
+            if (identResult.studentId) studentsIdentified++;
+            currentGroup = {
+              primaryId: pageId,
+              studentId: identResult.studentId,
+              studentName: identResult.studentName,
+              pageIds: [pageId],
+            };
+            newItems.push({
+              ...identResult,
+              pageType: 'new',
+            });
+            studentGroups.push(currentGroup);
+          } catch (e) {
+            currentGroup = {
+              primaryId: pageId,
+              pageIds: [pageId],
+            };
+            newItems.push({
+              ...baseItem,
+              pageType: 'new',
+            });
+            studentGroups.push(currentGroup);
+          }
+        }
+      }
+    }
+
+    // Update continuation pages lists for primary items
+    const finalItems = newItems.map(item => {
+      if (item.pageType === 'new') {
+        const group = studentGroups.find(g => g.primaryId === item.id);
+        if (group && group.pageIds.length > 1) {
+          return {
+            ...item,
+            continuationPages: group.pageIds.slice(1),
+          };
+        }
+      }
+      return item;
+    });
+
+    // Add all items to the batch
+    setItems(prev => [...prev, ...finalItems]);
+    setIsIdentifying(false);
+
+    return {
+      pagesAdded: pages.length,
+      studentsIdentified,
+      pagesLinked,
+    };
   }, []);
 
   const removeImage = useCallback((id: string) => {
@@ -1752,6 +2012,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     items,
     addImage,
     addImageWithAutoIdentify,
+    addPdfPagesWithAutoGrouping,
     removeImage,
     updateItemStudent,
     reorderItems,
