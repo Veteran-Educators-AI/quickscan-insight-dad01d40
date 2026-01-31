@@ -78,6 +78,10 @@ import {
   convertInchesToTwip,
   ImageRun,
   Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  VerticalAlign,
 } from "docx";
 import { getFormulasForTopics, type FormulaCategory } from "@/data/formulaReference";
 import { ScrapPaperGenerator } from "@/components/print/ScrapPaperGenerator";
@@ -2800,34 +2804,135 @@ export function WorksheetBuilder({
     try {
       const children: (Paragraph | Table)[] = [];
 
-      // Header
-      children.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: worksheetTitle,
-              bold: true,
-              size: 36, // 18pt
+      // Generate QR code for student identification (if enabled)
+      let qrCodeBuffer: ArrayBuffer | null = null;
+      try {
+        const { fetchQRCodeAsArrayBuffer } = await import('@/lib/qrCodeUtils');
+        // Generate a worksheet-level QR code with a unique ID
+        const worksheetId = `ws_${Date.now().toString(36)}`;
+        qrCodeBuffer = await fetchQRCodeAsArrayBuffer(worksheetId, 1, 1);
+      } catch (qrError) {
+        console.error('Error generating QR code for Word document:', qrError);
+      }
+
+      // Header with QR code in top-right corner
+      if (qrCodeBuffer) {
+        // Create a table-based layout for header with QR code on right
+        const headerTable = new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          borders: {
+            top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+          },
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: worksheetTitle,
+                          bold: true,
+                          size: 36, // 18pt
+                        }),
+                      ],
+                    }),
+                    ...(teacherName ? [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: `Teacher: ${teacherName}`,
+                            size: 24, // 12pt
+                          }),
+                        ],
+                        spacing: { before: 100 },
+                      }),
+                    ] : []),
+                  ],
+                  width: { size: 80, type: WidthType.PERCENTAGE },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                    bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                    left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                    right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new ImageRun({
+                          data: qrCodeBuffer,
+                          transformation: {
+                            width: 70,
+                            height: 70,
+                          },
+                          type: "png",
+                        }),
+                      ],
+                      alignment: AlignmentType.RIGHT,
+                    }),
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: "Scan to ID",
+                          size: 12,
+                          color: "666666",
+                        }),
+                      ],
+                      alignment: AlignmentType.RIGHT,
+                    }),
+                  ],
+                  width: { size: 20, type: WidthType.PERCENTAGE },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                    bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                    left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                    right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  },
+                }),
+              ],
             }),
           ],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 200 },
-        }),
-      );
-
-      if (teacherName) {
+        });
+        children.push(headerTable);
+      } else {
+        // Fallback: Header without QR code
         children.push(
           new Paragraph({
             children: [
               new TextRun({
-                text: `Teacher: ${teacherName}`,
-                size: 24, // 12pt
+                text: worksheetTitle,
+                bold: true,
+                size: 36, // 18pt
               }),
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { after: 150 },
+            spacing: { after: 200 },
           }),
         );
+
+        if (teacherName) {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Teacher: ${teacherName}`,
+                  size: 24, // 12pt
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 150 },
+            }),
+          );
+        }
       }
 
       // Student info line
@@ -2836,7 +2941,7 @@ export function WorksheetBuilder({
           children: [
             new TextRun({ text: "Name: _______________________   Date: ___________   Period: _____", size: 22 }),
           ],
-          spacing: { after: 300 },
+          spacing: { before: 200, after: 300 },
         }),
       );
 
