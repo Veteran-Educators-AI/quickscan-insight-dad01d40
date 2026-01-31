@@ -593,13 +593,40 @@ export function BatchImageZoomDialog({
                     // Parse out the location prefix if present
                     const cleanText = m.replace(/^ERROR_LOCATION:\s*\w+-\w+\s*\|\s*/i, '');
 
+                    // Hide dismissed errors from the list - they disappear when dismissed
+                    if (decision === 'dismissed') {
+                      return (
+                        <div
+                          key={i}
+                          className="p-2 rounded-lg border border-dashed border-red-200 bg-red-50/30 dark:bg-red-950/10"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <X className="h-3 w-3 text-red-400" />
+                              <span className="line-through">Error #{errorNum} dismissed</span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                clearDecision(errorNum);
+                              }}
+                            >
+                              Undo
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div
                         key={i}
                         className={cn(
                           "p-3 rounded-lg border transition-all",
                           decision === 'confirmed' && "border-green-400 bg-green-50/50 dark:bg-green-950/20",
-                          decision === 'dismissed' && "border-red-300 bg-red-50/50 dark:bg-red-950/20 opacity-60",
                           !decision && isHighlighted && "border-destructive bg-destructive/10 shadow-md",
                           !decision && !isHighlighted && "border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20"
                         )}
@@ -610,13 +637,10 @@ export function BatchImageZoomDialog({
                           <div className={cn(
                             "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold shrink-0",
                             decision === 'confirmed' && "bg-green-500 text-white",
-                            decision === 'dismissed' && "bg-red-400 text-white",
                             !decision && isHighlighted && "bg-destructive text-destructive-foreground",
                             !decision && !isHighlighted && "bg-amber-500 text-white"
                           )}>
-                            {decision === 'confirmed' ? <Check className="h-3 w-3" /> :
-                             decision === 'dismissed' ? <X className="h-3 w-3" /> :
-                             errorNum}
+                            {decision === 'confirmed' ? <Check className="h-3 w-3" /> : errorNum}
                           </div>
                           <div className="flex-1 min-w-0">
                             {region && (
@@ -625,7 +649,6 @@ export function BatchImageZoomDialog({
                                 className={cn(
                                   "text-[10px] mb-1.5",
                                   decision === 'confirmed' && "border-green-400 text-green-700 dark:text-green-300",
-                                  decision === 'dismissed' && "border-red-300 text-red-600 dark:text-red-400",
                                   !decision && isHighlighted && "border-destructive text-destructive",
                                   !decision && !isHighlighted && "border-amber-400 text-amber-700 dark:text-amber-300"
                                 )}
@@ -634,11 +657,7 @@ export function BatchImageZoomDialog({
                                 {region.vertical}-{region.horizontal}
                               </Badge>
                             )}
-                            <p className={cn(
-                              "text-xs leading-relaxed",
-                              decision === 'dismissed' && "line-through text-muted-foreground",
-                              !decision && "text-foreground/80"
-                            )}>
+                            <p className="text-xs leading-relaxed text-foreground/80">
                               {cleanText}
                             </p>
 
@@ -675,23 +694,16 @@ export function BatchImageZoomDialog({
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
-                                      variant={decision === 'dismissed' ? 'default' : 'outline'}
+                                      variant="outline"
                                       size="sm"
-                                      className={cn(
-                                        "h-6 px-2 text-xs gap-1",
-                                        decision === 'dismissed' && "bg-red-500 hover:bg-red-600"
-                                      )}
+                                      className="h-6 px-2 text-xs gap-1"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        if (decision === 'dismissed') {
-                                          clearDecision(errorNum);
-                                        } else {
-                                          dismissError(errorNum);
-                                        }
+                                        dismissError(errorNum);
                                       }}
                                     >
                                       <X className="h-3 w-3" />
-                                      {decision === 'dismissed' ? 'Dismissed' : 'Dismiss'}
+                                      Dismiss
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>AI incorrectly flagged this as an error</TooltipContent>

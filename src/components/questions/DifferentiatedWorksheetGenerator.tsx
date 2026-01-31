@@ -25,7 +25,7 @@ import { useFeatureTracking } from '@/hooks/useFeatureTracking';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
 import { fixEncodingCorruption, renderMathText, sanitizeForPDF, sanitizeForWord } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
-import { Document, Packer, Paragraph, TextRun, PageOrientation, BorderStyle, AlignmentType, convertInchesToTwip, ImageRun } from 'docx';
+import { Document, Packer, Paragraph, TextRun, PageOrientation, BorderStyle, AlignmentType, convertInchesToTwip, ImageRun, Table, TableRow, TableCell, WidthType, VerticalAlign } from 'docx';
 
 interface WorksheetPreset {
   id: string;
@@ -751,34 +751,123 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
         const children: any[] = [];
         const topicsLabel = selectedTopics.length > 0 ? selectedTopics.join(', ') : 'Math Practice';
 
-        // Header with level and form
-        children.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `Level ${student.recommendedLevel} - ${getLevelDescription(student.recommendedLevel)}${numForms > 1 ? ` | Form ${assignedForm}` : ''}`,
-                bold: true,
-                size: 32, // 16pt
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 200, after: 100 },
-          })
-        );
+        // Generate QR code for student identification
+        let qrCodeBuffer: ArrayBuffer | null = null;
+        try {
+          const { fetchQRCodeAsArrayBuffer } = await import('@/lib/qrCodeUtils');
+          qrCodeBuffer = await fetchQRCodeAsArrayBuffer(student.id, 1, 1);
+        } catch (qrError) {
+          console.error('Error generating QR code for Word document:', qrError);
+        }
 
-        // Topic subtitle
-        children.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `${topicsLabel.length > 50 ? topicsLabel.substring(0, 47) + '...' : topicsLabel} - Diagnostic Worksheet`,
-                size: 24, // 12pt
+        // Header with QR code
+        if (qrCodeBuffer) {
+          const headerTable = new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+              bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+              left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+              right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+              insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+              insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: `Level ${student.recommendedLevel} - ${getLevelDescription(student.recommendedLevel)}${numForms > 1 ? ` | Form ${assignedForm}` : ''}`,
+                            bold: true,
+                            size: 32,
+                          }),
+                        ],
+                      }),
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: `${topicsLabel.length > 50 ? topicsLabel.substring(0, 47) + '...' : topicsLabel} - Diagnostic Worksheet`,
+                            size: 24,
+                          }),
+                        ],
+                        spacing: { before: 100 },
+                      }),
+                    ],
+                    width: { size: 80, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                      bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                      left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                      right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                    },
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new ImageRun({
+                            data: qrCodeBuffer,
+                            transformation: { width: 70, height: 70 },
+                            type: "png",
+                          }),
+                        ],
+                        alignment: AlignmentType.RIGHT,
+                      }),
+                      new Paragraph({
+                        children: [
+                          new TextRun({ text: "Scan to ID", size: 12, color: "666666" }),
+                        ],
+                        alignment: AlignmentType.RIGHT,
+                      }),
+                    ],
+                    width: { size: 20, type: WidthType.PERCENTAGE },
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                      bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                      left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                      right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                    },
+                  }),
+                ],
               }),
             ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
-          })
-        );
+          });
+          children.push(headerTable);
+        } else {
+          // Fallback: Header without QR code
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Level ${student.recommendedLevel} - ${getLevelDescription(student.recommendedLevel)}${numForms > 1 ? ` | Form ${assignedForm}` : ''}`,
+                  bold: true,
+                  size: 32, // 16pt
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 200, after: 100 },
+            })
+          );
+
+          // Topic subtitle
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `${topicsLabel.length > 50 ? topicsLabel.substring(0, 47) + '...' : topicsLabel} - Diagnostic Worksheet`,
+                  size: 24, // 12pt
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            })
+          );
+        }
 
         // Student info line
         children.push(
@@ -789,7 +878,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               new TextRun({ text: '          Date: _______________', size: 22 }),
               ...(numForms > 1 ? [new TextRun({ text: `          Form ${assignedForm}`, bold: true, size: 22 })] : []),
             ],
-            spacing: { after: 200 },
+            spacing: { before: 200, after: 200 },
           })
         );
 
