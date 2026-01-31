@@ -2202,37 +2202,102 @@ export default function Scan() {
                   <ScannerImportMode
                     onPagesReady={async (pages) => {
                       setScannerImportPages(pages);
-                      // Add all pages to batch for processing (with filename for topic grouping)
-                      pages.forEach(page => {
-                        batch.addImage(page.dataUrl, undefined, undefined, page.filename);
-                      });
-                      toast.success(`${pages.length} pages added for analysis`);
                       
-                      // Auto-group by worksheet topic if filenames indicate multi-page papers
-                      if (pages.length >= 2) {
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                        const topicResult = batch.groupPagesByWorksheetTopic();
-                        if (topicResult.pagesLinked > 0) {
-                          toast.success(`Auto-grouped ${topicResult.pagesLinked} pages by worksheet topic`, {
-                            description: `${topicResult.topicsGrouped} multi-page papers detected`,
-                            icon: <FileStack className="h-4 w-4" />,
-                          });
-                        }
-                      }
+                      // Get the active student roster for auto-identification
+                      const activeRoster = students.length > 0 ? students : [];
+                      const pageDataUrls = pages.map(p => p.dataUrl);
                       
-                      // Auto-run handwriting grouping if enabled and more than 1 page
-                      if (qrScanSettings.autoHandwritingGroupingEnabled && pages.length >= 2) {
-                        // Wait for state update
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                        toast.info('Auto-grouping multi-page papers by handwriting...', { 
+                      let totalStudentsIdentified = 0;
+                      let totalPagesLinked = 0;
+                      
+                      // Use auto-grouping with student identification if roster available
+                      if (activeRoster.length > 0 && pages.length > 1 && qrScanSettings.autoHandwritingGroupingEnabled) {
+                        toast.info('Processing pages with auto-identification...', { 
                           icon: <FileStack className="h-4 w-4" /> 
                         });
-                        const result = await batch.detectMultiPageByHandwriting();
-                        if (result.pagesLinked > 0) {
-                          toast.success(`Auto-grouped ${result.pagesLinked} continuation pages`, {
-                            description: `${result.groupsCreated} separate student papers detected`,
-                            icon: <FileStack className="h-4 w-4" />,
+                        
+                        const result = await batch.addPdfPagesWithAutoGrouping(
+                          pageDataUrls,
+                          activeRoster,
+                          (current, total, status) => {
+                            // Progress callback - could show a progress indicator
+                          }
+                        );
+                        
+                        totalStudentsIdentified = result.studentsIdentified;
+                        totalPagesLinked = result.pagesLinked;
+                        
+                        // Build success message
+                        let message = `Added ${result.pagesAdded} page(s) for analysis`;
+                        const details: string[] = [];
+                        if (totalStudentsIdentified > 0) {
+                          details.push(`${totalStudentsIdentified} student(s) identified`);
+                        }
+                        if (totalPagesLinked > 0) {
+                          details.push(`${totalPagesLinked} page(s) auto-linked`);
+                        }
+                        
+                        if (details.length > 0) {
+                          toast.success(message, { description: details.join(', ') });
+                        } else {
+                          toast.success(message);
+                        }
+                      } else if (activeRoster.length > 0) {
+                        // Have roster but single page or handwriting grouping disabled - use auto-identify for each
+                        toast.info('Identifying students from papers...');
+                        
+                        for (const page of pages) {
+                          await batch.addImageWithAutoIdentify(page.dataUrl, activeRoster);
+                        }
+                        
+                        toast.success(`${pages.length} pages added with auto-identification`);
+                        
+                        // Auto-group by worksheet topic if filenames indicate multi-page papers
+                        if (pages.length >= 2) {
+                          await new Promise(resolve => setTimeout(resolve, 100));
+                          const topicResult = batch.groupPagesByWorksheetTopic();
+                          if (topicResult.pagesLinked > 0) {
+                            toast.success(`Auto-grouped ${topicResult.pagesLinked} pages by worksheet topic`, {
+                              description: `${topicResult.topicsGrouped} multi-page papers detected`,
+                              icon: <FileStack className="h-4 w-4" />,
+                            });
+                          }
+                        }
+                      } else {
+                        // No roster - add pages without identification (original behavior)
+                        pages.forEach(page => {
+                          batch.addImage(page.dataUrl, undefined, undefined, page.filename);
+                        });
+                        toast.success(`${pages.length} pages added for analysis`);
+                        toast.info('Select a class to enable automatic student identification', { 
+                          duration: 4000 
+                        });
+                        
+                        // Auto-group by worksheet topic if filenames indicate multi-page papers
+                        if (pages.length >= 2) {
+                          await new Promise(resolve => setTimeout(resolve, 100));
+                          const topicResult = batch.groupPagesByWorksheetTopic();
+                          if (topicResult.pagesLinked > 0) {
+                            toast.success(`Auto-grouped ${topicResult.pagesLinked} pages by worksheet topic`, {
+                              description: `${topicResult.topicsGrouped} multi-page papers detected`,
+                              icon: <FileStack className="h-4 w-4" />,
+                            });
+                          }
+                        }
+                        
+                        // Auto-run handwriting grouping if enabled and more than 1 page
+                        if (qrScanSettings.autoHandwritingGroupingEnabled && pages.length >= 2) {
+                          await new Promise(resolve => setTimeout(resolve, 100));
+                          toast.info('Auto-grouping multi-page papers by handwriting...', { 
+                            icon: <FileStack className="h-4 w-4" /> 
                           });
+                          const result = await batch.detectMultiPageByHandwriting();
+                          if (result.pagesLinked > 0) {
+                            toast.success(`Auto-grouped ${result.pagesLinked} continuation pages`, {
+                              description: `${result.groupsCreated} separate student papers detected`,
+                              icon: <FileStack className="h-4 w-4" />,
+                            });
+                          }
                         }
                       }
                     }}

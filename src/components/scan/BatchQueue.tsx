@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn, UserPlus, FilePlus2, RotateCcw, Play, Cloud } from 'lucide-react';
+import { useStudentNames } from '@/lib/StudentNameContext';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -182,6 +183,17 @@ export function BatchQueue({
   const [addStudentForItem, setAddStudentForItem] = useState<string | null>(null);
   const [showRestoredBanner, setShowRestoredBanner] = useState(isRestoredFromStorage);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { getDisplayName } = useStudentNames();
+  
+  // Helper to get display name for an item based on studentId
+  const getItemDisplayName = useCallback((item: BatchItem) => {
+    if (!item.studentId) return item.studentName || 'Unassigned';
+    const student = students.find(s => s.id === item.studentId);
+    if (student) {
+      return getDisplayName(student.id, student.first_name, student.last_name);
+    }
+    return item.studentName || 'Unassigned';
+  }, [students, getDisplayName]);
   
   // Find first unanalyzed paper index
   const firstUnanalyzedIndex = items.findIndex(item => item.status === 'pending' || item.status === 'identifying');
@@ -471,7 +483,7 @@ export function BatchQueue({
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="text-xs">
-                          Continuation of: {linkedPrimary?.studentName || 'previous paper'}
+                          Continuation of: {linkedPrimary ? getItemDisplayName(linkedPrimary) : 'previous paper'}
                           <br />
                           Will be graded together as one paper
                           {item.handwritingSimilarity && (
@@ -555,23 +567,25 @@ export function BatchQueue({
                           onValueChange={(value) => {
                             const student = students.find(s => s.id === value);
                             if (student) {
+                              // Pass pseudonym as display name for FERPA compliance
+                              const displayName = getDisplayName(student.id, student.first_name, student.last_name);
                               onAssignStudent(
                                 item.id, 
                                 student.id, 
-                                `${student.first_name} ${student.last_name}`
+                                displayName
                               );
                             }
                           }}
                         >
                           <SelectTrigger className="h-9 flex-1">
                             <SelectValue placeholder="Assign student...">
-                              {item.studentName && (
-                                <span className="flex items-center gap-2">
-                                  <UserCircle className="h-4 w-4" />
-                                  {item.studentName}
-                                </span>
-                              )}
-                            </SelectValue>
+                                              {item.studentId && (
+                                                <span className="flex items-center gap-2">
+                                                  <UserCircle className="h-4 w-4" />
+                                                  {getItemDisplayName(item)}
+                                                </span>
+                                              )}
+                                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent className="max-h-[300px]">
                             <ScrollArea className="h-[280px]">
@@ -580,6 +594,7 @@ export function BatchQueue({
                                 students.map((student) => {
                                   const isCurrentItem = item.studentId === student.id;
                                   const isAssignedElsewhere = !isCurrentItem && assignedStudentIds.includes(student.id);
+                                  const displayName = getDisplayName(student.id, student.first_name, student.last_name);
                                   
                                   return (
                                     <SelectItem 
@@ -587,7 +602,7 @@ export function BatchQueue({
                                       value={student.id}
                                       className={isAssignedElsewhere ? 'opacity-50' : ''}
                                     >
-                                      {student.last_name}, {student.first_name}
+                                      {displayName}
                                       {student.student_id && ` (${student.student_id})`}
                                       {isCurrentItem && ' ✓'}
                                       {isAssignedElsewhere && ' (assigned)'}
@@ -708,7 +723,7 @@ export function BatchQueue({
                       <div className="flex items-center gap-2">
                         <UserCircle className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm font-medium truncate">
-                          {item.studentName || 'Unassigned'}
+                          {getItemDisplayName(item)}
                         </span>
                         {item.autoAssigned && (
                           <TooltipProvider>
@@ -971,7 +986,7 @@ export function BatchQueue({
         {overrideDialogItem && (
           <div className="space-y-4 py-2">
             <div>
-              <p className="text-sm font-medium">{overrideDialogItem.studentName || 'Student'}</p>
+              <p className="text-sm font-medium">{getItemDisplayName(overrideDialogItem)}</p>
               {overrideDialogItem.result?.multiAnalysisGrades && overrideDialogItem.result.multiAnalysisGrades.length > 1 && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Original analysis grades: {overrideDialogItem.result.multiAnalysisGrades.join('%, ')}%
@@ -1041,7 +1056,7 @@ export function BatchQueue({
     <MultiAnalysisBreakdownDialog
       open={!!breakdownDialogItem}
       onOpenChange={(open) => !open && setBreakdownDialogItem(null)}
-      studentName={breakdownDialogItem?.studentName}
+      studentName={breakdownDialogItem ? getItemDisplayName(breakdownDialogItem) : undefined}
       result={breakdownDialogItem?.result || null}
       itemId={breakdownDialogItem?.id}
       onSelectRun={onSelectRunAsGrade}
@@ -1065,7 +1080,7 @@ export function BatchQueue({
         open={zoomPreviewIndex !== null}
         onOpenChange={(open) => !open && setZoomPreviewIndex(null)}
         imageUrl={items[zoomPreviewIndex].imageDataUrl}
-        studentName={items[zoomPreviewIndex].studentName || 'Unassigned'}
+        studentName={getItemDisplayName(items[zoomPreviewIndex])}
         paperIndex={zoomPreviewIndex}
         totalPapers={items.length}
         misconceptions={items[zoomPreviewIndex].result?.misconceptions}
