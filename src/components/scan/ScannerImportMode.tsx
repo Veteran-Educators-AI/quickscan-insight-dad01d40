@@ -560,7 +560,8 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
     for await (const entry of (handle as any).values()) {
       if (entry.kind === "file" && !existingNames.has(entry.name)) {
         const file = await entry.getFile();
-        if (file.type.startsWith("image/") || file.type === "application/pdf") {
+        // Use isPdfFile helper for consistent PDF detection across all MIME types
+        if (file.type.startsWith("image/") || isPdfFile(file)) {
           newFiles.push(file);
         }
       }
