@@ -2796,12 +2796,53 @@ export default function Scan() {
               setIsPreprocessing(true);
               
               try {
+                // Separate PDFs from images
+                const pdfFiles = files.filter(f => 
+                  f.name.toLowerCase().endsWith('.pdf') || 
+                  f.blob.type === 'application/pdf'
+                );
+                const imageFiles = files.filter(f => 
+                  !f.name.toLowerCase().endsWith('.pdf') && 
+                  f.blob.type !== 'application/pdf'
+                );
+                
+                // Convert PDFs to images
+                let allImageBlobs: { blob: Blob; name: string }[] = [...imageFiles];
+                
+                if (pdfFiles.length > 0) {
+                  toast.info(`Converting ${pdfFiles.length} PDF(s) to images...`);
+                  
+                  for (const pdfFile of pdfFiles) {
+                    try {
+                      // Convert blob to File for pdfToImages
+                      const file = new File([pdfFile.blob], pdfFile.name, { type: 'application/pdf' });
+                      const pageImages = await pdfToImages(file, 2, (current, total) => {
+                        // Could show progress here
+                      });
+                      
+                      // Convert data URLs back to blobs
+                      for (let i = 0; i < pageImages.length; i++) {
+                        const response = await fetch(pageImages[i]);
+                        const pageBlob = await response.blob();
+                        const baseName = pdfFile.name.replace(/\.pdf$/i, '');
+                        allImageBlobs.push({
+                          blob: pageBlob,
+                          name: `${baseName}_page${i + 1}.jpg`
+                        });
+                      }
+                    } catch (err) {
+                      console.error(`Error converting PDF ${pdfFile.name}:`, err);
+                      toast.error(`Failed to convert PDF: ${pdfFile.name}`);
+                    }
+                  }
+                }
+                
                 // Preprocess if enabled
-                let processedFiles = files;
-                if (autoPreprocess) {
-                  toast.info(`Enhancing ${files.length} file(s)...`);
+                let processedFiles = allImageBlobs;
+                if (autoPreprocess && allImageBlobs.length > 0) {
+                  toast.info(`Enhancing ${allImageBlobs.length} image(s)...`);
                   processedFiles = await preprocessBatch(
-                    files,
+                    allImageBlobs,
                     { ...defaultSettings, autoEnhance: true },
                     (current, total) => {
                       // Progress updates could be shown here
@@ -2810,7 +2851,7 @@ export default function Scan() {
                   toast.success('Image enhancement complete');
                 }
                 
-                toast.info(`Processing ${processedFiles.length} file(s) from Drive...`);
+                toast.info(`Processing ${processedFiles.length} image(s) from Drive...`);
                 
                 for (const file of processedFiles) {
                   try {
@@ -2828,9 +2869,13 @@ export default function Scan() {
                 }
                 
                 setScanMode('batch');
-                toast.success(`Added ${processedFiles.length} file(s) to batch${autoPreprocess ? ' (enhanced)' : ''}`);
+                const pdfPageCount = allImageBlobs.length - imageFiles.length;
+                const summary = pdfPageCount > 0 
+                  ? `Added ${processedFiles.length} image(s) (${pdfPageCount} from PDFs)${autoPreprocess ? ' (enhanced)' : ''}`
+                  : `Added ${processedFiles.length} file(s) to batch${autoPreprocess ? ' (enhanced)' : ''}`;
+                toast.success(summary);
               } catch (err) {
-                console.error('Preprocessing error:', err);
+                console.error('Processing error:', err);
                 toast.error('Failed to process files');
               } finally {
                 setIsPreprocessing(false);
