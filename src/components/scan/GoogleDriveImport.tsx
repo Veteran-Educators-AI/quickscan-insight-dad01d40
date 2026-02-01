@@ -136,8 +136,10 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
       return `Yesterday ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     } else if (diffDays < 7) {
       return `${diffDays} days ago`;
+    } else if (date.getFullYear() !== now.getFullYear()) {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
     } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
   };
 
