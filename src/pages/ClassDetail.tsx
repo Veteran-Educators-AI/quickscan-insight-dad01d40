@@ -21,6 +21,8 @@ import { getStudentPseudonym, getAvailablePseudonyms, setCustomPseudonym } from 
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Gradebook } from '@/components/reports/Gradebook';
 import { BehaviorPointDeductionDialog } from '@/components/behavior/BehaviorPointDeductionDialog';
+import { EditStudentDialog } from '@/components/classes/EditStudentDialog';
+import { SyncRosterToScholarButton } from '@/components/classes/SyncRosterToScholarButton';
 
 interface Student {
   id: string;
@@ -582,6 +584,11 @@ export default function ClassDetail() {
                   <MinusCircle className="h-4 w-4 mr-2" />
                   Deduct Points
                 </Button>
+                <SyncRosterToScholarButton
+                  classId={id!}
+                  className={classData.name}
+                  students={students}
+                />
                 <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
                   <Upload className="h-4 w-4 mr-2" />
                   Import CSV
@@ -791,30 +798,38 @@ export default function ClassDetail() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remove Student?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will remove {displayName} and all their assessment data. This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeleteStudent(student.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Remove
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                        </AlertDialog>
+                        <div className="flex items-center gap-1">
+                          <EditStudentDialog
+                            student={student}
+                            classId={id!}
+                            className={classData.name}
+                            onUpdate={fetchClassData}
+                          />
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Remove Student?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will remove {displayName} and all their assessment data. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteStudent(student.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Remove
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                     )}
