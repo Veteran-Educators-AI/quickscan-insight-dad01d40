@@ -124,6 +124,23 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return `Today ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (diffDays === 1) {
+      return `Yesterday ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+    }
+  };
+
   if (!initialized) {
     return (
       <Card>
@@ -268,8 +285,14 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="truncate text-sm">{file.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatFileSize(file.size)}
+                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                    <span>{formatFileSize(file.size)}</span>
+                    {file.modifiedTime && (
+                      <>
+                        <span className="text-muted-foreground/50">•</span>
+                        <span>{formatDate(file.modifiedTime)}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </label>
