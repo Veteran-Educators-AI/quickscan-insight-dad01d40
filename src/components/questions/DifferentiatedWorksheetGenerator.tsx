@@ -523,6 +523,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       const { data, error } = await supabase
         .from('classes')
         .select('id, name')
+        .is('archived_at', null)
         .order('name');
 
       if (error) throw error;

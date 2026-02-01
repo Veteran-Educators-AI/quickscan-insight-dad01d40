@@ -49,6 +49,7 @@ export function DiagnosticGapsSummary() {
         .from('classes')
         .select('id, name')
         .eq('teacher_id', user?.id)
+        .is('archived_at', null)
         .order('name');
       
       if (error) throw error;

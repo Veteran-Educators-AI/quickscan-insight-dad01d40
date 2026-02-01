@@ -154,7 +154,8 @@ export default function PresentationView() {
       const { data } = await supabase
         .from('classes')
         .select('id, name')
-        .eq('teacher_id', user.id);
+        .eq('teacher_id', user.id)
+        .is('archived_at', null);
       if (data) {
         setClasses(data);
         if (data.length > 0) setSelectedClassId(data[0].id);

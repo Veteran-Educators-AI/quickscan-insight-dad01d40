@@ -188,6 +188,7 @@ export function AdaptiveWorksheetGenerator({ open, onOpenChange }: AdaptiveWorks
       const { data, error } = await supabase
         .from('classes')
         .select('id, name')
+        .is('archived_at', null)
         .order('name');
       if (error) throw error;
       setClasses(data || []);

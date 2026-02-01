@@ -63,6 +63,7 @@ export function ClassStudentSelector({
       const { data, error } = await supabase
         .from('classes')
         .select('id, name, students(id)')
+        .is('archived_at', null)
         .order('name');
 
       if (!error && data) {
