@@ -1,6 +1,21 @@
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+interface ParticipantResult {
+  student_id: string;
+  student_name: string;
+  total_questions_answered: number;
+  correct_answers: number;
+  accuracy: number;
+  credit_awarded: number;
+  participated: boolean;
+  answers: {
+    selected_answer: string;
+    is_correct: boolean | null;
+    time_taken_seconds: number | null;
+  }[];
+}
+
 interface PushToSisterAppParams {
   class_id: string;
   title: string;
@@ -12,9 +27,27 @@ interface PushToSisterAppParams {
   printable_url?: string;
   student_id?: string;
   student_name?: string;
+  student_email?: string;
+  first_name?: string;
+  last_name?: string;
+  class_name?: string;
   grade?: number;
   topic_name?: string;
-  questions?: any[]; // Generated remediation or mastery challenge questions
+  questions?: any[];
+  type?: 'ping' | 'grade' | 'behavior' | 'student_created' | 'student_updated' | 'roster_sync' | 'live_session_completed';
+  // Behavior deduction fields
+  xp_deduction?: number;
+  coin_deduction?: number;
+  reason?: string;
+  notes?: string;
+  // Live session fields
+  session_code?: string;
+  participation_mode?: string;
+  credit_for_participation?: number;
+  deduction_for_non_participation?: number;
+  total_participants?: number;
+  active_participants?: number;
+  participant_results?: ParticipantResult[];
 }
 
 export function usePushToSisterApp() {

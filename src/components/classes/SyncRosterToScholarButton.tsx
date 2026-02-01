@@ -64,7 +64,6 @@ export function SyncRosterToScholarButton({
           title: 'Roster Sync',
           student_id: student.id,
           student_name: fullName,
-          // @ts-ignore - extended type for roster sync
           type: 'student_created',
           first_name: student.first_name,
           last_name: student.last_name,
