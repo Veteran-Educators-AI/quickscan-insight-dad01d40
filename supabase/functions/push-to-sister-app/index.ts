@@ -35,7 +35,7 @@ const corsHeaders = {
  * Contains class info, assignment details, and student grade data
  */
 interface PushRequest {
-  type?: 'ping' | 'grade' | 'behavior' | 'student_created' | 'live_session_completed';   // Request type
+  type?: 'ping' | 'grade' | 'behavior' | 'student_created' | 'student_updated' | 'roster_sync' | 'live_session_completed';   // Request type
   class_id?: string;         // The class this data belongs to
   class_name?: string;       // The class name
   title?: string;            // Assignment or activity title
@@ -157,6 +157,26 @@ function convertToStudentCreatedFormat(requestData: PushRequest) {
 }
 
 /**
+ * Convert student update request to sister app format
+ * Sends updated student info to sync roster with sister app
+ */
+function convertToStudentUpdatedFormat(requestData: PushRequest) {
+  return {
+    action: 'student_updated' as const,
+    student_id: requestData.student_id,
+    data: {
+      first_name: requestData.first_name,
+      last_name: requestData.last_name,
+      student_name: requestData.student_name,
+      email: requestData.student_email,
+      class_id: requestData.class_id,
+      class_name: requestData.class_name,
+      timestamp: new Date().toISOString(),
+    }
+  };
+}
+
+/**
  * Convert live session completed request to sister app format
  * Sends full participation and answer data for all students
  */
@@ -251,10 +271,14 @@ serve(async (req) => {
       // Handle behavior deduction - sends negative XP/coins
       console.log('Processing behavior deduction request');
       sisterAppPayload = convertToBehaviorFormat(requestData);
-    } else if (requestData.type === 'student_created') {
+    } else if (requestData.type === 'student_created' || requestData.type === 'roster_sync') {
       // Handle new student creation - sync roster
-      console.log('Processing student creation request');
+      console.log('Processing student creation/roster sync request');
       sisterAppPayload = convertToStudentCreatedFormat(requestData);
+    } else if (requestData.type === 'student_updated') {
+      // Handle student update - sync roster changes
+      console.log('Processing student update request');
+      sisterAppPayload = convertToStudentUpdatedFormat(requestData);
     } else if (requestData.type === 'live_session_completed') {
       // Handle live session results
       console.log('Processing live session completed request');
