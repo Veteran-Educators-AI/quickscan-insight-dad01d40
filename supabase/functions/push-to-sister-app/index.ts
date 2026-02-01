@@ -145,6 +145,7 @@ function convertToStudentCreatedFormat(requestData: PushRequest) {
     action: 'student_created' as const,
     student_id: requestData.student_id,
     data: {
+      student_id: requestData.student_id, // Also include in data object for API compatibility
       first_name: requestData.first_name,
       last_name: requestData.last_name,
       student_name: requestData.student_name,
@@ -165,6 +166,7 @@ function convertToStudentUpdatedFormat(requestData: PushRequest) {
     action: 'student_updated' as const,
     student_id: requestData.student_id,
     data: {
+      student_id: requestData.student_id, // Also include in data object for API compatibility
       first_name: requestData.first_name,
       last_name: requestData.last_name,
       student_name: requestData.student_name,
