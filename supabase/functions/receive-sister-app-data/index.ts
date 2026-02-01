@@ -43,7 +43,7 @@ const corsHeaders = {
 // data: Flexible object containing event-specific information
 // -----------------------------------------------------------------------------
 interface IncomingData {
-  action: 'grade_completed' | 'activity_completed' | 'reward_earned' | 'level_up' | 'achievement_unlocked' | 'batch_sync' | 'behavior_deduction' | 'live_session_completed';
+  action: 'grade_completed' | 'activity_completed' | 'reward_earned' | 'level_up' | 'achievement_unlocked' | 'batch_sync' | 'behavior_deduction' | 'live_session_completed' | 'roster_sync' | 'student_created' | 'student_updated';
   student_id?: string; // Optional for batch_sync and live_session_completed
   data?: {
     activity_type?: string;      // e.g., "quiz", "game", "practice", "live_presentation"
@@ -259,6 +259,15 @@ serve(async (req) => {
       if (!body.data?.participant_results) {
         return new Response(
           JSON.stringify({ success: false, error: 'live_session_completed requires data.participant_results array' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } else if (body.action === 'roster_sync' || body.action === 'student_created' || body.action === 'student_updated') {
+      // roster_sync can have student_id at root or in data object
+      const studentId = body.student_id || body.data?.student_id;
+      if (!studentId) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Missing required field: student_id (in root or data object)' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -535,6 +544,50 @@ serve(async (req) => {
         misconceptions_saved: misconceptionsSaved,
         remediations_queued: remediationsCreated,
         message: `Persisted ${gradesSaved} grades and ${misconceptionsSaved} misconceptions to database`,
+      };
+
+    } else if (body.action === 'roster_sync' || body.action === 'student_created' || body.action === 'student_updated') {
+      // ---------------------------------------------------------------------
+      // ROSTER SYNC PROCESSING
+      // ---------------------------------------------------------------------
+      // Handle roster data coming FROM the Scholar app
+      // This allows Scholar to push student info back to NYCLogic Ai
+      // ---------------------------------------------------------------------
+      console.log('Processing roster sync from Scholar:', body.action, body.data || body.student_id);
+      
+      const studentData = body.data || {};
+      const studentId = body.student_id || studentData.student_id;
+      
+      // Log the roster sync event
+      const { data: rosterLog } = await supabaseAdmin
+        .from('sister_app_sync_log')
+        .insert({
+          teacher_id: keyRecord.teacher_id,
+          student_id: studentId,
+          action: body.action,
+          data: {
+            student_id: studentId,
+            first_name: studentData.first_name,
+            last_name: studentData.last_name,
+            student_name: studentData.student_name,
+            email: studentData.email,
+            class_id: studentData.class_id,
+            class_name: studentData.class_name,
+            source_action: body.action,
+          },
+          source_app: 'scholar_app',
+          processed: true,
+          processed_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      logEntry = rosterLog;
+      processedResult = {
+        roster_sync_received: true,
+        student_id: studentId,
+        action: body.action,
+        message: `Roster sync logged for student: ${studentData.student_name || studentId}`,
       };
 
     } else {
