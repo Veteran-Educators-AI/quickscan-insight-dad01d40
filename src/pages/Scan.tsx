@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw, FileText, Brain, BookOpen, Loader2 } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Layers, Play, Plus, Sparkles, User, Bot, Wand2, Clock, Save, CheckCircle, Users, QrCode, FileQuestion, FileImage, UserCheck, GraduationCap, ScanLine, AlertTriangle, XCircle, FileStack, ShieldCheck, RefreshCw, FileText, Brain, BookOpen, Loader2, SunMedium } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { resizeImage, blobToBase64, compressImage } from '@/lib/imageUtils';
 import { pdfToImages, isPdfFile } from '@/lib/pdfUtils';
@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { SaveAnalyticsConfirmDialog } from '@/components/scan/SaveAnalyticsConfirmDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { CameraModal } from '@/components/scan/CameraModal';
 import { ContinuousQRScanner } from '@/components/scan/ContinuousQRScanner';
@@ -43,6 +45,8 @@ import { GoogleClassroomImport, type ImportedSubmission } from '@/components/sca
 import { GoogleConnectionPanel } from '@/components/scan/GoogleConnectionPanel';
 import { GoogleDriveImport } from '@/components/scan/GoogleDriveImport';
 import { SaveToDriveDialog } from '@/components/scan/SaveToDriveDialog';
+import { ImagePreprocessDialog } from '@/components/scan/ImagePreprocessDialog';
+import { preprocessImage, preprocessBatch, defaultSettings, PreprocessingSettings } from '@/lib/imagePreprocessing';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
@@ -190,6 +194,11 @@ export default function Scan() {
   // Google Drive import  
   const [showGoogleDriveImport, setShowGoogleDriveImport] = useState(false);
 
+  // Image preprocessing
+  const [autoPreprocess, setAutoPreprocess] = useState(true);
+  const [showPreprocessDialog, setShowPreprocessDialog] = useState(false);
+  const [preprocessingImage, setPreprocessingImage] = useState<{ blob: Blob; name: string } | null>(null);
+  const [isPreprocessing, setIsPreprocessing] = useState(false);
   const mockRubricSteps = [
     { step_number: 1, description: 'Correctly identifies the problem type', points: 1 },
     { step_number: 2, description: 'Sets up equations/approach correctly', points: 2 },
@@ -503,6 +512,21 @@ export default function Scan() {
     
     let totalPages = 0;
     
+    // Helper to apply preprocessing to a data URL
+    const maybePreprocess = async (dataUrl: string): Promise<string> => {
+      if (!autoPreprocess) return dataUrl;
+      try {
+        // Convert data URL to blob
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        const processed = await preprocessImage(blob, { ...defaultSettings, autoEnhance: true });
+        return await blobToBase64(processed);
+      } catch (err) {
+        console.warn('Preprocessing failed, using original:', err);
+        return dataUrl;
+      }
+    };
+    
     // Process files with auto-identification if class is selected
     const processFile = async (file: File) => {
       try {
@@ -510,16 +534,18 @@ export default function Scan() {
         if (isPdfFile(file)) {
           const images = await pdfToImages(file);
           for (const dataUrl of images) {
+            const processedUrl = await maybePreprocess(dataUrl);
             if (selectedClassId && students.length > 0) {
-              await batch.addImageWithAutoIdentify(dataUrl, students);
+              await batch.addImageWithAutoIdentify(processedUrl, students);
             } else {
-              batch.addImage(dataUrl);
+              batch.addImage(processedUrl);
             }
             totalPages++;
           }
         } else {
           const resizedBlob = await resizeImage(file);
-          const dataUrl = await blobToBase64(resizedBlob);
+          let dataUrl = await blobToBase64(resizedBlob);
+          dataUrl = await maybePreprocess(dataUrl);
           if (selectedClassId && students.length > 0) {
             await batch.addImageWithAutoIdentify(dataUrl, students);
           } else {
@@ -533,7 +559,8 @@ export default function Scan() {
         if (!isPdfFile(file)) {
           const reader = new FileReader();
           reader.onload = async (ev) => {
-            const dataUrl = ev.target?.result as string;
+            let dataUrl = ev.target?.result as string;
+            dataUrl = await maybePreprocess(dataUrl);
             if (selectedClassId && students.length > 0) {
               await batch.addImageWithAutoIdentify(dataUrl, students);
             } else {
@@ -599,6 +626,20 @@ export default function Scan() {
       return;
     }
 
+    // Helper to apply preprocessing to a data URL
+    const maybePreprocessDrop = async (dataUrl: string): Promise<string> => {
+      if (!autoPreprocess) return dataUrl;
+      try {
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        const processed = await preprocessImage(blob, { ...defaultSettings, autoEnhance: true });
+        return await blobToBase64(processed);
+      } catch (err) {
+        console.warn('Preprocessing failed, using original:', err);
+        return dataUrl;
+      }
+    };
+
     // Single file in single mode
     if (scanMode === 'single' && validFiles.length === 1) {
       const file = validFiles[0];
@@ -626,7 +667,8 @@ export default function Scan() {
           }
         } else {
           const resizedBlob = await resizeImage(file);
-          const dataUrl = await blobToBase64(resizedBlob);
+          let dataUrl = await blobToBase64(resizedBlob);
+          dataUrl = await maybePreprocessDrop(dataUrl);
           setCapturedImage(dataUrl);
           setScanState('preview');
         }
@@ -704,7 +746,10 @@ export default function Scan() {
             } else {
               // Single page PDF or no roster - process normally
               for (let pageIndex = 0; pageIndex < images.length; pageIndex++) {
-                const dataUrl = images[pageIndex];
+                let dataUrl = images[pageIndex];
+                
+                // Apply preprocessing if enabled
+                dataUrl = await maybePreprocessDrop(dataUrl);
                 
                 // Update page progress
                 setDropProcessing(prev => prev ? {
@@ -731,7 +776,8 @@ export default function Scan() {
             } : null);
             
             const resizedBlob = await resizeImage(file);
-            const dataUrl = await blobToBase64(resizedBlob);
+            let dataUrl = await blobToBase64(resizedBlob);
+            dataUrl = await maybePreprocessDrop(dataUrl);
             if (activeRoster.length > 0) {
               await batch.addImageWithAutoIdentify(dataUrl, activeRoster);
             } else {
@@ -2259,6 +2305,26 @@ export default function Scan() {
                     onClose={() => setScanMode('single')}
                   />
 
+                  {/* Auto-enhance toggle for uploads */}
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Wand2 className="h-4 w-4 text-primary" />
+                      <div>
+                        <Label htmlFor="auto-preprocess" className="text-sm font-medium cursor-pointer">
+                          Auto-enhance scanned images
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Improves contrast, sharpness, and reduces noise
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      id="auto-preprocess"
+                      checked={autoPreprocess}
+                      onCheckedChange={setAutoPreprocess}
+                    />
+                  </div>
+
                   {/* Add images section */}
                   <Card>
                     <CardContent className="p-6">
@@ -2706,30 +2772,69 @@ export default function Scan() {
               Import from Google Drive
             </DialogTitle>
           </DialogHeader>
+          
+          {/* Auto-enhance toggle */}
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg mb-2">
+            <div className="flex items-center gap-2">
+              <Wand2 className="h-4 w-4 text-primary" />
+              <Label htmlFor="auto-preprocess-drive" className="text-sm">
+                Auto-enhance image quality
+              </Label>
+            </div>
+            <Switch
+              id="auto-preprocess-drive"
+              checked={autoPreprocess}
+              onCheckedChange={setAutoPreprocess}
+            />
+          </div>
+          
           <GoogleDriveImport 
             onFilesSelected={async (files) => {
               setShowGoogleDriveImport(false);
               if (files.length === 0) return;
               
-              toast.info(`Processing ${files.length} file(s) from Drive...`);
+              setIsPreprocessing(true);
               
-              for (const file of files) {
-                try {
-                  const dataUrl = await blobToBase64(file.blob);
-                  if (singleScanClassId && singleScanStudents.length > 0) {
-                    await batch.addImageWithAutoIdentify(dataUrl, singleScanStudents);
-                  } else if (selectedClassId && students.length > 0) {
-                    await batch.addImageWithAutoIdentify(dataUrl, students);
-                  } else {
-                    batch.addImage(dataUrl);
-                  }
-                } catch (err) {
-                  console.error('Error processing Drive file:', err);
+              try {
+                // Preprocess if enabled
+                let processedFiles = files;
+                if (autoPreprocess) {
+                  toast.info(`Enhancing ${files.length} file(s)...`);
+                  processedFiles = await preprocessBatch(
+                    files,
+                    { ...defaultSettings, autoEnhance: true },
+                    (current, total) => {
+                      // Progress updates could be shown here
+                    }
+                  );
+                  toast.success('Image enhancement complete');
                 }
+                
+                toast.info(`Processing ${processedFiles.length} file(s) from Drive...`);
+                
+                for (const file of processedFiles) {
+                  try {
+                    const dataUrl = await blobToBase64(file.blob);
+                    if (singleScanClassId && singleScanStudents.length > 0) {
+                      await batch.addImageWithAutoIdentify(dataUrl, singleScanStudents);
+                    } else if (selectedClassId && students.length > 0) {
+                      await batch.addImageWithAutoIdentify(dataUrl, students);
+                    } else {
+                      batch.addImage(dataUrl);
+                    }
+                  } catch (err) {
+                    console.error('Error processing Drive file:', err);
+                  }
+                }
+                
+                setScanMode('batch');
+                toast.success(`Added ${processedFiles.length} file(s) to batch${autoPreprocess ? ' (enhanced)' : ''}`);
+              } catch (err) {
+                console.error('Preprocessing error:', err);
+                toast.error('Failed to process files');
+              } finally {
+                setIsPreprocessing(false);
               }
-              
-              setScanMode('batch');
-              toast.success(`Added ${files.length} file(s) to batch`);
             }}
             onClose={() => setShowGoogleDriveImport(false)}
           />
@@ -2763,6 +2868,21 @@ export default function Scan() {
           })}
         onSaveComplete={(count, folderName) => {
           setDriveSaved(true);
+        }}
+      />
+
+      {/* Image Preprocess Dialog */}
+      <ImagePreprocessDialog
+        open={showPreprocessDialog}
+        onOpenChange={setShowPreprocessDialog}
+        imageBlob={preprocessingImage?.blob || null}
+        imageName={preprocessingImage?.name || 'Image'}
+        onProcessed={async (processedBlob) => {
+          if (!preprocessingImage) return;
+          const dataUrl = await blobToBase64(processedBlob);
+          batch.addImage(dataUrl);
+          setPreprocessingImage(null);
+          toast.success('Enhanced image added to batch');
         }}
       />
     </>
