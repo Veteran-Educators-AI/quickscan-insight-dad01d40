@@ -79,7 +79,8 @@ export function StudentsNeedingHelpWidget({ className, limit = 5 }: StudentsNeed
       const { data: classes, error: classError } = await supabase
         .from('classes')
         .select('id, name')
-        .eq('teacher_id', user.id);
+        .eq('teacher_id', user.id)
+        .is('archived_at', null);
 
       if (classError) throw classError;
       if (!classes?.length) return [];

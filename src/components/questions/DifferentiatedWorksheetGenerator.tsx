@@ -23,9 +23,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useFeatureTracking } from '@/hooks/useFeatureTracking';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
-import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
+import { fixEncodingCorruption, renderMathText, sanitizeForPDF, sanitizeForWord } from '@/lib/mathRenderer';
 import jsPDF from 'jspdf';
-import { Document, Packer, Paragraph, TextRun, PageOrientation, BorderStyle, AlignmentType, convertInchesToTwip, ImageRun } from 'docx';
+import { Document, Packer, Paragraph, TextRun, PageOrientation, BorderStyle, AlignmentType, convertInchesToTwip, ImageRun, Table, TableRow, TableCell, WidthType, VerticalAlign, Header, Footer } from 'docx';
 
 interface WorksheetPreset {
   id: string;
@@ -43,6 +43,7 @@ type FormLetter = typeof FORM_LETTERS[number];
 type AdvancementLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
 const formatPdfText = (text: string) => sanitizeForPDF(renderMathText(fixEncodingCorruption(text)));
+const formatWordText = (text: string) => sanitizeForWord(text);
 
 interface Student {
   id: string;
@@ -443,6 +444,18 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   } | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   
+  // Subjects that should NEVER have geometry shapes/diagrams
+  const noShapeSubjectKeywords = ['financial', 'finance', 'economics', 'history', 'government', 'english', 'ela', 'bond', 'investment', 'insurance', 'retirement'];
+  
+  const isNoShapeSubject = customTopics.some((t) => {
+    const topicName = t.topicName?.toLowerCase() || "";
+    const standard = t.standard?.toLowerCase() || "";
+    return noShapeSubjectKeywords.some(ns => topicName.includes(ns) || standard.includes(ns));
+  }) || selectedTopics.some((topic) => {
+    const topicLower = topic?.toLowerCase() || "";
+    return noShapeSubjectKeywords.some(ns => topicLower.includes(ns));
+  });
+  
   // Selective regeneration state
   const [regeneratingKey, setRegeneratingKey] = useState<string | null>(null);
   const [selectedRegenerateKeys, setSelectedRegenerateKeys] = useState<Set<string>>(new Set());
@@ -514,6 +527,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       const { data, error } = await supabase
         .from('classes')
         .select('id, name')
+        .is('archived_at', null)
         .order('name');
 
       if (error) throw error;
@@ -573,6 +587,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
       // Check if we have custom topics from standards menu (new diagnostic mode)
       const isNewDiagnosticFromStandards = customTopics.length > 0;
+      
+      // For new topics, ALL students start at the same intermediate level (C)
+      // This ensures fair differentiation only after we see their performance
+      const defaultStartingLevel: AdvancementLevel = 'C';
 
       // Merge students with their most recent diagnostic result and adaptive levels
       const studentsWithDiagnostics: StudentWithDiagnostic[] = (studentsData || []).map(student => {
@@ -587,10 +605,20 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
         const adaptiveStudent = adaptiveStudents.find(s => s.studentId === student.id);
         const hasPerformanceData = adaptiveStudent?.hasPerformanceData ?? false;
         
-        // Use adaptive level if enabled and available, otherwise fall back to diagnostic
-        const recommendedLevel = (useAdaptiveDifficulty && adaptiveLevel) 
-          ? adaptiveLevel 
-          : (latestDiagnostic?.recommended_level as AdvancementLevel) || 'C';
+        // For NEW topics from standards menu: ALL students start at intermediate level (C)
+        // Only use performance-based differentiation for follow-up worksheets
+        let recommendedLevel: AdvancementLevel;
+        
+        if (isNewDiagnosticFromStandards) {
+          // New topic = everyone starts equal at intermediate level
+          recommendedLevel = defaultStartingLevel;
+        } else if (useAdaptiveDifficulty && adaptiveLevel) {
+          // Use adaptive level based on past performance for this topic
+          recommendedLevel = adaptiveLevel;
+        } else {
+          // Fall back to diagnostic or default
+          recommendedLevel = (latestDiagnostic?.recommended_level as AdvancementLevel) || defaultStartingLevel;
+        }
         
         // For new diagnostics from standards, pre-select all students
         // For follow-up worksheets, only select students with existing data
@@ -742,28 +770,144 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
         const children: any[] = [];
         const topicsLabel = selectedTopics.length > 0 ? selectedTopics.join(', ') : 'Math Practice';
 
-        // Header with level and form
+        // Generate QR code for student identification - appears on EVERY page
+        // Generate QR codes for BOTH sides of the page for reliable scanning
+        let qrCodeBuffer: ArrayBuffer | null = null;
+        try {
+          const { fetchQRCodeAsArrayBuffer } = await import('@/lib/qrCodeUtils');
+          qrCodeBuffer = await fetchQRCodeAsArrayBuffer(student.id, 1, 1);
+        } catch (qrError) {
+          console.error('Error generating QR code for Word document:', qrError);
+        }
+
+        // Create page header with QR codes on BOTH SIDES that repeats on EVERY page
+        let pageHeader: Header | undefined;
+        if (qrCodeBuffer) {
+          pageHeader = new Header({
+            children: [
+              new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                },
+                rows: [
+                  new TableRow({
+                    children: [
+                      // LEFT QR CODE
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new ImageRun({
+                                data: qrCodeBuffer,
+                                transformation: { width: 60, height: 60 },
+                                type: "png",
+                              }),
+                            ],
+                            alignment: AlignmentType.LEFT,
+                          }),
+                          new Paragraph({
+                            children: [
+                              new TextRun({ text: "📷 Scan", size: 12, color: "666666" }),
+                            ],
+                            alignment: AlignmentType.LEFT,
+                          }),
+                        ],
+                        width: { size: 15, type: WidthType.PERCENTAGE },
+                        verticalAlign: VerticalAlign.CENTER,
+                        borders: {
+                          top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        },
+                      }),
+                      // CENTER - Student name and level
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({
+                                text: `${student.first_name} ${student.last_name} - Level ${student.recommendedLevel}`,
+                                bold: true,
+                                size: 20,
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                          }),
+                        ],
+                        width: { size: 70, type: WidthType.PERCENTAGE },
+                        verticalAlign: VerticalAlign.CENTER,
+                        borders: {
+                          top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        },
+                      }),
+                      // RIGHT QR CODE (mirror of left)
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new ImageRun({
+                                data: qrCodeBuffer,
+                                transformation: { width: 60, height: 60 },
+                                type: "png",
+                              }),
+                            ],
+                            alignment: AlignmentType.RIGHT,
+                          }),
+                          new Paragraph({
+                            children: [
+                              new TextRun({ text: "📷 Scan", size: 12, color: "666666" }),
+                            ],
+                            alignment: AlignmentType.RIGHT,
+                          }),
+                        ],
+                        width: { size: 15, type: WidthType.PERCENTAGE },
+                        verticalAlign: VerticalAlign.CENTER,
+                        borders: {
+                          top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        },
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          });
+        }
+
+        // Main document header in content area (larger, on first page)
         children.push(
           new Paragraph({
             children: [
               new TextRun({
                 text: `Level ${student.recommendedLevel} - ${getLevelDescription(student.recommendedLevel)}${numForms > 1 ? ` | Form ${assignedForm}` : ''}`,
                 bold: true,
-                size: 32, // 16pt
+                size: 32,
               }),
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { before: 200, after: 100 },
+            spacing: { after: 100 },
           })
         );
 
-        // Topic subtitle
         children.push(
           new Paragraph({
             children: [
               new TextRun({
                 text: `${topicsLabel.length > 50 ? topicsLabel.substring(0, 47) + '...' : topicsLabel} - Diagnostic Worksheet`,
-                size: 24, // 12pt
+                size: 24,
               }),
             ],
             alignment: AlignmentType.CENTER,
@@ -780,7 +924,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               new TextRun({ text: '          Date: _______________', size: 22 }),
               ...(numForms > 1 ? [new TextRun({ text: `          Form ${assignedForm}`, bold: true, size: 22 })] : []),
             ],
-            spacing: { after: 200 },
+            spacing: { before: 200, after: 200 },
           })
         );
 
@@ -835,11 +979,11 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
           for (let warmUpIdx = 0; warmUpIdx < questions.warmUp.length; warmUpIdx++) {
             const q = questions.warmUp[warmUpIdx];
-            const sanitizedQuestion = formatPdfText(q.question);
+            const sanitizedQuestion = formatWordText(q.question);
             const shapeKey = `${assignedForm}-${student.recommendedLevel}-warmUp-${warmUpIdx}`;
             const altWarmUpKey = `${cacheKey}-warmUp-${warmUpIdx}`;
             const generatedShapeUrl = geometryShapes[shapeKey] || geometryShapes[altWarmUpKey];
-            const hasShape = ((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl;
+            const hasShape = !isNoShapeSubject && (((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl);
             children.push(
               new Paragraph({
                 children: [
@@ -852,7 +996,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             );
 
             // Add geometry image if available (for warm-up) - check generated shapes first
-            if (generatedShapeUrl || ((q.imageUrl || q.svg) && includeGeometry)) {
+            if (!isNoShapeSubject && (generatedShapeUrl || ((q.imageUrl || q.svg) && includeGeometry))) {
               try {
                 let imageData = generatedShapeUrl || q.imageUrl || '';
                 if (!imageData && q.svg && !q.imageUrl) {
@@ -962,10 +1106,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
           for (let idx = 0; idx < questions.main.length; idx++) {
             const q = questions.main[idx];
-            const sanitizedQuestion = formatPdfText(q.question);
+            const sanitizedQuestion = formatWordText(q.question);
             const shapeKey = `${assignedForm}-${student.recommendedLevel}-main-${idx}`;
             const generatedShapeUrl = geometryShapes[shapeKey];
-            const hasShape = ((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl;
+            const hasShape = !isNoShapeSubject && (((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl);
 
             children.push(
               new Paragraph({
@@ -983,7 +1127,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             const altShapeKey = `${cacheKey}-main-${idx}`;
             const finalShapeUrl = generatedShapeUrl || geometryShapes[altShapeKey];
             
-            if (finalShapeUrl || ((q.imageUrl || q.svg) && includeGeometry)) {
+            if (!isNoShapeSubject && (finalShapeUrl || ((q.imageUrl || q.svg) && includeGeometry))) {
               try {
                 let imageData = '';
                 
@@ -1164,11 +1308,12 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
         }
 
         // Add section with page break for each student (except last)
+        // Include page header with QR code that repeats on ALL pages for this student
         sections.push({
           properties: {
             page: {
               margin: {
-                top: convertInchesToTwip(0.75),
+                top: convertInchesToTwip(1.0), // Extra top margin for header
                 right: convertInchesToTwip(0.75),
                 bottom: convertInchesToTwip(0.75),
                 left: convertInchesToTwip(0.75),
@@ -1180,6 +1325,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               },
             },
           },
+          headers: pageHeader ? { default: pageHeader } : undefined,
           children: children,
         });
 
@@ -1518,7 +1664,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
               // Add geometry diagram if available for warm-up (check on-demand shapes first)
               const warmUpShapeKey = `${cacheKey}-warmUp-${warmUpIdx}`;
               const warmUpGeneratedShapeUrl = geometryShapes[warmUpShapeKey];
-              const hasWarmUpShape = warmUpGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry);
+              const hasWarmUpShape = !isNoShapeSubject && (warmUpGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry));
               
               if (hasWarmUpShape) {
                 try {
@@ -1705,7 +1851,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
             // Add geometry diagram if available (check on-demand shapes first)
             const mainShapeKey = `${cacheKey}-main-${questionIdx}`;
             const mainGeneratedShapeUrl = geometryShapes[mainShapeKey];
-            const hasMainShape = mainGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry);
+            const hasMainShape = !isNoShapeSubject && (mainGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry));
             
             if (hasMainShape) {
               try {
@@ -2800,8 +2946,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                         </Tooltip>
                       </TooltipProvider>
                     </div>
-                    {/* Show geometry shapes in preview - from question or generated */}
-                    {((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-warmUp-${idx}`] ? (
+                    {/* Show geometry shapes in preview - from question or generated - only for geometry subjects */}
+                    {!isNoShapeSubject && (((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-warmUp-${idx}`]) ? (
                       <div className="mt-2 flex flex-col items-center gap-2">
                         <div className="relative">
                           {geometryShapes[`${cacheKey}-warmUp-${idx}`] ? (
@@ -2838,7 +2984,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                           Regenerate Diagram
                         </Button>
                       </div>
-                    ) : includeGeometry && (
+                    ) : includeGeometry && !isNoShapeSubject && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -2958,8 +3104,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                         </Tooltip>
                       </TooltipProvider>
                     </div>
-                    {/* Show geometry shapes in preview - from question or generated */}
-                    {((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-main-${idx}`] ? (
+                    {/* Show geometry shapes in preview - from question or generated - only for geometry subjects */}
+                    {!isNoShapeSubject && (((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-main-${idx}`]) ? (
                       <div className="mt-2 flex flex-col items-center gap-2">
                         <div className="relative">
                           {geometryShapes[`${cacheKey}-main-${idx}`] ? (
@@ -3097,8 +3243,8 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                     {/* Answer space with Generate Shape button */}
                     <div className="mt-3 border-t pt-2">
                       <div className="h-16 border border-dashed rounded bg-gray-50 relative flex items-center justify-center">
-                        {/* Show Generate Shape button if no shape exists and geometry is enabled */}
-                        {includeGeometry && !q.imageUrl && !q.svg && !geometryShapes[`${cacheKey}-main-${idx}`] && (
+                        {/* Show Generate Shape button if no shape exists and geometry is enabled - only for geometry subjects */}
+                        {includeGeometry && !isNoShapeSubject && !q.imageUrl && !q.svg && !geometryShapes[`${cacheKey}-main-${idx}`] && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -3529,47 +3675,30 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
 
           {includeGeometry && (
             <div className="ml-6 space-y-3">
-              {/* Prefer Deterministic SVG Toggle */}
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <Label htmlFor="preferDeterministicSVG" className="text-sm font-medium text-emerald-900 cursor-pointer flex items-center gap-2">
-                      ✓ Guaranteed Accurate Diagrams
-                      <Badge variant="secondary" className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5">Recommended</Badge>
-                    </Label>
-                    <p className="text-xs text-emerald-700 mt-0.5">
-                      Use programmatic SVG for coordinate planes — 100% correct axis labels every time
-                    </p>
-                  </div>
-                  <Switch
-                    id="preferDeterministicSVG"
-                    checked={preferDeterministicSVG}
-                    onCheckedChange={(checked) => {
-                      setPreferDeterministicSVG(checked);
-                      if (checked) setUseAIImages(false); // Mutually exclusive
-                    }}
-                  />
-                </div>
+              {/* Info box about text-based geometry */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <p className="text-sm text-slate-700">
+                  <strong>Default:</strong> Geometry questions will include detailed verbal descriptions 
+                  of shapes that students can draw themselves. This provides <strong>maximum workspace</strong> for 
+                  showing work clearly.
+                </p>
               </div>
 
-              {/* AI-Generated Images Toggle */}
+              {/* AI-Generated Images Toggle - Optional */}
               <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <Label htmlFor="useAIImages" className="text-sm font-medium text-cyan-900 cursor-pointer flex items-center gap-2">
-                      Use AI-Generated Images
-                      {!preferDeterministicSVG && (
-                        <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 px-1.5">May have errors</Badge>
-                      )}
+                      Generate AI Diagrams (Optional)
+                      <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 px-1.5">Slower</Badge>
                     </Label>
                     <p className="text-xs text-cyan-700 mt-0.5">
-                      Generate realistic images using AI (may occasionally have axis labeling issues)
+                      Add AI-generated images. Takes a few seconds per image; full class set may take 5-10 mins.
                     </p>
                   </div>
                   <Switch
                     id="useAIImages"
                     checked={useAIImages}
-                    disabled={preferDeterministicSVG}
                     onCheckedChange={() => handleImageToggle('aiImages', useAIImages)}
                   />
                 </div>

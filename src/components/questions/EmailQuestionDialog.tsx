@@ -67,6 +67,7 @@ export function EmailQuestionDialog({ questionId, questionTitle, trigger }: Emai
       const { data: classesData, error: classesError } = await supabase
         .from('classes')
         .select('id, name')
+        .is('archived_at', null)
         .order('name');
 
       if (classesError) throw classesError;

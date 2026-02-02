@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Users, Copy, Check, ChevronRight } from 'lucide-react';
+import { Plus, Users, Copy, Check, ChevronRight, Archive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EditClassDialog } from '@/components/classes/EditClassDialog';
+import { ArchiveClassDialog } from '@/components/classes/ArchiveClassDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -16,6 +18,7 @@ interface ClassWithStudentCount {
   school_year: string | null;
   class_period: string | null;
   created_at: string;
+  archived_at: string | null;
   student_count: number;
 }
 
@@ -72,6 +75,75 @@ export default function Classes() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
+  const activeClasses = classes.filter(c => !c.archived_at);
+  const archivedClasses = classes.filter(c => c.archived_at);
+
+  const renderClassCard = (cls: ClassWithStudentCount) => (
+    <Card key={cls.id} className="hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg flex items-center justify-between">
+          <Link to={`/classes/${cls.id}`} className="hover:underline flex-1">
+            {cls.name}
+          </Link>
+          <div className="flex items-center gap-1">
+            <EditClassDialog
+              classId={cls.id}
+              currentName={cls.name}
+              currentPeriod={cls.class_period}
+              currentYear={cls.school_year}
+              onUpdate={fetchClasses}
+            />
+            <ArchiveClassDialog
+              classId={cls.id}
+              className={cls.name}
+              isArchived={!!cls.archived_at}
+              onUpdate={fetchClasses}
+            />
+            <Link to={`/classes/${cls.id}`}>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </Link>
+          </div>
+        </CardTitle>
+        <CardDescription className="flex items-center gap-2">
+          {cls.school_year || 'No year set'}
+          {cls.class_period && (
+            <Badge variant="secondary" className="text-xs">
+              {cls.class_period}
+            </Badge>
+          )}
+          {cls.archived_at && (
+            <Badge variant="outline" className="text-xs text-orange-600">
+              Archived
+            </Badge>
+          )}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Users className="h-4 w-4" />
+            {cls.student_count} student{cls.student_count !== 1 ? 's' : ''}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.preventDefault();
+              if (cls.join_code) copyJoinCode(cls.join_code);
+            }}
+          >
+            {copiedCode === cls.join_code ? (
+              <Check className="h-3 w-3" />
+            ) : (
+              <Copy className="h-3 w-3" />
+            )}
+            {cls.join_code || 'No code'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -89,7 +161,7 @@ export default function Classes() {
           </Link>
         </div>
 
-        {/* Classes Grid */}
+        {/* Classes Tabs */}
         {loading ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
@@ -121,62 +193,56 @@ export default function Classes() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {classes.map((cls) => (
-              <Card key={cls.id} className="hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 h-full">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center justify-between">
-                    <Link to={`/classes/${cls.id}`} className="hover:underline flex-1">
-                      {cls.name}
+          <Tabs defaultValue="active" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="active" className="gap-2">
+                <Users className="h-4 w-4" />
+                Active ({activeClasses.length})
+              </TabsTrigger>
+              <TabsTrigger value="archived" className="gap-2">
+                <Archive className="h-4 w-4" />
+                Archived ({archivedClasses.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="active">
+              {activeClasses.length === 0 ? (
+                <Card className="text-center py-8">
+                  <CardContent>
+                    <p className="text-muted-foreground">No active classes</p>
+                    <Link to="/classes/new" className="mt-4 inline-block">
+                      <Button variant="hero" size="sm">
+                        <Plus className="h-4 w-4" />
+                        Create Class
+                      </Button>
                     </Link>
-                    <div className="flex items-center gap-1">
-                      <EditClassDialog
-                        classId={cls.id}
-                        currentName={cls.name}
-                        currentPeriod={cls.class_period}
-                        currentYear={cls.school_year}
-                        onUpdate={fetchClasses}
-                      />
-                      <Link to={`/classes/${cls.id}`}>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </Link>
-                    </div>
-                  </CardTitle>
-                  <CardDescription className="flex items-center gap-2">
-                    {cls.school_year || 'No year set'}
-                    {cls.class_period && (
-                      <Badge variant="secondary" className="text-xs">
-                        {cls.class_period}
-                      </Badge>
-                    )}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Users className="h-4 w-4" />
-                      {cls.student_count} student{cls.student_count !== 1 ? 's' : ''}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (cls.join_code) copyJoinCode(cls.join_code);
-                      }}
-                    >
-                      {copiedCode === cls.join_code ? (
-                        <Check className="h-3 w-3" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
-                      {cls.join_code || 'No code'}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {activeClasses.map(renderClassCard)}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="archived">
+              {archivedClasses.length === 0 ? (
+                <Card className="text-center py-8">
+                  <CardContent>
+                    <Archive className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                    <p className="text-muted-foreground">No archived classes</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Classes you archive will appear here
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {archivedClasses.map(renderClassCard)}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         )}
       </div>
     </AppLayout>

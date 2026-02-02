@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link, FileStack, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,12 +14,21 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { BatchItem } from '@/hooks/useBatchAnalysis';
+import { useStudentNames } from '@/lib/StudentNameContext';
+
+interface StudentInfo {
+  id: string;
+  first_name: string;
+  last_name: string;
+  student_id: string | null;
+}
 
 interface ManualLinkDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   continuationItem: BatchItem | null;
   items: BatchItem[];
+  students?: StudentInfo[];
   onLink: (continuationId: string, primaryId: string) => void;
 }
 
@@ -28,9 +37,22 @@ export function ManualLinkDialog({
   onOpenChange,
   continuationItem,
   items,
+  students,
   onLink,
 }: ManualLinkDialogProps) {
   const [selectedPrimaryId, setSelectedPrimaryId] = useState<string>('');
+  const { getDisplayName } = useStudentNames();
+
+  // Helper to get student display name (pseudonym if available) from a batch item
+  const getItemDisplayName = useCallback((item: BatchItem): string => {
+    if (item.studentId && students && students.length > 0) {
+      const student = students.find(s => s.id === item.studentId);
+      if (student) {
+        return getDisplayName(student.id, student.first_name, student.last_name);
+      }
+    }
+    return item.studentName || 'Unassigned';
+  }, [students, getDisplayName]);
 
   // Get available primary pages (not continuations, not this item)
   const availablePrimaries = items.filter(
@@ -82,7 +104,7 @@ export function ManualLinkDialog({
             <div>
               <p className="text-sm font-medium">Page to link</p>
               <p className="text-xs text-muted-foreground">
-                {continuationItem.studentName || 'Unassigned student'}
+                {getItemDisplayName(continuationItem)}
               </p>
             </div>
           </div>
@@ -126,7 +148,7 @@ export function ManualLinkDialog({
                         
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">
-                            {item.studentName || 'Unassigned'}
+                            {getItemDisplayName(item)}
                           </p>
                           <div className="flex items-center gap-2">
                             {item.status === 'completed' && item.result && (

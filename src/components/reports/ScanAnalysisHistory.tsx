@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { useStudentNames } from '@/lib/StudentNameContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ interface AttemptWithDetails {
 
 export function ScanAnalysisHistory({ classId }: ScanAnalysisHistoryProps) {
   const { user } = useAuth();
+  const { getDisplayName } = useStudentNames();
   const [selectedAttempt, setSelectedAttempt] = useState<AttemptWithDetails | null>(null);
   const [showRecalcDialog, setShowRecalcDialog] = useState(false);
 
@@ -178,8 +180,8 @@ export function ScanAnalysisHistory({ classId }: ScanAnalysisHistoryProps) {
   }, [attempts]);
 
   const analyzedStudentNames = useMemo(() => {
-    return [...new Set(attempts?.map(a => `${a.student.first_name} ${a.student.last_name}`) || [])];
-  }, [attempts]);
+    return [...new Set(attempts?.map(a => getDisplayName(a.student.id, a.student.first_name, a.student.last_name)) || [])];
+  }, [attempts, getDisplayName]);
 
   return (
     <>
@@ -250,7 +252,7 @@ export function ScanAnalysisHistory({ classId }: ScanAnalysisHistoryProps) {
                         <div className="flex items-center gap-2">
                           <User className="h-3 w-3 text-muted-foreground" />
                           <span className="font-medium">
-                            {attempt.student.first_name} {attempt.student.last_name}
+                            {getDisplayName(attempt.student.id, attempt.student.first_name, attempt.student.last_name)}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -287,7 +289,7 @@ export function ScanAnalysisHistory({ classId }: ScanAnalysisHistoryProps) {
         <StudentWorkDetailDialog
           open={!!selectedAttempt}
           onOpenChange={(open) => !open && setSelectedAttempt(null)}
-          studentName={`${selectedAttempt.student.first_name} ${selectedAttempt.student.last_name}`}
+          studentName={getDisplayName(selectedAttempt.student.id, selectedAttempt.student.first_name, selectedAttempt.student.last_name)}
           imageUrl={selectedAttempt.images?.[0]?.image_url}
           result={transformToAnalysisResult(selectedAttempt)}
         />

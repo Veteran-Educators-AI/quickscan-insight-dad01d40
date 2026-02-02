@@ -575,6 +575,7 @@ export type Database = {
       }
       classes: {
         Row: {
+          archived_at: string | null
           class_period: string | null
           created_at: string
           id: string
@@ -585,6 +586,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           class_period?: string | null
           created_at?: string
           id?: string
@@ -595,6 +597,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           class_period?: string | null
           created_at?: string
           id?: string

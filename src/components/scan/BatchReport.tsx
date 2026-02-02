@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2, Save, CheckCircle, BookOpen, Link, Unlink, FileStack, Upload, FileText, Cloud, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { useStudentNames } from '@/lib/StudentNameContext';
 import { toast } from 'sonner';
 import {
   exportGradingReportPDF,
@@ -51,6 +52,13 @@ interface ClassroomContext {
   maxPoints: number;
 }
 
+interface StudentInfo {
+  id: string;
+  first_name: string;
+  last_name: string;
+  student_id: string | null;
+}
+
 interface BatchReportProps {
   items: BatchItem[];
   summary: BatchSummary;
@@ -58,6 +66,7 @@ interface BatchReportProps {
   questionId?: string;
   className?: string;
   assignmentName?: string;
+  students?: StudentInfo[];
   onExport: () => void;
   onUpdateNotes?: (itemId: string, notes: string) => void;
   onSaveComplete?: () => void;
@@ -67,8 +76,9 @@ interface BatchReportProps {
   assignmentTitle?: string;
 }
 
-export function BatchReport({ items, summary, classId, questionId, className, assignmentName, onExport, onUpdateNotes, onSaveComplete, onUnlinkContinuation, onReanalyzeItem, classroomContextMap, assignmentTitle }: BatchReportProps) {
+export function BatchReport({ items, summary, classId, questionId, className, assignmentName, students, onExport, onUpdateNotes, onSaveComplete, onUnlinkContinuation, onReanalyzeItem, classroomContextMap, assignmentTitle }: BatchReportProps) {
   const { user } = useAuth();
+  const { getDisplayName } = useStudentNames();
   const [selectedStudent, setSelectedStudent] = useState<BatchItem | null>(null);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
   const [showComparison, setShowComparison] = useState(false);
@@ -78,6 +88,17 @@ export function BatchReport({ items, summary, classId, questionId, className, as
   const [isPushingAll, setIsPushingAll] = useState(false);
   const [isPushingBasicSkills, setIsPushingBasicSkills] = useState(false);
   const [isSavingAll, setIsSavingAll] = useState(false);
+
+  // Helper to get student display name (pseudonym if available) from a batch item
+  const getItemStudentDisplayName = useCallback((item: BatchItem): string => {
+    if (item.studentId && students && students.length > 0) {
+      const student = students.find(s => s.id === item.studentId);
+      if (student) {
+        return getDisplayName(student.id, student.first_name, student.last_name);
+      }
+    }
+    return item.studentName || 'Unknown';
+  }, [students, getDisplayName]);
   const [isExporting, setIsExporting] = useState(false);
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [driveFiles, setDriveFiles] = useState<{ blob: Blob; name: string }[]>([]);
@@ -393,7 +414,7 @@ export function BatchReport({ items, summary, classId, questionId, className, as
     .filter(item => item.result)
     .map(item => ({
       id: item.id,
-      studentName: item.studentName,
+      studentName: getItemStudentDisplayName(item),
       imageUrl: item.imageDataUrl,
       result: item.result!,
     }));
@@ -729,7 +750,7 @@ export function BatchReport({ items, summary, classId, questionId, className, as
                   <TableCell className="font-medium">
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-2">
-                        {item.studentName || 'Unknown'}
+                        {getItemStudentDisplayName(item)}
                         {item.pageType === 'continuation' && (
                           <TooltipProvider>
                             <Tooltip>
@@ -858,7 +879,7 @@ export function BatchReport({ items, summary, classId, questionId, className, as
         <StudentWorkDetailDialog
           open={!!selectedStudent}
           onOpenChange={(open) => !open && setSelectedStudent(null)}
-          studentName={selectedStudent.studentName}
+          studentName={getItemStudentDisplayName(selectedStudent)}
           imageUrl={selectedStudent.imageDataUrl}
           result={selectedStudent.result}
           isReanalyzing={isReanalyzing}

@@ -151,28 +151,74 @@ const FALLBACK_SHAPES: Record<string, (params?: any) => string> = {
     <text x="180" y="145" font-family="Arial" font-size="10">r = 3</text>
   </svg>`,
 
-  // Simple circle (no coordinate plane)
-  simple_circle: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+  // Simple circle with SECTOR - parameterized by angle
+  simple_circle: (params?: { angle?: number; radius?: number; label?: string }) => {
+    const angle = params?.angle || 90;
+    const r = 100;
+    const cx = 150, cy = 150;
+    // Calculate arc endpoint
+    const angleRad = (angle * Math.PI) / 180;
+    const endX = cx + r * Math.cos(angleRad);
+    const endY = cy - r * Math.sin(angleRad); // SVG Y is inverted
+    const largeArc = angle > 180 ? 1 : 0;
+    
+    return `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
-    <circle cx="150" cy="150" r="100" stroke="#000000" stroke-width="2" fill="none"/>
-    <circle cx="150" cy="150" r="4" fill="#000000"/>
-    <line x1="150" y1="150" x2="250" y2="150" stroke="#000000" stroke-width="1.5" stroke-dasharray="4,2"/>
-    <text x="150" y="140" font-family="Arial" font-size="12" text-anchor="middle" font-weight="bold">O</text>
-    <text x="200" y="140" font-family="Arial" font-size="11">r</text>
-  </svg>`,
+    <circle cx="${cx}" cy="${cy}" r="${r}" stroke="#000000" stroke-width="2" fill="none"/>
+    <!-- Sector -->
+    <path d="M ${cx} ${cy} L ${cx + r} ${cy} A ${r} ${r} 0 ${largeArc} 0 ${endX.toFixed(1)} ${endY.toFixed(1)} Z" stroke="#000000" stroke-width="2" fill="#e3f2fd"/>
+    <!-- Center point -->
+    <circle cx="${cx}" cy="${cy}" r="4" fill="#000000"/>
+    <!-- Radius lines -->
+    <line x1="${cx}" y1="${cy}" x2="${cx + r}" y2="${cy}" stroke="#000000" stroke-width="1.5"/>
+    <line x1="${cx}" y1="${cy}" x2="${endX.toFixed(1)}" y2="${endY.toFixed(1)}" stroke="#000000" stroke-width="1.5"/>
+    <!-- Angle arc indicator -->
+    <path d="M ${cx + 25} ${cy} A 25 25 0 ${largeArc} 0 ${cx + 25 * Math.cos(angleRad)} ${cy - 25 * Math.sin(angleRad)}" stroke="#000000" stroke-width="1" fill="none"/>
+    <!-- Labels -->
+    <text x="${cx}" y="${cy - 8}" font-family="Arial" font-size="12" text-anchor="middle" font-weight="bold">O</text>
+    <text x="${cx + 40}" y="${cy - 10}" font-family="Arial" font-size="11">${angle}°</text>
+    <text x="${cx + r/2}" y="${cy + 15}" font-family="Arial" font-size="11">r</text>
+  </svg>`;
+  },
 
-  // Arc / Semicircle
-  arc: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+  // Arc with specific angle - parameterized
+  arc: (params?: { angle?: number; startAngle?: number }) => {
+    const angle = params?.angle || 180;
+    const startAngle = params?.startAngle || 0;
+    const r = 100;
+    const cx = 150, cy = 150;
+    // Calculate arc endpoints
+    const startRad = (startAngle * Math.PI) / 180;
+    const endRad = ((startAngle + angle) * Math.PI) / 180;
+    const startX = cx + r * Math.cos(startRad);
+    const startY = cy - r * Math.sin(startRad);
+    const endX = cx + r * Math.cos(endRad);
+    const endY = cy - r * Math.sin(endRad);
+    const largeArc = angle > 180 ? 1 : 0;
+    
+    return `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
-    <path d="M 50 200 A 100 100 0 0 1 250 200" stroke="#000000" stroke-width="2" fill="none"/>
-    <line x1="50" y1="200" x2="250" y2="200" stroke="#000000" stroke-width="2"/>
-    <circle cx="50" cy="200" r="4" fill="#000000"/>
-    <circle cx="250" cy="200" r="4" fill="#000000"/>
-    <circle cx="150" cy="200" r="4" fill="#000000"/>
-    <text x="35" y="215" font-family="Arial" font-size="12" font-weight="bold">A</text>
-    <text x="255" y="215" font-family="Arial" font-size="12" font-weight="bold">B</text>
-    <text x="145" y="215" font-family="Arial" font-size="12" font-weight="bold">O</text>
-  </svg>`,
+    <!-- Full circle outline (faint) -->
+    <circle cx="${cx}" cy="${cy}" r="${r}" stroke="#cccccc" stroke-width="1" fill="none" stroke-dasharray="4,4"/>
+    <!-- Arc (bold) -->
+    <path d="M ${startX.toFixed(1)} ${startY.toFixed(1)} A ${r} ${r} 0 ${largeArc} 0 ${endX.toFixed(1)} ${endY.toFixed(1)}" stroke="#000000" stroke-width="3" fill="none"/>
+    <!-- Radii to endpoints -->
+    <line x1="${cx}" y1="${cy}" x2="${startX.toFixed(1)}" y2="${startY.toFixed(1)}" stroke="#000000" stroke-width="1.5" stroke-dasharray="4,2"/>
+    <line x1="${cx}" y1="${cy}" x2="${endX.toFixed(1)}" y2="${endY.toFixed(1)}" stroke="#000000" stroke-width="1.5" stroke-dasharray="4,2"/>
+    <!-- Center point -->
+    <circle cx="${cx}" cy="${cy}" r="4" fill="#000000"/>
+    <!-- Endpoint markers -->
+    <circle cx="${startX.toFixed(1)}" cy="${startY.toFixed(1)}" r="4" fill="#000000"/>
+    <circle cx="${endX.toFixed(1)}" cy="${endY.toFixed(1)}" r="4" fill="#000000"/>
+    <!-- Angle indicator -->
+    <path d="M ${cx + 30 * Math.cos(startRad)} ${cy - 30 * Math.sin(startRad)} A 30 30 0 ${largeArc} 0 ${cx + 30 * Math.cos(endRad)} ${cy - 30 * Math.sin(endRad)}" stroke="#000000" stroke-width="1" fill="none"/>
+    <!-- Labels -->
+    <text x="${cx - 10}" y="${cy + 5}" font-family="Arial" font-size="12" font-weight="bold">O</text>
+    <text x="${(cx + 45 * Math.cos((startRad + endRad) / 2)).toFixed(0)}" y="${(cy - 45 * Math.sin((startRad + endRad) / 2)).toFixed(0)}" font-family="Arial" font-size="11">${angle}°</text>
+    <text x="${startX.toFixed(0)}" y="${(parseFloat(startY.toFixed(0)) - 8)}" font-family="Arial" font-size="11" font-weight="bold">A</text>
+    <text x="${endX.toFixed(0)}" y="${(parseFloat(endY.toFixed(0)) - 8)}" font-family="Arial" font-size="11" font-weight="bold">B</text>
+  </svg>`;
+  },
 
   // Inscribed angle / chord
   chord: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
@@ -390,44 +436,42 @@ const FALLBACK_SHAPES: Record<string, (params?: any) => string> = {
     <text x="240" y="155" font-family="Arial" font-size="14" text-anchor="middle" font-weight="bold">H</text>
     <text x="150" y="250" font-family="Arial" font-size="16" text-anchor="middle">H₂O</text>
   </svg>`,
-  
-  // Plane with support pillars (3D geometry)
-  plane_with_pillars: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+
+  // Generic coordinate plane (blank for any problem)
+  coordinate_plane: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
-    <!-- Foundation plane (top view) -->
-    <rect x="50" y="50" width="200" height="150" stroke="#000000" stroke-width="2" fill="#f0f0f0" opacity="0.3"/>
-    <text x="150" y="140" font-family="Arial" font-size="12" text-anchor="middle" font-weight="bold">Foundation Plane</text>
-    <!-- Four support pillars (3D perspective) -->
-    <!-- Front-left pillar -->
-    <rect x="70" y="70" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
-    <line x1="70" y1="70" x2="60" y2="60" stroke="#000000" stroke-width="2"/>
-    <line x1="100" y1="70" x2="90" y2="60" stroke="#000000" stroke-width="2"/>
-    <line x1="70" y1="100" x2="60" y2="90" stroke="#000000" stroke-width="2"/>
-    <rect x="60" y="60" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
-    <text x="85" y="95" font-family="Arial" font-size="10" text-anchor="middle">P1</text>
-    <!-- Front-right pillar -->
-    <rect x="180" y="70" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
-    <line x1="180" y1="70" x2="170" y2="60" stroke="#000000" stroke-width="2"/>
-    <line x1="210" y1="70" x2="200" y2="60" stroke="#000000" stroke-width="2"/>
-    <line x1="180" y1="100" x2="170" y2="90" stroke="#000000" stroke-width="2"/>
-    <rect x="170" y="60" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
-    <text x="195" y="95" font-family="Arial" font-size="10" text-anchor="middle">P2</text>
-    <!-- Back-left pillar -->
-    <rect x="70" y="170" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
-    <line x1="70" y1="170" x2="60" y2="160" stroke="#000000" stroke-width="2"/>
-    <line x1="100" y1="170" x2="90" y2="160" stroke="#000000" stroke-width="2"/>
-    <line x1="70" y1="200" x2="60" y2="190" stroke="#000000" stroke-width="2"/>
-    <rect x="60" y="160" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
-    <text x="85" y="195" font-family="Arial" font-size="10" text-anchor="middle">P3</text>
-    <!-- Back-right pillar -->
-    <rect x="180" y="170" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
-    <line x1="180" y1="170" x2="170" y2="160" stroke="#000000" stroke-width="2"/>
-    <line x1="210" y1="170" x2="200" y2="160" stroke="#000000" stroke-width="2"/>
-    <line x1="180" y1="200" x2="170" y2="190" stroke="#000000" stroke-width="2"/>
-    <rect x="170" y="160" width="30" height="30" stroke="#000000" stroke-width="2" fill="none"/>
-    <text x="195" y="195" font-family="Arial" font-size="10" text-anchor="middle">P4</text>
-    <!-- Label -->
-    <text x="150" y="240" font-family="Arial" font-size="11" text-anchor="middle">Four support pillars defining a plane</text>
+    <g stroke="#e0e0e0" stroke-width="1">
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="${30 + i * 24}" y1="30" x2="${30 + i * 24}" y2="270"/>`).join('\n      ')}
+      ${Array.from({ length: 11 }, (_, i) => `<line x1="30" y1="${270 - i * 24}" x2="270" y2="${270 - i * 24}"/>`).join('\n      ')}
+    </g>
+    <g stroke="#000000" stroke-width="2">
+      <line x1="25" y1="150" x2="280" y2="150"/>
+      <polygon points="280,150 272,146 272,154" fill="#000000"/>
+      <line x1="150" y1="275" x2="150" y2="20"/>
+      <polygon points="150,20 146,28 154,28" fill="#000000"/>
+    </g>
+    <g font-family="Arial" font-size="11" fill="#000000">
+      <text x="275" y="165" font-style="italic">x</text>
+      <text x="155" y="18" font-style="italic">y</text>
+      <text x="155" y="165">O</text>
+    </g>
+  </svg>`,
+
+  // Number line
+  number_line: () => `<svg width="300" height="120" viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="120" fill="#ffffff"/>
+    <line x1="20" y1="60" x2="280" y2="60" stroke="#000000" stroke-width="2"/>
+    <polygon points="280,60 272,56 272,64" fill="#000000"/>
+    ${Array.from({ length: 11 }, (_, i) => `<line x1="${30 + i * 24}" y1="55" x2="${30 + i * 24}" y2="65" stroke="#000000" stroke-width="2"/>`).join('\n    ')}
+    ${Array.from({ length: 11 }, (_, i) => `<text x="${30 + i * 24}" y="80" font-family="Arial" font-size="11" text-anchor="middle">${i - 5}</text>`).join('\n    ')}
+  </svg>`,
+
+  // Generic shape placeholder
+  generic_shape: () => `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="300" height="300" fill="#ffffff"/>
+    <rect x="50" y="50" width="200" height="200" stroke="#000000" stroke-width="2" fill="none" stroke-dasharray="8,4"/>
+    <text x="150" y="150" font-family="Arial" font-size="14" text-anchor="middle" fill="#666666">[Diagram]</text>
+    <text x="150" y="170" font-family="Arial" font-size="10" text-anchor="middle" fill="#999999">Draw your figure here</text>
   </svg>`
 };
 
@@ -520,20 +564,67 @@ function matchFallbackShape(prompt: string): string | null {
     return 'molecule';
   }
   
-  return null;
+  // Coordinate plane / graph paper fallbacks
+  if (lowerPrompt.includes('coordinate') || lowerPrompt.includes('graph') || lowerPrompt.includes('axis') || lowerPrompt.includes('axes')) {
+    return 'coordinate_plane';
+  }
+  if (lowerPrompt.includes('number line')) {
+    return 'number_line';
+  }
+  
+  // ALWAYS return a fallback - never return null
+  // This ensures generation never fails
+  return 'generic_shape';
 }
 
-// Get fallback shape SVG as data URL
+// Get fallback shape SVG as data URL - with parameter extraction
 function getFallbackShape(prompt: string): string | null {
   const shapeKey = matchFallbackShape(prompt);
   if (shapeKey && FALLBACK_SHAPES[shapeKey]) {
-    const svg = FALLBACK_SHAPES[shapeKey]();
+    // Extract parameters from prompt for parameterized shapes
+    const params = extractShapeParams(prompt, shapeKey);
+    const svg = FALLBACK_SHAPES[shapeKey](params);
     const base64Svg = btoa(unescape(encodeURIComponent(svg)));
     return `data:image/svg+xml;base64,${base64Svg}`;
   }
   return null;
 }
 
+// Extract shape parameters from prompt text
+function extractShapeParams(prompt: string, shapeKey: string): any {
+  const params: any = {};
+  const lowerPrompt = prompt.toLowerCase();
+  
+  // Extract angle (e.g., "100°", "100 degrees", "central angle of 100")
+  const angleMatch = prompt.match(/(\d+)\s*(?:°|degrees?|deg)/i) ||
+                     prompt.match(/central\s*(?:angle|∠)\s*(?:of\s*)?(\d+)/i) ||
+                     prompt.match(/angle\s*(?:of\s*)?(\d+)/i);
+  if (angleMatch) {
+    params.angle = parseInt(angleMatch[1]);
+  }
+  
+  // For arc problems with time (clock), convert to degrees
+  // 60 minutes = 360°, so 1 minute = 6°
+  const minuteMatch = prompt.match(/(\d+)[- ]?minute/i);
+  if (minuteMatch && (lowerPrompt.includes('clock') || lowerPrompt.includes('minute hand'))) {
+    const minutes = parseInt(minuteMatch[1]);
+    params.angle = minutes * 6; // Convert minutes to degrees
+    params.startAngle = 90; // Clock starts at 12 o'clock (90° in standard position)
+  }
+  
+  // Extract radius
+  const radiusMatch = prompt.match(/radius\s*(?:of\s*)?(\d+(?:\.\d+)?)/i);
+  if (radiusMatch) {
+    params.radius = parseFloat(radiusMatch[1]);
+  }
+  
+  // For sector vs arc, default appropriately
+  if (shapeKey === 'simple_circle' && lowerPrompt.includes('sector')) {
+    params.isSector = true;
+  }
+  
+  return params;
+}
 
 // Query the Regents Shape Library for matching shapes
 // Phase 5 - P5.1: Enhanced with geometry_type matching
@@ -1616,8 +1707,20 @@ function generateDeterministicCoordinatePlaneSVG(prompt: string): string | null 
 }
 
 // Detect subject area from prompt for subject-specific diagram styles
-function detectSubjectArea(prompt: string): 'math' | 'physics' | 'chemistry' | 'biology' | 'general' {
+function detectSubjectArea(prompt: string): 'math' | 'physics' | 'chemistry' | 'biology' | 'financial' | 'general' {
   const lowerPrompt = prompt.toLowerCase();
+  
+  // Financial/Business indicators - Check FIRST to avoid false positives with "interest" (could be physics)
+  const financialKeywords = [
+    'bond', 'bonds', 'stock', 'stocks', 'investment', 'interest rate', 'coupon rate',
+    'face value', 'maturity', 'yield', 'dividend', 'mortgage', 'loan', 'principal',
+    'annuity', 'depreciation', 'profit', 'revenue', 'cost', 'price', 'market value',
+    'compound interest', 'simple interest', 'amortization', 'budget', 'finance',
+    'financial', 'investor', 'portfolio', 'tax', 'inflation', 'currency', 'dollar'
+  ];
+  if (financialKeywords.some(kw => lowerPrompt.includes(kw))) {
+    return 'financial';
+  }
   
   // Physics indicators
   const physicsKeywords = [
@@ -1664,7 +1767,7 @@ function detectSubjectArea(prompt: string): 'math' | 'physics' | 'chemistry' | '
 }
 
 // Get subject-specific SVG generation prompt based on the Universal Diagram Component methodology
-function getSubjectSpecificPrompt(prompt: string, subject: 'math' | 'physics' | 'chemistry' | 'biology' | 'general'): string {
+function getSubjectSpecificPrompt(prompt: string, subject: 'math' | 'physics' | 'chemistry' | 'biology' | 'financial' | 'general'): string {
   const baseRequirements = `
 SVG TECHNICAL REQUIREMENTS (MANDATORY):
 - Use viewBox="0 0 300 300" for consistent scaling
@@ -1754,6 +1857,22 @@ MATH DIAGRAM STYLE GUIDE (Geometric/Coordinate):
 - Right angle markers: small squares at corners
 - Construction lines: stroke-dasharray="5,5"
 - Measurements: positioned <text> elements with appropriate font-size
+
+${baseRequirements}
+
+Return ONLY valid SVG code, no explanation.`;
+
+    case 'financial':
+      // Financial topics don't need geometry diagrams - return minimal prompt
+      return `Create a simple informational icon/diagram for financial education.
+
+TOPIC: ${prompt}
+
+STYLE GUIDE:
+- Simple, clean icon style (NO geometric shapes like triangles, circles, arcs)
+- Use dollar signs, graph bars, or simple charts if appropriate
+- Minimalist line-art with professional appearance
+- Black and white only
 
 ${baseRequirements}
 
@@ -2539,49 +2658,20 @@ Style: Simple line art, clean educational diagram suitable for projection.`
         }
       }
 
-      // STEP 4: Use AI generation (Nano Banana) for complex/3D geometry
-      if (!imageUrl && useNanoBanana) {
-        const isCoordinatePlane = q.imagePrompt.toLowerCase().includes('coordinate') || 
-                                   q.imagePrompt.toLowerCase().includes('coordinate plane') ||
-                                   /\(-?\d+,\s*-?\d+\)/.test(q.imagePrompt);
-        const is3DGeometry = q.imagePrompt.toLowerCase().includes('plane') && 
-                            (q.imagePrompt.toLowerCase().includes('pillar') || 
-                             q.imagePrompt.toLowerCase().includes('support') ||
-                             q.imagePrompt.toLowerCase().includes('foundation') ||
-                             q.imagePrompt.toLowerCase().includes('3d') ||
-                             q.imagePrompt.toLowerCase().includes('three-dimensional'));
-        
-        if (is3DGeometry || !isCoordinatePlane) {
-          console.log("Step 4: Using AI generation for 3D/non-coordinate geometry...");
-          const result = await generateImageWithNanoBanana(q.imagePrompt);
-          const aiValidation = validateAndAcceptSVG(result.imageUrl, "AI");
-          if (aiValidation.accepted) {
-            imageUrl = aiValidation.svg;
-            validation = result.validation;
-            diagramSource = 'ai'; // P9.1
-          } else if (result.imageUrl) {
-            console.log("⚠ AI-generated SVG failed validation, trying next step...");
-            validation = result.validation;
+      // STEP 4: Use hardcoded fallback shapes as last resort
+      // IMPORTANT: Only use fallback shapes for math/physics subjects
+      // Do NOT show geometry shapes for financial, biology, chemistry, or general subjects
+      if (!imageUrl) {
+        // Only provide fallback shapes for subjects where geometric diagrams make sense
+        if (subject === 'math' || subject === 'physics') {
+          console.log("Using hardcoded fallback shapes for math/physics...");
+          imageUrl = getFallbackShape(q.imagePrompt);
+          if (imageUrl) {
+            console.log("Using hardcoded fallback shape");
+            validation = { isValid: true, issues: ['Used fallback shape'], shouldRetry: false };
           }
         } else {
-          console.log("Step 4: Skipped (coordinate plane - prefer deterministic)");
-        }
-      } else if (!imageUrl && !useNanoBanana) {
-        console.log("Step 4: Skipped (AI generation disabled)");
-      }
-
-      // STEP 5: Use hardcoded fallback shapes as last resort
-      if (!imageUrl) {
-        console.log("Step 5: Trying hardcoded fallback shapes...");
-        const fallbackResult = getFallbackShape(q.imagePrompt);
-        const fallbackValidation = validateAndAcceptSVG(fallbackResult, "Fallback");
-        if (fallbackValidation.accepted) {
-          imageUrl = fallbackValidation.svg;
-          console.log("✓ Using hardcoded fallback shape");
-          validation = { isValid: true, issues: ['Used fallback shape'], shouldRetry: false };
-          diagramSource = 'fallback'; // P9.1
-        } else if (fallbackResult) {
-          console.log("⚠ Fallback shape failed validation");
+          console.log(`Skipping fallback shapes for subject: ${subject} (not math/physics)`);
         }
       }
 

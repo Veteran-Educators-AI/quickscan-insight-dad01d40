@@ -204,6 +204,46 @@ Sent when a teacher pushes remediation or mastery challenges to students.
 }
 ```
 
+### 4. Student Created (Roster Sync)
+
+Sent when a teacher syncs their roster or adds a new student. Use this to pre-register students in Scholar app.
+
+```json
+{
+  "action": "student_created",
+  "student_id": "uuid-of-student",
+  "data": {
+    "first_name": "John",
+    "last_name": "Smith",
+    "student_name": "John Smith",
+    "email": "johnsmith@nycstudents.net",
+    "class_id": "uuid-of-class",
+    "class_name": "Algebra I - Period 3",
+    "timestamp": "2025-01-25T10:00:00.000Z"
+  }
+}
+```
+
+### 5. Student Updated
+
+Sent when a teacher updates student information (name, email).
+
+```json
+{
+  "action": "student_updated",
+  "student_id": "uuid-of-student",
+  "data": {
+    "first_name": "John",
+    "last_name": "Smith",
+    "student_name": "John Smith",
+    "email": "johnsmith@nycstudents.net",
+    "class_id": "uuid-of-class",
+    "class_name": "Algebra I - Period 3",
+    "timestamp": "2025-01-25T10:00:00.000Z"
+  }
+}
+```
+
 ---
 
 ## Question Object Schema

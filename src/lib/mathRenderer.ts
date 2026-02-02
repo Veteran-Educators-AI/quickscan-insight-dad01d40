@@ -307,31 +307,31 @@ function convertExponents(text: string): string {
 
 /**
  * Converts plain text subscripts (like x_1 or a_n) to subscript Unicode
- * IMPORTANT: Only applies to single-letter variables to avoid corrupting words like "needed_2"
+ * IMPORTANT: Only applies to standalone single-letter variables to avoid corrupting 
+ * words like "roses_2", "PM_2", "needed_2", etc.
  */
 function convertSubscripts(text: string): string {
-  // Pattern 1: Single letter followed by _{content} - e.g., x_{12} -> x₁₂
-  let result = text.replace(/\b([a-zA-Z])_{([^}]+)}/g, (match, letter, content) => {
+  let result = text;
+  
+  // Pattern 1: Single letter followed by _{content} with explicit braces - e.g., x_{12} -> x₁₂
+  // Only match if preceded by whitespace, punctuation, or start of string (NOT another letter)
+  result = result.replace(/(?<![a-zA-Z])([a-zA-Z])_{([^}]+)}/g, (match, letter, content) => {
     const subscripted = content.split('').map((char: string) => subscripts[char] || char).join('');
     return letter + subscripted;
   });
   
-  // Pattern 2: Single letter followed by _digit(s) - e.g., x_2 -> x₂, y_12 -> y₁₂
-  // Must be preceded by word boundary or space to avoid "needed_2" becoming "needed₂"
-  result = result.replace(/(?<=\s|^)([a-zA-Z])_(\d+)(?=\s|$|[,.:;!?)])/g, (match, letter, digits) => {
+  // Pattern 2: Single letter followed by _digit(s) - e.g., x_2 -> x₂
+  // CRITICAL: Must NOT be preceded by a letter (to avoid "roses_2" -> "roses₂")
+  // Must be preceded by whitespace, punctuation, math operators, or start of string
+  result = result.replace(/(?<![a-zA-Z])([a-zA-Z])_(\d+)(?![a-zA-Z])/g, (match, letter, digits) => {
     const subscripted = digits.split('').map((char: string) => subscripts[char] || char).join('');
     return letter + subscripted;
   });
   
-  // Pattern 3: Common math notation - single letter variable with subscript in math context
-  // e.g., "solve for x_1" or "(x_2 + y_3)"
-  result = result.replace(/([a-zA-Z])_(\d+|[a-z])(?=[\s+\-*/=<>()[\],.:;]|$)/gi, (match, letter, sub, offset) => {
-    // Check if the character before is a letter (making it part of a word)
-    const prevChar = result[offset - 1];
-    if (prevChar && /[a-zA-Z]/.test(prevChar)) {
-      return match; // Don't convert - it's part of a word like "needed_2"
-    }
-    const subscripted = sub.split('').map((char: string) => subscripts[char] || char).join('');
+  // Pattern 3: Single letter variable with letter subscript in math context - e.g., a_n, x_i
+  // Only match isolated single-letter variables
+  result = result.replace(/(?<![a-zA-Z])([a-zA-Z])_([a-z])(?![a-zA-Z])/gi, (match, letter, sub) => {
+    const subscripted = subscripts[sub.toLowerCase()] || sub;
     return letter + subscripted;
   });
   
@@ -439,28 +439,41 @@ export function formatCurrency(text: string): string {
   
   let result = text;
   
+  // CRITICAL: Skip if text already has properly formatted currency with thousands separators
+  // Numbers like $5,000.00 or $1,000,000.00 should be left alone
+  // This pattern detects if we have $ followed by digits with commas (valid currency)
+  const hasFormattedCurrency = /\$\d{1,3}(,\d{3})+(\.\d{2})?/.test(result);
+  
   // Pattern 1: Numbers with exactly 2 decimal places that don't already have $ (e.g., "4.00", "12.50", "100.99")
-  // Exclude measurements, percentages, and other non-currency decimals
-  result = result.replace(/(?<!\$)(?<!\d)\b(\d{1,})\.(00|[0-9]{2})\b(?!\s*(?:dollars?|cents?|%|degrees?|°|cm|m|ft|in|kg|lb|g|oz|ml|L|hours?|minutes?|seconds?|years?|months?|days?|miles?|km))(?!\d)/gi, (match, whole, cents) => {
-    return `$${whole}.${cents}`;
-  });
+  // IMPORTANT: Skip numbers with commas (they're already formatted as currency like 5,000.00)
+  // Also exclude measurements, percentages, and other non-currency decimals
+  if (!hasFormattedCurrency) {
+    result = result.replace(/(?<!\$)(?<!\d)(?<!,)\b(\d{1,3})\.(\d{2})\b(?!\s*(?:dollars?|cents?|%|degrees?|°|cm|m|ft|in|kg|lb|g|oz|ml|L|hours?|minutes?|seconds?|years?|months?|days?|miles?|km))(?!\d)/gi, (match, whole, cents) => {
+      return `$${whole}.${cents}`;
+    });
+  }
   
   // Pattern 2: Whole numbers followed by "dollars" or "cents" - add $ sign if missing
+  // But skip if already has $ sign
   result = result.replace(/(?<!\$)\b(\d+)\s+(dollars?)\b/gi, '$$$1 $2');
   result = result.replace(/(?<!\$)\b(\d+)\s+(cents?)\b/gi, '$1 $2'); // cents stay as is
   
   // Pattern 3: Numbers in context phrases like "costs 5" or "price of 10" 
-  // Add $ and format properly
-  result = result.replace(/\b(costs?|priced? at|charges?|pays?|earns?|spends?|saves?|sells? for|bought for|sold for|worth)\s+(?<!\$)(\d+(?:\.\d{2})?)\b(?!\s*(?:dollars?|cents?|%))/gi, 
+  // Add $ and format properly - but skip if there's already a $ or comma in the number
+  result = result.replace(/\b(costs?|priced? at|charges?|pays?|earns?|spends?|saves?|sells? for|bought for|sold for|worth)\s+(?<!\$)(\d{1,3})(?!\d|,)(?:\.\d{2})?\b(?!\s*(?:dollars?|cents?|%))/gi, 
     (match, verb, amount) => {
+      // Don't modify if the original match contains comma (already formatted)
+      if (match.includes(',')) return match;
       const formattedAmount = amount.includes('.') ? amount : `${amount}.00`;
       return `${verb} $${formattedAmount}`;
     }
   );
   
   // Pattern 4: "of X" patterns like "profit of 25" -> "profit of $25.00"
-  result = result.replace(/\b(profit|revenue|income|savings?|balance|total|discount|fee|tax|tip|cost|price|amount|loss)\s+of\s+(?<!\$)(\d+(?:\.\d{2})?)\b(?!\s*(?:dollars?|cents?|%))/gi,
+  // Skip numbers with commas
+  result = result.replace(/\b(profit|revenue|income|savings?|balance|total|discount|fee|tax|tip|cost|price|amount|loss)\s+of\s+(?<!\$)(\d{1,3})(?!\d|,)(?:\.\d{2})?\b(?!\s*(?:dollars?|cents?|%))/gi,
     (match, noun, amount) => {
+      if (match.includes(',')) return match;
       const formattedAmount = amount.includes('.') ? amount : `${amount}.00`;
       return `${noun} of $${formattedAmount}`;
     }
@@ -468,21 +481,23 @@ export function formatCurrency(text: string): string {
   
   // Pattern 5: Standalone currency amounts at end of sentence or before punctuation
   // e.g., "The answer is 25.50." -> "The answer is $25.50."
-  result = result.replace(/\b(?:is|was|equals?|=|totals?|makes?)\s+(?<!\$)(\d+\.\d{2})(?=\s*[.,;:?!]|\s*$)/gi,
+  // Skip numbers with commas (already formatted)
+  result = result.replace(/\b(?:is|was|equals?|=|totals?|makes?)\s+(?<!\$)(\d{1,3}\.\d{2})(?=\s*[.,;:?!]|\s*$)/gi,
     (match, amount) => {
+      if (match.includes(',')) return match;
       return match.replace(amount, `$${amount}`);
     }
   );
   
-  // Pattern 6: Add "dollars" after standalone $ amounts that don't have it
-  // Only add if the amount is followed by a period, comma, or end of sentence
-  // and doesn't already have "dollars" or "cents" after it
-  result = result.replace(/(\$\d+\.\d{2})(?=\s*[.,;:?!]|\s*$)(?!\s*(?:dollars?|cents?|each|per|for))/gi,
-    (match) => `${match} dollars`
-  );
+  // REMOVED: Pattern 6 that added "dollars" after $ amounts
+  // This was adding unnecessary verbosity
   
   // Cleanup: Remove double dollar signs if any were introduced
   result = result.replace(/\$\$/g, '$');
+  
+  // Cleanup: Fix any accidental $X,$XXX patterns (comma after first digit group)
+  // This catches cases like "$5,$000.00" and fixes to "$5,000.00"
+  result = result.replace(/\$(\d{1,3}),\$(\d{3})/g, '$$$1,$2');
   
   return result;
 }
@@ -842,28 +857,34 @@ export function sanitizeForPDF(text: string): string {
     [/ˣ/g, '^x'],
     [/ʸ/g, '^y'],
     
-    // Subscript numbers - convert to _n format
-    [/₀/g, '_0'],
-    [/₁/g, '_1'],
-    [/₂/g, '_2'],
-    [/₃/g, '_3'],
-    [/₄/g, '_4'],
-    [/₅/g, '_5'],
-    [/₆/g, '_6'],
-    [/₇/g, '_7'],
-    [/₈/g, '_8'],
-    [/₉/g, '_9'],
+    // Subscript numbers - convert to _n format ONLY for single-letter contexts
+    // These patterns check context to avoid "roses_2" type issues
+    [/(?<![a-zA-Z])([a-zA-Z])₀/g, '$1_0'],
+    [/(?<![a-zA-Z])([a-zA-Z])₁/g, '$1_1'],
+    [/(?<![a-zA-Z])([a-zA-Z])₂/g, '$1_2'],
+    [/(?<![a-zA-Z])([a-zA-Z])₃/g, '$1_3'],
+    [/(?<![a-zA-Z])([a-zA-Z])₄/g, '$1_4'],
+    [/(?<![a-zA-Z])([a-zA-Z])₅/g, '$1_5'],
+    [/(?<![a-zA-Z])([a-zA-Z])₆/g, '$1_6'],
+    [/(?<![a-zA-Z])([a-zA-Z])₇/g, '$1_7'],
+    [/(?<![a-zA-Z])([a-zA-Z])₈/g, '$1_8'],
+    [/(?<![a-zA-Z])([a-zA-Z])₉/g, '$1_9'],
+    // For subscripts attached to multi-letter words, just remove them entirely
+    [/([a-zA-Z]{2,})[₀₁₂₃₄₅₆₇₈₉]+/g, '$1'],
+    // Subscript operators and letters (these are rare enough to handle generically)
     [/₊/g, '_+'],
     [/₋/g, '_-'],
     [/₌/g, '_='],
     [/₍/g, '_('],
     [/₎/g, '_)'],
-    [/ₐ/g, '_a'],
-    [/ₑ/g, '_e'],
-    [/ᵢ/g, '_i'],
-    [/ₙ/g, '_n'],
-    [/ₓ/g, '_x'],
-    [/ᵧ/g, '_y'],
+    [/(?<![a-zA-Z])([a-zA-Z])ₐ/g, '$1_a'],
+    [/(?<![a-zA-Z])([a-zA-Z])ₑ/g, '$1_e'],
+    [/(?<![a-zA-Z])([a-zA-Z])ᵢ/g, '$1_i'],
+    [/(?<![a-zA-Z])([a-zA-Z])ₙ/g, '$1_n'],
+    [/(?<![a-zA-Z])([a-zA-Z])ₓ/g, '$1_x'],
+    [/(?<![a-zA-Z])([a-zA-Z])ᵧ/g, '$1_y'],
+    // Remove any remaining orphan subscripts from words
+    [/([a-zA-Z]{2,})[ₐₑᵢₙₓᵧ]/g, '$1'],
     
     // Unicode fractions - convert to a/b format
     [/½/g, '1/2'],
@@ -1046,8 +1067,59 @@ export function fixEncodingCorruption(text: string): string {
   
   return result;
 }
-
 export { mathSymbols, superscripts, subscripts, fractions };
+
+/**
+ * Sanitize text for Word document export
+ * Unlike sanitizeForPDF, this preserves Unicode symbols since Word handles them natively.
+ * It still fixes encoding corruption and cleans up problematic patterns.
+ */
+export function sanitizeForWord(text: string, skipPreProcessing = false): string {
+  if (!text) return '';
+  
+  let result = text;
+  
+  // If skipPreProcessing is false, apply encoding fix and math rendering
+  // This is the default behavior when called directly
+  if (!skipPreProcessing) {
+    // First fix any encoding corruption - this restores proper Unicode from mojibake
+    result = fixEncodingCorruption(result);
+    
+    // Render math symbols properly
+    result = renderMathText(result);
+  }
+  
+  // Fix common Word-specific issues
+  const wordCleanupPatterns: [RegExp, string][] = [
+    // Remove control characters that cause issues in Word
+    [/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ''],
+    
+    // Fix double spaces
+    [/\s+/g, ' '],
+    
+    // Fix em-dashes and en-dashes to regular dashes for consistency
+    [/—/g, '-'],
+    [/–/g, '-'],
+    
+    // Fix smart quotes to regular quotes
+    [/[""]/g, '"'],
+    [/['']/g, "'"],
+    
+    // Clean up orphan subscripts from multi-letter words (same logic as PDF)
+    [/([a-zA-Z]{2,})[₀₁₂₃₄₅₆₇₈₉]+/g, '$1'],
+    [/([a-zA-Z]{2,})[ₐₑᵢₙₓᵧ]/g, '$1'],
+    
+    // Remove any Â artifacts that slipped through
+    [/Â(?=\s|[₀₁₂₃₄₅₆₇₈₉])/g, ''],
+    [/Â$/g, ''],
+  ];
+  
+  for (const [pattern, replacement] of wordCleanupPatterns) {
+    result = result.replace(pattern, replacement);
+  }
+  
+  return result.trim();
+}
 
 /**
  * Cleans text for print-safe output by removing problematic characters

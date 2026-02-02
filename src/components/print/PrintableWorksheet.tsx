@@ -1,5 +1,6 @@
 import { StudentQRCode } from './StudentQRCode';
 import { StudentOnlyQRCode } from './StudentOnlyQRCode';
+import { StudentPageQRCode } from './StudentPageQRCode';
 import { renderMathText } from '@/lib/mathRenderer';
 
 interface Student {
@@ -49,7 +50,10 @@ interface PrintableWorksheetProps {
   topicName?: string;
   standard?: string;
   teacherName?: string;
-  aiOptimizedLayout?: boolean; // New: Enable AI-optimized bounded answer zones
+  aiOptimizedLayout?: boolean; // Enable AI-optimized bounded answer zones
+  pageNumber?: number; // For multi-page worksheets - current page
+  totalPages?: number; // For multi-page worksheets - total pages
+  hideLevelFromStudent?: boolean; // Hide level indicator except for Advanced (A) students
 }
 
 export function PrintableWorksheet({ 
@@ -63,9 +67,15 @@ export function PrintableWorksheet({
   standard,
   teacherName,
   aiOptimizedLayout = true, // Default to AI-optimized for all diagnostic worksheets
+  pageNumber = 1,
+  totalPages = 1,
+  hideLevelFromStudent = true, // Default: hide level from students unless Advanced
 }: PrintableWorksheetProps) {
   const levelInfo = studentLevel ? LEVEL_COLORS[studentLevel] : null;
   const levelDescription = studentLevel ? LEVEL_DESCRIPTIONS[studentLevel] : null;
+  
+  // Only show level to students if they are Advanced (A) OR if explicitly allowed
+  const shouldShowLevelToStudent = studentLevel && levelInfo && (!hideLevelFromStudent || studentLevel === 'A');
   
   // AI-Optimized Answer Box Component with clear boundaries
   const AIOptimizedAnswerBox = ({ questionNumber }: { questionNumber: number }) => (
@@ -260,24 +270,36 @@ export function PrintableWorksheet({
           </div>
           
           {/* Student Identification QR Code - Top Right Corner */}
+          {/* Uses page-aware QR for multi-page documents (front/back identification) */}
           {showQRCodes && (
             <div style={{ 
               flexShrink: 0, 
               textAlign: 'center',
               marginLeft: '1rem',
             }}>
-              <StudentOnlyQRCode studentId={student.id} size={70} />
-              <p style={{ 
-                fontSize: '0.6rem', 
-                color: '#6b7280', 
-                marginTop: '0.15rem', 
-                fontWeight: 600,
-                fontFamily: 'Helvetica, Arial, sans-serif',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}>
-                Student ID
-              </p>
+              {totalPages > 1 ? (
+                <StudentPageQRCode 
+                  studentId={student.id} 
+                  pageNumber={pageNumber}
+                  totalPages={totalPages}
+                  size={65} 
+                />
+              ) : (
+                <>
+                  <StudentOnlyQRCode studentId={student.id} size={70} />
+                  <p style={{ 
+                    fontSize: '0.6rem', 
+                    color: '#6b7280', 
+                    marginTop: '0.15rem', 
+                    fontWeight: 600,
+                    fontFamily: 'Helvetica, Arial, sans-serif',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Student ID
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -411,8 +433,8 @@ export function PrintableWorksheet({
         </div>
       </div>
 
-      {/* Student Level Indicator */}
-      {studentLevel && levelInfo && (
+      {/* Student Level Indicator - Only shown for Advanced students or when explicitly allowed */}
+      {shouldShowLevelToStudent && (
         <div 
           style={{
             display: 'flex',
@@ -442,7 +464,7 @@ export function PrintableWorksheet({
               boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
             }}
           >
-            {studentLevel}
+            ⭐
           </div>
           <div style={{ flex: 1 }}>
             <p style={{ 
@@ -452,7 +474,7 @@ export function PrintableWorksheet({
               color: levelInfo.text,
               fontFamily: 'Helvetica, Arial, sans-serif',
             }}>
-              Your Current Level: {studentLevel}
+              🎉 Advanced Level Challenge!
               {topicName && <span style={{ fontWeight: 'normal' }}> in {topicName}</span>}
             </p>
             <p style={{ 
@@ -462,47 +484,8 @@ export function PrintableWorksheet({
               opacity: 0.9,
               fontFamily: 'Helvetica, Arial, sans-serif',
             }}>
-              {levelDescription}
+              Great work! You've earned access to advanced problems.
             </p>
-          </div>
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <p style={{ 
-              margin: 0, 
-              fontSize: '0.7rem', 
-              color: levelInfo.text,
-              fontWeight: 500,
-              fontFamily: 'Helvetica, Arial, sans-serif',
-            }}>
-              Scale: A (Best) → F
-            </p>
-            <div style={{ 
-              display: 'flex', 
-              gap: '3px', 
-              marginTop: '0.375rem',
-              justifyContent: 'flex-end',
-            }}>
-              {(['A', 'B', 'C', 'D', 'E', 'F'] as AdvancementLevel[]).map(level => (
-                <div
-                  key={level}
-                  style={{
-                    width: '18px',
-                    height: '18px',
-                    borderRadius: '4px',
-                    backgroundColor: level === studentLevel ? LEVEL_COLORS[level].border : LEVEL_COLORS[level].bg,
-                    border: `1.5px solid ${LEVEL_COLORS[level].border}`,
-                    fontSize: '0.65rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: level === studentLevel ? 'bold' : 'normal',
-                    color: level === studentLevel ? 'white' : LEVEL_COLORS[level].text,
-                    fontFamily: 'Helvetica, Arial, sans-serif',
-                  }}
-                >
-                  {level}
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       )}

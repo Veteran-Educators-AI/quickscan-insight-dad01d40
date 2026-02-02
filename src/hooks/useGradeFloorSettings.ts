@@ -61,32 +61,42 @@ export function useGradeFloorSettings() {
     regentsScore?: number
   ): number => {
     const { gradeFloor, gradeFloorWithEffort } = settings;
-    // CRITICAL: If there's any work, minimum is gradeFloorWithEffort (default 65)
-    // Only completely blank work gets gradeFloor (default 55)
-    const minGrade = hasWork ? gradeFloorWithEffort : gradeFloor;
+    
+    // CRITICAL: No work shown = absolute floor (55) - no exceptions
+    // This catches blank pages, only question text visible, no student writing
+    if (!hasWork) {
+      return gradeFloor;
+    }
+
+    // Student showed work - minimum is gradeFloorWithEffort (default 65)
+    const minGrade = gradeFloorWithEffort;
+    
+    // Maximum grade from calculation is 95 (Regents 4 = Exceeding Standards)
+    // 100 is reserved for teacher overrides / truly exceptional demonstrated mastery
+    const maxCalculatedGrade = 95;
 
     // If regents score is available, use it for conversion
     if (regentsScore !== undefined && regentsScore >= 0) {
       const regentsToGrade: Record<number, number> = {
-        4: 95,  // Exceeding
-        3: 85,  // Meeting
-        2: 75,  // Approaching
-        1: Math.max(gradeFloorWithEffort, 67),  // Limited understanding - slightly above effort floor
-        0: hasWork ? gradeFloorWithEffort : gradeFloor,  // Even 0 with work gets effort floor
+        4: 95,  // Exceeding Standards - max without override
+        3: 85,  // Meeting Standards
+        2: 75,  // Approaching Standards
+        1: Math.max(gradeFloorWithEffort, 67),  // Limited understanding
+        0: gradeFloorWithEffort,  // Has work but completely wrong
       };
       const convertedGrade = regentsToGrade[regentsScore] ?? minGrade;
-      return Math.max(minGrade, convertedGrade);
+      return Math.max(minGrade, Math.min(maxCalculatedGrade, convertedGrade));
     }
 
-    // Calculate from percentage
+    // Calculate from percentage - scale between effort floor and max (95)
     if (percentage > 0) {
-      // Map percentage to grade range above the effort floor
-      const scaledGrade = Math.round(gradeFloorWithEffort + (percentage / 100) * (100 - gradeFloorWithEffort));
-      return Math.max(minGrade, scaledGrade);
+      // Map percentage to grade range: 65-95 (not 100)
+      const gradeRange = maxCalculatedGrade - gradeFloorWithEffort; // 95 - 65 = 30
+      const scaledGrade = Math.round(gradeFloorWithEffort + (percentage / 100) * gradeRange);
+      return Math.max(minGrade, Math.min(maxCalculatedGrade, scaledGrade));
     }
 
-    // No percentage but has work = effort floor
-    // No work at all = absolute floor
+    // Has work but no percentage calculated = effort floor
     return minGrade;
   };
 

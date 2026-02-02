@@ -66,6 +66,7 @@ export function GoogleClassroomImport({ open, onOpenChange, onImportComplete }: 
   const [submissions, setSubmissions] = useState<GoogleClassroomSubmission[]>([]);
   const [studentMap, setStudentMap] = useState<Record<string, { name: string; email?: string }>>({});
   const [selectedSubmissionIds, setSelectedSubmissionIds] = useState<string[]>([]);
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [importedSubmissions, setImportedSubmissions] = useState<ImportedSubmission[]>([]);
   const [importProgress, setImportProgress] = useState(0);
   const [loadingCourseWork, setLoadingCourseWork] = useState(false);
@@ -159,13 +160,28 @@ export function GoogleClassroomImport({ open, onOpenChange, onImportComplete }: 
     }
   };
 
-  const toggleSubmission = (submissionId: string) => {
-    setSelectedSubmissionIds(prev => {
-      if (prev.includes(submissionId)) {
-        return prev.filter(id => id !== submissionId);
-      }
-      return [...prev, submissionId];
-    });
+  const toggleSubmission = (submissionId: string, index: number, shiftKey: boolean) => {
+    if (shiftKey && lastClickedIndex !== null) {
+      // Shift-click: select range
+      const start = Math.min(lastClickedIndex, index);
+      const end = Math.max(lastClickedIndex, index);
+      const rangeIds = submissions.slice(start, end + 1).map(s => s.id);
+      
+      setSelectedSubmissionIds(prev => {
+        const newSelection = new Set(prev);
+        rangeIds.forEach(id => newSelection.add(id));
+        return Array.from(newSelection);
+      });
+    } else {
+      // Normal click: toggle single item
+      setSelectedSubmissionIds(prev => {
+        if (prev.includes(submissionId)) {
+          return prev.filter(id => id !== submissionId);
+        }
+        return [...prev, submissionId];
+      });
+      setLastClickedIndex(index);
+    }
   };
 
   const selectAllSubmissions = () => {
@@ -444,59 +460,59 @@ export function GoogleClassroomImport({ open, onOpenChange, onImportComplete }: 
             ) : (
               <>
                 <ScrollArea className="h-[350px]">
-                  <div className="space-y-2">
-                    {submissions.map(sub => {
-                      const student = studentMap[sub.userId];
-                      const isSelected = selectedSubmissionIds.includes(sub.id);
-                      const hasAttachments = (sub.assignmentSubmission?.attachments?.length || 0) > 0;
-                      
-                      return (
-                        <Card
-                          key={sub.id}
-                          className={`cursor-pointer transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/50'}`}
-                          onClick={() => toggleSubmission(sub.id)}
-                        >
-                          <CardContent className="p-4 flex items-center gap-3">
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleSubmission(sub.id)}
-                            />
-                            <div className="p-2 rounded-full bg-muted">
-                              <Users className="h-4 w-4 text-muted-foreground" />
+                <div className="space-y-2">
+                  {submissions.map((sub, index) => {
+                    const student = studentMap[sub.userId];
+                    const isSelected = selectedSubmissionIds.includes(sub.id);
+                    const hasAttachments = (sub.assignmentSubmission?.attachments?.length || 0) > 0;
+                    
+                    return (
+                      <Card
+                        key={sub.id}
+                        className={`cursor-pointer transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/50'}`}
+                        onClick={(e) => toggleSubmission(sub.id, index, e.shiftKey)}
+                      >
+                        <CardContent className="p-4 flex items-center gap-3">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSubmission(sub.id, index, false)}
+                          />
+                          <div className="p-2 rounded-full bg-muted">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium">{student?.name || 'Unknown Student'}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge className={`text-xs ${getSubmissionStateColor(sub.state)}`}>
+                                {sub.state.replace(/_/g, ' ')}
+                              </Badge>
+                              {hasAttachments && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <ImageIcon className="h-3 w-3" />
+                                  {sub.assignmentSubmission?.attachments?.length} file(s)
+                                </span>
+                              )}
+                              {sub.assignedGrade !== undefined && (
+                                <span className="text-xs text-muted-foreground">
+                                  Grade: {sub.assignedGrade}/{selectedCourseWork?.maxPoints || '?'}
+                                </span>
+                              )}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium">{student?.name || 'Unknown Student'}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge className={`text-xs ${getSubmissionStateColor(sub.state)}`}>
-                                  {sub.state.replace(/_/g, ' ')}
-                                </Badge>
-                                {hasAttachments && (
-                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <ImageIcon className="h-3 w-3" />
-                                    {sub.assignmentSubmission?.attachments?.length} file(s)
-                                  </span>
-                                )}
-                                {sub.assignedGrade !== undefined && (
-                                  <span className="text-xs text-muted-foreground">
-                                    Grade: {sub.assignedGrade}/{selectedCourseWork?.maxPoints || '?'}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <a
-                              href={sub.alternateLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={e => e.stopPropagation()}
-                              className="text-muted-foreground hover:text-primary"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
+                          </div>
+                          <a
+                            href={sub.alternateLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="text-muted-foreground hover:text-primary"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
                 </ScrollArea>
 
                 <Separator />

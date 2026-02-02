@@ -1053,31 +1053,47 @@ Provide your analysis in the following structure:
 - Regents Score: (0, 1, 2, 3, or 4 - remember: ANY understanding = Score 1 minimum)
 - Regents Score Justification: (why this score - cite evidence)
 - Rubric Scores: (if teacher rubric provided, score each criterion with points)
-- Misconceptions: (CRITICAL - ONLY list ERRORS. Do NOT include strengths or what the student did correctly here.
+- Misconceptions: (CRITICAL - ONLY list VERIFIED ERRORS that you can directly quote from the student's work.
+    
+    *** ANTI-HALLUCINATION RULES FOR ERROR REPORTING ***
+    BEFORE reporting ANY error, you MUST:
+    1. QUOTE EXACTLY what the student wrote - copy their actual handwritten text/numbers character by character
+    2. VERIFY the quote exists in the OCR text you extracted above
+    3. If you cannot DIRECTLY QUOTE the error from the student's work, DO NOT REPORT IT
+    4. NEVER report errors based on what you THINK the student might have done
+    5. NEVER fabricate mathematical expressions that don't appear in the image
+    6. If the student's work is CORRECT, write "No errors found - work is mathematically correct"
+    
+    *** CORRECT ANSWER = NO ERRORS ***
+    If the student arrives at the CORRECT FINAL ANSWER:
+    - Their work is fundamentally correct
+    - Minor notation differences are NOT errors (e.g., writing "12.5π" vs "12.5π sq ft")
+    - DO NOT report "errors" for correct mathematical work
+    - Only report genuine mathematical mistakes that happen to still lead to correct answer (rare)
     
     FORMAT - Start with the ERROR first, then explain:
-    "ERROR_LOCATION: [top/middle/bottom]-[left/center/right] | [WHAT WENT WRONG]: The student wrote '[EXACT QUOTE]' which is incorrect. [WHY IT'S WRONG]: The correct approach is [expected]. [IMPACT]: This caused [consequence]."
+    "ERROR_LOCATION: [top/middle/bottom]-[left/center/right] | [EXACT QUOTE FROM WORK]: '[paste exact text here]'. [ERROR]: This is incorrect because [explanation]. [CORRECT]: The right approach is [expected]."
     
-    CRITICAL RULES:
-    1. ERRORS ONLY - Never mention strengths, correct work, or what student did right in this section
-    2. ERROR FIRST - Always state the error/mistake at the beginning of each entry
-    3. START with "ERROR_LOCATION: [position]" format: "top-left", "middle-center", "bottom-right"
-    4. QUOTE EXACTLY what the student wrote - copy their actual words/numbers
+    CRITICAL VALIDATION RULES:
+    1. The EXACT QUOTE must appear in your OCR extraction above - if it doesn't, the error is fabricated
+    2. ERRORS ONLY - Never mention strengths, correct work, or what student did right in this section
+    3. ERROR FIRST - Always state the error/mistake at the beginning of each entry
+    4. START with "ERROR_LOCATION: [position]" format: "top-left", "middle-center", "bottom-right"
     5. EXPLAIN why this is mathematically wrong
     6. STATE the impact on the final answer
     7. Write COMPLETE sentences - no fragments
     8. Separate entry for each distinct error
+    9. If NO errors exist, explicitly state "No errors found"
     
     CORRECT EXAMPLES:
-    ✓ "ERROR_LOCATION: top-right | The student incorrectly wrote 'A = πr' instead of 'A = πr²', omitting the exponent. The area formula requires squaring the radius. This caused the area to be 15.7 instead of 78.5."
-    ✓ "ERROR_LOCATION: middle-center | The student made an addition error: '1/2 + 1/3 = 2/5'. When adding fractions, a common denominator is required. The correct sum is 5/6."
-    ✓ "ERROR_LOCATION: bottom-left | The student stopped at 'x = 5' without finding y. The solution is incomplete - both variables must be solved. The full answer is x = 5, y = 3."
+    ✓ "ERROR_LOCATION: top-right | [EXACT QUOTE]: 'A = πr'. [ERROR]: Student omitted the exponent - formula should be A = πr². This caused the area calculation to be wrong."
+    ✓ "No errors found - the student's work is mathematically correct and leads to the right answer of 12.5π."
     
     WRONG EXAMPLES (NEVER DO THIS):
-    ✗ "Strengths include calculating areas correctly. The error was..." - NO STRENGTHS ALLOWED
-    ✗ "The student did many things right but..." - START WITH ERROR, NOT PRAISE
-    ✗ "S and errors in algebraic manipulation" - INCOMPLETE FRAGMENT
-    ✗ "Wrong formula used" - TOO VAGUE, needs specifics)
+    ✗ Reporting an error for work that leads to the correct answer
+    ✗ Reporting an error you cannot directly quote from the OCR text
+    ✗ "The student wrote '$\\sqrt{60}\\pi$'" - if this doesn't appear in OCR, it's fabricated
+    ✗ Inventing expressions the student never wrote)
 - Needs Teacher Review: (list items flagged for verification)
 - Total Score: (IMPORTANT: This is points from teacher rubric criteria ONLY. If no teacher rubric was provided, use the Regents score converted: Score 4=4/4, Score 3=3/4, Score 2=2/4, Score 1=1/4, Score 0=0/4. Format: earned/possible)
 - Standards Met: (YES or NO - does work show ANY understanding of the standards?)
@@ -1453,7 +1469,7 @@ interface StudentRosterItem {
 interface IdentificationResult {
   qrCodeDetected: boolean;
   qrCodeContent: string | null;
-  parsedQRCode: { studentId: string; questionId?: string; version?: number } | null;
+  parsedQRCode: { studentId: string; questionId?: string; version?: number; pageNumber?: number; totalPages?: number } | null;
   handwrittenName: string | null;
   matchedStudentId: string | null;
   matchedStudentName: string | null;
@@ -1473,30 +1489,38 @@ async function identifyStudent(
       ).join('\n')}`
     : '';
 
-const prompt = `Analyze this image of student work to identify the student. CRITICAL: Look carefully for QR codes!
+const prompt = `Analyze this image of student work to identify the student. CRITICAL: Look carefully for QR codes AND the printed student name!
 
 1. QR CODE: Check ALL corners and edges thoroughly for any QR code. Scan the ENTIRE image carefully.
-   - QR codes are typically small black-and-white square patterns, often in corners
+   - QR codes are typically small black-and-white square patterns, often in BOTH top corners
    - VERSION 1 FORMAT: {"v":1,"s":"student-uuid","q":"question-uuid"} - contains student AND question IDs
    - VERSION 2 FORMAT: {"v":2,"type":"student","s":"student-uuid"} - contains ONLY student ID
+   - VERSION 3 FORMAT: {"v":3,"type":"student-page","s":"student-uuid","p":1,"t":2} - contains student ID + page number
    - If you find a QR code, extract its EXACT content character-by-character
    - The "s" field contains the student UUID that MUST match the roster
    
-2. HANDWRITTEN NAME: Look for a handwritten student name, typically at the top of the page.
-3. STUDENT ID: Look for any printed or handwritten student ID number.
+2. PRINTED/TYPED STUDENT NAME: Look for a PRINTED name at the top of the page (not handwritten).
+   - Worksheets often have the student name printed in the center-top header
+   - Look for patterns like "StudentName - Level X" or just "FirstName LastName" centered at top
+   - This is often BOLD and clearly visible
+   
+3. HANDWRITTEN NAME: Also look for any handwritten student name.
+4. STUDENT ID: Look for any printed or handwritten student ID number.
 ${rosterInfo}
 
 IMPORTANT MATCHING RULES:
 - If you find a QR code with an "s" field, that UUID must EXACTLY match an "id" from the roster
 - The roster IDs are UUIDs like "a1b2c3d4-e5f6-..." - match against these, NOT student_id numbers
 - QR code match = "high" confidence always
+- PRINTED NAME at top of worksheet should be treated as "high" confidence if it exactly matches a roster name
 
 Respond in this exact JSON format (no markdown, just raw JSON):
 {
   "qr_code_detected": true/false,
   "qr_code_content": "exact JSON content if found or null",
-  "qr_code_version": 1 or 2 or null,
+  "qr_code_version": 1 or 2 or 3 or null,
   "handwritten_name": "extracted name or null",
+  "printed_name": "printed name at top if found or null",
   "student_id_found": "ID if found or null",
   "matched_student_id": "roster UUID if matched or null",
   "matched_student_name": "full name if matched or null",
@@ -1523,7 +1547,7 @@ Respond in this exact JSON format (no markdown, just raw JSON):
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       
-      let parsedQRCode: { studentId: string; questionId?: string; version: number } | null = null;
+      let parsedQRCode: { studentId: string; questionId?: string; version: number; pageNumber?: number; totalPages?: number } | null = null;
       let matchedId = parsed.matched_student_id;
       let matchedName = parsed.matched_student_name;
       let matchedQuestionId: string | null = null;
@@ -1568,6 +1592,25 @@ Respond in this exact JSON format (no markdown, just raw JSON):
             
             console.log('Parsed v2 QR code (student-only):', parsedQRCode);
           }
+          // Version 3: Student + Page QR code (for multi-page worksheets)
+          else if (qrData.v === 3 && qrData.type === 'student-page' && qrData.s) {
+            parsedQRCode = {
+              studentId: qrData.s,
+              version: 3,
+              pageNumber: qrData.p,
+              totalPages: qrData.t,
+            };
+            matchedId = qrData.s;
+            
+            if (studentRoster && studentRoster.length > 0) {
+              const student = studentRoster.find(s => s.id === qrData.s);
+              if (student) {
+                matchedName = `${student.first_name} ${student.last_name}`;
+              }
+            }
+            
+            console.log('Parsed v3 QR code (student+page):', parsedQRCode);
+          }
           // Fallback: Try to extract student ID from any "s" field
           else if (qrData.s) {
             parsedQRCode = {
@@ -1592,6 +1635,18 @@ Respond in this exact JSON format (no markdown, just raw JSON):
         }
       }
       
+      // Try printed name first (high confidence for worksheet headers)
+      if (!matchedId && parsed.printed_name && studentRoster && studentRoster.length > 0) {
+        console.log('Trying to match printed name:', parsed.printed_name);
+        const match = fuzzyMatchStudent(parsed.printed_name, studentRoster);
+        if (match) {
+          matchedId = match.id;
+          matchedName = `${match.first_name} ${match.last_name}`;
+          console.log('Matched printed name to student:', matchedName);
+        }
+      }
+      
+      // Fall back to handwritten name
       if (!matchedId && parsed.handwritten_name && studentRoster && studentRoster.length > 0) {
         const match = fuzzyMatchStudent(parsed.handwritten_name, studentRoster);
         if (match) {

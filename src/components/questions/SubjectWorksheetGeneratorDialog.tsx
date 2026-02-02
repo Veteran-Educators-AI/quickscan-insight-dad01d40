@@ -206,9 +206,10 @@ export function SubjectWorksheetGeneratorDialog({
   const [includeGeometry, setIncludeGeometry] = useState(true);
   const [includeImages, setIncludeImages] = useState(false);
 
-  // Check if subject supports geometry diagrams
-  const supportsGeometry = ['algebra1', 'algebra2', 'geometry', 'precalculus', 'physics'].includes(subjectId);
-  const supportsImages = ['biology', 'chemistry', 'physics', 'earthscience', 'history'].includes(subjectId);
+  // Check if subject supports geometry diagrams - explicitly exclude financial math and social studies
+  const noImageSubjects = ['financialmath', 'economics', 'government', 'history'];
+  const supportsGeometry = ['algebra1', 'algebra2', 'geometry', 'precalculus', 'physics'].includes(subjectId) && !noImageSubjects.includes(subjectId);
+  const supportsImages = ['biology', 'chemistry', 'physics', 'earthscience'].includes(subjectId) && !noImageSubjects.includes(subjectId);
 
   // Update levels when preselected level changes
   useEffect(() => {
@@ -289,6 +290,9 @@ export function SubjectWorksheetGeneratorDialog({
           difficulty: selectedLevels.has('advanced') ? 3 : selectedLevels.has('intermediate') ? 2 : 1,
           isDiagnostic: false,
           subjectContext: context,
+          // Default to NO image generation - text-only with generous workspace for student work
+          useAIImages: includeImages,
+          includeGeometry: supportsGeometry && includeGeometry,
         },
       });
 

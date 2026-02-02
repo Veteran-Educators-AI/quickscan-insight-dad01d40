@@ -89,7 +89,6 @@ export function AddUnknownStudentDialog({
           title: 'New Student Added',
           student_id: data.id,
           student_name: fullName,
-          // @ts-ignore - extended type for student_created
           type: 'student_created',
           first_name: data.first_name,
           last_name: data.last_name,

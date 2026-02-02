@@ -19,6 +19,11 @@ interface PresentationSlide {
     explanation?: string;
   };
   icon?: 'lightbulb' | 'book' | 'question' | 'award' | 'sparkles';
+  wordProblem?: {
+    problem: string;
+    steps: string[];
+    finalAnswer: string;
+  };
 }
 
 interface NycologicPresentation {
@@ -35,22 +40,169 @@ function generateId(): string {
 }
 
 /**
+ * Detect if the topic is math-related
+ */
+function isMathTopic(topic: string, subject: string): boolean {
+  const mathKeywords = [
+    'math', 'algebra', 'geometry', 'calculus', 'trigonometry', 'equation',
+    'polynomial', 'quadratic', 'linear', 'function', 'graph', 'slope',
+    'triangle', 'circle', 'angle', 'perimeter', 'area', 'volume',
+    'fraction', 'decimal', 'percent', 'ratio', 'proportion', 'statistics',
+    'probability', 'theorem', 'pythagorean', 'sine', 'cosine', 'tangent',
+    'exponent', 'logarithm', 'derivative', 'integral', 'matrix', 'vector',
+    'bond', 'interest', 'annuity', 'present value', 'future value', 'investment'
+  ];
+  const combined = `${topic} ${subject}`.toLowerCase();
+  return mathKeywords.some(kw => combined.includes(kw)) || 
+         subject.toLowerCase().includes('math') ||
+         ['algebra i', 'algebra ii', 'geometry', 'precalculus', 'statistics', 'financial math'].includes(subject.toLowerCase());
+}
+
+/**
+ * Detect if the topic is bond/finance-related
+ */
+function isBondTopic(topic: string, subject: string): boolean {
+  const bondKeywords = ['bond', 'coupon', 'yield', 'maturity', 'present value', 'future value', 'par value', 'face value'];
+  const combined = `${topic} ${subject}`.toLowerCase();
+  return bondKeywords.some(kw => combined.includes(kw));
+}
+
+/**
+ * Get bond-specific prompt additions
+ */
+function getBondPromptAdditions(): string {
+  return `
+BOND & TIME VALUE OF MONEY - COMPREHENSIVE REQUIREMENTS:
+
+You MUST include ALL of these formulas with clear explanations:
+
+═══════════════════════════════════════════════════════════
+SECTION 1: CORE BOND FORMULAS
+═══════════════════════════════════════════════════════════
+
+1. COUPON PAYMENT:
+   Annual Coupon = Face Value × Coupon Rate
+   Semi-annual Coupon = (Face Value × Coupon Rate) / 2
+
+2. TOTAL COUPON PAYMENTS:
+   Total = Coupon Payment × Number of Periods
+
+3. CURRENT YIELD:
+   Current Yield = Annual Coupon Payment / Current Market Price × 100%
+
+═══════════════════════════════════════════════════════════
+SECTION 2: PRESENT VALUE (PV) FORMULAS - CRITICAL!
+═══════════════════════════════════════════════════════════
+
+4. PRESENT VALUE OF A SINGLE AMOUNT:
+   PV = FV / (1 + r)^n
+   Where: FV = future value, r = discount rate per period, n = number of periods
+   
+5. PRESENT VALUE OF BOND (combining coupon stream + face value):
+   PV = C × [(1 - (1 + r)^(-n)) / r] + FV / (1 + r)^n
+   Where: C = coupon payment, r = discount rate per period, n = periods, FV = face value
+
+6. PRESENT VALUE OF ANNUITY (coupon stream):
+   PVA = PMT × [(1 - (1 + r)^(-n)) / r]
+
+═══════════════════════════════════════════════════════════
+SECTION 3: FUTURE VALUE (FV) FORMULAS - CRITICAL!
+═══════════════════════════════════════════════════════════
+
+7. FUTURE VALUE OF A SINGLE AMOUNT:
+   FV = PV × (1 + r)^n
+   
+8. FUTURE VALUE OF ANNUITY (reinvested coupons):
+   FVA = PMT × [((1 + r)^n - 1) / r]
+
+═══════════════════════════════════════════════════════════
+SECTION 4: DISCOUNT RATE & YIELD - CRITICAL!
+═══════════════════════════════════════════════════════════
+
+9. DISCOUNT RATE EXPLAINED:
+   - The discount rate is the interest rate used to determine present value
+   - Higher discount rate = Lower present value
+   - Lower discount rate = Higher present value
+   - For bonds, discount rate often equals market yield or required return
+
+10. YIELD TO MATURITY (YTM):
+    YTM ≈ (C + (FV - P) / n) / ((FV + P) / 2)
+    Where: C = annual coupon, FV = face value, P = current price, n = years
+
+11. BOND PRICING RELATIONSHIP:
+    - If Coupon Rate > Market Rate → Bond trades at PREMIUM (PV > Face Value)
+    - If Coupon Rate < Market Rate → Bond trades at DISCOUNT (PV < Face Value)
+    - If Coupon Rate = Market Rate → Bond trades at PAR (PV = Face Value)
+
+═══════════════════════════════════════════════════════════
+REQUIRED: AT LEAST 6 WORKED EXAMPLES
+═══════════════════════════════════════════════════════════
+
+You MUST include AT LEAST 6 complete word problems with step-by-step solutions:
+
+EXAMPLE 1 - Present Value Calculation:
+"A $1,000 bond pays 6% annually and matures in 5 years. If the discount rate is 8%, find the present value."
+
+EXAMPLE 2 - Future Value Calculation:
+"You invest $2,500 today at 5% annual interest. What is the future value in 10 years?"
+
+EXAMPLE 3 - Coupon Payments & Total Interest:
+"A $5,000 bond with 4% coupon rate paid semi-annually matures in 15 years. Calculate total interest earned."
+
+EXAMPLE 4 - Discount Rate Impact:
+"A $1,000 bond pays $60 annually. Calculate PV using (a) 5% discount rate and (b) 7% discount rate. Explain the difference."
+
+EXAMPLE 5 - Premium vs Discount:
+"A $1,000 bond has a 7% coupon rate. The market rate is 5%. Is this bond at premium or discount? Calculate PV for 10 years."
+
+EXAMPLE 6 - Future Value of Reinvested Coupons:
+"If you receive $50 semi-annually from a bond and reinvest at 4% per period, what's the FV after 20 periods?"
+
+Use realistic values: Face values $1,000-$10,000, coupon rates 3%-8%, maturities 5-30 years.
+Format all currency with $ and commas: $1,000.00, $5,250.75`;
+}
+
+/**
+ * Get math-specific prompt additions
+ */
+function getMathPromptAdditions(topic: string): string {
+  return `
+MATH PRESENTATION REQUIREMENTS:
+1. Use ONLY Unicode math symbols - NEVER use LaTeX notation like \\frac, \\theta, \\pi, \\cdot, \\text
+2. Write fractions as: θ/360° × 2πr (NOT \\frac{\\theta}{360°})
+3. Use these symbols directly: π √ ² ³ × ÷ ≤ ≥ ≠ ∞ θ Σ ° △ □
+4. Include geometric shapes: triangles △, squares □, circles ○
+5. For each concept, show a challenging WORD PROBLEM with real-world context
+6. After each word problem, provide STEP-BY-STEP SOLUTION with:
+   - "Step 1: [identify what we know]"
+   - "Step 2: [set up the equation/formula]"
+   - "Step 3: [solve step by step]"
+   - "Final Answer: [clear answer with units]"
+7. Use mathematical notation in content (e.g., "x² + 5x + 6 = 0" not "x squared plus 5x plus 6 equals 0")
+
+CRITICAL: Write math expressions as plain Unicode text like:
+- L = (θ/360°) × 2πr (CORRECT)
+- \\( L = (\\frac{\\theta}{360°}) \\cdot 2\\pi r \\) (WRONG - NO LATEX!)
+
+For word problems, create scenarios like:
+- Finance: loans, interest, investments, budgets
+- Construction: measurements, materials, costs
+- Science: speed, distance, time, growth rates
+- Sports: statistics, scores, averages
+- Shopping: discounts, taxes, unit prices`;
+}
+
+/**
  * Attempt to recover partial JSON from truncated AI responses
- * Finds complete slide objects and reconstructs valid presentation
  */
 function recoverTruncatedPresentation(jsonStr: string, topic: string): NycologicPresentation | null {
   console.log("Attempting to recover truncated presentation...");
   
   try {
-    // Try to extract presentation metadata
     const titleMatch = jsonStr.match(/"title"\s*:\s*"([^"]+)"/);
     const subtitleMatch = jsonStr.match(/"subtitle"\s*:\s*"([^"]+)"/);
     
-    // Find all complete slide objects
     const slides: PresentationSlide[] = [];
-    const slidePattern = /\{\s*"id"\s*:\s*"slide-\d+"[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
-    
-    // More robust: find slides by looking for complete objects with id starting with "slide-"
     let depth = 0;
     let currentSlide = "";
     let inSlide = false;
@@ -73,7 +225,6 @@ function recoverTruncatedPresentation(jsonStr: string, topic: string): Nycologic
           depth--;
           currentSlide += char;
           if (depth === 0) {
-            // Complete slide found
             try {
               const slide = JSON.parse(currentSlide);
               if (slide.id && slide.type && slide.title) {
@@ -94,7 +245,6 @@ function recoverTruncatedPresentation(jsonStr: string, topic: string): Nycologic
     if (slides.length >= 2) {
       console.log(`Recovered ${slides.length} complete slides from truncated response`);
       
-      // Add a summary slide if not present
       const hasSum = slides.some(s => s.type === 'summary');
       if (!hasSum) {
         slides.push({
@@ -136,12 +286,14 @@ async function callLovableAI(prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       model: "google/gemini-3-flash-preview",
-      max_tokens: 4096,
+      max_tokens: 6000,
       messages: [
         {
           role: "system",
-          content: `You create concise JSON presentations. Return ONLY valid JSON, no markdown.
-Keep speakerNotes under 20 words. Keep content items under 15 words each.`,
+          content: `You create educational JSON presentations. Return ONLY valid JSON, no markdown code blocks.
+Keep speakerNotes under 25 words. Keep content items under 20 words each.
+Use proper mathematical symbols (π, √, ², θ, ×, ÷) not words.
+For math topics, include word problems with step-by-step solutions.`,
         },
         { role: "user", content: prompt },
       ],
@@ -207,24 +359,82 @@ serve(async (req) => {
 
     console.log(`Generating Nycologic presentation for: ${topic}`);
 
-    // Keep slide count small to avoid truncation
-    const slideCount = Math.min(Math.floor((parseInt(duration) || 30) / 5), 8);
-    const qCount = Math.min(questionCount, 2);
+    const isMath = isMathTopic(topic, subject);
+    const isBond = isBondTopic(topic, subject);
+    // For bond topics, generate more slides to fit 6+ examples
+    const baseSlideCount = Math.min(Math.floor((parseInt(duration) || 30) / 5), 10);
+    const slideCount = isBond ? Math.max(baseSlideCount, 12) : baseSlideCount;
+    const qCount = Math.min(questionCount, 3);
 
-    const prompt = `Create a ${slideCount}-slide presentation about "${topic}" for ${subject}.
+    // Build the prompt based on whether it's a math topic
+    let prompt = `Create a ${slideCount}-slide presentation about "${topic}" for ${subject}.
 ${description ? `Context: ${description}` : ''}
 ${standard ? `Standard: ${standard}` : ''}
-${includeQuestions ? `Include ${qCount} question slides.` : ''}
+${includeQuestions ? `Include ${qCount} question slides with multiple choice options.` : ''}`;
 
-Return this exact JSON structure:
-{"id":"${generateId()}","title":"Title Here","subtitle":"Subtitle","topic":"${topic}","slides":[
-{"id":"slide-1","type":"title","title":"**${topic}**","subtitle":"${subject.toUpperCase()}","content":["Brief intro"],"speakerNotes":"Welcome notes","icon":"sparkles"},
-{"id":"slide-2","type":"content","title":"Key **Concept**","content":["Point 1","Point 2"],"speakerNotes":"Explain","icon":"book"},
-{"id":"slide-3","type":"question","title":"**Check**","subtitle":"QUIZ","content":[],"question":{"prompt":"Question?","options":["A","B","C","D"],"answer":"A","explanation":"Why"},"icon":"question"},
-{"id":"slide-4","type":"summary","title":"**Takeaways**","content":["Key point 1","Key point 2"],"icon":"award"}
+    if (isMath) {
+      prompt += getMathPromptAdditions(topic);
+      
+      // Add bond-specific formulas if it's a bond topic
+      if (isBond) {
+        prompt += getBondPromptAdditions();
+        prompt += `
+
+BOND PRESENTATION STRUCTURE (${slideCount} slides minimum):
+Slide 1: Title slide
+Slide 2: What is a Bond? (definitions: face value, coupon, maturity)
+Slide 3: Present Value Formula - PV = FV / (1 + r)^n with explanation
+Slide 4: Future Value Formula - FV = PV × (1 + r)^n with explanation  
+Slide 5: Discount Rate Explained - What it is, how it affects bond prices
+Slide 6-11: SIX WORKED EXAMPLES (one per slide) - Each with wordProblem field:
+   - Example 1: Calculate Present Value of a bond
+   - Example 2: Calculate Future Value of an investment
+   - Example 3: Calculate total coupon payments
+   - Example 4: Compare PV with different discount rates
+   - Example 5: Determine if bond trades at premium/discount
+   - Example 6: Future Value of reinvested coupons
+Slide 12: Summary of all formulas
+
+CRITICAL: You MUST include exactly 6 slides with wordProblem objects containing worked examples!`;
+      }
+      
+      prompt += `
+
+For this MATH presentation, include:
+- ${isBond ? 'AT LEAST 6 slides' : 'At least 2 slides'} with challenging word problems
+- Each word problem should have a "wordProblem" field with:
+  - "problem": the real-world scenario
+  - "steps": array of step-by-step solution strings (5-8 steps each)
+  - "finalAnswer": the complete answer with units
+
+${isBond ? `Example BOND Present Value slide:
+{"id":"slide-6","type":"content","title":"**Present Value** Calculation","content":["Using PV = FV / (1 + r)^n"],"wordProblem":{"problem":"Find the present value of a $1,000 bond that pays 6% annually and matures in 5 years. The current discount rate is 8%.","steps":["Step 1: Identify given values: FV = $1,000, Coupon Rate = 6%, n = 5 years, Discount Rate (r) = 8%","Step 2: Calculate annual coupon payment: C = $1,000 × 6% = $60","Step 3: Apply PV formula for coupons: PVA = $60 × [(1 - (1.08)^(-5)) / 0.08]","Step 4: Calculate: PVA = $60 × [(1 - 0.6806) / 0.08] = $60 × 3.9927 = $239.56","Step 5: Calculate PV of face value: PV = $1,000 / (1.08)^5 = $1,000 / 1.4693 = $680.58","Step 6: Add both components: Total PV = $239.56 + $680.58 = $920.14","Step 7: Since PV ($920.14) < Face Value ($1,000), bond trades at DISCOUNT"],"finalAnswer":"Present Value = $920.14 (Bond trades at discount because discount rate 8% > coupon rate 6%)"},"icon":"lightbulb"}
+
+Example BOND Future Value slide:
+{"id":"slide-7","type":"content","title":"**Future Value** Calculation","content":["Using FV = PV × (1 + r)^n"],"wordProblem":{"problem":"You invest $2,500 today in a savings bond that pays 5% annual interest. What will be the future value in 10 years?","steps":["Step 1: Identify given values: PV = $2,500, r = 5% = 0.05, n = 10 years","Step 2: Write the Future Value formula: FV = PV × (1 + r)^n","Step 3: Substitute values: FV = $2,500 × (1 + 0.05)^10","Step 4: Calculate (1.05)^10 = 1.6289","Step 5: Multiply: FV = $2,500 × 1.6289 = $4,072.25","Step 6: Calculate total interest earned: $4,072.25 - $2,500 = $1,572.25"],"finalAnswer":"Future Value = $4,072.25 (You earn $1,572.25 in interest over 10 years)"},"icon":"lightbulb"}
+
+Example Discount Rate Comparison slide:
+{"id":"slide-8","type":"content","title":"**Discount Rate** Impact","content":["How discount rate affects bond value"],"wordProblem":{"problem":"A $1,000 bond pays $60 annually for 5 years. Calculate the present value using (a) 5% discount rate and (b) 7% discount rate. Explain why the values differ.","steps":["Step 1: Given: Face Value = $1,000, Annual Coupon = $60, n = 5 years","Step 2: At 5% discount rate: PV of coupons = $60 × 4.3295 = $259.77","Step 3: PV of face value at 5% = $1,000 / (1.05)^5 = $783.53","Step 4: Total PV at 5% = $259.77 + $783.53 = $1,043.30","Step 5: At 7% discount rate: PV of coupons = $60 × 4.1002 = $246.01","Step 6: PV of face value at 7% = $1,000 / (1.07)^5 = $712.99","Step 7: Total PV at 7% = $246.01 + $712.99 = $959.00","Step 8: Higher discount rate → Lower present value"],"finalAnswer":"At 5%: PV = $1,043.30 (premium) | At 7%: PV = $959.00 (discount) | Higher discount rates reduce bond value"},"icon":"lightbulb"}` : `Example word problem slide:
+{"id":"slide-3","type":"content","title":"**Real-World** Application","content":["Let's solve a challenging problem"],"wordProblem":{"problem":"A rectangular garden has a perimeter of 56 feet. If the length is 4 feet more than twice the width, find the dimensions.","steps":["Step 1: Let w = width, then length = 2w + 4","Step 2: Perimeter = 2(length) + 2(width) = 56","Step 3: 2(2w + 4) + 2w = 56","Step 4: 4w + 8 + 2w = 56","Step 5: 6w = 48","Step 6: w = 8 feet, length = 2(8) + 4 = 20 feet"],"finalAnswer":"Width = 8 feet, Length = 20 feet"},"icon":"lightbulb"}`}`;
+    }
+
+    prompt += `
+
+Return this JSON structure (no markdown, just JSON):
+{"id":"${generateId()}","title":"Title with **bold** keywords","subtitle":"${subject.toUpperCase()}","topic":"${topic}","slides":[
+{"id":"slide-1","type":"title","title":"**${topic}**","subtitle":"${subject.toUpperCase()}","content":["Brief engaging intro"],"speakerNotes":"Welcome notes","icon":"sparkles"},
+{"id":"slide-2","type":"content","title":"Key **Concept**","content":["Main point with symbols like π, √, or ²","Formula: y = mx + b"],"speakerNotes":"Explain clearly","icon":"book"},
+${isMath ? '{"id":"slide-3","type":"content","title":"**Word Problem** Challenge","content":["Apply what we learned"],"wordProblem":{"problem":"Challenging real-world scenario here","steps":["Step 1: Identify knowns","Step 2: Set up equation","Step 3: Solve","Step 4: Check answer"],"finalAnswer":"Complete answer with units"},"icon":"lightbulb"},' : ''}
+{"id":"slide-${isMath ? '4' : '3'}","type":"question","title":"**Check** Understanding","subtitle":"QUIZ","content":[],"question":{"prompt":"Question with math symbols?","options":["A) First option","B) Second option","C) Third option","D) Fourth option"],"answer":"A","explanation":"Clear explanation of why"},"icon":"question"},
+{"id":"slide-${isMath ? '5' : '4'}","type":"summary","title":"**Key** Takeaways","content":["Important point 1","Important point 2","Formula to remember"],"icon":"award"}
 ],"createdAt":"${new Date().toISOString()}"}
 
-IMPORTANT: Keep ALL text SHORT. No long sentences. Return ONLY the JSON object.`;
+IMPORTANT: 
+- Use actual math symbols (π, √, ², ³, θ, ×, ÷, ≤, ≥, ∞)
+- Keep text concise but mathematically precise
+- Word problems should be grade-appropriate but challenging
+${isBond ? '- MUST include 6 worked examples with PV, FV, and discount rate calculations' : ''}
+- Return ONLY the JSON object`;
 
     const aiResponse = await callLovableAI(prompt);
     
@@ -254,7 +464,6 @@ IMPORTANT: Keep ALL text SHORT. No long sentences. Return ONLY the JSON object.`
     } catch {
       console.error("Failed to parse AI response, attempting recovery:", cleanedResponse.substring(0, 1000));
       
-      // Try to recover partial data
       const recovered = recoverTruncatedPresentation(cleanedResponse, topic);
       if (recovered) {
         presentation = recovered;
@@ -281,7 +490,7 @@ IMPORTANT: Keep ALL text SHORT. No long sentences. Return ONLY the JSON object.`
       presentation.id = generateId();
     }
 
-    console.log(`Generated presentation with ${presentation.slides.length} slides`);
+    console.log(`Generated ${isMath ? 'MATH' : 'standard'} presentation with ${presentation.slides.length} slides`);
 
     return new Response(
       JSON.stringify({ success: true, presentation }),

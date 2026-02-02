@@ -37,6 +37,7 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
 
   const [initialized, setInitialized] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
 
@@ -51,16 +52,31 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
     init();
   }, [checkConnection, fetchFolders]);
 
-  const toggleFileSelection = (fileId: string) => {
-    setSelectedFiles(prev => {
-      const next = new Set(prev);
-      if (next.has(fileId)) {
-        next.delete(fileId);
-      } else {
-        next.add(fileId);
-      }
-      return next;
-    });
+  const toggleFileSelection = (fileId: string, index: number, shiftKey: boolean) => {
+    if (shiftKey && lastClickedIndex !== null) {
+      // Shift-click: select all files in range
+      const start = Math.min(lastClickedIndex, index);
+      const end = Math.max(lastClickedIndex, index);
+      const rangeFileIds = files.slice(start, end + 1).map(f => f.id);
+      
+      setSelectedFiles(prev => {
+        const next = new Set(prev);
+        rangeFileIds.forEach(id => next.add(id));
+        return next;
+      });
+    } else {
+      // Normal click: toggle single file
+      setSelectedFiles(prev => {
+        const next = new Set(prev);
+        if (next.has(fileId)) {
+          next.delete(fileId);
+        } else {
+          next.add(fileId);
+        }
+        return next;
+      });
+      setLastClickedIndex(index);
+    }
   };
 
   const selectAll = () => {
@@ -122,6 +138,25 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return `Today ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (diffDays === 1) {
+      return `Yesterday ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else if (date.getFullYear() !== now.getFullYear()) {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
   };
 
   if (!initialized) {
@@ -243,17 +278,22 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
             )}
 
             {/* Files */}
-            {files.map((file) => (
-              <label
+            {files.map((file, index) => (
+              <div
                 key={file.id}
+                onClick={(e) => toggleFileSelection(file.id, index, e.shiftKey)}
                 className={cn(
-                  "flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors cursor-pointer",
-                  selectedFiles.has(file.id) && "bg-accent"
+                  "flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors cursor-pointer select-none",
+                  selectedFiles.has(file.id) && "bg-primary/10 border border-primary/30"
                 )}
               >
-                <Checkbox
+              <Checkbox
                   checked={selectedFiles.has(file.id)}
-                  onCheckedChange={() => toggleFileSelection(file.id)}
+                  onCheckedChange={() => {}}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFileSelection(file.id, index, e.shiftKey);
+                  }}
                 />
                 {file.thumbnailLink ? (
                   <img 
@@ -268,11 +308,17 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="truncate text-sm">{file.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatFileSize(file.size)}
+                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                    <span>{formatFileSize(file.size)}</span>
+                    {file.modifiedTime && (
+                      <>
+                        <span className="text-muted-foreground/50">•</span>
+                        <span>{formatDate(file.modifiedTime)}</span>
+                      </>
+                    )}
                   </div>
                 </div>
-              </label>
+              </div>
             ))}
 
             {/* Empty State */}

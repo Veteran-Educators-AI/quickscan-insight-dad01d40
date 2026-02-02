@@ -28,6 +28,7 @@ interface AdaptiveLevelResult {
 interface UseAdaptiveLevelsOptions {
   classId?: string;
   topicName?: string;
+  defaultLevelForNewTopics?: AdvancementLevel; // Default level when no performance data exists
 }
 
 // Level progression values for calculations
@@ -104,7 +105,11 @@ function calculateTrend(scores: number[]): 'improving' | 'stable' | 'declining' 
   return 'stable';
 }
 
-export function useAdaptiveLevels({ classId, topicName }: UseAdaptiveLevelsOptions = {}) {
+export function useAdaptiveLevels({ 
+  classId, 
+  topicName, 
+  defaultLevelForNewTopics = 'C' // Default to intermediate (C) for new topics - all students start equal
+}: UseAdaptiveLevelsOptions = {}) {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [students, setStudents] = useState<AdaptiveLevelResult[]>([]);
@@ -234,10 +239,11 @@ export function useAdaptiveLevels({ classId, topicName }: UseAdaptiveLevelsOptio
 
         // Calculate overall recommended level
         const performanceValues = Object.values(topicPerformance);
-        let overallRecommendedLevel: AdvancementLevel = 'C'; // Default
+        // Use the configurable default level for new topics (all students start equal)
+        let overallRecommendedLevel: AdvancementLevel = defaultLevelForNewTopics;
 
         if (performanceValues.length > 0) {
-          // Weight by confidence score
+          // Only use performance-based differentiation if we have data for this topic
           const weightedSum = performanceValues.reduce((sum, p) => {
             return sum + (LEVEL_VALUES[p.recommendedLevel] * p.confidenceScore);
           }, 0);
@@ -247,8 +253,12 @@ export function useAdaptiveLevels({ classId, topicName }: UseAdaptiveLevelsOptio
             const weightedAvg = Math.round(weightedSum / totalWeight);
             overallRecommendedLevel = VALUE_TO_LEVEL[Math.max(1, Math.min(6, weightedAvg))];
           }
+        } else if (topicName) {
+          // For a specific new topic with no data, use the default starting level
+          // All students start at the same intermediate level
+          overallRecommendedLevel = defaultLevelForNewTopics;
         } else {
-          // Fall back to most recent diagnostic
+          // Fall back to most recent diagnostic only if no specific topic requested
           const latestDiagnostic = studentDiagnostics
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
           
