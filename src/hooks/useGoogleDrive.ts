@@ -316,13 +316,16 @@ export function useGoogleDrive() {
     }
   }, []);
 
-  // Upload a file to Drive
+  // Upload a file to Drive with retry logic
   const uploadFile = useCallback(async (
     file: Blob,
     fileName: string,
     folderId: string = 'root',
-    mimeType: string = 'image/jpeg'
+    mimeType: string = 'image/jpeg',
+    retryCount: number = 0
   ): Promise<string | null> => {
+    const maxRetries = 2;
+    
     try {
       const accessToken = await getAccessToken();
       if (!accessToken) {
@@ -353,19 +356,37 @@ export function useGoogleDrive() {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to upload file');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData?.error?.message || `HTTP ${response.status}`;
+        
+        // Retry on rate limiting or server errors
+        if ((response.status === 429 || response.status >= 500) && retryCount < maxRetries) {
+          console.log(`Retrying upload for ${fileName} (attempt ${retryCount + 2}/${maxRetries + 1})`);
+          // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+          return uploadFile(file, fileName, folderId, mimeType, retryCount + 1);
+        }
+        
+        // Handle token expiration - clear and fail gracefully
+        if (response.status === 401) {
+          localStorage.removeItem('google_drive_access_token');
+          localStorage.removeItem('google_drive_token_expiry');
+          setConnected(false);
+          throw new Error('Session expired. Please reconnect to Google Drive.');
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
       return data.id;
     } catch (error) {
-      console.error('Error uploading file:', error);
+      console.error(`Error uploading file ${fileName}:`, error);
       return null;
     }
   }, []);
 
-  // Upload multiple files to Drive
+  // Upload multiple files to Drive with progress
   const uploadMultipleFiles = useCallback(async (
     files: { blob: Blob; name: string; mimeType?: string }[],
     folderId: string = 'root',
@@ -380,8 +401,18 @@ export function useGoogleDrive() {
         onProgress(i + 1, files.length);
       }
 
-      const fileId = await uploadFile(file.blob, file.name, folderId, file.mimeType || 'image/jpeg');
-      results.push({ name: file.name, fileId });
+      try {
+        const fileId = await uploadFile(file.blob, file.name, folderId, file.mimeType || 'image/jpeg');
+        results.push({ name: file.name, fileId });
+        
+        // Small delay between uploads to avoid rate limiting for large batches
+        if (files.length > 10 && i < files.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } catch (error) {
+        console.error(`Failed to upload ${file.name}:`, error);
+        results.push({ name: file.name, fileId: null });
+      }
     }
 
     return results;
