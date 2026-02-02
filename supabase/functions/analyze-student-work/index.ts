@@ -1469,7 +1469,7 @@ interface StudentRosterItem {
 interface IdentificationResult {
   qrCodeDetected: boolean;
   qrCodeContent: string | null;
-  parsedQRCode: { studentId: string; questionId?: string; version?: number } | null;
+  parsedQRCode: { studentId: string; questionId?: string; version?: number; pageNumber?: number; totalPages?: number } | null;
   handwrittenName: string | null;
   matchedStudentId: string | null;
   matchedStudentName: string | null;
@@ -1489,30 +1489,38 @@ async function identifyStudent(
       ).join('\n')}`
     : '';
 
-const prompt = `Analyze this image of student work to identify the student. CRITICAL: Look carefully for QR codes!
+const prompt = `Analyze this image of student work to identify the student. CRITICAL: Look carefully for QR codes AND the printed student name!
 
 1. QR CODE: Check ALL corners and edges thoroughly for any QR code. Scan the ENTIRE image carefully.
-   - QR codes are typically small black-and-white square patterns, often in corners
+   - QR codes are typically small black-and-white square patterns, often in BOTH top corners
    - VERSION 1 FORMAT: {"v":1,"s":"student-uuid","q":"question-uuid"} - contains student AND question IDs
    - VERSION 2 FORMAT: {"v":2,"type":"student","s":"student-uuid"} - contains ONLY student ID
+   - VERSION 3 FORMAT: {"v":3,"type":"student-page","s":"student-uuid","p":1,"t":2} - contains student ID + page number
    - If you find a QR code, extract its EXACT content character-by-character
    - The "s" field contains the student UUID that MUST match the roster
    
-2. HANDWRITTEN NAME: Look for a handwritten student name, typically at the top of the page.
-3. STUDENT ID: Look for any printed or handwritten student ID number.
+2. PRINTED/TYPED STUDENT NAME: Look for a PRINTED name at the top of the page (not handwritten).
+   - Worksheets often have the student name printed in the center-top header
+   - Look for patterns like "StudentName - Level X" or just "FirstName LastName" centered at top
+   - This is often BOLD and clearly visible
+   
+3. HANDWRITTEN NAME: Also look for any handwritten student name.
+4. STUDENT ID: Look for any printed or handwritten student ID number.
 ${rosterInfo}
 
 IMPORTANT MATCHING RULES:
 - If you find a QR code with an "s" field, that UUID must EXACTLY match an "id" from the roster
 - The roster IDs are UUIDs like "a1b2c3d4-e5f6-..." - match against these, NOT student_id numbers
 - QR code match = "high" confidence always
+- PRINTED NAME at top of worksheet should be treated as "high" confidence if it exactly matches a roster name
 
 Respond in this exact JSON format (no markdown, just raw JSON):
 {
   "qr_code_detected": true/false,
   "qr_code_content": "exact JSON content if found or null",
-  "qr_code_version": 1 or 2 or null,
+  "qr_code_version": 1 or 2 or 3 or null,
   "handwritten_name": "extracted name or null",
+  "printed_name": "printed name at top if found or null",
   "student_id_found": "ID if found or null",
   "matched_student_id": "roster UUID if matched or null",
   "matched_student_name": "full name if matched or null",
@@ -1539,7 +1547,7 @@ Respond in this exact JSON format (no markdown, just raw JSON):
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       
-      let parsedQRCode: { studentId: string; questionId?: string; version: number } | null = null;
+      let parsedQRCode: { studentId: string; questionId?: string; version: number; pageNumber?: number; totalPages?: number } | null = null;
       let matchedId = parsed.matched_student_id;
       let matchedName = parsed.matched_student_name;
       let matchedQuestionId: string | null = null;
@@ -1584,6 +1592,25 @@ Respond in this exact JSON format (no markdown, just raw JSON):
             
             console.log('Parsed v2 QR code (student-only):', parsedQRCode);
           }
+          // Version 3: Student + Page QR code (for multi-page worksheets)
+          else if (qrData.v === 3 && qrData.type === 'student-page' && qrData.s) {
+            parsedQRCode = {
+              studentId: qrData.s,
+              version: 3,
+              pageNumber: qrData.p,
+              totalPages: qrData.t,
+            };
+            matchedId = qrData.s;
+            
+            if (studentRoster && studentRoster.length > 0) {
+              const student = studentRoster.find(s => s.id === qrData.s);
+              if (student) {
+                matchedName = `${student.first_name} ${student.last_name}`;
+              }
+            }
+            
+            console.log('Parsed v3 QR code (student+page):', parsedQRCode);
+          }
           // Fallback: Try to extract student ID from any "s" field
           else if (qrData.s) {
             parsedQRCode = {
@@ -1608,6 +1635,18 @@ Respond in this exact JSON format (no markdown, just raw JSON):
         }
       }
       
+      // Try printed name first (high confidence for worksheet headers)
+      if (!matchedId && parsed.printed_name && studentRoster && studentRoster.length > 0) {
+        console.log('Trying to match printed name:', parsed.printed_name);
+        const match = fuzzyMatchStudent(parsed.printed_name, studentRoster);
+        if (match) {
+          matchedId = match.id;
+          matchedName = `${match.first_name} ${match.last_name}`;
+          console.log('Matched printed name to student:', matchedName);
+        }
+      }
+      
+      // Fall back to handwritten name
       if (!matchedId && parsed.handwritten_name && studentRoster && studentRoster.length > 0) {
         const match = fuzzyMatchStudent(parsed.handwritten_name, studentRoster);
         if (match) {

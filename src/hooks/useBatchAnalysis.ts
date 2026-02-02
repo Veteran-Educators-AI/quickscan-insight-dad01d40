@@ -383,6 +383,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   }, []);
 
   // Add image and auto-identify if roster provided
+  // IMPORTANT: Uses local QR scanning first (fast & reliable), falls back to AI vision only when needed
   const addImageWithAutoIdentify = useCallback(async (imageDataUrl: string, studentRoster?: Student[]): Promise<string> => {
     const id = crypto.randomUUID();
     console.log(`[addImageWithAutoIdentify] Adding image, roster size: ${studentRoster?.length ?? 0}`);
@@ -399,8 +400,53 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     if (studentRoster && studentRoster.length > 0) {
       try {
         console.log(`[addImageWithAutoIdentify] Starting identification for image ${id}`);
+        
+        // STEP 1: Try local QR scan first (fast & reliable using jsQR)
+        const qrResult = await scanQRCodeFromImage(imageDataUrl);
+        
+        if (qrResult && qrResult.studentId) {
+          console.log(`[addImageWithAutoIdentify] Local QR scan found student: ${qrResult.studentId}, type: ${qrResult.type}`);
+          
+          // Match against roster
+          const matchedStudent = studentRoster.find(s => s.id === qrResult.studentId);
+          
+          if (matchedStudent) {
+            console.log(`[addImageWithAutoIdentify] QR matched to roster: ${matchedStudent.first_name} ${matchedStudent.last_name}`);
+            
+            // SUCCESS: QR code found and matched - skip expensive AI call!
+            const identifiedItem: BatchItem = {
+              ...newItem,
+              status: 'pending',
+              studentId: matchedStudent.id,
+              studentName: `${matchedStudent.first_name} ${matchedStudent.last_name}`,
+              questionId: qrResult.questionId,
+              pageNumber: qrResult.pageNumber,
+              totalPages: qrResult.totalPages,
+              autoAssigned: true,
+              identification: {
+                qrCodeDetected: true,
+                qrCodeContent: JSON.stringify(qrResult),
+                parsedQRCode: qrResult,
+                handwrittenName: null,
+                matchedStudentId: matchedStudent.id,
+                matchedStudentName: `${matchedStudent.first_name} ${matchedStudent.last_name}`,
+                matchedQuestionId: qrResult.questionId || null,
+                confidence: 'high',
+              },
+            };
+            
+            setItems(prev => prev.map(item => item.id === id ? identifiedItem : item));
+            return id;
+          } else {
+            console.log(`[addImageWithAutoIdentify] QR student ID ${qrResult.studentId} not found in roster, will try AI vision`);
+          }
+        } else {
+          console.log(`[addImageWithAutoIdentify] No QR code detected locally, falling back to AI vision`);
+        }
+        
+        // STEP 2: QR not found or not matched - use AI vision for handwriting recognition
         const result = await identifyStudent(newItem, studentRoster);
-        console.log(`[addImageWithAutoIdentify] Identification complete for ${id}: ${result.studentName || 'no match'}`);
+        console.log(`[addImageWithAutoIdentify] AI identification complete for ${id}: ${result.studentName || 'no match'}`);
         setItems(prev => prev.map(item => item.id === id ? result : item));
       } catch (err: any) {
         console.error('[addImageWithAutoIdentify] Auto-identify failed:', err);
