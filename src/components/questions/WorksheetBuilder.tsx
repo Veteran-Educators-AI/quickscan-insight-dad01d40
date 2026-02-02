@@ -2800,18 +2800,21 @@ export function WorksheetBuilder({
     try {
       const children: (Paragraph | Table)[] = [];
 
-      // Generate QR code for student identification (if enabled) - appears on EVERY page
+      // Generate QR code for worksheet identification - appears on EVERY page
+      // IMPORTANT: QR code is positioned in TOP-LEFT for reliable scanner detection
+      // Scanners typically scan left-to-right, top-to-bottom, so top-left is detected first
       let qrCodeBuffer: ArrayBuffer | null = null;
       const worksheetId = `ws_${Date.now().toString(36)}`;
       try {
-        const { fetchQRCodeAsArrayBuffer } = await import('@/lib/qrCodeUtils');
-        // Generate a worksheet-level QR code with a unique ID
-        qrCodeBuffer = await fetchQRCodeAsArrayBuffer(worksheetId, 1, 1);
+        const { fetchWorksheetQRCodeAsArrayBuffer } = await import('@/lib/qrCodeUtils');
+        // Generate a worksheet-level QR code with a unique ID (100px for reliable scanning)
+        qrCodeBuffer = await fetchWorksheetQRCodeAsArrayBuffer(worksheetId);
       } catch (qrError) {
         console.error('Error generating QR code for Word document:', qrError);
       }
 
-      // Create page header with QR code that repeats on EVERY page
+      // Create page header with QR code in TOP-LEFT corner that repeats on EVERY page
+      // QR is larger (80x80) and positioned LEFT for better scanner detection
       let pageHeader: Header | undefined;
       if (qrCodeBuffer) {
         pageHeader = new Header({
@@ -2829,20 +2832,28 @@ export function WorksheetBuilder({
               rows: [
                 new TableRow({
                   children: [
+                    // QR Code in LEFT cell for better scanner detection
                     new TableCell({
                       children: [
                         new Paragraph({
                           children: [
-                            new TextRun({
-                              text: worksheetTitle,
-                              bold: true,
-                              size: 24, // 12pt in header
+                            new ImageRun({
+                              data: qrCodeBuffer,
+                              transformation: { width: 80, height: 80 }, // Larger for reliable scanning
+                              type: "png",
                             }),
                           ],
+                          alignment: AlignmentType.LEFT,
+                        }),
+                        new Paragraph({
+                          children: [
+                            new TextRun({ text: "📷 Scan for grading", size: 14, color: "666666", italics: true }),
+                          ],
+                          alignment: AlignmentType.LEFT,
                         }),
                       ],
-                      width: { size: 75, type: WidthType.PERCENTAGE },
-                      verticalAlign: VerticalAlign.CENTER,
+                      width: { size: 20, type: WidthType.PERCENTAGE },
+                      verticalAlign: VerticalAlign.TOP,
                       borders: {
                         top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
                         bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
@@ -2850,26 +2861,21 @@ export function WorksheetBuilder({
                         right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
                       },
                     }),
+                    // Title in CENTER/RIGHT cell
                     new TableCell({
                       children: [
                         new Paragraph({
                           children: [
-                            new ImageRun({
-                              data: qrCodeBuffer,
-                              transformation: { width: 55, height: 55 },
-                              type: "png",
+                            new TextRun({
+                              text: worksheetTitle,
+                              bold: true,
+                              size: 28, // 14pt in header
                             }),
                           ],
-                          alignment: AlignmentType.RIGHT,
-                        }),
-                        new Paragraph({
-                          children: [
-                            new TextRun({ text: "Scan to grade", size: 12, color: "666666" }),
-                          ],
-                          alignment: AlignmentType.RIGHT,
+                          alignment: AlignmentType.CENTER,
                         }),
                       ],
-                      width: { size: 25, type: WidthType.PERCENTAGE },
+                      width: { size: 80, type: WidthType.PERCENTAGE },
                       verticalAlign: VerticalAlign.CENTER,
                       borders: {
                         top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
