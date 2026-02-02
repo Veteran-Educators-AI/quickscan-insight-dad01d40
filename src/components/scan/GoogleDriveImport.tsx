@@ -287,10 +287,13 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
                   selectedFiles.has(file.id) && "bg-primary/10 border border-primary/30"
                 )}
               >
-                <Checkbox
+              <Checkbox
                   checked={selectedFiles.has(file.id)}
-                  onCheckedChange={() => toggleFileSelection(file.id, index, false)}
-                  onClick={(e) => e.stopPropagation()}
+                  onCheckedChange={() => {}}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFileSelection(file.id, index, e.shiftKey);
+                  }}
                 />
                 {file.thumbnailLink ? (
                   <img 
