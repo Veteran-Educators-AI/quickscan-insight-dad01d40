@@ -124,18 +124,26 @@ export function QuestionPreviewPanel({
                     questionNumber: question.questionNumber,
                     imagePrompt: question.imagePrompt,
                   }],
+                  // For previews, prefer fast, deterministic SVG for geometry diagrams.
+                  // If AI images are enabled, we still allow the backend to decide,
+                  // but we hint that deterministic SVG is preferred for accuracy.
                   useNanoBanana: useAIImages,
-                  useDeterministicSvg: !useAIImages,
+                  preferDeterministicSVG: !useAIImages,
                 },
               });
               
-              if (!error && data?.images?.[0]?.imageUrl) {
+              const imageUrl =
+                data?.results?.[0]?.imageUrl ??
+                // Backwards compatibility: older edge versions may return `images`
+                data?.images?.[0]?.imageUrl;
+
+              if (!error && imageUrl) {
                 // Find and update the question in the array
                 const idx = updatedQuestions.findIndex(q => q.questionNumber === question.questionNumber);
                 if (idx !== -1) {
                   updatedQuestions[idx] = {
                     ...updatedQuestions[idx],
-                    imageUrl: data.images[0].imageUrl,
+                    imageUrl,
                   };
                 }
               }

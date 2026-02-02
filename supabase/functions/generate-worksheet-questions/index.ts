@@ -1,5 +1,8 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { GeometryMetadata, GeometryValidationResult } from "../_shared/geometryTypes.ts";
+import { validateGeometryMetadata } from "../_shared/geometryValidation.ts";
+import { GEOMETRY_METADATA_INSTRUCTION } from "../_shared/geometryPromptExamples.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,6 +34,8 @@ interface GeneratedQuestion {
   svg?: string;
   imageUrl?: string;
   imagePrompt?: string;
+  geometry?: GeometryMetadata; // NEW: Structured geometry metadata
+  geometryValidation?: GeometryValidationResult; // NEW: Validation result
   hint?: string;
 }
 
@@ -347,7 +352,7 @@ VARIATION REQUIREMENT (CRITICAL - ANTI-COPYING MEASURE):
 8. For geometry-related questions, you MUST include an "imagePrompt" field. Write the prompt using this STRICT format:
 
 ═══════════════════════════════════════════════════════════════════════════════
-IMAGEPR0MPT FORMAT - USE THIS EXACT STRUCTURE
+IMAGEPROMPT FORMAT - USE THIS EXACT STRUCTURE
 ═══════════════════════════════════════════════════════════════════════════════
 
 Your imagePrompt must be a SIMPLE, CLEAR description that includes:
@@ -418,14 +423,25 @@ DO NOT DO THESE THINGS IN YOUR imagePrompt
 - DO NOT add unnecessary arrows or decorations
 - DO NOT make it overly complex
 - DO NOT forget to specify label positions`;
-    } else if (includeGeometry && !useAIImages) {
-      // When includeGeometry is on but useAIImages is off, just describe shapes in text - NO SVG generation
-      geometryInstruction = `
-8. For geometry-related questions, describe the shapes clearly in the question text itself.
-   - Use clear verbal descriptions of shapes (e.g., "A rectangle with length 5 cm and width 3 cm")
-   - Include all necessary measurements in the question text
-   - DO NOT include any "svg" or "imagePrompt" fields - this worksheet is text-only
-   - Students should be able to draw the shapes themselves based on your description`;
+      } else {
+        geometryInstruction = `
+8. For geometry-related questions, you MUST include an "svg" field with a complete, valid SVG string that visually represents the geometric figure described in the question.
+   - The SVG should be self-contained with width="200" height="200" viewBox="0 0 200 200"
+   - Use clear colors: stroke="#1f2937" (dark gray) for lines, fill="none" or fill="#e5e7eb" for shapes
+   - Include labels for vertices, angles, or measurements using <text> elements
+   - Examples of shapes to draw:
+     * Triangles with labeled vertices (A, B, C)
+     * Circles with radius lines and center points
+     * Quadrilaterals (rectangles, squares, parallelograms, trapezoids)
+     * Coordinate grids with plotted points
+     * Angle diagrams with arc indicators
+     * 3D shapes like cubes, prisms, pyramids (using isometric projections)
+   - Make sure the SVG is clean, properly formatted, and renders correctly
+   - For coordinate geometry, include axis lines and grid marks
+   
+   OPTIONALLY, if the geometry uses numeric coordinates (not algebraic), also include a "geometry" field with structured metadata.
+   See the examples in the system prompt for the correct format.`;
+      }
     }
 
     let formulasInstruction = '';
@@ -1385,6 +1401,49 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
         hint: q.hint ? sanitizeMathText(q.hint) : q.hint,
         imagePrompt: q.imagePrompt ? sanitizeMathText(q.imagePrompt) : q.imagePrompt,
       }));
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PHASE 2: Parse and Validate Geometry Metadata (P2.2)
+      // ═══════════════════════════════════════════════════════════════════════
+      
+      console.log('Validating geometry metadata for', questions.length, 'questions...');
+      let geometryValidCount = 0;
+      let geometryInvalidCount = 0;
+      let geometryMissingCount = 0;
+
+      questions = questions.map((q, index) => {
+        if (!q.geometry) {
+          geometryMissingCount++;
+          return q;
+        }
+
+        try {
+          const validationResult = validateGeometryMetadata(q.geometry, {
+            useExtendedBounds: false,
+            strictMode: false,
+          });
+
+          if (validationResult.isValid) {
+            geometryValidCount++;
+            console.log(`✓ Q${q.questionNumber || index + 1}: Valid ${q.geometry.type}`);
+            return { ...q, geometryValidation: validationResult };
+          } else {
+            geometryInvalidCount++;
+            console.warn(`⚠ Q${q.questionNumber || index + 1}: Invalid geometry`);
+            console.log('[GEOMETRY_ERROR]', JSON.stringify({
+              q: q.questionNumber || index + 1,
+              type: q.geometry.type,
+              errors: validationResult.errors.map(e => e.code),
+            }));
+            return { ...q, geometry: undefined, geometryValidation: validationResult };
+          }
+        } catch (error) {
+          geometryInvalidCount++;
+          return { ...q, geometry: undefined };
+        }
+      });
+
+      console.log('Geometry summary:', { valid: geometryValidCount, invalid: geometryInvalidCount, missing: geometryMissingCount });
     } catch (parseError) {
       console.error('Failed to parse AI response:', content.substring(0, 500));
       console.error('Parse error details:', parseError);
