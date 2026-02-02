@@ -128,8 +128,8 @@ export default function Scan() {
   const [resultsSaved, setResultsSaved] = useState(false);
   const [multiQuestionResults, setMultiQuestionResults] = useState<Record<string, any>>({});
   
-  // QR code detection state - now supports student-only, student-question, and student-page QR codes
-  const [detectedQR, setDetectedQR] = useState<{ studentId: string; questionId?: string; pageNumber?: number; totalPages?: number; type: 'student-only' | 'student-question' | 'student-page' } | null>(null);
+  // QR code detection state - now supports student-only, student-question, student-page, and worksheet QR codes
+  const [detectedQR, setDetectedQR] = useState<{ studentId: string; questionId?: string; pageNumber?: number; totalPages?: number; worksheetId?: string; type: 'student-only' | 'student-question' | 'student-page' | 'worksheet' } | null>(null);
   
   // Auto-identified student state
   const [autoIdentifiedStudent, setAutoIdentifiedStudent] = useState<{
@@ -277,20 +277,29 @@ export default function Scan() {
         
         if (qrResult) {
           setDetectedQR(qrResult);
-          setSingleScanStudentId(qrResult.studentId);
           
-          // Only set question ID if it's a student+question QR code
-          if (qrResult.type === 'student-question' && qrResult.questionId) {
-            setSelectedQuestionIds([qrResult.questionId]);
-            toast.success('QR code detected! Student and question auto-identified.', {
+          // Handle worksheet QR (no student ID - just worksheet identification)
+          if (qrResult.type === 'worksheet' && qrResult.worksheetId) {
+            toast.success(`Worksheet identified: ${qrResult.worksheetId}`, {
               icon: <QrCode className="h-4 w-4" />,
             });
-          } else {
-            toast.success('Student QR code detected! Student auto-identified.', {
-              icon: <QrCode className="h-4 w-4" />,
-            });
+            // Don't set student ID for worksheet QR - continue with student identification
+          } else if (qrResult.studentId) {
+            setSingleScanStudentId(qrResult.studentId);
+            
+            // Only set question ID if it's a student+question QR code
+            if (qrResult.type === 'student-question' && qrResult.questionId) {
+              setSelectedQuestionIds([qrResult.questionId]);
+              toast.success('QR code detected! Student and question auto-identified.', {
+                icon: <QrCode className="h-4 w-4" />,
+              });
+            } else {
+              toast.success('Student QR code detected! Student auto-identified.', {
+                icon: <QrCode className="h-4 w-4" />,
+              });
+            }
+            return; // QR with student found, no need for name identification
           }
-          return; // QR found, no need for name identification
         }
       }
       
