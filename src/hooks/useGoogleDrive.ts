@@ -279,8 +279,14 @@ export function useGoogleDrive() {
     }
   }, [selectedFolderId, fetchImagesFromFolder]);
 
-  // Create a folder in Drive
-  const createFolder = useCallback(async (folderName: string, parentId: string = 'root'): Promise<string | null> => {
+  // Create a folder in Drive with retry logic
+  const createFolder = useCallback(async (
+    folderName: string, 
+    parentId: string = 'root',
+    retryCount: number = 0
+  ): Promise<string | null> => {
+    const maxRetries = 2;
+    
     try {
       const accessToken = await getAccessToken();
       if (!accessToken) {
@@ -294,6 +300,8 @@ export function useGoogleDrive() {
         parents: [parentId],
       };
 
+      console.log('Creating folder:', folderName, 'in parent:', parentId);
+
       const response = await fetch('https://www.googleapis.com/drive/v3/files', {
         method: 'POST',
         headers: {
@@ -304,14 +312,41 @@ export function useGoogleDrive() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create folder');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData?.error?.message || `HTTP ${response.status}`;
+        console.error('Folder creation failed:', response.status, errorMessage);
+        
+        // Retry on rate limiting or server errors
+        if ((response.status === 429 || response.status >= 500) && retryCount < maxRetries) {
+          console.log(`Retrying folder creation (attempt ${retryCount + 2}/${maxRetries + 1})`);
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+          return createFolder(folderName, parentId, retryCount + 1);
+        }
+        
+        // Handle token expiration
+        if (response.status === 401) {
+          localStorage.removeItem(GOOGLE_DRIVE_TOKEN_KEY);
+          localStorage.removeItem(GOOGLE_DRIVE_TOKEN_EXPIRY_KEY);
+          setConnected(false);
+          toast.error('Session expired. Please reconnect to Google Drive.');
+          return null;
+        }
+        
+        // Handle insufficient permissions (403)
+        if (response.status === 403) {
+          toast.error('Permission denied. Please reconnect with Google Drive permissions.');
+          return null;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      console.log('Folder created successfully:', data.id);
       return data.id;
     } catch (error) {
       console.error('Error creating folder:', error);
-      toast.error('Failed to create folder');
+      toast.error(`Failed to create folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return null;
     }
   }, []);
