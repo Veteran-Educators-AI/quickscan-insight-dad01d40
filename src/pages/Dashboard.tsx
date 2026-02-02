@@ -118,20 +118,22 @@ export default function Dashboard() {
           setUserName(profile.full_name.split(' ')[0]); // Use first name only
         }
 
-        // Fetch class count
+        // Fetch class count (active classes only)
         const { count: classCount } = await supabase
           .from('classes')
-          .select('*', { count: 'exact', head: true });
+          .select('*', { count: 'exact', head: true })
+          .is('archived_at', null);
 
         // Fetch question count
         const { count: questionCount } = await supabase
           .from('questions')
           .select('*', { count: 'exact', head: true });
 
-        // Fetch student count across all classes
+        // Fetch student count across active classes only
         const { data: classes } = await supabase
           .from('classes')
-          .select('id');
+          .select('id')
+          .is('archived_at', null);
 
         let studentCount = 0;
         if (classes && classes.length > 0) {
