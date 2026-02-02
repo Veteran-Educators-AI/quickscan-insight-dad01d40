@@ -19,6 +19,11 @@ interface PresentationSlide {
     explanation?: string;
   };
   icon?: 'lightbulb' | 'book' | 'question' | 'award' | 'sparkles';
+  wordProblem?: {
+    problem: string;
+    steps: string[];
+    finalAnswer: string;
+  };
 }
 
 interface NycologicPresentation {
@@ -35,22 +40,59 @@ function generateId(): string {
 }
 
 /**
+ * Detect if the topic is math-related
+ */
+function isMathTopic(topic: string, subject: string): boolean {
+  const mathKeywords = [
+    'math', 'algebra', 'geometry', 'calculus', 'trigonometry', 'equation',
+    'polynomial', 'quadratic', 'linear', 'function', 'graph', 'slope',
+    'triangle', 'circle', 'angle', 'perimeter', 'area', 'volume',
+    'fraction', 'decimal', 'percent', 'ratio', 'proportion', 'statistics',
+    'probability', 'theorem', 'pythagorean', 'sine', 'cosine', 'tangent',
+    'exponent', 'logarithm', 'derivative', 'integral', 'matrix', 'vector'
+  ];
+  const combined = `${topic} ${subject}`.toLowerCase();
+  return mathKeywords.some(kw => combined.includes(kw)) || 
+         subject.toLowerCase().includes('math') ||
+         ['algebra i', 'algebra ii', 'geometry', 'precalculus', 'statistics', 'financial math'].includes(subject.toLowerCase());
+}
+
+/**
+ * Get math-specific prompt additions
+ */
+function getMathPromptAdditions(topic: string): string {
+  return `
+MATH PRESENTATION REQUIREMENTS:
+1. Use proper mathematical symbols: π, √, ², ³, ×, ÷, ≤, ≥, ≠, ∞, θ, Σ, ∫
+2. Include geometric shapes when relevant (triangles △, squares □, circles ○)
+3. For each concept, show a challenging WORD PROBLEM with real-world context
+4. After each word problem, provide STEP-BY-STEP SOLUTION with:
+   - "Step 1: [identify what we know]"
+   - "Step 2: [set up the equation/formula]"
+   - "Step 3: [solve step by step]"
+   - "Final Answer: [clear answer with units]"
+5. Use mathematical notation in content (e.g., "x² + 5x + 6 = 0" not "x squared plus 5x plus 6 equals 0")
+6. Include formulas in a clear format
+
+For word problems, create scenarios like:
+- Finance: loans, interest, investments, budgets
+- Construction: measurements, materials, costs
+- Science: speed, distance, time, growth rates
+- Sports: statistics, scores, averages
+- Shopping: discounts, taxes, unit prices`;
+}
+
+/**
  * Attempt to recover partial JSON from truncated AI responses
- * Finds complete slide objects and reconstructs valid presentation
  */
 function recoverTruncatedPresentation(jsonStr: string, topic: string): NycologicPresentation | null {
   console.log("Attempting to recover truncated presentation...");
   
   try {
-    // Try to extract presentation metadata
     const titleMatch = jsonStr.match(/"title"\s*:\s*"([^"]+)"/);
     const subtitleMatch = jsonStr.match(/"subtitle"\s*:\s*"([^"]+)"/);
     
-    // Find all complete slide objects
     const slides: PresentationSlide[] = [];
-    const slidePattern = /\{\s*"id"\s*:\s*"slide-\d+"[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
-    
-    // More robust: find slides by looking for complete objects with id starting with "slide-"
     let depth = 0;
     let currentSlide = "";
     let inSlide = false;
@@ -73,7 +115,6 @@ function recoverTruncatedPresentation(jsonStr: string, topic: string): Nycologic
           depth--;
           currentSlide += char;
           if (depth === 0) {
-            // Complete slide found
             try {
               const slide = JSON.parse(currentSlide);
               if (slide.id && slide.type && slide.title) {
@@ -94,7 +135,6 @@ function recoverTruncatedPresentation(jsonStr: string, topic: string): Nycologic
     if (slides.length >= 2) {
       console.log(`Recovered ${slides.length} complete slides from truncated response`);
       
-      // Add a summary slide if not present
       const hasSum = slides.some(s => s.type === 'summary');
       if (!hasSum) {
         slides.push({
@@ -136,12 +176,14 @@ async function callLovableAI(prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       model: "google/gemini-3-flash-preview",
-      max_tokens: 4096,
+      max_tokens: 6000,
       messages: [
         {
           role: "system",
-          content: `You create concise JSON presentations. Return ONLY valid JSON, no markdown.
-Keep speakerNotes under 20 words. Keep content items under 15 words each.`,
+          content: `You create educational JSON presentations. Return ONLY valid JSON, no markdown code blocks.
+Keep speakerNotes under 25 words. Keep content items under 20 words each.
+Use proper mathematical symbols (π, √, ², θ, ×, ÷) not words.
+For math topics, include word problems with step-by-step solutions.`,
         },
         { role: "user", content: prompt },
       ],
@@ -207,24 +249,47 @@ serve(async (req) => {
 
     console.log(`Generating Nycologic presentation for: ${topic}`);
 
-    // Keep slide count small to avoid truncation
-    const slideCount = Math.min(Math.floor((parseInt(duration) || 30) / 5), 8);
-    const qCount = Math.min(questionCount, 2);
+    const isMath = isMathTopic(topic, subject);
+    const slideCount = Math.min(Math.floor((parseInt(duration) || 30) / 5), 10);
+    const qCount = Math.min(questionCount, 3);
 
-    const prompt = `Create a ${slideCount}-slide presentation about "${topic}" for ${subject}.
+    // Build the prompt based on whether it's a math topic
+    let prompt = `Create a ${slideCount}-slide presentation about "${topic}" for ${subject}.
 ${description ? `Context: ${description}` : ''}
 ${standard ? `Standard: ${standard}` : ''}
-${includeQuestions ? `Include ${qCount} question slides.` : ''}
+${includeQuestions ? `Include ${qCount} question slides with multiple choice options.` : ''}`;
 
-Return this exact JSON structure:
-{"id":"${generateId()}","title":"Title Here","subtitle":"Subtitle","topic":"${topic}","slides":[
-{"id":"slide-1","type":"title","title":"**${topic}**","subtitle":"${subject.toUpperCase()}","content":["Brief intro"],"speakerNotes":"Welcome notes","icon":"sparkles"},
-{"id":"slide-2","type":"content","title":"Key **Concept**","content":["Point 1","Point 2"],"speakerNotes":"Explain","icon":"book"},
-{"id":"slide-3","type":"question","title":"**Check**","subtitle":"QUIZ","content":[],"question":{"prompt":"Question?","options":["A","B","C","D"],"answer":"A","explanation":"Why"},"icon":"question"},
-{"id":"slide-4","type":"summary","title":"**Takeaways**","content":["Key point 1","Key point 2"],"icon":"award"}
+    if (isMath) {
+      prompt += getMathPromptAdditions(topic);
+      prompt += `
+
+For this MATH presentation, include:
+- At least 2 slides with challenging word problems
+- Each word problem should have a "wordProblem" field with:
+  - "problem": the real-world scenario
+  - "steps": array of step-by-step solution strings
+  - "finalAnswer": the complete answer with units
+
+Example word problem slide:
+{"id":"slide-3","type":"content","title":"**Real-World** Application","content":["Let's solve a challenging problem"],"wordProblem":{"problem":"A rectangular garden has a perimeter of 56 feet. If the length is 4 feet more than twice the width, find the dimensions.","steps":["Step 1: Let w = width, then length = 2w + 4","Step 2: Perimeter = 2(length) + 2(width) = 56","Step 3: 2(2w + 4) + 2w = 56","Step 4: 4w + 8 + 2w = 56","Step 5: 6w = 48","Step 6: w = 8 feet, length = 2(8) + 4 = 20 feet"],"finalAnswer":"Width = 8 feet, Length = 20 feet"},"icon":"lightbulb"}`;
+    }
+
+    prompt += `
+
+Return this JSON structure (no markdown, just JSON):
+{"id":"${generateId()}","title":"Title with **bold** keywords","subtitle":"${subject.toUpperCase()}","topic":"${topic}","slides":[
+{"id":"slide-1","type":"title","title":"**${topic}**","subtitle":"${subject.toUpperCase()}","content":["Brief engaging intro"],"speakerNotes":"Welcome notes","icon":"sparkles"},
+{"id":"slide-2","type":"content","title":"Key **Concept**","content":["Main point with symbols like π, √, or ²","Formula: y = mx + b"],"speakerNotes":"Explain clearly","icon":"book"},
+${isMath ? '{"id":"slide-3","type":"content","title":"**Word Problem** Challenge","content":["Apply what we learned"],"wordProblem":{"problem":"Challenging real-world scenario here","steps":["Step 1: Identify knowns","Step 2: Set up equation","Step 3: Solve","Step 4: Check answer"],"finalAnswer":"Complete answer with units"},"icon":"lightbulb"},' : ''}
+{"id":"slide-${isMath ? '4' : '3'}","type":"question","title":"**Check** Understanding","subtitle":"QUIZ","content":[],"question":{"prompt":"Question with math symbols?","options":["A) First option","B) Second option","C) Third option","D) Fourth option"],"answer":"A","explanation":"Clear explanation of why"},"icon":"question"},
+{"id":"slide-${isMath ? '5' : '4'}","type":"summary","title":"**Key** Takeaways","content":["Important point 1","Important point 2","Formula to remember"],"icon":"award"}
 ],"createdAt":"${new Date().toISOString()}"}
 
-IMPORTANT: Keep ALL text SHORT. No long sentences. Return ONLY the JSON object.`;
+IMPORTANT: 
+- Use actual math symbols (π, √, ², ³, θ, ×, ÷, ≤, ≥, ∞)
+- Keep text concise but mathematically precise
+- Word problems should be grade-appropriate but challenging
+- Return ONLY the JSON object`;
 
     const aiResponse = await callLovableAI(prompt);
     
@@ -254,7 +319,6 @@ IMPORTANT: Keep ALL text SHORT. No long sentences. Return ONLY the JSON object.`
     } catch {
       console.error("Failed to parse AI response, attempting recovery:", cleanedResponse.substring(0, 1000));
       
-      // Try to recover partial data
       const recovered = recoverTruncatedPresentation(cleanedResponse, topic);
       if (recovered) {
         presentation = recovered;
@@ -281,7 +345,7 @@ IMPORTANT: Keep ALL text SHORT. No long sentences. Return ONLY the JSON object.`
       presentation.id = generateId();
     }
 
-    console.log(`Generated presentation with ${presentation.slides.length} slides`);
+    console.log(`Generated ${isMath ? 'MATH' : 'standard'} presentation with ${presentation.slides.length} slides`);
 
     return new Response(
       JSON.stringify({ success: true, presentation }),

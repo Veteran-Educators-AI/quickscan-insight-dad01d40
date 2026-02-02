@@ -32,6 +32,11 @@ export interface PresentationSlide {
     answer?: string;
     explanation?: string;
   };
+  wordProblem?: {
+    problem: string;
+    steps: string[];
+    finalAnswer: string;
+  };
   icon?: 'lightbulb' | 'book' | 'question' | 'award' | 'sparkles';
   image?: SlideImage;
 }
@@ -762,6 +767,80 @@ export function NycologicPresents({
                     )}
                   </motion.div>
                 ))}
+              </motion.div>
+            )}
+
+            {/* Word Problem Section - Math presentations */}
+            {slide.wordProblem && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35 }}
+                className="mt-8 w-full max-w-5xl mx-auto"
+              >
+                {/* Problem Statement */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-white/10 mb-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div 
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-bold"
+                      style={{ backgroundColor: `${colors.accentHex}20`, color: colors.accentHex }}
+                    >
+                      📝
+                    </div>
+                    <p className="font-semibold text-lg md:text-xl" style={{ color: colors.accentHex }}>
+                      Word Problem
+                    </p>
+                  </div>
+                  <p className="text-white text-xl md:text-2xl leading-relaxed">
+                    {slide.wordProblem.problem}
+                  </p>
+                </div>
+
+                {/* Step-by-Step Solution */}
+                <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-emerald-400/20 mb-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-xl">
+                      📋
+                    </div>
+                    <p className="text-emerald-400 font-semibold text-lg md:text-xl">Step-by-Step Solution</p>
+                  </div>
+                  <div className="space-y-4">
+                    {slide.wordProblem.steps.map((step, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.4 + index * 0.1 }}
+                        className="flex items-start gap-4 pl-2"
+                      >
+                        <span className="w-8 h-8 rounded-lg bg-emerald-500/30 flex items-center justify-center text-emerald-300 font-bold text-sm shrink-0 mt-0.5">
+                          {index + 1}
+                        </span>
+                        <p className="text-white/90 text-lg md:text-xl leading-relaxed">
+                          {step.replace(/^Step \d+:\s*/i, '')}
+                        </p>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Final Answer */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.6 }}
+                  className="bg-gradient-to-r from-amber-400/20 to-amber-500/10 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-amber-400/30"
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-amber-400/30 flex items-center justify-center">
+                      <span className="text-amber-300 text-xl">✓</span>
+                    </div>
+                    <p className="text-amber-400 font-bold text-lg md:text-xl">Final Answer</p>
+                  </div>
+                  <p className="text-white text-xl md:text-2xl font-medium leading-relaxed">
+                    {slide.wordProblem.finalAnswer}
+                  </p>
+                </motion.div>
               </motion.div>
             )}
 
