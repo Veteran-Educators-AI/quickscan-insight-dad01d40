@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { exportToPDF, exportToPPTX } from '@/lib/presentationExport';
+import { renderMathText } from '@/lib/mathRenderer';
 import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 import { SlideImageGenerator, GeneratedImageData } from './SlideImageGenerator';
 
@@ -792,7 +793,7 @@ export function NycologicPresents({
                     </p>
                   </div>
                   <p className="text-white text-xl md:text-2xl leading-relaxed">
-                    {slide.wordProblem.problem}
+                    {renderMathText(slide.wordProblem.problem)}
                   </p>
                 </div>
 
@@ -817,7 +818,7 @@ export function NycologicPresents({
                           {index + 1}
                         </span>
                         <p className="text-white/90 text-lg md:text-xl leading-relaxed">
-                          {step.replace(/^Step \d+:\s*/i, '')}
+                          {renderMathText(step.replace(/^Step \d+:\s*/i, ''))}
                         </p>
                       </motion.div>
                     ))}
@@ -838,7 +839,7 @@ export function NycologicPresents({
                     <p className="text-amber-400 font-bold text-lg md:text-xl">Final Answer</p>
                   </div>
                   <p className="text-white text-xl md:text-2xl font-medium leading-relaxed">
-                    {slide.wordProblem.finalAnswer}
+                    {renderMathText(slide.wordProblem.finalAnswer)}
                   </p>
                 </motion.div>
               </motion.div>

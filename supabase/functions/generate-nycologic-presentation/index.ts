@@ -63,16 +63,21 @@ function isMathTopic(topic: string, subject: string): boolean {
 function getMathPromptAdditions(topic: string): string {
   return `
 MATH PRESENTATION REQUIREMENTS:
-1. Use proper mathematical symbols: π, √, ², ³, ×, ÷, ≤, ≥, ≠, ∞, θ, Σ, ∫
-2. Include geometric shapes when relevant (triangles △, squares □, circles ○)
-3. For each concept, show a challenging WORD PROBLEM with real-world context
-4. After each word problem, provide STEP-BY-STEP SOLUTION with:
+1. Use ONLY Unicode math symbols - NEVER use LaTeX notation like \\frac, \\theta, \\pi, \\cdot, \\text
+2. Write fractions as: θ/360° × 2πr (NOT \\frac{\\theta}{360°})
+3. Use these symbols directly: π √ ² ³ × ÷ ≤ ≥ ≠ ∞ θ Σ ° △ □
+4. Include geometric shapes: triangles △, squares □, circles ○
+5. For each concept, show a challenging WORD PROBLEM with real-world context
+6. After each word problem, provide STEP-BY-STEP SOLUTION with:
    - "Step 1: [identify what we know]"
    - "Step 2: [set up the equation/formula]"
    - "Step 3: [solve step by step]"
    - "Final Answer: [clear answer with units]"
-5. Use mathematical notation in content (e.g., "x² + 5x + 6 = 0" not "x squared plus 5x plus 6 equals 0")
-6. Include formulas in a clear format
+7. Use mathematical notation in content (e.g., "x² + 5x + 6 = 0" not "x squared plus 5x plus 6 equals 0")
+
+CRITICAL: Write math expressions as plain Unicode text like:
+- L = (θ/360°) × 2πr (CORRECT)
+- \\( L = (\\frac{\\theta}{360°}) \\cdot 2\\pi r \\) (WRONG - NO LATEX!)
 
 For word problems, create scenarios like:
 - Finance: loans, interest, investments, budgets
