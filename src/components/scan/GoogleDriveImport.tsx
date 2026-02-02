@@ -37,6 +37,7 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
 
   const [initialized, setInitialized] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
 
@@ -51,16 +52,31 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
     init();
   }, [checkConnection, fetchFolders]);
 
-  const toggleFileSelection = (fileId: string) => {
-    setSelectedFiles(prev => {
-      const next = new Set(prev);
-      if (next.has(fileId)) {
-        next.delete(fileId);
-      } else {
-        next.add(fileId);
-      }
-      return next;
-    });
+  const toggleFileSelection = (fileId: string, index: number, shiftKey: boolean) => {
+    if (shiftKey && lastClickedIndex !== null) {
+      // Shift-click: select all files in range
+      const start = Math.min(lastClickedIndex, index);
+      const end = Math.max(lastClickedIndex, index);
+      const rangeFileIds = files.slice(start, end + 1).map(f => f.id);
+      
+      setSelectedFiles(prev => {
+        const next = new Set(prev);
+        rangeFileIds.forEach(id => next.add(id));
+        return next;
+      });
+    } else {
+      // Normal click: toggle single file
+      setSelectedFiles(prev => {
+        const next = new Set(prev);
+        if (next.has(fileId)) {
+          next.delete(fileId);
+        } else {
+          next.add(fileId);
+        }
+        return next;
+      });
+      setLastClickedIndex(index);
+    }
   };
 
   const selectAll = () => {
@@ -262,17 +278,19 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
             )}
 
             {/* Files */}
-            {files.map((file) => (
-              <label
+            {files.map((file, index) => (
+              <div
                 key={file.id}
+                onClick={(e) => toggleFileSelection(file.id, index, e.shiftKey)}
                 className={cn(
-                  "flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors cursor-pointer",
-                  selectedFiles.has(file.id) && "bg-accent"
+                  "flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors cursor-pointer select-none",
+                  selectedFiles.has(file.id) && "bg-primary/10 border border-primary/30"
                 )}
               >
                 <Checkbox
                   checked={selectedFiles.has(file.id)}
-                  onCheckedChange={() => toggleFileSelection(file.id)}
+                  onCheckedChange={() => toggleFileSelection(file.id, index, false)}
+                  onClick={(e) => e.stopPropagation()}
                 />
                 {file.thumbnailLink ? (
                   <img 
@@ -297,7 +315,7 @@ export function GoogleDriveImport({ onFilesSelected, onClose }: GoogleDriveImpor
                     )}
                   </div>
                 </div>
-              </label>
+              </div>
             ))}
 
             {/* Empty State */}
