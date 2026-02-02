@@ -255,9 +255,10 @@ serve(async (req) => {
           console.log(`✓ Inserted: ${shape.description}`);
           results.inserted++;
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error(`Exception inserting ${shape.description}:`, err);
-        results.errors.push(`${shape.description}: ${err.message}`);
+        const errMessage = err instanceof Error ? err.message : String(err);
+        results.errors.push(`${shape.description}: ${errMessage}`);
       }
     }
 
@@ -273,12 +274,13 @@ serve(async (req) => {
         status: 200,
       },
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Seed function error:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: errorMessage,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

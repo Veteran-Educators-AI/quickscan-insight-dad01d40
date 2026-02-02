@@ -423,8 +423,9 @@ DO NOT DO THESE THINGS IN YOUR imagePrompt
 - DO NOT add unnecessary arrows or decorations
 - DO NOT make it overly complex
 - DO NOT forget to specify label positions`;
-      } else {
-        geometryInstruction = `
+    } else if (includeGeometry && isGeometrySubject && !isNoImageSubject) {
+      // SVG mode when useAIImages is false but geometry is needed
+      geometryInstruction = `
 8. For geometry-related questions, you MUST include an "svg" field with a complete, valid SVG string that visually represents the geometric figure described in the question.
    - The SVG should be self-contained with width="200" height="200" viewBox="0 0 200 200"
    - Use clear colors: stroke="#1f2937" (dark gray) for lines, fill="none" or fill="#e5e7eb" for shapes
@@ -441,7 +442,6 @@ DO NOT DO THESE THINGS IN YOUR imagePrompt
    
    OPTIONALLY, if the geometry uses numeric coordinates (not algebraic), also include a "geometry" field with structured metadata.
    See the examples in the system prompt for the correct format.`;
-      }
     }
 
     let formulasInstruction = '';
@@ -645,7 +645,80 @@ WARM-UP MODE (Confidence Building):
     // Check if this is an English Literature worksheet
     const isEnglishLiterature = englishContext && topics[0]?.subject === 'English';
 
-    const prompt = `Generate ${questionCount} questions for topics: ${topicsList}. Return as JSON array with fields: questionNumber, topic, standard, question, difficulty, bloomLevel, bloomVerb.`;
+    let prompt: string;
+    
+    if (isEnglishLiterature && englishContext) {
+      // English Literature specific prompt
+      prompt = `Generate ${questionCount} high-quality reading comprehension and literary analysis questions for "${englishContext.textTitle}" by ${englishContext.author}.
+
+CONTEXT:
+- Genre: ${englishContext.genre}
+- Grade Level: ${englishContext.gradeLevel}
+- Themes: ${englishContext.themes.join(', ')}
+- Literary Devices to Assess: ${englishContext.literaryDevices.join(', ')}
+- Focus Areas: ${englishContext.focusAreas.join(', ')}
+${englishContext.lessonObjectives?.length ? `- Lesson Objectives: ${englishContext.lessonObjectives.join('; ')}` : ''}
+
+QUESTION FORMAT: ${englishContext.questionFormat}
+${englishContext.questionFormat === 'multiple_choice' ? 'Generate 4 answer choices (A, B, C, D) for each question with one clearly correct answer.' : ''}
+${englishContext.questionFormat === 'text_evidence' ? 'Each question should require students to cite specific evidence from the text.' : ''}
+${englishContext.questionFormat === 'extended_response' ? 'Questions should prompt analysis, synthesis, and evaluation with room for developed responses.' : ''}
+
+${includeHints ? 'Include a "hint" field for each question to guide student thinking.' : ''}
+${englishContext.includeRubric ? 'Include a "rubric" field with grading criteria for each question.' : ''}
+${englishContext.includeTextReferences ? 'Questions should reference specific parts of the text where possible.' : ''}
+
+${bloomInstruction}
+${difficultyInstruction}
+
+Generate ${questionsPerTopic} questions per topic, ensuring each question:
+1. Directly assesses understanding of the literary text
+2. Aligns with Common Core ELA standards
+3. Uses grade-appropriate vocabulary and complexity
+4. Encourages critical thinking and textual analysis
+
+Return ONLY a valid JSON array with no additional text, explanation, or markdown.
+Each object must include: questionNumber, topic, standard, question, difficulty, bloomLevel, bloomVerb${includeHints ? ', hint' : ''}${includeAnswerKey ? ', answer' : ''}${englishContext.includeRubric ? ', rubric' : ''}
+
+Example:
+${exampleOutput}`;
+    } else {
+      // Math/Science prompt (original flow)
+      prompt = `Generate ${questionCount} high-quality ${isWarmup ? 'warm-up' : 'practice'} questions across these topics:
+
+${topicsList}
+
+${difficultyInstruction}
+
+${bloomInstruction}
+
+REQUIREMENTS:
+1. Generate ${questionsPerTopic} questions per topic to total ${questionCount} questions
+2. Each question should be numbered sequentially from 1 to ${questionCount}
+3. Include the topic name and standard in each question object
+4. Write questions in complete sentences with clear, professional language
+5. Vary question types: direct calculation, word problems, conceptual understanding
+6. ${worksheetMode === 'diagnostic' ? 'Include advancementLevel field (A-F) for each question' : 'Ensure progressive difficulty within the topic'}
+7. Every question MUST include a "bloomLevel" field (one of: remember, understand, apply, analyze, evaluate, create) and a "bloomVerb" field with the specific action verb used
+${geometryInstruction}
+${formulasInstruction}
+${graphPaperInstruction}
+${coordinateGeometryInstruction}
+
+${diagnosticInstruction}
+${variationInstruction}
+${formInstruction}
+${hintInstruction}
+${answerKeyInstruction}
+
+${imageFieldNote}
+
+Return ONLY a valid JSON array with no additional text, explanation, or markdown.
+Each object must include: questionNumber, topic, standard, question, difficulty, bloomLevel, bloomVerb
+
+Example:
+${exampleOutput}`;
+    }
 
     // Use GPT-5.2 for Geometry and Physics worksheets with shapes for better diagram accuracy
     const isGeometryOrPhysics = topics.some(t =>
