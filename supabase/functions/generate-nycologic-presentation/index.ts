@@ -49,12 +49,60 @@ function isMathTopic(topic: string, subject: string): boolean {
     'triangle', 'circle', 'angle', 'perimeter', 'area', 'volume',
     'fraction', 'decimal', 'percent', 'ratio', 'proportion', 'statistics',
     'probability', 'theorem', 'pythagorean', 'sine', 'cosine', 'tangent',
-    'exponent', 'logarithm', 'derivative', 'integral', 'matrix', 'vector'
+    'exponent', 'logarithm', 'derivative', 'integral', 'matrix', 'vector',
+    'bond', 'interest', 'annuity', 'present value', 'future value', 'investment'
   ];
   const combined = `${topic} ${subject}`.toLowerCase();
   return mathKeywords.some(kw => combined.includes(kw)) || 
          subject.toLowerCase().includes('math') ||
          ['algebra i', 'algebra ii', 'geometry', 'precalculus', 'statistics', 'financial math'].includes(subject.toLowerCase());
+}
+
+/**
+ * Detect if the topic is bond/finance-related
+ */
+function isBondTopic(topic: string, subject: string): boolean {
+  const bondKeywords = ['bond', 'coupon', 'yield', 'maturity', 'present value', 'future value', 'par value', 'face value'];
+  const combined = `${topic} ${subject}`.toLowerCase();
+  return bondKeywords.some(kw => combined.includes(kw));
+}
+
+/**
+ * Get bond-specific prompt additions
+ */
+function getBondPromptAdditions(): string {
+  return `
+BOND CALCULATIONS REQUIREMENTS:
+Include these essential bond formulas and calculations:
+
+1. COUPON PAYMENT FORMULA:
+   Coupon Payment = (Coupon Rate × Face Value) / Payments per Year
+   Example: ($1,000 × 6%) / 2 = $30 per semi-annual payment
+
+2. TOTAL PAYMENTS FORMULA:
+   Total Payments = Coupon Payment × Number of Periods
+   Example: $30 × 20 periods = $600 total coupon payments
+
+3. PRESENT VALUE OF BOND FORMULA:
+   PV = C × [(1 - (1 + r)^(-n)) / r] + FV / (1 + r)^n
+   Where: C = coupon payment, r = yield per period, n = number of periods, FV = face value
+
+4. FUTURE VALUE FORMULA:
+   FV = PV × (1 + r)^n
+   
+5. YIELD TO MATURITY (simplified):
+   YTM ≈ (C + (FV - P) / n) / ((FV + P) / 2)
+   Where: C = annual coupon, FV = face value, P = current price, n = years to maturity
+
+Include word problems that ask students to:
+- Calculate semi-annual or annual coupon payments
+- Find total interest earned over the life of a bond
+- Compute present value of a bond given yield rate
+- Determine if a bond is trading at premium, par, or discount
+- Calculate future value of reinvested coupon payments
+
+Use realistic values: Face values like $1,000 or $5,000, coupon rates 3%-8%, maturities 5-30 years.
+Show all calculations with proper currency formatting ($1,000.00).`;
 }
 
 /**
@@ -255,6 +303,7 @@ serve(async (req) => {
     console.log(`Generating Nycologic presentation for: ${topic}`);
 
     const isMath = isMathTopic(topic, subject);
+    const isBond = isBondTopic(topic, subject);
     const slideCount = Math.min(Math.floor((parseInt(duration) || 30) / 5), 10);
     const qCount = Math.min(questionCount, 3);
 
@@ -266,6 +315,12 @@ ${includeQuestions ? `Include ${qCount} question slides with multiple choice opt
 
     if (isMath) {
       prompt += getMathPromptAdditions(topic);
+      
+      // Add bond-specific formulas if it's a bond topic
+      if (isBond) {
+        prompt += getBondPromptAdditions();
+      }
+      
       prompt += `
 
 For this MATH presentation, include:
@@ -275,8 +330,9 @@ For this MATH presentation, include:
   - "steps": array of step-by-step solution strings
   - "finalAnswer": the complete answer with units
 
-Example word problem slide:
-{"id":"slide-3","type":"content","title":"**Real-World** Application","content":["Let's solve a challenging problem"],"wordProblem":{"problem":"A rectangular garden has a perimeter of 56 feet. If the length is 4 feet more than twice the width, find the dimensions.","steps":["Step 1: Let w = width, then length = 2w + 4","Step 2: Perimeter = 2(length) + 2(width) = 56","Step 3: 2(2w + 4) + 2w = 56","Step 4: 4w + 8 + 2w = 56","Step 5: 6w = 48","Step 6: w = 8 feet, length = 2(8) + 4 = 20 feet"],"finalAnswer":"Width = 8 feet, Length = 20 feet"},"icon":"lightbulb"}`;
+${isBond ? `Example BOND word problem slide:
+{"id":"slide-3","type":"content","title":"**Bond** Calculations","content":["Calculate total payments and present value"],"wordProblem":{"problem":"A corporate bond has a face value of $5,000, a coupon rate of 6% paid semi-annually, and matures in 10 years. If the current yield is 5%, calculate: (a) the semi-annual coupon payment, (b) total coupon payments over the life of the bond, and (c) the present value of the bond.","steps":["Step 1: Semi-annual coupon = ($5,000 × 6%) / 2 = $150","Step 2: Number of periods = 10 years × 2 = 20 periods","Step 3: Total coupon payments = $150 × 20 = $3,000","Step 4: Yield per period = 5% / 2 = 2.5% = 0.025","Step 5: PV of coupons = $150 × [(1 - (1.025)^(-20)) / 0.025] = $150 × 15.5892 = $2,338.38","Step 6: PV of face value = $5,000 / (1.025)^20 = $5,000 / 1.6386 = $3,051.63","Step 7: Total PV = $2,338.38 + $3,051.63 = $5,390.01"],"finalAnswer":"(a) $150 per period, (b) $3,000 total coupons, (c) PV = $5,390.01 (trading at premium)"},"icon":"lightbulb"}` : `Example word problem slide:
+{"id":"slide-3","type":"content","title":"**Real-World** Application","content":["Let's solve a challenging problem"],"wordProblem":{"problem":"A rectangular garden has a perimeter of 56 feet. If the length is 4 feet more than twice the width, find the dimensions.","steps":["Step 1: Let w = width, then length = 2w + 4","Step 2: Perimeter = 2(length) + 2(width) = 56","Step 3: 2(2w + 4) + 2w = 56","Step 4: 4w + 8 + 2w = 56","Step 5: 6w = 48","Step 6: w = 8 feet, length = 2(8) + 4 = 20 feet"],"finalAnswer":"Width = 8 feet, Length = 20 feet"},"icon":"lightbulb"}`}`;
     }
 
     prompt += `
