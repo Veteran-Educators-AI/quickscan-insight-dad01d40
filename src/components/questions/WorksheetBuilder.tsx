@@ -445,6 +445,10 @@ export function WorksheetBuilder({
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
+  const [previewFormat, setPreviewFormat] = useState<"html" | "pdf" | "word">("html");
+  const [wordPreviewUrl, setWordPreviewUrl] = useState<string | null>(null);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedWorksheets, setSavedWorksheets] = useState<SavedWorksheet[]>([]);
   const [showSavedWorksheets, setShowSavedWorksheets] = useState(false);
@@ -3293,7 +3297,244 @@ export function WorksheetBuilder({
       });
       return;
     }
+    // Reset preview state and show HTML by default
+    setPreviewFormat("html");
+    setPdfPreviewUrl(null);
+    setWordPreviewUrl(null);
     setShowPreview(true);
+  };
+
+  // Generate Word document for preview (returns blob URL)
+  const generateWordPreview = async (): Promise<string | null> => {
+    if (compiledQuestions.length === 0) return null;
+    
+    setIsGeneratingPreview(true);
+    try {
+      const children: (Paragraph | Table)[] = [];
+
+      // Title
+      children.push(
+        new Paragraph({
+          text: worksheetTitle,
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+          children: [new TextRun({ text: worksheetTitle, bold: true, size: 32 })],
+        })
+      );
+
+      // Teacher name
+      if (teacherName) {
+        children.push(
+          new Paragraph({
+            text: `Teacher: ${teacherName}`,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          })
+        );
+      }
+
+      // Name/Date/Period line
+      children.push(
+        new Paragraph({
+          spacing: { after: 400 },
+          border: { bottom: { color: "auto", style: BorderStyle.SINGLE, size: 6 } },
+          children: [
+            new TextRun({ text: "Name: _______________________     Date: ___________     Period: _____" }),
+          ],
+        })
+      );
+
+      // Questions
+      for (const question of compiledQuestions) {
+        // Question header with Bloom's level
+        const bloomInfo = getBloomInfo(question.bloomLevel);
+        const levelLabel = worksheetMode === "diagnostic" && question.advancementLevel 
+          ? ` [Level ${question.advancementLevel}]` 
+          : "";
+        
+        children.push(
+          new Paragraph({
+            spacing: { before: 300, after: 100 },
+            border: { bottom: { color: "1e3a5f", style: BorderStyle.SINGLE, size: 2 } },
+            children: [
+              new TextRun({
+                text: `${question.questionNumber}. [${bloomInfo.label}: ${question.bloomVerb || "apply"}]${levelLabel} `,
+                bold: true,
+                size: 22,
+              }),
+              new TextRun({
+                text: `[${question.difficulty}]`,
+                size: 18,
+                color: "666666",
+              }),
+            ],
+          })
+        );
+
+        // Topic/Standard
+        children.push(
+          new Paragraph({
+            spacing: { after: 100 },
+            children: [
+              new TextRun({
+                text: `${question.topic} (${question.standard})`,
+                italics: true,
+                size: 18,
+                color: "666666",
+              }),
+            ],
+          })
+        );
+
+        // Question text
+        const sanitizedQuestion = sanitizeForWord(fixEncodingCorruption(question.question));
+        children.push(
+          new Paragraph({
+            spacing: { after: 200 },
+            children: [new TextRun({ text: sanitizedQuestion, size: 22 })],
+          })
+        );
+
+        // Work area box
+        if (showAnswerLines) {
+          children.push(
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [new TextRun({ text: `WORK AREA Q${question.questionNumber}`, bold: true, size: 16 })],
+                        }),
+                        new Paragraph({ text: "" }),
+                        new Paragraph({ text: "" }),
+                        new Paragraph({ text: "" }),
+                      ],
+                      borders: {
+                        top: { style: BorderStyle.SINGLE, size: 8, color: "1e3a5f" },
+                        bottom: { style: BorderStyle.DASHED, size: 4, color: "94a3b8" },
+                        left: { style: BorderStyle.SINGLE, size: 8, color: "1e3a5f" },
+                        right: { style: BorderStyle.SINGLE, size: 8, color: "1e3a5f" },
+                      },
+                    }),
+                  ],
+                }),
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [new TextRun({ text: "FINAL ANSWER: _________________________________", bold: true, size: 18 })],
+                        }),
+                      ],
+                      shading: { fill: "fef3c7" },
+                      borders: {
+                        top: { style: BorderStyle.SINGLE, size: 4, color: "f59e0b" },
+                        bottom: { style: BorderStyle.SINGLE, size: 8, color: "1e3a5f" },
+                        left: { style: BorderStyle.SINGLE, size: 8, color: "1e3a5f" },
+                        right: { style: BorderStyle.SINGLE, size: 8, color: "1e3a5f" },
+                      },
+                    }),
+                  ],
+                }),
+              ],
+            })
+          );
+        }
+      }
+
+      const doc = new Document({
+        sections: [
+          {
+            properties: {
+              page: {
+                margin: {
+                  top: convertInchesToTwip(marginMm / 25.4),
+                  bottom: convertInchesToTwip(marginMm / 25.4),
+                  left: convertInchesToTwip(marginMm / 25.4),
+                  right: convertInchesToTwip(marginMm / 25.4),
+                },
+              },
+            },
+            children,
+          },
+        ],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      return url;
+    } catch (error) {
+      console.error("Error generating Word preview:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate Word preview.",
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setIsGeneratingPreview(false);
+    }
+  };
+
+  // Generate PDF for preview (returns blob URL)
+  const generatePdfPreview = async (): Promise<string | null> => {
+    const printContent = printRef.current;
+    if (!printContent) return null;
+
+    setIsGeneratingPreview(true);
+    try {
+      const canvas = await html2canvas(printContent, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "letter");
+      const pageWidth = 215.9;
+      const pageHeight = 279.4;
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const blob = pdf.output("blob");
+      const url = URL.createObjectURL(blob);
+      return url;
+    } catch (error) {
+      console.error("Error generating PDF preview:", error);
+      return null;
+    } finally {
+      setIsGeneratingPreview(false);
+    }
+  };
+
+  // Handle format change in preview
+  const handlePreviewFormatChange = async (format: "html" | "pdf" | "word") => {
+    setPreviewFormat(format);
+    
+    if (format === "word" && !wordPreviewUrl) {
+      const url = await generateWordPreview();
+      if (url) setWordPreviewUrl(url);
+    } else if (format === "pdf" && !pdfPreviewUrl) {
+      const url = await generatePdfPreview();
+      if (url) setPdfPreviewUrl(url);
+    }
   };
 
   /**
@@ -4835,127 +5076,175 @@ export function WorksheetBuilder({
               className="print:hidden"
               style={{
                 display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "0.75rem 1rem",
+                flexDirection: "column",
                 backgroundColor: "white",
                 borderBottom: "1px solid #e5e7eb",
                 boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
               }}
             >
-              <div className="flex items-center gap-4">
-                <h2 className="font-semibold text-lg">Print Preview</h2>
-                <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setPreviewZoom(Math.max(50, previewZoom - 25))}
-                    disabled={previewZoom <= 50}
-                  >
-                    <ZoomOut className="h-4 w-4" />
+              {/* Top row: Title, Zoom, Close */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.75rem 1rem" }}>
+                <div className="flex items-center gap-4">
+                  <h2 className="font-semibold text-lg">Worksheet Preview</h2>
+                  <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPreviewZoom(Math.max(50, previewZoom - 25))}
+                      disabled={previewZoom <= 50}
+                    >
+                      <ZoomOut className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm font-medium min-w-[4rem] text-center">{previewZoom}%</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPreviewZoom(Math.min(200, previewZoom + 25))}
+                      disabled={previewZoom >= 200}
+                    >
+                      <ZoomIn className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {compiledQuestions.length} question{compiledQuestions.length !== 1 ? "s" : ""} • Press ESC to close
+                  </span>
+                </div>
+                <div className="flex items-center gap-2" style={{ marginRight: "4rem" }}>
+                  <Button variant="outline" onClick={() => setShowPreview(false)}>
+                    <X className="h-4 w-4 mr-2" />
+                    Close
                   </Button>
-                  <span className="text-sm font-medium min-w-[4rem] text-center">{previewZoom}%</span>
+                  <Button variant="outline" onClick={generateWYSIWYGPdf} disabled={isGeneratingPDF}>
+                    {isGeneratingPDF ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download PDF
+                      </>
+                    )}
+                  </Button>
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setPreviewZoom(Math.min(200, previewZoom + 25))}
-                    disabled={previewZoom >= 200}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={generateWordDocument}
+                    disabled={isGenerating}
                   >
-                    <ZoomIn className="h-4 w-4" />
+                    <FileType className="h-4 w-4 mr-2" />
+                    Download Word
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const printContent = printRef.current;
+                      if (!printContent) {
+                        toast({ title: "Error", description: "Could not find content to print", variant: "destructive" });
+                        return;
+                      }
+
+                      const printWindow = window.open("", "_blank");
+                      if (!printWindow) {
+                        toast({
+                          title: "Error",
+                          description: "Popup blocked. Please allow popups.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      const worksheetHTML = printContent.innerHTML;
+
+                      printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                      <title>${worksheetTitle}</title>
+                      <style>
+                        @page { size: letter; margin: 0; }
+                        * { box-sizing: border-box; }
+                        body { 
+                          font-family: Georgia, serif; 
+                          margin: 0; 
+                          padding: 0;
+                          color: #000;
+                          background: #fff;
+                        }
+                        .worksheet-page {
+                          width: 100%;
+                          max-width: 8.5in;
+                          margin: 0 auto;
+                        }
+                        .print-worksheet {
+                          padding: ${marginInCss}in;
+                          box-sizing: border-box;
+                        }
+                      </style>
+                    </head>
+                    <body>
+                      <div class="worksheet-page">${worksheetHTML}</div>
+                      <script>
+                        window.onload = function() {
+                          window.print();
+                          window.onafterprint = function() { window.close(); };
+                        };
+                      </script>
+                    </body>
+                    </html>
+                  `);
+                      printWindow.document.close();
+                    }}
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print
                   </Button>
                 </div>
-                <span className="text-sm text-muted-foreground">
-                  {compiledQuestions.length} question{compiledQuestions.length !== 1 ? "s" : ""} • Press ESC to close
-                </span>
               </div>
-              <div className="flex items-center gap-2" style={{ marginRight: "4rem" }}>
-                <Button variant="outline" onClick={() => setShowPreview(false)}>
-                  <X className="h-4 w-4 mr-2" />
-                  Close
-                </Button>
-                <Button variant="outline" onClick={generateWYSIWYGPdf} disabled={isGeneratingPDF}>
-                  {isGeneratingPDF ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download PDF
-                    </>
-                  )}
+              
+              {/* Format tabs row */}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", padding: "0 1rem 0.5rem", borderTop: "1px solid #f1f5f9" }}>
+                <span className="text-sm font-medium text-muted-foreground mr-2">Preview Format:</span>
+                <Button
+                  variant={previewFormat === "html" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => handlePreviewFormatChange("html")}
+                  className={previewFormat === "html" ? "" : "text-muted-foreground"}
+                >
+                  <Eye className="h-4 w-4 mr-1.5" />
+                  HTML Preview
                 </Button>
                 <Button
-                  onClick={() => {
-                    // Print the worksheet content properly
-                    const printContent = printRef.current;
-                    if (!printContent) {
-                      toast({ title: "Error", description: "Could not find content to print", variant: "destructive" });
-                      return;
-                    }
-
-                    // Create a new window for printing
-                    const printWindow = window.open("", "_blank");
-                    if (!printWindow) {
-                      toast({
-                        title: "Error",
-                        description: "Popup blocked. Please allow popups.",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-
-                    // Get the worksheet HTML
-                    const worksheetHTML = printContent.innerHTML;
-
-                    printWindow.document.write(`
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                    <title>${worksheetTitle}</title>
-                    <style>
-                      @page { size: letter; margin: 0; }
-                      * { box-sizing: border-box; }
-                      body { 
-                        font-family: Georgia, serif; 
-                        margin: 0; 
-                        padding: 0;
-                        color: #000;
-                        background: #fff;
-                      }
-                      .worksheet-page {
-                        width: 100%;
-                        max-width: 8.5in;
-                        margin: 0 auto;
-                      }
-                      .print-worksheet {
-                        padding: ${marginInCss}in;
-                        box-sizing: border-box;
-                      }
-                    </style>
-                  </head>
-                  <body>
-                    <div class="worksheet-page">${worksheetHTML}</div>
-                    <script>
-                      window.onload = function() {
-                        window.print();
-                        window.onafterprint = function() { window.close(); };
-                      };
-                    </script>
-                  </body>
-                  </html>
-                `);
-                    printWindow.document.close();
-                  }}
+                  variant={previewFormat === "pdf" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => handlePreviewFormatChange("pdf")}
+                  disabled={isGeneratingPreview && previewFormat !== "pdf"}
+                  className={previewFormat === "pdf" ? "" : "text-muted-foreground"}
                 >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print from Preview
+                  {isGeneratingPreview && previewFormat === "pdf" ? (
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <FileText className="h-4 w-4 mr-1.5" />
+                  )}
+                  PDF Preview
+                </Button>
+                <Button
+                  variant={previewFormat === "word" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => handlePreviewFormatChange("word")}
+                  disabled={isGeneratingPreview && previewFormat !== "word"}
+                  className={previewFormat === "word" ? "bg-blue-600 hover:bg-blue-700" : "text-muted-foreground"}
+                >
+                  {isGeneratingPreview && previewFormat === "word" ? (
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <FileType className="h-4 w-4 mr-1.5" />
+                  )}
+                  Word Preview
                 </Button>
               </div>
             </div>
 
-            {/* Preview Content Area - render as 8.5x11 pages with page break indicators */}
+            {/* Preview Content Area */}
             <div
               className="print:p-0 print:overflow-visible"
               style={{
@@ -4969,7 +5258,77 @@ export function WorksheetBuilder({
                 gap: "0",
               }}
             >
-              {/* Page container with visual page breaks */}
+              {/* Word/PDF Preview using iframe */}
+              {(previewFormat === "word" || previewFormat === "pdf") && (
+                <div
+                  style={{
+                    width: "100%",
+                    maxWidth: "8.5in",
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {isGeneratingPreview ? (
+                    <div className="flex flex-col items-center gap-4 p-8">
+                      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                      <p className="text-lg font-medium">Generating {previewFormat.toUpperCase()} preview...</p>
+                      <p className="text-sm text-muted-foreground">This may take a moment</p>
+                    </div>
+                  ) : previewFormat === "word" && wordPreviewUrl ? (
+                    <div className="w-full h-full flex flex-col items-center">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center max-w-md">
+                        <FileType className="h-16 w-16 mx-auto mb-4 text-blue-600" />
+                        <h3 className="text-lg font-semibold mb-2">Word Document Ready</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Word documents cannot be previewed directly in the browser. Click below to download and open in Microsoft Word or Google Docs.
+                        </p>
+                        <div className="flex gap-2 justify-center">
+                          <Button
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={() => {
+                              const a = document.createElement("a");
+                              a.href = wordPreviewUrl;
+                              a.download = `${worksheetTitle.replace(/\s+/g, "_")}_preview.docx`;
+                              a.click();
+                            }}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download Word Preview
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-3">
+                          Or use the HTML Preview tab to see the worksheet layout
+                        </p>
+                      </div>
+                    </div>
+                  ) : previewFormat === "pdf" && pdfPreviewUrl ? (
+                    <iframe
+                      src={pdfPreviewUrl}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        minHeight: "600px",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "0.5rem",
+                        boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+                        transform: `scale(${previewZoom / 100})`,
+                        transformOrigin: "top center",
+                      }}
+                      title="PDF Preview"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-4 p-8">
+                      <p className="text-muted-foreground">Click the format button above to generate preview</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* HTML Preview - Page container with visual page breaks */}
+              {previewFormat === "html" && (
               <div
                 ref={printRef}
                 className="print:shadow-none print:border-none"
@@ -5368,6 +5727,7 @@ export function WorksheetBuilder({
                   </div>
                 </div>
               </div>
+              )}
             </div>
           </div>,
           document.body,
