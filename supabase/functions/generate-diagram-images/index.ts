@@ -704,7 +704,9 @@ async function queryShapeLibrary(
         
         if (fallbackData && fallbackData.length > 0) {
           console.log(`[Library] Found ${fallbackData.length} fallback matches`);
-          data.push(...fallbackData);
+          if (data) {
+            data.push(...fallbackData);
+          }
         }
       }
       
