@@ -767,6 +767,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
         const topicsLabel = selectedTopics.length > 0 ? selectedTopics.join(', ') : 'Math Practice';
 
         // Generate QR code for student identification - appears on EVERY page
+        // Generate QR codes for BOTH sides of the page for reliable scanning
         let qrCodeBuffer: ArrayBuffer | null = null;
         try {
           const { fetchQRCodeAsArrayBuffer } = await import('@/lib/qrCodeUtils');
@@ -775,7 +776,7 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
           console.error('Error generating QR code for Word document:', qrError);
         }
 
-        // Create page header with QR code that repeats on EVERY page for this student
+        // Create page header with QR codes on BOTH SIDES that repeats on EVERY page
         let pageHeader: Header | undefined;
         if (qrCodeBuffer) {
           pageHeader = new Header({
@@ -793,6 +794,36 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                 rows: [
                   new TableRow({
                     children: [
+                      // LEFT QR CODE
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new ImageRun({
+                                data: qrCodeBuffer,
+                                transformation: { width: 60, height: 60 },
+                                type: "png",
+                              }),
+                            ],
+                            alignment: AlignmentType.LEFT,
+                          }),
+                          new Paragraph({
+                            children: [
+                              new TextRun({ text: "📷 Scan", size: 12, color: "666666" }),
+                            ],
+                            alignment: AlignmentType.LEFT,
+                          }),
+                        ],
+                        width: { size: 15, type: WidthType.PERCENTAGE },
+                        verticalAlign: VerticalAlign.CENTER,
+                        borders: {
+                          top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                          right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        },
+                      }),
+                      // CENTER - Student name and level
                       new TableCell({
                         children: [
                           new Paragraph({
@@ -803,9 +834,10 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                                 size: 20,
                               }),
                             ],
+                            alignment: AlignmentType.CENTER,
                           }),
                         ],
-                        width: { size: 75, type: WidthType.PERCENTAGE },
+                        width: { size: 70, type: WidthType.PERCENTAGE },
                         verticalAlign: VerticalAlign.CENTER,
                         borders: {
                           top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
@@ -814,13 +846,14 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                           right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
                         },
                       }),
+                      // RIGHT QR CODE (mirror of left)
                       new TableCell({
                         children: [
                           new Paragraph({
                             children: [
                               new ImageRun({
                                 data: qrCodeBuffer,
-                                transformation: { width: 55, height: 55 },
+                                transformation: { width: 60, height: 60 },
                                 type: "png",
                               }),
                             ],
@@ -828,12 +861,12 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                           }),
                           new Paragraph({
                             children: [
-                              new TextRun({ text: "Scan to grade", size: 12, color: "666666" }),
+                              new TextRun({ text: "📷 Scan", size: 12, color: "666666" }),
                             ],
                             alignment: AlignmentType.RIGHT,
                           }),
                         ],
-                        width: { size: 25, type: WidthType.PERCENTAGE },
+                        width: { size: 15, type: WidthType.PERCENTAGE },
                         verticalAlign: VerticalAlign.CENTER,
                         borders: {
                           top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
