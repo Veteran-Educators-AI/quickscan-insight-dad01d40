@@ -2813,8 +2813,8 @@ export function WorksheetBuilder({
         console.error('Error generating QR code for Word document:', qrError);
       }
 
-      // Create page header with QR code in TOP-LEFT corner that repeats on EVERY page
-      // QR is larger (80x80) and positioned LEFT for better scanner detection
+      // Create page header with QR codes on BOTH LEFT and RIGHT corners for reliable scanning
+      // This ensures QR code is detected regardless of paper orientation when scanned
       let pageHeader: Header | undefined;
       if (qrCodeBuffer) {
         pageHeader = new Header({
@@ -2832,14 +2832,14 @@ export function WorksheetBuilder({
               rows: [
                 new TableRow({
                   children: [
-                    // QR Code in LEFT cell for better scanner detection
+                    // LEFT QR Code cell
                     new TableCell({
                       children: [
                         new Paragraph({
                           children: [
                             new ImageRun({
                               data: qrCodeBuffer,
-                              transformation: { width: 80, height: 80 }, // Larger for reliable scanning
+                              transformation: { width: 70, height: 70 },
                               type: "png",
                             }),
                           ],
@@ -2847,12 +2847,12 @@ export function WorksheetBuilder({
                         }),
                         new Paragraph({
                           children: [
-                            new TextRun({ text: "📷 Scan for grading", size: 14, color: "666666", italics: true }),
+                            new TextRun({ text: "📷 Scan", size: 12, color: "666666", italics: true }),
                           ],
                           alignment: AlignmentType.LEFT,
                         }),
                       ],
-                      width: { size: 20, type: WidthType.PERCENTAGE },
+                      width: { size: 15, type: WidthType.PERCENTAGE },
                       verticalAlign: VerticalAlign.TOP,
                       borders: {
                         top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
@@ -2861,7 +2861,7 @@ export function WorksheetBuilder({
                         right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
                       },
                     }),
-                    // Title in CENTER/RIGHT cell
+                    // CENTER Title cell
                     new TableCell({
                       children: [
                         new Paragraph({
@@ -2875,8 +2875,37 @@ export function WorksheetBuilder({
                           alignment: AlignmentType.CENTER,
                         }),
                       ],
-                      width: { size: 80, type: WidthType.PERCENTAGE },
+                      width: { size: 70, type: WidthType.PERCENTAGE },
                       verticalAlign: VerticalAlign.CENTER,
+                      borders: {
+                        top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                      },
+                    }),
+                    // RIGHT QR Code cell (mirror of left for reliable detection)
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new ImageRun({
+                              data: qrCodeBuffer,
+                              transformation: { width: 70, height: 70 },
+                              type: "png",
+                            }),
+                          ],
+                          alignment: AlignmentType.RIGHT,
+                        }),
+                        new Paragraph({
+                          children: [
+                            new TextRun({ text: "📷 Scan", size: 12, color: "666666", italics: true }),
+                          ],
+                          alignment: AlignmentType.RIGHT,
+                        }),
+                      ],
+                      width: { size: 15, type: WidthType.PERCENTAGE },
+                      verticalAlign: VerticalAlign.TOP,
                       borders: {
                         top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
                         bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
