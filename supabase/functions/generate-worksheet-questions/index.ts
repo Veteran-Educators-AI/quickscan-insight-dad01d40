@@ -642,293 +642,13 @@ WARM-UP MODE (Confidence Building):
   }
 ]`;
 
-// Check if this is an English Literature worksheet
-const isEnglishLiterature = englishContext && topics[0]?.subject === 'English';
+    // Check if this is an English Literature worksheet
+    const isEnglishLiterature = englishContext && topics[0]?.subject === 'English';
 
-let prompt: string;
-
-if (isEnglishLiterature) {
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // ENGLISH LITERATURE WORKSHEET PROMPT
-  // ═══════════════════════════════════════════════════════════════════════════════
-  
-  const formatInstructions: Record<string, string> = {
-    'multiple_choice': `Generate ONLY multiple choice questions with exactly 4 options (A, B, C, D).
-Include the "options" field as an array of 4 strings.
-Include the "answer" field with the correct letter (A, B, C, or D).`,
-    'short_answer': `Generate short answer questions requiring 1-3 sentence responses.
-Include the "answer" field with a model response.`,
-    'extended_response': `Generate extended response questions requiring paragraph-length analysis (4-6 sentences).
-Include the "answer" field with key points the response should address.
-Include "rubricPoints" field with the point value (typically 4-6 points).`,
-    'text_evidence': `Generate text evidence questions that require students to cite AND explain evidence from the text.
-Each question should ask students to find a quote and explain its significance.
-Include the "answer" field with an example text reference and explanation.
-Include "textReference" field with a suggested passage reference (e.g., "Chapter 3, page 45").`,
-    'mixed': `Generate a MIX of question formats:
-- 30% Multiple Choice (include "options" array with 4 choices)
-- 30% Short Answer
-- 25% Extended Response (include "rubricPoints")
-- 15% Text Evidence (include "textReference")
-Include the appropriate fields for each question type.`
-  };
-
-  const focusAreaDescriptions: Record<string, string> = {
-    'character': 'character development, motivations, relationships, and character arcs',
-    'theme': 'central themes, recurring motifs, and thematic development',
-    'literary_devices': 'literary devices, figurative language, and stylistic choices',
-    'plot': 'plot structure, key events, conflict development, and resolution',
-    'setting': 'setting details, historical context, and how setting influences the narrative',
-    'author_purpose': "author's purpose, intended audience, and rhetorical strategies",
-    'symbolism': 'symbols, their meanings, and how they reinforce themes',
-    'conflict': 'types of conflict (internal/external), conflict development, and resolution',
-  };
-
-  const selectedFocusDescriptions = englishContext.focusAreas
-    .map(area => focusAreaDescriptions[area] || area)
-    .join('; ');
-
-  const textReferenceInstruction = englishContext.includeTextReferences
-    ? `IMPORTANT: Include specific text references in your questions when applicable.
-Examples: "In Chapter 3, when Scout says...", "Referring to the scene where...", "Based on the passage describing..."`
-    : '';
-
-  const rubricInstruction = englishContext.includeRubric
-    ? `Include a "rubricPoints" field (2-6 points) for extended response and text evidence questions.`
-    : '';
-
-  const lessonObjectivesInstruction = englishContext.lessonObjectives?.length
-    ? `\nALIGN QUESTIONS TO THESE LESSON OBJECTIVES:\n${englishContext.lessonObjectives.map((o, i) => `${i + 1}. ${o}`).join('\n')}`
-    : '';
-
-  prompt = `You are an expert English Language Arts educator creating a professional, NYS-aligned literature assessment.
-
-LITERARY TEXT CONTEXT:
-═══════════════════════════════════════════════════════════════════════════════
-Title: "${englishContext.textTitle}" by ${englishContext.author}
-Genre: ${englishContext.genre}
-Grade Level: ${englishContext.gradeLevel}
-Key Themes: ${englishContext.themes.join(', ')}
-Literary Devices: ${englishContext.literaryDevices.join(', ')}
-═══════════════════════════════════════════════════════════════════════════════
-
-TOPIC/LESSON FOCUS:
-${topicsList}
-${lessonObjectivesInstruction}
-
-QUESTION FORMAT REQUIREMENTS:
-═══════════════════════════════════════════════════════════════════════════════
-${formatInstructions[englishContext.questionFormat] || formatInstructions['mixed']}
-
-FOCUS AREAS (emphasize these in your questions):
-${selectedFocusDescriptions}
-
-${textReferenceInstruction}
-${rubricInstruction}
-
-COGNITIVE LEVELS (Bloom's Taxonomy for Literature):
-═══════════════════════════════════════════════════════════════════════════════
-${bloomInstruction}
-
-COMPREHENSION LEVEL (Remember/Understand):
-├── Identify characters, settings, plot events
-├── Summarize sections or chapters
-├── Define vocabulary in context
-└── Example: "Who is the narrator of the story?" / "What event triggers the main conflict?"
-
-ANALYSIS LEVEL (Apply/Analyze):
-├── Analyze character motivations and development
-├── Examine literary devices and their effects
-├── Compare and contrast elements within the text
-└── Example: "How does the author use symbolism to develop the theme of innocence?" / "Analyze the significance of the setting in Chapter 4."
-
-HIGHER-ORDER LEVEL (Evaluate/Create):
-├── Evaluate character decisions and author choices
-├── Synthesize themes across the text
-├── Construct arguments using textual evidence
-└── Example: "Evaluate whether the protagonist's final decision was justified. Use evidence from the text." / "How does this text reflect the social issues of its time?"
-
-REQUIREMENTS:
-1. Generate exactly ${questionCount} questions
-2. Include "bloomLevel" (remember, understand, apply, analyze, evaluate, or create) for each question
-3. Include "bloomVerb" with the action verb used
-4. Include "cognitiveLevel" (comprehension, analysis, or higher-order) 
-5. Questions should be engaging and require genuine engagement with the text
-6. Use specific character names, events, and details from the text
-7. For extended response, provide clear criteria for a strong answer
-8. Questions should be appropriate for grade level ${englishContext.gradeLevel}
-
-STANDARD ALIGNMENT:
-Use NYS/Common Core ELA standards. Common standards for literature:
-- RL.9-10.1 / RL.11-12.1: Cite textual evidence
-- RL.9-10.2 / RL.11-12.2: Determine themes
-- RL.9-10.3 / RL.11-12.3: Analyze character development
-- RL.9-10.4 / RL.11-12.4: Determine word meanings, analyze word choice
-- RL.9-10.5 / RL.11-12.5: Analyze text structure
-- RL.9-10.6 / RL.11-12.6: Analyze point of view
-
-Respond with a JSON array:
-[
-  {
-    "questionNumber": 1,
-    "topic": "${englishContext.textTitle}",
-    "standard": "RL.9-10.3",
-    "question": "The full question text here",
-    "difficulty": "medium",
-    "bloomLevel": "analyze",
-    "bloomVerb": "analyze",
-    "cognitiveLevel": "analysis",
-    "questionFormat": "short_answer",
-    "answer": "Model answer or key points"${englishContext.includeTextReferences ? ',\n    "textReference": "Chapter/page reference"' : ''}${englishContext.includeRubric ? ',\n    "rubricPoints": 4' : ''}
-  }
-]
-
-For multiple choice questions, include: "options": ["A. First option", "B. Second option", "C. Third option", "D. Fourth option"]
-
-IMPORTANT: Return ONLY the JSON array, no other text.`;
-
-} else {
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // ORIGINAL MATH/SCIENCE WORKSHEET PROMPT
-  // ═══════════════════════════════════════════════════════════════════════════════
-
-prompt = `You are an expert math educator creating a professional, textbook-quality worksheet structured around BLOOM'S TAXONOMY for NYS Regents preparation.
-
-Based on the following standards and topics, generate exactly ${questionCount} questions that progressively move through Bloom's Taxonomy cognitive levels.
-
-TOPICS:
-${topicsList}
-
-═══════════════════════════════════════════════════════════════════════════════
-STUDENT WORKSPACE REQUIREMENTS (CRITICAL FOR AI SCANNING):
-═══════════════════════════════════════════════════════════════════════════════
-
-IMPORTANT: Design questions that allow GENEROUS WORKSPACE for students to show their work clearly.
-- Questions should be structured so students have PLENTY OF ROOM to write out all steps
-- Avoid questions that require tiny, cramped work areas
-- Multi-step problems should be phrased to encourage showing work STEP BY STEP
-- For geometry: describe shapes verbally rather than requiring diagram interpretation
-- Each problem should have a clear "final answer" that students can box or circle
-- Leave mental space for: initial setup, intermediate calculations, final answer
-
-This enables the AI grading system to:
-1. Clearly see each step of student work
-2. Identify where errors occur in the problem-solving process
-3. Provide targeted feedback on specific misconceptions
-4. Award appropriate partial credit for shown work
-
-═══════════════════════════════════════════════════════════════════════════════
-BLOOM'S TAXONOMY STRUCTURE (MANDATORY - Follow this progression):
-═══════════════════════════════════════════════════════════════════════════════
-
-Each question MUST include a "bloomLevel" field (one of: remember, understand, apply, analyze, evaluate, create) and a "bloomVerb" field with the specific action verb used.
-
-LEVEL 1: REMEMBER (Recall facts and basic concepts)
-├── Verbs: define, identify, list, name, recall, recognize, state, label
-├── Question types: What is the formula for...? Identify the...? What are the...?
-└── Example: "State the Pythagorean theorem." / "Identify which expression represents a quadratic function."
-
-LEVEL 2: UNDERSTAND (Explain ideas or concepts)
-├── Verbs: describe, explain, interpret, classify, summarize, compare, paraphrase
-├── Question types: Explain why...? What does this mean...? Compare...
-└── Example: "Explain why the sum of angles in a triangle equals 180°." / "Describe the relationship between the slope and y-intercept."
-
-LEVEL 3: APPLY (Use information in new situations)
-├── Verbs: solve, calculate, demonstrate, apply, compute, construct, use, implement
-├── Question types: Calculate...? Solve for...? Apply the formula to find...
-└── Example: "Calculate the area of a circle with radius 7 cm." / "Solve: 3x² - 12 = 0"
-
-LEVEL 4: ANALYZE (Draw connections among ideas)
-├── Verbs: analyze, differentiate, examine, compare, contrast, investigate, distinguish
-├── Question types: Why does...? What evidence...? How does X relate to Y...?
-└── Example: "Analyze why the function f(x) = x² has no x-intercepts when shifted up by 5 units." / "Examine the relationship between the discriminant and the nature of roots."
-
-LEVEL 5: EVALUATE (Justify a decision or course of action)
-├── Verbs: evaluate, justify, critique, assess, argue, defend, judge, support
-├── Question types: Is this the best approach...? Justify your reasoning...? Which method is more efficient...?
-└── Example: "Evaluate whether the substitution or elimination method is more efficient for this system." / "Justify why the triangle is a right triangle."
-
-LEVEL 6: CREATE (Produce new or original work)
-├── Verbs: design, construct, develop, formulate, create, devise, compose, plan
-├── Question types: Design a...? Create an equation that...? Develop a strategy to...?
-└── Example: "Create a quadratic equation that has roots at x = 3 and x = -5." / "Design a geometric proof to show that the diagonals of a rhombus are perpendicular."
-
-═══════════════════════════════════════════════════════════════════════════════
-BLOOM'S LEVEL FILTER (IMPORTANT):
-═══════════════════════════════════════════════════════════════════════════════
-${bloomInstruction}
-
-DISTRIBUTION REQUIREMENTS:
-═══════════════════════════════════════════════════════════════════════════════
-- For ${questionCount} questions, distribute ONLY across the allowed cognitive levels: ${allowedBloomLevels.join(', ')}
-- If all 6 levels are allowed, use this distribution:
-  • 10-15% Remember/Understand (foundation questions to build confidence)
-  • 30-40% Apply (core computational and procedural skills)
-  • 30-40% Analyze/Evaluate (higher-order thinking and reasoning)
-  • 10-20% Create (synthesis and original thinking)
-- If only specific levels are selected, distribute questions evenly across those levels
-- Start with lower-level questions and progress to higher levels
-- Each question should explicitly test the cognitive level indicated
-
-REQUIREMENTS:
-1. Generate exactly ${questionCount} questions total
-2. Distribute questions across the topics (approximately ${questionsPerTopic} per topic)
-3. EVERY question must include "bloomLevel" and "bloomVerb" fields
-4. ONLY use cognitive levels from the allowed list: ${allowedBloomLevels.join(', ')}
-5. Include multi-step problems that require showing work at Apply level and above
-6. ${difficultyInstruction}
-7. Use real-world contexts where appropriate (especially for Apply and above)
-8. Questions should be clear and unambiguous${geometryInstruction}${formulasInstruction}${graphPaperInstruction}${coordinateGeometryInstruction}
-${diagnosticInstruction}
-${hintInstruction}
-${answerKeyInstruction}
-${formInstruction}
-${variationInstruction}
-
-CRITICAL - TEXTBOOK-QUALITY FORMATTING:
-- Write in fluid, complete sentences like a professional textbook
-- Use proper mathematical Unicode symbols throughout:
-  • π instead of "pi" or "3.14"
-  • √ for roots (√2, √3, √5)
-  • ² ³ ⁴ ⁵ for exponents (x², y³, n⁴)
-  • ° for degrees (30°, 45°, 90°, 180°)
-  • ∠ for angles (∠ABC, ∠XYZ)
-  • ≤ ≥ ≠ for inequalities
-  • θ for angle theta
-  • △ for triangles (△ABC ≅ △DEF)
-  • ⊥ for perpendicular, ∥ for parallel
-  • ≅ for congruent, ~ for similar
-  • ½ ⅓ ¼ ⅔ ¾ for common fractions
-- Format examples:
-  ✓ "In △ABC, if ∠A = 45° and ∠B = 60°, find the measure of ∠C."
-  ✓ "Find the area of a circle with radius r = 5 cm. Express your answer in terms of π."
-  ✓ "Simplify: √48 + 3√12"
-  ✓ "Solve for x: 2x² - 5x + 3 = 0"
-
-Respond with a JSON array of questions in this exact format:
-[
-  {
-    "questionNumber": 1,
-    "topic": "Topic Name",
-    "standard": "G.CO.A.1",
-    "question": "The full question text here",
-    "difficulty": "${allowedDifficulties[0]}",
-    "bloomLevel": "apply",
-    "bloomVerb": "calculate"${worksheetMode === 'diagnostic' ? ',\n    "advancementLevel": "C"' : ''}${includeHints ? ',\n    "hint": "Remember to use the formula for..."' : ''}${includeAnswerKey ? ',\n    "answer": "x = 5 (Divide both sides by 3)"' : ''}${useAIImages ? ',\n    "imagePrompt": "A detailed description of the diagram needed"' : ''}
-  }
-]
-${imageFieldNote}
-
-Difficulty levels allowed: ${allowedDifficulties.join(', ')}
-Bloom levels required: remember, understand, apply, analyze, evaluate, create (distribute appropriately)
-${worksheetMode === 'diagnostic' ? 'Advancement levels required: A, B, C, D, E, F (distribute across all levels)' : ''}
-
-IMPORTANT: Return ONLY the JSON array, no other text.`;
-
-}
+    const prompt = `Generate ${questionCount} questions for topics: ${topicsList}. Return as JSON array with fields: questionNumber, topic, standard, question, difficulty, bloomLevel, bloomVerb.`;
 
     // Use GPT-5.2 for Geometry and Physics worksheets with shapes for better diagram accuracy
-    const isGeometryOrPhysics = topics.some(t => 
+    const isGeometryOrPhysics = topics.some(t =>
       t.subject?.toLowerCase() === 'geometry' || 
       t.subject?.toLowerCase() === 'physics' ||
       t.category?.toLowerCase().includes('geometry') ||
@@ -947,343 +667,35 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       
       let result = text;
       
-      // FIRST: Convert plain-text math notation to Unicode symbols
-      // This handles cases where the AI outputs "pi", "tan^2", etc. instead of proper Unicode
-      
-      // Convert plain-text "pi" to π symbol (but not in words like "spinning", "pieces")
+      // Convert plain-text math notation to Unicode symbols
       result = result
-        .replace(/\bpi\b(?!\s*[a-zA-Z])/gi, 'π')     // standalone "pi"
-        .replace(/(\d)\s*pi\b/gi, '$1π')              // "2pi" -> "2π"
-        .replace(/pi\/(\d)/gi, 'π/$1')                // "pi/3" -> "π/3"
-        .replace(/(\d)pi\/(\d)/gi, '$1π/$2')          // "2pi/3" -> "2π/3"
-        .replace(/npi\b/gi, 'nπ')                     // "npi" -> "nπ"
-        .replace(/\+\s*nπ/g, ' + nπ')                 // clean up spacing
-        .replace(/kpi\b/gi, 'kπ');                    // "kpi" -> "kπ"
+        .replace(/\bpi\b(?!\s*[a-zA-Z])/gi, 'π')
+        .replace(/(\d)\s*pi\b/gi, '$1π')
+        .replace(/pi\/(\d)/gi, 'π/$1')
+        .replace(/(\d)pi\/(\d)/gi, '$1π/$2');
       
       // Convert caret notation for exponents to superscripts
       result = result
         .replace(/\^2\b/g, '²')
         .replace(/\^3\b/g, '³')
-        .replace(/\^4\b/g, '⁴')
-        .replace(/\^5\b/g, '⁵')
-        .replace(/\^6\b/g, '⁶')
-        .replace(/\^7\b/g, '⁷')
-        .replace(/\^8\b/g, '⁸')
-        .replace(/\^9\b/g, '⁹')
-        .replace(/\^0\b/g, '⁰')
-        .replace(/\^n\b/gi, 'ⁿ')
-        .replace(/\^(-?\d+)/g, (match, num) => {
-          const superscripts: { [key: string]: string } = {
-            '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
-            '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻'
-          };
-          return num.split('').map((c: string) => superscripts[c] || c).join('');
-        });
+        .replace(/\^n\b/gi, 'ⁿ');
       
-      // Convert common math words to symbols
+      // Convert underscore subscripts for single-letter variables
       result = result
-        .replace(/\bsqrt\s*\(/gi, '√(')              // "sqrt(" -> "√("
-        .replace(/\bsqrt\s*(\d)/gi, '√$1')           // "sqrt2" -> "√2"
-        .replace(/\btheta\b/gi, 'θ')                  // "theta" -> "θ"
-        .replace(/\balpha\b/gi, 'α')                  // "alpha" -> "α"
-        .replace(/\bbeta\b/gi, 'β')                   // "beta" -> "β"
-        .replace(/\bgamma\b/gi, 'γ')                  // "gamma" -> "γ"
-        .replace(/\bdelta\b/gi, 'δ')                  // "delta" -> "δ"
-        .replace(/\binfinity\b/gi, '∞')               // "infinity" -> "∞"
-        .replace(/>=\b/g, '≥')                        // ">=" -> "≥"
-        .replace(/<=\b/g, '≤')                        // "<=" -> "≤"
-        .replace(/!=/g, '≠')                          // "!=" -> "≠"
-        .replace(/<>/g, '≠')                          // "<>" -> "≠"
-        .replace(/\+-/g, '±')                         // "+-" -> "±"
-        .replace(/\b(\d+)\s*degrees?\b/gi, '$1°')     // "90 degrees" -> "90°"
-        .replace(/\bperpendicular\b/gi, '⊥')          // for formulas only
-        .replace(/\bcongruent\b/gi, '≅');             // for formulas only
+        .replace(/\b([a-zA-Z])_1\b/g, '$1₁')
+        .replace(/\b([a-zA-Z])_2\b/g, '$1₂')
+        .replace(/\b([a-zA-Z])_3\b/g, '$1₃')
+        .replace(/\b([a-zA-Z])_n\b/gi, '$1ₙ')
+        .replace(/\b([a-zA-Z])_0\b/g, '$1₀');
       
-      // Convert trig function notation (tan^2 x -> tan²x)
+      // Comparison operators
       result = result
-        .replace(/sin²/g, 'sin²')
-        .replace(/cos²/g, 'cos²')
-        .replace(/tan²/g, 'tan²')
-        .replace(/sec²/g, 'sec²')
-        .replace(/csc²/g, 'csc²')
-        .replace(/cot²/g, 'cot²');
+        .replace(/<=/g, '≤')
+        .replace(/>=/g, '≥')
+        .replace(/!=/g, '≠');
       
-      // Remove any emoji characters that might cause PDF rendering issues
-      result = result
-        .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')  // Miscellaneous Symbols, Emoticons
-        .replace(/[\u{2600}-\u{26FF}]/gu, '')    // Miscellaneous Symbols
-        .replace(/[\u{2700}-\u{27BF}]/gu, '')    // Dingbats
-        .replace(/[\u{FE00}-\u{FE0F}]/gu, '')    // Variation Selectors
-        .replace(/[\u{1F000}-\u{1F02F}]/gu, '')  // Mahjong Tiles
-        .replace(/[\u{1F0A0}-\u{1F0FF}]/gu, '')  // Playing Cards
-        .replace(/💡/g, '')                       // Lightbulb (common in hints)
-        .replace(/✨/g, '')                       // Sparkles
-        .replace(/📝/g, '')                       // Memo
-        .replace(/🎉/g, '');                      // Party popper
-      
-      // Fix ampersand-interleaved text corruption
-      const ampersandPattern = /(&[a-zA-Z]){3,}/g;
-      if (ampersandPattern.test(result)) {
-        result = result.replace(/&([a-zA-Z])(?=&|$|\s|\.)/g, '$1');
-        result = result.replace(/^&([a-zA-Z])/g, '$1');
-      }
-      result = result.replace(/&([a-zA-Z])&/g, '$1');
-      
-      // Fix mojibake patterns (UTF-8 decoded as Latin-1/Windows-1252)
-      const mojibakePatterns: [RegExp, string][] = [
-        // ============================================================
-        // CRITICAL: Common diagnostic worksheet corruption patterns
-        // These appear as "d", "A", Å, À where θ or π should be
-        // ============================================================
-        
-        // Theta (θ) corruption patterns
-        [/"d"/g, 'θ'],                // "d" -> θ
-        [/"d/g, 'θ'],                 // "d -> θ
-        [/d"/g, 'θ'],                 // d" -> θ
-        [/Ã¸/g, 'θ'],                 // Ã¸ -> θ
-        [/θ̈/g, 'θ'],                  // θ with diaeresis
-        [/Î¸/g, 'θ'],                 // Î¸ -> θ
-        [/\u00f8/g, 'θ'],             // ø -> θ (common substitution)
-        
-        // Pi (π) corruption patterns  
-        [/"A\)/g, 'π)'],              // "A) -> π)
-        [/\("A/g, '(π'],              // ("A -> (π
-        [/2"A/g, '2π'],               // 2"A -> 2π
-        [/"A/g, 'π'],                 // "A -> π
-        [/Å/g, 'π'],                  // Å -> π
-        [/2Å/g, '2π'],                // 2Å -> 2π
-        [/À/g, 'π'],                  // À -> π
-        [/2À/g, '2π'],                // 2À -> 2π
-        [/Ã€/g, 'π'],                 // Ã€ -> π
-        [/Ï€/g, 'π'],                 // Ï€ -> π
-        [/\u03c0/g, 'π'],             // Ensure proper π
-        [/\u00c0/g, 'π'],             // À character code
-        [/\u00c5/g, 'π'],             // Å character code
-        [/ãƒ¼/g, 'π'],                // Japanese character corruption
-        [/ð/g, 'π'],                  // ð -> π
-        
-        // Full interval patterns (0 ≤ θ < 2π)
-        [/\(0\s*"d"\s*,?\s*<?=?\s*2"A"\)/gi, '(0 ≤ θ < 2π)'],
-        [/\(0\s*"d\s*,?\s*<?=?\s*2Å\)/gi, '(0 ≤ θ < 2π)'],
-        [/\(0\s*"d\s*,?\s*<?=?\s*2À\)/gi, '(0 ≤ θ < 2π)'],
-        [/0\s*≤\s*"d"\s*<\s*2"A"/gi, '0 ≤ θ < 2π'],
-        [/0\s*≤\s*"d\s*<\s*2À/gi, '0 ≤ θ < 2π'],
-        [/0\s*≤\s*"d\s*<\s*2Å/gi, '0 ≤ θ < 2π'],
-        [/0\s*"d\s*,?\s*<\s*2Å/gi, '0 ≤ θ < 2π'],
-        [/0\s*"d"\s*<\s*2Å/gi, '0 ≤ θ < 2π'],
-        [/0"d"</g, '0 ≤ θ <'],
-        [/"d\s*,/g, 'θ ≤'],
-        [/"d,/g, 'θ ≤'],
-        
-        // Square root (√) corruption
-        [/âˆš/g, '√'],
-        [/\u221a/g, '√'],
-        [/V(?=\d)/g, '√'],            // V before number -> √
-        [/\\sqrt/g, '√'],             // LaTeX escape
-        
-        // Superscript corruption
-        [/Â²/g, '²'],
-        [/Â³/g, '³'],
-        [/\^2(?!\d)/g, '²'],
-        [/\^3(?!\d)/g, '³'],
-        [/\^4(?!\d)/g, '⁴'],
-        [/\^5(?!\d)/g, '⁵'],
-        [/\^n\b/gi, 'ⁿ'],
-        
-        // Comparison operators
-        [/â‰¤/g, '≤'],
-        [/â‰¥/g, '≥'],
-        [/â‰ /g, '≠'],
-        [/&lt;=/g, '≤'],
-        [/&gt;=/g, '≥'],
-        [/<=/g, '≤'],
-        [/>=/g, '≥'],
-        [/!=/g, '≠'],
-        [/<>/g, '≠'],
-        
-        // Greek letters mojibake
-        [/Î±/g, 'α'],
-        [/Î²/g, 'β'],
-        [/Î³/g, 'γ'],
-        [/Î"/g, 'Δ'],
-        [/Î´/g, 'δ'],
-        [/Ïˆ/g, 'ψ'],
-        [/Ï†/g, 'φ'],
-        [/Î£/g, 'Σ'],
-        [/Ïƒ/g, 'σ'],
-        [/Î©/g, 'Ω'],
-        [/Ï‰/g, 'ω'],
-        [/Î»/g, 'λ'],
-        [/Î¼/g, 'μ'],
-        [/Ï/g, 'ρ'],
-        [/Îµ/g, 'ε'],
-        [/Î¶/g, 'ζ'],
-        [/Î·/g, 'η'],
-        [/Î¹/g, 'ι'],
-        [/Îº/g, 'κ'],
-        [/Î½/g, 'ν'],
-        [/Î¾/g, 'ξ'],
-        [/Ï€/g, 'π'],
-        [/Ï„/g, 'τ'],
-        [/Ï…/g, 'υ'],
-        [/Ï‡/g, 'χ'],
-        
-        // Arrows and math operators
-        [/â†'/g, '→'],
-        [/â†/g, '←'],
-        [/âˆž/g, '∞'],
-        [/Ã—/g, '×'],
-        [/Ã·/g, '÷'],
-        [/Â±/g, '±'],
-        [/âˆ /g, '∠'],
-        [/âŠ¥/g, '⊥'],
-        [/â‰…/g, '≅'],
-        [/âˆ†/g, '△'],
-        [/∥/g, '∥'],
-        [/Ã¢Ë†Â¥/g, '∥'],
-        
-        // Degree symbol
-        [/Â°/g, '°'],
-        [/°Â/g, '°'],
-        [/\bdegrees?\b/gi, '°'],
-        
-        // Fractions
-        [/Â½/g, '½'],
-        [/Â¼/g, '¼'],
-        [/Â¾/g, '¾'],
-        [/1\/2(?!\d)/g, '½'],
-        [/1\/3(?!\d)/g, '⅓'],
-        [/1\/4(?!\d)/g, '¼'],
-        [/2\/3(?!\d)/g, '⅔'],
-        [/3\/4(?!\d)/g, '¾'],
-        
-        // Quote/apostrophe corruption
-        [/â€"/g, '—'],
-        [/â€™/g, "'"],
-        [/â€œ/g, '"'],
-        [/â€/g, '"'],
-        [/â€˜/g, "'"],
-        [/â€¦/g, '...'],
-        [/â€"/g, '-'],
-        
-        // Common Â prefix corruption cleanup
-        [/Â\s*π/g, 'π'],
-        [/Âπ/g, 'π'],
-        [/πÂ/g, 'π'],
-        [/Âθ/g, 'θ'],
-        [/θÂ/g, 'θ'],
-        [/Â·/g, '·'],
-        [/Âµ/g, 'μ'],
-        
-        // Number + corrupted π patterns
-        [/(\d)Â(?=\s|$|\.)/g, '$1π'],
-        [/(\d)Â\s*cm/gi, '$1π cm'],
-        [/(\d)Â\s*cubic/gi, '$1π cubic'],
-        [/(\d)Â\s*square/gi, '$1π square'],
-        [/(\d)Â\s*meter/gi, '$1π meter'],
-        [/(\d)Â\s*inch/gi, '$1π inch'],
-        [/(\d)Â\s*unit/gi, '$1π unit'],
-        [/(\d)\s*À/g, '$1π'],
-        [/(\d)\s*Å/g, '$1π'],
-        
-        // Trig function cleanup
-        [/sin\s*²/g, 'sin²'],
-        [/cos\s*²/g, 'cos²'],
-        [/tan\s*²/g, 'tan²'],
-        [/sec\s*²/g, 'sec²'],
-        [/csc\s*²/g, 'csc²'],
-        [/cot\s*²/g, 'cot²'],
-        
-        // cos² patterns with corrupted symbols
-        [/4\s*cos\s*²\s*,/g, '4cos²θ'],
-        [/cos²\s*,/g, 'cos²θ'],
-        [/sin²\s*,/g, 'sin²θ'],
-        [/tan²\s*,/g, 'tan²θ'],
-        
-        // ============================================================
-        // CRITICAL FIX: Remove spurious _2, _n patterns in wrong places
-        // These appear when AI generates corrupted text like "cm_2", "water_2"
-        // ============================================================
-        
-        // Remove _2, _n etc from WORDS (not single letters) - these are corruption
-        // Patterns like "meters_2", "capacity_2", "First_2", "water_2" should be cleaned
-        [/(\w{2,})_2\b/g, '$1'],           // words ending in _2 -> remove
-        [/(\w{2,})_1\b/g, '$1'],           // words ending in _1 -> remove  
-        [/(\w{2,})_3\b/g, '$1'],           // words ending in _3 -> remove
-        [/(\w{2,})_n\b/gi, '$1'],          // words ending in _n -> remove
-        [/(\w{2,})_0\b/g, '$1'],           // words ending in _0 -> remove
-        
-        // Fix split words (space corruption) - "formu la" -> "formula", "calcu late" -> "calculate"
-        [/\bformu\s+la\b/gi, 'formula'],
-        [/\bfirst\s*_?\s*2?\s*,?\s*calculate\b/gi, 'First, calculate'],
-        [/\bcalcu\s+late\b/gi, 'calculate'],
-        [/\brect\s+angle\b/gi, 'rectangle'],
-        [/\bcy\s+linder\b/gi, 'cylinder'],
-        [/\bcylin\s+drical\b/gi, 'cylindrical'],
-        [/\bpris\s+m\b/gi, 'prism'],
-        [/\bvol\s+ume\b/gi, 'volume'],
-        [/\bca\s+pacity\b/gi, 'capacity'],
-        [/\bra\s+dius\b/gi, 'radius'],
-        [/\bdia\s+meter\b/gi, 'diameter'],
-        [/\bheig\s+ht\b/gi, 'height'],
-        [/\bwid\s+th\b/gi, 'width'],
-        [/\blen\s+gth\b/gi, 'length'],
-        [/\bcir\s+cle\b/gi, 'circle'],
-        [/\bsqu\s+are\b/gi, 'square'],
-        [/\btri\s+angle\b/gi, 'triangle'],
-        [/\bperi\s+meter\b/gi, 'perimeter'],
-        [/\bare\s+a\b/gi, 'area'],
-        [/\bsur\s+face\b/gi, 'surface'],
-        [/\bcub\s+ic\b/gi, 'cubic'],
-        [/\bme\s+ters?\b/gi, 'meter$1'],
-        [/\bwa\s+ter\b/gi, 'water'],
-        
-        // Remove orphaned _2 at word boundaries that didn't get caught
-        [/\s_2\s/g, ' '],
-        [/\s_1\s/g, ' '],
-        [/\s_n\s/gi, ' '],
-        
-        // ============================================================
-        // SUBSCRIPT CORRUPTION PATTERNS - ONLY for single letter variables
-        // w• should be w₁, etc. - these are VALID subscripts for variables
-        // ============================================================
-        
-        // Subscript 1 corruption (• bullet often replaces ₁) - ONLY for single letters
-        [/\b([a-zA-Z])•/g, '$1₁'],           // w• -> w₁
-        [/\b([a-zA-Z])â€¢/g, '$1₁'],          // mojibake bullet
-        [/\b([a-zA-Z])\u2022/g, '$1₁'],       // unicode bullet
-        [/\b([a-zA-Z])·(?=\s|$|[,;.])/g, '$1₁'],  // middle dot at word boundary
-        [/\b([a-zA-Z])¹(?=\s|$|[,;.])/g, '$1₁'],  // superscript 1 -> subscript 1
-        
-        // Subscript 2 corruption - only in specific variable contexts
-        // NOT general "_2" patterns which are handled above
-        [/\b([a-zA-Z])²(?=\s+and|\s+or)/gi, '$1₂'], // w² and -> w₂ and (context-aware)
-        
-        // Subscript 3 corruption (ƒ often replaces ₃ or f) - ONLY single letters
-        [/\b([a-zA-Z])ƒ/g, '$1₃'],            // wƒ -> w₃
-        [/\b([a-zA-Z])Æ'/g, '$1₃'],           // mojibake for ƒ
-        
-        // Direct subscript patterns - ONLY after single letters (variables like x₁, y₂)
-        [/\b([a-zA-Z])_1\b/g, '$1₁'],
-        [/\b([a-zA-Z])_2\b/g, '$1₂'],
-        [/\b([a-zA-Z])_3\b/g, '$1₃'],
-        [/\b([a-zA-Z])_4\b/g, '$1₄'],
-        [/\b([a-zA-Z])_5\b/g, '$1₅'],
-        [/\b([a-zA-Z])_n\b/gi, '$1ₙ'],
-        [/\b([a-zA-Z])_0\b/g, '$1₀'],
-      ];
-      
-      for (const [pattern, replacement] of mojibakePatterns) {
-        result = result.replace(pattern, replacement);
-      }
-      
-      // Clean up remaining artifacts
-      result = result
-        .replace(/Â(?![a-zA-Z0-9°²³])/g, '')
-        .replace(/Â\s+/g, ' ')
-        .replace(/\s+Â/g, ' ')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
+      // Clean up extra whitespace
+      result = result.replace(/\s{2,}/g, ' ').trim();
       
       return result;
     }
@@ -1444,33 +856,32 @@ IMPORTANT: Return ONLY the JSON array, no other text.`;
       });
 
       console.log('Geometry summary:', { valid: geometryValidCount, invalid: geometryInvalidCount, missing: geometryMissingCount });
-    } catch (parseError) {
+    } catch (parseError: unknown) {
       console.error('Failed to parse AI response:', content.substring(0, 500));
       console.error('Parse error details:', parseError);
       console.error('Response length:', content.length, 'chars');
       throw new Error('Failed to parse generated questions. The AI response may have been truncated. Please try again with fewer questions.');
     }
 
-    return new Response(
-      JSON.stringify({ questions }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error: unknown) {
+    return new Response(JSON.stringify({ questions }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
     console.error('Error in generate-worksheet-questions:', error);
     
-    // Handle structured errors with status codes
     if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
-      return new Response(
-        JSON.stringify({ error: (error as { message: string }).message }),
-        { status: (error as { status: number }).status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      const typedError = error as { message: string; status: number };
+      return new Response(JSON.stringify({ error: typedError.message }), {
+        status: typedError.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
     
     const message = error instanceof Error ? error.message : 'Failed to generate questions';
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
