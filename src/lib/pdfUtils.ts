@@ -1,13 +1,4 @@
-import * as pdfjsLib from "pdfjs-dist";
-// @ts-ignore - Vite handles the ?url suffix for static asset import
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-
-// Configure PDF.js worker using Vite's ?url import suffix
-// This ensures the worker is properly bundled and versioned
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-
-console.log("[pdfUtils] PDF.js version:", pdfjsLib.version);
-console.log("[pdfUtils] Worker source:", pdfWorkerUrl);
+import { getPdfjs } from "@/lib/pdfjsLoader";
 
 /**
  * Convert a PDF file to an array of image data URLs (one per page)
@@ -38,6 +29,7 @@ export async function pdfToImages(
     console.log(`[pdfToImages] ArrayBuffer created, size: ${arrayBuffer.byteLength} bytes`);
 
     // Create loading task with robust options
+    const pdfjsLib = await getPdfjs();
     const loadingTask = pdfjsLib.getDocument({ 
       data: arrayBuffer,
       // Disable features that can cause worker issues

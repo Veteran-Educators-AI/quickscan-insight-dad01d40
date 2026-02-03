@@ -12,10 +12,8 @@ import { Loader2, Upload, Scan, Check, X, Trash2, Save, Image as ImageIcon, Shap
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+import type { PDFDocumentProxy } from "pdfjs-dist";
+import { getPdfjs } from "@/lib/pdfjsLoader";
 
 interface ExtractedShape {
   id: string;
@@ -76,7 +74,7 @@ export function RegentsShapeScanner({ open, onOpenChange }: RegentsShapeScannerP
   const [selectedShapeIndex, setSelectedShapeIndex] = useState<number | null>(null);
 
   // Render a PDF page to an image
-  const renderPdfPage = async (pdf: pdfjsLib.PDFDocumentProxy, pageNum: number): Promise<string> => {
+  const renderPdfPage = async (pdf: PDFDocumentProxy, pageNum: number): Promise<string> => {
     const page = await pdf.getPage(pageNum);
     const scale = 2; // Higher scale for better quality
     const viewport = page.getViewport({ scale });
@@ -126,6 +124,7 @@ export function RegentsShapeScanner({ open, onOpenChange }: RegentsShapeScannerP
       
       try {
         const arrayBuffer = await file.arrayBuffer();
+        const pdfjsLib = await getPdfjs();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const totalPages = pdf.numPages;
         
