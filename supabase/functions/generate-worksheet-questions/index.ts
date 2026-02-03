@@ -50,7 +50,7 @@ async function callLovableAI(prompt: string, modelOrAdvanced: boolean | string =
   if (typeof modelOrAdvanced === 'string') {
     model = modelOrAdvanced;
   } else {
-    model = modelOrAdvanced ? 'openai/gpt-5.2' : 'google/gemini-1.5-flash';
+    model = modelOrAdvanced ? 'openai/gpt-5.2' : 'openai/gpt-4o-mini';
   }
   
   console.log(`Using AI model: ${model}`);
@@ -753,9 +753,9 @@ ${exampleOutput}`;
         throw new Error('Insufficient content');
       }
     } catch (e) {
-      console.warn("Primary AI call failed, attempting fallback to Gemini...", e);
-      // Fallback to Gemini 1.5 Flash which is reliable and supported
-      content = await callLovableAI(prompt, 'google/gemini-1.5-flash');
+      console.warn("Primary AI call failed, attempting fallback to GPT-4o-mini...", e);
+      // Fallback to GPT-4o-mini which is reliable and supported
+      content = await callLovableAI(prompt, 'openai/gpt-4o-mini');
     }
 
     // Function to fix common Unicode encoding issues in math text
