@@ -771,8 +771,8 @@ ${exampleOutput}`;
       }
     } catch (e) {
       console.warn("Primary AI call failed, attempting fallback to Gemini...", e);
-      // Fallback to Gemini 2.0 Flash which is very reliable for formatting
-      content = await callLovableAI(prompt, 'google/gemini-2.0-flash');
+      // Fallback to Gemini 1.5 Flash which is reliable and supported
+      content = await callLovableAI(prompt, 'google/gemini-1.5-flash');
     }
 
     // Function to fix common Unicode encoding issues in math text
