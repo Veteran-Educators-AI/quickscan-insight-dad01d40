@@ -1043,21 +1043,32 @@ async function generateImageWithNanoBanana(
     // ═══════════════════════════════════════════════════════════════════════════════
 
     // Parse coordinates from the prompt to provide explicit placement instructions
-    const coordinateMatches = prompt.match(/\((\d+),\s*(\d+)\)/g) || [];
+    // Support negative coordinates
+    const coordinateMatches = prompt.match(/\((-?\d+),\s*(-?\d+)\)/g) || [];
     const coordinates = coordinateMatches
       .map((match) => {
-        const nums = match.match(/(\d+)/g);
+        const nums = match.match(/(-?\d+)/g);
         return nums ? { x: parseInt(nums[0]), y: parseInt(nums[1]) } : null;
       })
       .filter(Boolean);
 
     // Determine the coordinate range needed
-    const maxX = Math.max(10, ...coordinates.map((c) => c!.x + 1));
-    const maxY = Math.max(10, ...coordinates.map((c) => c!.y + 1));
+    // Default to -5 to 10 to cover most cases if no coords
+    let minX = coordinates.length ? Math.min(-1, ...coordinates.map((c) => c!.x - 1)) : -2;
+    let maxX = coordinates.length ? Math.max(10, ...coordinates.map((c) => c!.x + 1)) : 10;
+    let minY = coordinates.length ? Math.min(-1, ...coordinates.map((c) => c!.y - 1)) : -2;
+    let maxY = coordinates.length ? Math.max(10, ...coordinates.map((c) => c!.y + 1)) : 10;
+
+    // Ensure origin (0,0) is included or at least reasonable context
+    minX = Math.min(minX, -1);
+    minY = Math.min(minY, -1);
 
     // Generate the EXPLICIT list of axis numbers
-    const xAxisNumbers = Array.from({ length: maxX + 1 }, (_, i) => i).join(", ");
-    const yAxisNumbers = Array.from({ length: maxY + 1 }, (_, i) => i).join(", ");
+    const range = (start: number, end: number) => Array.from({length: (end - start) + 1}, (_, i) => start + i);
+    const xAxisNumbers = range(minX, maxX).join(", ");
+    const yAxisNumbers = range(minY, maxY).join(", ");
+    const xAxisSequence = range(minX, maxX).join(" then ");
+    const yAxisSequence = range(minY, maxY).join(", then ");
 
     const enhancedPrompt = `CREATE A MATHEMATICAL COORDINATE PLANE DIAGRAM.
 
@@ -1074,10 +1085,10 @@ THE X-AXIS (horizontal line):
 - Put tick marks at EQUAL intervals
 - Write these EXACT numbers BELOW the tick marks, reading LEFT to RIGHT:
   ${xAxisNumbers}
-- The number 0 is on the LEFT (at the origin)
+- The number ${minX} is on the LEFT
 - The number ${maxX} is on the RIGHT
-- EVERY number from 0 to ${maxX} must appear ONCE and ONLY ONCE
-- Numbers must be IN ORDER: 0 then 1 then 2 then 3 then 4 then 5 then 6 then 7 then 8 then 9 then 10
+- EVERY number from ${minX} to ${maxX} must appear ONCE and ONLY ONCE
+- Numbers must be IN ORDER: ${xAxisSequence}
 - DO NOT SKIP ANY NUMBERS
 - DO NOT PUT ANY NUMBER TWICE
 
@@ -1088,16 +1099,15 @@ THE Y-AXIS (vertical line):
 - Put tick marks at EQUAL intervals
 - Write these EXACT numbers TO THE LEFT of the tick marks, reading BOTTOM to TOP:
   ${yAxisNumbers}
-- The number 0 is at the BOTTOM (at the origin, shared with x-axis)
+- The number ${minY} is at the BOTTOM
 - The number ${maxY} is at the TOP
-- EVERY number from 0 to ${maxY} must appear ONCE and ONLY ONCE
-- Numbers must be IN ORDER: 0 at bottom, then 1 above it, then 2, then 3, then 4, then 5, then 6, then 7, then 8, then 9, then 10 at top
+- EVERY number from ${minY} to ${maxY} must appear ONCE and ONLY ONCE
+- Numbers must be IN ORDER: ${yAxisSequence}
 - DO NOT SKIP ANY NUMBERS
 - DO NOT PUT ANY NUMBER TWICE
 
 THE ORIGIN:
 - Is where the X and Y axes cross
-- Is at the BOTTOM-LEFT of the coordinate grid
 - Has the value (0, 0)
 - Both axes share the "0" at this point
 
@@ -1106,14 +1116,15 @@ GRID LINES (optional but helpful):
 - Like graph paper
 
 ═══════════════════════════════════════════════════════════════════════════════
-AXIS NUMBER VERIFICATION - COUNT THESE OUT LOUD:
+═══════════════════════════════════════════════════════════════════════════════
+AXIS NUMBER VERIFICATION:
 ═══════════════════════════════════════════════════════════════════════════════
 
 X-AXIS (read left to right): 
-Position 1: "0" | Position 2: "1" | Position 3: "2" | Position 4: "3" | Position 5: "4" | Position 6: "5" | Position 7: "6" | Position 8: "7" | Position 9: "8" | Position 10: "9" | Position 11: "10"
+Start at "${minX}", count up one by one until you reach "${maxX}".
 
 Y-AXIS (read bottom to top):
-Position 1 (bottom): "0" | Position 2: "1" | Position 3: "2" | Position 4: "3" | Position 5: "4" | Position 6: "5" | Position 7: "6" | Position 8: "7" | Position 9: "8" | Position 10: "9" | Position 11 (top): "10"
+Start at "${minY}" (bottom), count up one by one until you reach "${maxY}" (top).
 
 ═══════════════════════════════════════════════════════════════════════════════
 NOW DRAW THE SHAPE ON TOP OF THE COORDINATE PLANE:
@@ -1127,13 +1138,13 @@ ${
 VERTEX PLOTTING INSTRUCTIONS:
 ${coordinates
   .map((c, i) => {
-    const labels = prompt.match(/[A-Z]\s*\(\d+,\s*\d+\)/g) || [];
-    const label = labels[i] || `Point ${i + 1}`;
+    const labels = prompt.match(/[A-Z]\s*\((-?\d+),\s*(-?\d+)\)/g) || [];
+    const label = labels[i] ? labels[i].split('(')[0].trim() : `Point ${i + 1}`;
     return `• ${label}: 
-    - Start at origin (0,0) in bottom-left corner
-    - Count ${c!.x} tick marks to the RIGHT on the x-axis (you should be at x=${c!.x})
-    - From there, count ${c!.y} tick marks UPWARD (you should now be at y=${c!.y})
-    - Place a solid black dot at this grid intersection
+    - Start at origin (0,0)
+    - Move ${Math.abs(c!.x)} units ${c!.x >= 0 ? "RIGHT" : "LEFT"} along x-axis to x=${c!.x}
+    - Move ${Math.abs(c!.y)} units ${c!.y >= 0 ? "UP" : "DOWN"} parallel to y-axis to y=${c!.y}
+    - Place a solid black dot at this intersection
     - Write "${label}" next to the dot, outside the shape`;
   })
   .join("\n")}
@@ -1147,19 +1158,17 @@ Connect the vertices with thin black lines to form the shape.
 COMMON MISTAKES TO AVOID:
 ═══════════════════════════════════════════════════════════════════════════════
 
-❌ WRONG: X-axis reads "0, 1, 2, 3, 5, 8, 9, 10" (missing 4, 6, 7)
-❌ WRONG: Y-axis reads "0, 1, 2, 3, 4, 7, 8, 9, 10" (missing 5, 6)
+❌ WRONG: Missing numbers
 ❌ WRONG: Numbers not evenly spaced
-❌ WRONG: Numbers in random order like "10, 3, 7, 4"
-❌ WRONG: Same number appearing twice
+❌ WRONG: Random order
 ❌ WRONG: Rotated or diagonal text
-❌ WRONG: Numbers placed inconsistently (some above, some below axis)
+❌ WRONG: Origin (0,0) not clearly defined
 
-✅ CORRECT: Every integer from 0 to 10 appears exactly once
-✅ CORRECT: Numbers are in sequential order (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-✅ CORRECT: Numbers are evenly spaced
-✅ CORRECT: X-axis numbers below the line, Y-axis numbers to the left of the line
+✅ CORRECT: Every integer from min to max appears exactly once
+✅ CORRECT: Sequential order
+✅ CORRECT: Evenly spaced
 ✅ CORRECT: All text is horizontal
+✅ CORRECT: Vertex labels outside the shape
 
 ═══════════════════════════════════════════════════════════════════════════════
 STYLE REQUIREMENTS:
@@ -2657,9 +2666,13 @@ Style: Simple line art, clean educational diagram suitable for projection.`
           diagramSource = 'coordinate_svg'; // P9.1
         } else if (coordinateResult) {
           console.log("⚠ Coordinate SVG failed validation, trying next step...");
+        } else {
+          console.log("Step 3: Deterministic generation not applicable or failed (returned null)");
         }
+      } else if (!imageUrl) {
+        console.log(`Step 3: Skipped (SimpleSVG: ${shouldUseSimpleSVG}, PreferDeterministic: ${preferDeterministicSVG})`);
       }
-      console.log("New Changes for debugging.")
+
       // STEP 4: Try AI Generation (Nano Banana)
       if (!imageUrl && useNanoBanana) {
         console.log("Step 4: Attempting AI generation with Nano Banana...");
@@ -2672,6 +2685,8 @@ Style: Simple line art, clean educational diagram suitable for projection.`
         } else {
           console.log("⚠ AI generation failed, trying next step...");
         }
+      } else if (!imageUrl) {
+        console.log(`Step 4: Skipped (useNanoBanana is ${useNanoBanana})`);
       }
 
       // STEP 5: Use hardcoded fallback shapes as last resort
