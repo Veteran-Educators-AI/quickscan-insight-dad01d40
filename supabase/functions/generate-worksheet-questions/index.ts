@@ -50,7 +50,7 @@ async function callLovableAI(prompt: string, modelOrAdvanced: boolean | string =
   if (typeof modelOrAdvanced === 'string') {
     model = modelOrAdvanced;
   } else {
-    model = modelOrAdvanced ? 'openai/gpt-5.2' : 'google/gemini-2.5-flash';
+    model = modelOrAdvanced ? 'openai/gpt-5.2' : 'google/gemini-1.5-flash';
   }
   
   console.log(`Using AI model: ${model}`);
