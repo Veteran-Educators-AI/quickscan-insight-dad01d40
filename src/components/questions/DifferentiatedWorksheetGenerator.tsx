@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, Shapes, RefreshCw, QrCode, Palette, BookOpen, ImageIcon, FileType } from 'lucide-react';
+import { Loader2, Sparkles, Users, Download, FileText, CheckCircle, AlertCircle, Save, Trash2, TrendingUp, Brain, Eye, ZoomIn, ZoomOut, X, Printer, RefreshCw, QrCode, Palette, BookOpen, ImageIcon, FileType } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QuestionPreviewPanel } from './QuestionPreviewPanel';
 import { GenerationTimeEstimator } from './GenerationTimeEstimator';
@@ -362,9 +362,6 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [formCount, setFormCount] = useState(diagnosticMode ? '4' : '1');
   const [includeHints, setIncludeHints] = useState(false);
   const [useAdaptiveDifficulty, setUseAdaptiveDifficulty] = useState(true);
-  const [includeGeometry, setIncludeGeometry] = useState(false);
-  const [useAIImages, setUseAIImages] = useState(false);
-  const [preferDeterministicSVG, setPreferDeterministicSVG] = useState(false);
   const [includeStudentQR, setIncludeStudentQR] = useState(true);
   const [onlyWithoutDiagnostic, setOnlyWithoutDiagnostic] = useState(false);
   const [marginSize, setMarginSize] = useState<'small' | 'medium' | 'large'>('medium');
@@ -375,10 +372,6 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [storyboardStyle, setStoryboardStyle] = useState<'storyboard' | 'illustration' | 'diagram'>('storyboard');
   const [storyboardImages, setStoryboardImages] = useState<Record<string, string>>({});
   const [regeneratingImageKey, setRegeneratingImageKey] = useState<string | null>(null);
-  
-  // Geometry shapes state for on-demand generation
-  const [geometryShapes, setGeometryShapes] = useState<Record<string, string>>({});
-  const [regeneratingShapeKey, setRegeneratingShapeKey] = useState<string | null>(null);
   
   // Topics from standards menu selection
   const [customTopics, setCustomTopics] = useState<{ topicName: string; standard: string }[]>([]);
@@ -407,10 +400,6 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       if (diagnosticMode) {
         setFormCount('4');
         setWarmUpDifficulty('easy');
-        // For diagnostics, default to including geometry with deterministic SVG
-        setIncludeGeometry(true);
-        setPreferDeterministicSVG(true);
-        setUseAIImages(false);
       }
       // Load initial topics from standards menu selection
       if (initialTopics.length > 0) {
@@ -472,16 +461,12 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
       setShowImageWarning(true);
     } else {
       // Turning OFF - no warning needed
-      if (option === 'geometry') setIncludeGeometry(false);
-      else if (option === 'aiImages') setUseAIImages(false);
-      else if (option === 'storyboard') setIncludeStoryboardArt(false);
+      if (option === 'storyboard') setIncludeStoryboardArt(false);
     }
   };
   
   const confirmImageGeneration = () => {
-    if (pendingImageOption === 'geometry') setIncludeGeometry(true);
-    else if (pendingImageOption === 'aiImages') setUseAIImages(true);
-    else if (pendingImageOption === 'storyboard') setIncludeStoryboardArt(true);
+    if (pendingImageOption === 'storyboard') setIncludeStoryboardArt(true);
     setShowImageWarning(false);
     setPendingImageOption(null);
   };
@@ -987,67 +972,15 @@ const toggleStudent = (studentId: string) => {
           for (let warmUpIdx = 0; warmUpIdx < questions.warmUp.length; warmUpIdx++) {
             const q = questions.warmUp[warmUpIdx];
             const sanitizedQuestion = formatWordText(q.question);
-            const shapeKey = `${assignedForm}-${student.recommendedLevel}-warmUp-${warmUpIdx}`;
-            const altWarmUpKey = `${cacheKey}-warmUp-${warmUpIdx}`;
-            const generatedShapeUrl = geometryShapes[shapeKey] || geometryShapes[altWarmUpKey];
-            const hasShape = !isNoShapeSubject && useAIImages && (((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl);
             children.push(
               new Paragraph({
                 children: [
                   new TextRun({ text: `${q.questionNumber}. `, bold: true, size: 22 }),
                   new TextRun({ text: sanitizedQuestion, size: 20 }),
-                  ...(hasShape ? [new TextRun({ text: '  📐 Diagram', size: 16, color: '2563EB', italics: true })] : []),
                 ],
                 spacing: { before: 100, after: 50 },
               })
             );
-
-            // Add geometry image if available (for warm-up) - check generated shapes first
-            if (!isNoShapeSubject && useAIImages && (generatedShapeUrl || ((q.imageUrl || q.svg) && includeGeometry))) {
-              try {
-                let imageData = generatedShapeUrl || q.imageUrl || '';
-                if (!imageData && q.svg && !q.imageUrl) {
-                  imageData = await svgToPngDataUrl(q.svg, 200, 200);
-                }
-                // If still no image but we have an imagePrompt, generate on-demand
-                if (!imageData && q.imagePrompt && useAIImages && includeGeometry) {
-                  try {
-                    const { data: genData } = await supabase.functions.invoke('generate-diagram-images', {
-                      body: {
-                        questions: [{ questionNumber: 1, imagePrompt: q.imagePrompt }],
-                        useNanoBanana: useAIImages,
-                        preferDeterministicSVG: preferDeterministicSVG,
-                      },
-                    });
-                    imageData = genData?.results?.[0]?.imageUrl || '';
-                  } catch (genError) {
-                    console.error('Error generating warm-up shape on-demand for Word:', genError);
-                  }
-                }
-                if (imageData) {
-                  const imageBuffer = await fetchImageAsArrayBuffer(imageData);
-                  if (imageBuffer) {
-                    children.push(
-                      new Paragraph({
-                        children: [
-                          new ImageRun({
-                            data: imageBuffer,
-                            transformation: {
-                              width: 120,
-                              height: 120,
-                            },
-                            type: 'png',
-                          }),
-                        ],
-                        spacing: { before: 100, after: 100 },
-                      })
-                    );
-                  }
-                }
-              } catch (imgError) {
-                console.error('Error adding warm-up image to Word doc:', imgError);
-              }
-            }
 
             if (q.hint && includeHints) {
               children.push(
@@ -1114,122 +1047,16 @@ const toggleStudent = (studentId: string) => {
           for (let idx = 0; idx < questions.main.length; idx++) {
             const q = questions.main[idx];
             const sanitizedQuestion = formatWordText(q.question);
-            const shapeKey = `${assignedForm}-${student.recommendedLevel}-main-${idx}`;
-            const generatedShapeUrl = geometryShapes[shapeKey];
-            const hasShape = !isNoShapeSubject && useAIImages && (((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl);
 
             children.push(
               new Paragraph({
                 children: [
                   new TextRun({ text: `${idx + 1}. `, bold: true, size: 22 }),
                   new TextRun({ text: sanitizedQuestion, size: 20 }),
-                  ...(hasShape ? [new TextRun({ text: '  📐 Diagram', size: 16, color: '2563EB', italics: true })] : []),
                 ],
                 spacing: { before: 150, after: 50 },
               })
             );
-
-            // Add geometry image if available (for main questions) - check generated shapes first
-            // Also try alternative key formats for robustness
-            const altShapeKey = `${cacheKey}-main-${idx}`;
-            const finalShapeUrl = generatedShapeUrl || geometryShapes[altShapeKey];
-            
-            if (!isNoShapeSubject && useAIImages && (finalShapeUrl || ((q.imageUrl || q.svg) && includeGeometry))) {
-              try {
-                let imageData = '';
-                
-                // Priority 1: Use pre-generated shape URL
-                if (finalShapeUrl) {
-                  // Check if it's SVG that needs conversion
-                  const isSvg = finalShapeUrl.startsWith('data:image/svg') || 
-                               finalShapeUrl.startsWith('<svg') || 
-                               finalShapeUrl.includes('xmlns="http://www.w3.org/2000/svg"');
-                  if (isSvg) {
-                    imageData = await svgToPngDataUrl(finalShapeUrl, 200, 200);
-                  } else {
-                    imageData = finalShapeUrl;
-                  }
-                }
-                
-                // Priority 2: Use existing imageUrl
-                if (!imageData && q.imageUrl && useAIImages && includeGeometry) {
-                  const isSvg = q.imageUrl.startsWith('data:image/svg') || 
-                               q.imageUrl.startsWith('<svg');
-                  if (isSvg) {
-                    imageData = await svgToPngDataUrl(q.imageUrl, 200, 200);
-                  } else if (q.imageUrl.startsWith('data:image/png') || q.imageUrl.startsWith('data:image/jpeg')) {
-                    imageData = q.imageUrl;
-                  } else {
-                    // External URL - convert via canvas
-                    try {
-                      imageData = await svgToPngDataUrl(q.imageUrl, 200, 200);
-                    } catch {
-                      imageData = q.imageUrl;
-                    }
-                  }
-                }
-                
-                // Priority 3: Convert raw SVG string
-                if (!imageData && q.svg && !q.imageUrl && useAIImages && includeGeometry) {
-                  imageData = await svgToPngDataUrl(q.svg, 200, 200);
-                }
-                
-                // Priority 4: Generate from imagePrompt on-demand
-                if (!imageData && q.imagePrompt && useAIImages && includeGeometry) {
-                  try {
-                    console.log('Generating diagram for Word doc:', q.imagePrompt.substring(0, 50));
-                    const { data: genData, error: genError } = await supabase.functions.invoke('generate-diagram-images', {
-                      body: {
-                        questions: [{ questionNumber: 1, imagePrompt: q.imagePrompt }],
-                        useNanoBanana: false, // Use simple B&W SVG for worksheets
-                        preferDeterministicSVG: preferDeterministicSVG,
-                      },
-                    });
-                    
-                    if (genError) {
-                      console.error('Edge function error:', genError);
-                    } else {
-                      const generatedUrl = genData?.results?.[0]?.imageUrl || '';
-                      if (generatedUrl) {
-                        // Always convert to PNG for Word compatibility
-                        const isGenSvg = generatedUrl.startsWith('data:image/svg') || 
-                                        generatedUrl.startsWith('<svg');
-                        if (isGenSvg) {
-                          imageData = await svgToPngDataUrl(generatedUrl, 200, 200);
-                        } else {
-                          imageData = generatedUrl;
-                        }
-                      }
-                    }
-                  } catch (genError) {
-                    console.error('Error generating shape on-demand for Word:', genError);
-                  }
-                }
-                
-                if (imageData) {
-                  const imageBuffer = await fetchImageAsArrayBuffer(imageData);
-                  if (imageBuffer) {
-                    children.push(
-                      new Paragraph({
-                        children: [
-                          new ImageRun({
-                            data: imageBuffer,
-                            transformation: {
-                              width: 150,
-                              height: 150,
-                            },
-                            type: 'png',
-                          }),
-                        ],
-                        spacing: { before: 100, after: 100 },
-                      })
-                    );
-                  }
-                }
-              } catch (imgError) {
-                console.error('Error adding main question image to Word doc:', imgError);
-              }
-            }
 
             // Also add storyboard art if available
             const storyboardKey = `${cacheKey}-main-${idx}`;
@@ -1425,7 +1252,7 @@ const toggleStudent = (studentId: string) => {
       for (const form of formsToGenerate) {
         for (const level of levelsWithStudents) {
           const cacheKey = `${form}-${level}`;
-          setGenerationStatus(`Generating Form ${form} questions for Level ${level}${includeGeometry ? ' with shapes' : ''}...`);
+          setGenerationStatus(`Generating Form ${form} questions for Level ${level}...`);
           
           // Generate warm-up questions for this form
           let warmUpQuestions: GeneratedQuestion[] = [];
@@ -1449,8 +1276,6 @@ const toggleStudent = (studentId: string) => {
                 formVariation: form,
                 formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
                 includeHints,
-                includeGeometry,
-                useAIImages,
               },
             });
             warmUpQuestions = warmUpData?.questions || [];
@@ -1480,8 +1305,6 @@ const toggleStudent = (studentId: string) => {
               formVariation: form,
               formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
               includeHints,
-              includeGeometry,
-              useAIImages,
             },
           });
           
@@ -1668,41 +1491,6 @@ const toggleStudent = (studentId: string) => {
               });
               pdf.setFontSize(11); // Reset font size
 
-              // Add geometry diagram if available for warm-up (check on-demand shapes first)
-              const warmUpShapeKey = `${cacheKey}-warmUp-${warmUpIdx}`;
-              const warmUpGeneratedShapeUrl = geometryShapes[warmUpShapeKey];
-              const hasWarmUpShape = !isNoShapeSubject && (warmUpGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry));
-              
-              if (hasWarmUpShape) {
-                try {
-                  if (yPosition > pageHeight - 55) {
-                    pdf.addPage();
-                    yPosition = margin;
-                  }
-                  const imgWidth = 40; // smaller for warm-up
-                  const imgHeight = 40;
-                  yPosition += 3;
-                  
-                  // Prioritize on-demand generated shape, then imageUrl, then SVG
-                  let imageData = warmUpGeneratedShapeUrl || question.imageUrl || '';
-                  if (!imageData && question.svg) {
-                    try {
-                      imageData = await svgToPngDataUrl(question.svg, 200, 200);
-                    } catch (convErr) {
-                      console.error('Error converting warm-up SVG to PNG:', convErr);
-                      imageData = '';
-                    }
-                  }
-                  
-                  if (imageData) {
-                    pdf.addImage(imageData, 'PNG', textIndent, yPosition, imgWidth, imgHeight);
-                    yPosition += imgHeight + 3;
-                  }
-                } catch (imgError) {
-                  console.error('Error adding warm-up image to PDF:', imgError);
-                }
-              }
-
               // Add hint if available
               if (question.hint && includeHints) {
                 yPosition += 2;
@@ -1854,48 +1642,6 @@ const toggleStudent = (studentId: string) => {
               yPosition += 4.5;
             }
             pdf.setFontSize(11); // Reset font size
-
-            // Add geometry diagram if available (check on-demand shapes first)
-            const mainShapeKey = `${cacheKey}-main-${questionIdx}`;
-            const mainGeneratedShapeUrl = geometryShapes[mainShapeKey];
-            const hasMainShape = !isNoShapeSubject && (mainGeneratedShapeUrl || ((question.imageUrl || question.svg) && includeGeometry));
-            
-            if (hasMainShape) {
-              try {
-                // Check if we need a new page for the image
-                if (yPosition > pageHeight - 70) {
-                  pdf.addPage();
-                  pageCount++;
-                  await addContinuationPageHeader(pageCount);
-                  yPosition = 25; // Start below the continuation header
-                }
-                
-                // Prioritize on-demand generated shape, then imageUrl, then SVG
-                let imageData = mainGeneratedShapeUrl || question.imageUrl || '';
-                if (!imageData && question.svg) {
-                  try {
-                    imageData = await svgToPngDataUrl(question.svg, 200, 200);
-                  } catch (convErr) {
-                    console.error('Error converting SVG to PNG:', convErr);
-                    imageData = '';
-                  }
-                }
-                
-                if (imageData) {
-                  // Add the image to the PDF
-                  const imgWidth = 50; // mm
-                  const imgHeight = 50; // mm
-                  const imgX = textIndent;
-                  
-                  yPosition += 3;
-                  pdf.addImage(imageData, 'PNG', imgX, yPosition, imgWidth, imgHeight);
-                  yPosition += imgHeight + 5;
-                }
-              } catch (imgError) {
-                console.error('Error adding image to PDF:', imgError);
-                // Continue without the image
-              }
-            }
 
             // Add storyboard art if available
             if (includeStoryboardArt) {
@@ -2202,7 +1948,6 @@ const toggleStudent = (studentId: string) => {
           studentCount: selectedStudents.length,
           formCount: numForms,
           topicCount: selectedTopics.length,
-          includeGeometry,
           includeStoryboardArt,
           diagnosticMode,
         },
@@ -2255,7 +2000,7 @@ const toggleStudent = (studentId: string) => {
       for (const form of formsToGenerate) {
         for (const level of levelsWithStudents) {
           const cacheKey = `${form}-${level}`;
-          setGenerationStatus(`Generating Form ${form} questions for Level ${level}${includeGeometry ? ' with shapes' : ''}...`);
+          setGenerationStatus(`Generating Form ${form} questions for Level ${level}...`);
 
           let warmUpQuestions: GeneratedQuestion[] = [];
           if (parseInt(warmUpCount) > 0) {
@@ -2277,8 +2022,6 @@ const toggleStudent = (studentId: string) => {
                 formVariation: form,
                 formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
                 includeHints,
-                includeGeometry,
-                useAIImages,
               },
             });
             warmUpQuestions = warmUpData?.questions || [];
@@ -2306,8 +2049,6 @@ const toggleStudent = (studentId: string) => {
               formVariation: form,
               formSeed: form.charCodeAt(0) * 1000 + level.charCodeAt(0),
               includeHints,
-              includeGeometry,
-              useAIImages,
             },
           });
 
@@ -2327,66 +2068,7 @@ const toggleStudent = (studentId: string) => {
       });
       setShowPreview(true);
 
-      // Auto-generate geometry shapes if includeGeometry is enabled
-      if (includeGeometry) {
-        setGenerationStatus('Generating geometry diagrams...');
-        const shapesToGenerate: { questionKey: string; questionText: string; imagePrompt?: string }[] = [];
-        
-        for (const [cacheKey, questions] of Object.entries(formQuestionCache)) {
-          questions.warmUp?.forEach((q, idx) => {
-            if (q.imagePrompt || q.question) {
-              shapesToGenerate.push({
-                questionKey: `${cacheKey}-warmUp-${idx}`,
-                questionText: q.question,
-                imagePrompt: q.imagePrompt,
-              });
-            }
-          });
-          questions.main?.forEach((q, idx) => {
-            if (q.imagePrompt || q.question) {
-              shapesToGenerate.push({
-                questionKey: `${cacheKey}-main-${idx}`,
-                questionText: q.question,
-                imagePrompt: q.imagePrompt,
-              });
-            }
-          });
-        }
-
-        // Generate shapes in batches to avoid overwhelming the API
-        const batchSize = 5;
-        for (let i = 0; i < shapesToGenerate.length; i += batchSize) {
-          const batch = shapesToGenerate.slice(i, i + batchSize);
-          await Promise.all(
-            batch.map(async ({ questionKey, questionText, imagePrompt }) => {
-              try {
-                const prompt = imagePrompt || questionText;
-                const { data } = await supabase.functions.invoke('generate-diagram-images', {
-                  body: {
-                    questions: [{
-                      questionNumber: 1,
-                      imagePrompt: prompt,
-                    }],
-                    useNanoBanana: useAIImages,
-                    preferDeterministicSVG: preferDeterministicSVG,
-                  },
-                });
-                
-                const imageUrl = data?.results?.[0]?.imageUrl;
-                if (imageUrl) {
-                  setGeometryShapes(prev => ({
-                    ...prev,
-                    [questionKey]: imageUrl,
-                  }));
-                }
-              } catch (error) {
-                console.error(`Error generating shape for ${questionKey}:`, error);
-              }
-            })
-          );
-          setGenerationProgress(Math.min(100, ((i + batchSize) / shapesToGenerate.length) * 100));
-        }
-      }
+      // Preview is ready
     } catch (error) {
       console.error('Error generating preview:', error);
       toast({
@@ -2425,7 +2107,7 @@ const toggleStudent = (studentId: string) => {
       for (const key of keys) {
         const [form, level] = key.split('-');
         setRegeneratingKey(key);
-        setGenerationStatus(`Regenerating Form ${form} Level ${level}${includeGeometry ? ' with shapes' : ''}...`);
+        setGenerationStatus(`Regenerating Form ${form} Level ${level}...`);
 
         let warmUpQuestions: GeneratedQuestion[] = [];
         if (parseInt(warmUpCount) > 0) {
@@ -2447,8 +2129,6 @@ const toggleStudent = (studentId: string) => {
               formVariation: form,
               formSeed: Date.now() + form.charCodeAt(0) * 1000 + level.charCodeAt(0), // New seed for variation
               includeHints,
-              includeGeometry,
-              useAIImages,
             },
           });
           warmUpQuestions = warmUpData?.questions || [];
@@ -2476,8 +2156,6 @@ const toggleStudent = (studentId: string) => {
             formVariation: form,
             formSeed: Date.now() + form.charCodeAt(0) * 1000 + level.charCodeAt(0), // New seed for variation
             includeHints,
-            includeGeometry,
-            useAIImages,
           },
         });
 
@@ -2550,8 +2228,6 @@ const toggleStudent = (studentId: string) => {
           formVariation: form,
           formSeed: Date.now(), // New seed for unique question
           includeHints,
-          includeGeometry,
-          useAIImages,
         },
       });
 
@@ -3645,73 +3321,6 @@ const toggleStudent = (studentId: string) => {
             </div>
           </div>
 
-          {/* Include Geometry Shapes Option */}
-          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Shapes className="h-5 w-5 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <Label htmlFor="includeGeometry" className="text-sm font-medium text-blue-900 cursor-pointer flex items-center gap-2">
-                  Include Geometry Shapes
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="text-sm">
-                          Generate visual diagrams for geometry questions including triangles, circles, angles, 
-                          coordinate planes, and 3D shapes. Makes worksheets more engaging and visual.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </Label>
-                <p className="text-xs text-blue-700 mt-0.5">
-                  Add visual diagrams for geometry-related questions
-                </p>
-              </div>
-            </div>
-            <Switch
-              id="includeGeometry"
-              checked={includeGeometry}
-              onCheckedChange={() => handleImageToggle('geometry', includeGeometry)}
-            />
-          </div>
-
-          {includeGeometry && (
-            <div className="ml-6 space-y-3">
-              {/* Info box about text-based geometry */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                <p className="text-sm text-slate-700">
-                  <strong>Default:</strong> Geometry questions will include detailed verbal descriptions 
-                  of shapes that students can draw themselves. This provides <strong>maximum workspace</strong> for 
-                  showing work clearly.
-                </p>
-              </div>
-
-              {/* AI-Generated Images Toggle - Optional */}
-              <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <Label htmlFor="useAIImages" className="text-sm font-medium text-cyan-900 cursor-pointer flex items-center gap-2">
-                      Generate AI Diagrams (Optional)
-                      <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 px-1.5">Slower</Badge>
-                    </Label>
-                    <p className="text-xs text-cyan-700 mt-0.5">
-                      Add AI-generated images. Takes a few seconds per image; full class set may take 5-10 mins.
-                    </p>
-                  </div>
-                  <Switch
-                    id="useAIImages"
-                    checked={useAIImages}
-                    onCheckedChange={() => handleImageToggle('aiImages', useAIImages)}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Storyboard Art for Non-Math Subjects */}
           <div className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 rounded-lg">
