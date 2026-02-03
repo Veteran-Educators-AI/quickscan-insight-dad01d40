@@ -50,12 +50,12 @@ async function callLovableAI(prompt: string, modelOrAdvanced: boolean | string =
   if (typeof modelOrAdvanced === 'string') {
     model = modelOrAdvanced;
   } else {
-    model = modelOrAdvanced ? 'openai/gpt-5.2' : 'openai/gpt-4o-mini';
+    model = modelOrAdvanced ? 'openai/gpt-4o' : 'openai/gpt-4o-mini';
   }
   
   console.log(`Using AI model: ${model}`);
 
-  // OpenAI models (gpt-5.2, etc.) require max_completion_tokens, Gemini uses max_tokens
+  // OpenAI models (gpt-4o, etc.) require max_completion_tokens, Gemini uses max_tokens
   const isOpenAIModel = model.startsWith('openai/');
   const tokenParams = isOpenAIModel 
     ? { max_completion_tokens: 12000 }
