@@ -1203,7 +1203,6 @@ export function Gradebook({ classId }: GradebookProps) {
         open={pushAssignmentOpen}
         onOpenChange={setPushAssignmentOpen}
         defaultClassId={classId}
-        defaultTopic={pushAssignmentTopic}
       />
     </Collapsible>
   );
