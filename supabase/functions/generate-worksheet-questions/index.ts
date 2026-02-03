@@ -49,6 +49,12 @@ async function callLovableAI(prompt: string, useAdvancedModel: boolean = false):
   const model = useAdvancedModel ? 'openai/gpt-5.2' : 'google/gemini-2.5-flash';
   console.log(`Using AI model: ${model} (advanced: ${useAdvancedModel})`);
 
+  // OpenAI models (gpt-5.2, etc.) require max_completion_tokens, Gemini uses max_tokens
+  const isOpenAIModel = model.startsWith('openai/');
+  const tokenParams = isOpenAIModel 
+    ? { max_completion_tokens: 12000 }
+    : { max_tokens: 12000 };
+
   try {
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -106,8 +112,7 @@ Return only valid JSON arrays when asked for questions.` },
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
-        // Use max_completion_tokens for newer models like o1/o3-mini (mapped to gpt-5.2)
-        max_completion_tokens: 12000,
+        ...tokenParams,
       }),
     });
 
