@@ -2163,51 +2163,68 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   
   // *** CRITICAL: Check for FULL MASTERY / PERFECT SCORE indicators ***
   // If the justification says the student met full standards, got everything correct, etc. -> 100
-  // BUT ONLY IF STUDENT WORK IS ACTUALLY PRESENT
-  const fullMasteryIndicators = [
+  // BUT ONLY IF:
+  // 1. STUDENT WORK IS ACTUALLY PRESENT (studentWorkPresent = true)
+  // 2. There is MEANINGFUL OCR content showing actual student work (not just printed questions)
+  // 3. Regents score is 4 (the highest) OR explicit correct answer indicators
+  
+  // *** CRITICAL: NEVER GIVE 100 TO BLANK PAGES ***
+  // A blank page has "no errors" by definition - this does NOT mean full mastery!
+  // 100 requires POSITIVE EVIDENCE of mastery, not just absence of errors
+  
+  // REQUIRE substantial OCR content AND high Regents score for 100
+  const hasSubstantialWork = result.ocrText.trim().length >= 30 && result.studentWorkPresent;
+  const hasHighRegentsScore = result.regentsScore >= 4;
+  const hasCorrectAnswer = result.isAnswerCorrect === true;
+  
+  // Only these indicators count as POSITIVE evidence of mastery (not absence of errors)
+  const positiveMasteryIndicators = [
     'complete and correct',
     'complete mastery',
     'full mastery',
-    'all concepts',
+    'all concepts demonstrated',
     'all problems correct',
     'complete understanding',
     'complete solutions',
     'correct solutions for all',
-    'no discernible error',
-    'no errors',
-    'no computational error',
-    'no conceptual error',
-    'highest standards',
-    'meeting the highest',
-    'meets the highest',
-    'exceeding standards',
-    'exceeds standards',
-    'perfect score',
+    'correctly applied formulas',
+    'correctly executed',
+    'demonstrates proficiency',
+    'accurately solving',
+    'accurate solution',
     'perfectly correct',
     'all correct',
     'fully correct',
-    'accurately understanding',
-    'complete and accurate',
-    'well-organized',
-    'correctly applied formulas',
-    'correctly executed',
-    'proficiency in',
-    'demonstrates proficiency',
+    'exceeding standards',
+    'exceeds standards',
   ];
   
-  // *** "No errors" does NOT mean correct if there's no work to have errors in! ***
-  // Filter out "no errors" indicator if no student work is present
-  const hasPerfectIndicators = result.studentWorkPresent && fullMasteryIndicators.some(indicator => textLower.includes(indicator));
+  // REMOVED from mastery indicators - these DO NOT indicate mastery:
+  // 'no errors', 'no discernible error', 'no computational error', 'no conceptual error'
+  // A blank page has "no errors" but that doesn't mean the student has mastery!
+  
+  const textLowerForMastery = textLower;
+  const hasPerfectIndicators = hasSubstantialWork && positiveMasteryIndicators.some(indicator => textLowerForMastery.includes(indicator));
   
   // Check the grade justification and regents justification specifically for mastery signals
   const justificationText = (result.gradeJustification + ' ' + result.regentsScoreJustification).toLowerCase();
-  const justificationHasMastery = result.studentWorkPresent && fullMasteryIndicators.some(indicator => justificationText.includes(indicator));
+  const justificationHasMastery = hasSubstantialWork && positiveMasteryIndicators.some(indicator => justificationText.includes(indicator));
   
-  // If justification explicitly says student met full standards / complete correct work -> override to 100
-  // BUT ONLY IF STUDENT WORK IS ACTUALLY PRESENT
-  const shouldGetPerfectScore = result.studentWorkPresent && (hasPerfectIndicators || justificationHasMastery);
+  // *** STRICT PERFECT SCORE REQUIREMENTS ***
+  // 100 requires ALL of these:
+  // 1. Student work present (not blank)
+  // 2. Substantial OCR content (>=30 chars of actual work)
+  // 3. EITHER Regents 4 with correct answer OR explicit mastery language
+  const shouldGetPerfectScore = (
+    hasSubstantialWork &&
+    result.studentWorkPresent &&
+    (
+      (hasHighRegentsScore && hasCorrectAnswer) ||
+      (hasPerfectIndicators || justificationHasMastery)
+    )
+  );
   
-  console.log(`Grade determination - StudentWorkPresent: ${result.studentWorkPresent}, Concepts: ${result.conceptsDemonstrated.length}, Coherent: ${hasCoherentWork}, Understanding: ${showsUnderstanding}, Blank: ${explicitlyBlank}, PerfectIndicators: ${shouldGetPerfectScore}`);
+  console.log(`Grade determination - StudentWorkPresent: ${result.studentWorkPresent}, OCR length: ${result.ocrText.trim().length}, Concepts: ${result.conceptsDemonstrated.length}, Coherent: ${hasCoherentWork}, Understanding: ${showsUnderstanding}, Blank: ${explicitlyBlank}, SubstantialWork: ${hasSubstantialWork}, Regents: ${result.regentsScore}, PerfectIndicators: ${shouldGetPerfectScore}`);
   
   // *** CRITICAL: NO STUDENT WORK = GRADE 55, NO EXCEPTIONS ***
   // If student work is not present, there's no understanding to evaluate
