@@ -958,6 +958,25 @@ ${exampleOutput}`;
       
       console.log(`Successfully parsed ${questions.length} questions`);
       
+      // CRITICAL: Strip visual data (svg, imagePrompt) when useAIImages is false
+      // This is the "Shapes OFF" mode - no diagrams should appear in the worksheet
+      if (!useAIImages) {
+        console.log('Shapes OFF mode: stripping svg and imagePrompt fields from all questions');
+        questions = questions.map(q => {
+          const { svg, imagePrompt, imageUrl, geometry, ...rest } = q;
+          return rest;
+        });
+      }
+      
+      // Also strip visual data for non-image subjects (Financial Math, History, etc.)
+      if (isNoImageSubject) {
+        console.log('Non-image subject detected: stripping visual fields');
+        questions = questions.map(q => {
+          const { svg, imagePrompt, imageUrl, geometry, ...rest } = q;
+          return rest;
+        });
+      }
+      
       // Sanitize all question text to fix encoding issues
       questions = questions.map(q => ({
         ...q,

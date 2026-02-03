@@ -990,7 +990,7 @@ const toggleStudent = (studentId: string) => {
             const shapeKey = `${assignedForm}-${student.recommendedLevel}-warmUp-${warmUpIdx}`;
             const altWarmUpKey = `${cacheKey}-warmUp-${warmUpIdx}`;
             const generatedShapeUrl = geometryShapes[shapeKey] || geometryShapes[altWarmUpKey];
-            const hasShape = !isNoShapeSubject && (((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl);
+            const hasShape = !isNoShapeSubject && useAIImages && (((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl);
             children.push(
               new Paragraph({
                 children: [
@@ -1003,14 +1003,14 @@ const toggleStudent = (studentId: string) => {
             );
 
             // Add geometry image if available (for warm-up) - check generated shapes first
-            if (!isNoShapeSubject && (generatedShapeUrl || ((q.imageUrl || q.svg) && includeGeometry))) {
+            if (!isNoShapeSubject && useAIImages && (generatedShapeUrl || ((q.imageUrl || q.svg) && includeGeometry))) {
               try {
                 let imageData = generatedShapeUrl || q.imageUrl || '';
                 if (!imageData && q.svg && !q.imageUrl) {
                   imageData = await svgToPngDataUrl(q.svg, 200, 200);
                 }
                 // If still no image but we have an imagePrompt, generate on-demand
-                if (!imageData && q.imagePrompt && includeGeometry) {
+                if (!imageData && q.imagePrompt && useAIImages && includeGeometry) {
                   try {
                     const { data: genData } = await supabase.functions.invoke('generate-diagram-images', {
                       body: {
@@ -1116,7 +1116,7 @@ const toggleStudent = (studentId: string) => {
             const sanitizedQuestion = formatWordText(q.question);
             const shapeKey = `${assignedForm}-${student.recommendedLevel}-main-${idx}`;
             const generatedShapeUrl = geometryShapes[shapeKey];
-            const hasShape = !isNoShapeSubject && (((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl);
+            const hasShape = !isNoShapeSubject && useAIImages && (((q.imageUrl || q.svg) && includeGeometry) || generatedShapeUrl);
 
             children.push(
               new Paragraph({
@@ -1134,7 +1134,7 @@ const toggleStudent = (studentId: string) => {
             const altShapeKey = `${cacheKey}-main-${idx}`;
             const finalShapeUrl = generatedShapeUrl || geometryShapes[altShapeKey];
             
-            if (!isNoShapeSubject && (finalShapeUrl || ((q.imageUrl || q.svg) && includeGeometry))) {
+            if (!isNoShapeSubject && useAIImages && (finalShapeUrl || ((q.imageUrl || q.svg) && includeGeometry))) {
               try {
                 let imageData = '';
                 
@@ -1152,7 +1152,7 @@ const toggleStudent = (studentId: string) => {
                 }
                 
                 // Priority 2: Use existing imageUrl
-                if (!imageData && q.imageUrl && includeGeometry) {
+                if (!imageData && q.imageUrl && useAIImages && includeGeometry) {
                   const isSvg = q.imageUrl.startsWith('data:image/svg') || 
                                q.imageUrl.startsWith('<svg');
                   if (isSvg) {
@@ -1170,12 +1170,12 @@ const toggleStudent = (studentId: string) => {
                 }
                 
                 // Priority 3: Convert raw SVG string
-                if (!imageData && q.svg && !q.imageUrl && includeGeometry) {
+                if (!imageData && q.svg && !q.imageUrl && useAIImages && includeGeometry) {
                   imageData = await svgToPngDataUrl(q.svg, 200, 200);
                 }
                 
                 // Priority 4: Generate from imagePrompt on-demand
-                if (!imageData && q.imagePrompt && includeGeometry) {
+                if (!imageData && q.imagePrompt && useAIImages && includeGeometry) {
                   try {
                     console.log('Generating diagram for Word doc:', q.imagePrompt.substring(0, 50));
                     const { data: genData, error: genError } = await supabase.functions.invoke('generate-diagram-images', {
@@ -2954,7 +2954,7 @@ const toggleStudent = (studentId: string) => {
                       </TooltipProvider>
                     </div>
                     {/* Show geometry shapes in preview - from question or generated - only for geometry subjects */}
-                    {!isNoShapeSubject && (((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-warmUp-${idx}`]) ? (
+                    {!isNoShapeSubject && useAIImages && (((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-warmUp-${idx}`]) ? (
                       <div className="mt-2 flex flex-col items-center gap-2">
                         <div className="relative">
                           {geometryShapes[`${cacheKey}-warmUp-${idx}`] ? (
@@ -2991,7 +2991,7 @@ const toggleStudent = (studentId: string) => {
                           Regenerate Diagram
                         </Button>
                       </div>
-                    ) : includeGeometry && !isNoShapeSubject && (
+                    ) : useAIImages && includeGeometry && !isNoShapeSubject && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -3112,7 +3112,7 @@ const toggleStudent = (studentId: string) => {
                       </TooltipProvider>
                     </div>
                     {/* Show geometry shapes in preview - from question or generated - only for geometry subjects */}
-                    {!isNoShapeSubject && (((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-main-${idx}`]) ? (
+                    {!isNoShapeSubject && useAIImages && (((q.imageUrl || q.svg) && includeGeometry) || geometryShapes[`${cacheKey}-main-${idx}`]) ? (
                       <div className="mt-2 flex flex-col items-center gap-2">
                         <div className="relative">
                           {geometryShapes[`${cacheKey}-main-${idx}`] ? (
@@ -3251,7 +3251,7 @@ const toggleStudent = (studentId: string) => {
                     <div className="mt-3 border-t pt-2">
                       <div className="h-16 border border-dashed rounded bg-gray-50 relative flex items-center justify-center">
                         {/* Show Generate Shape button if no shape exists and geometry is enabled - only for geometry subjects */}
-                        {includeGeometry && !isNoShapeSubject && !q.imageUrl && !q.svg && !geometryShapes[`${cacheKey}-main-${idx}`] && (
+                        {useAIImages && includeGeometry && !isNoShapeSubject && !q.imageUrl && !q.svg && !geometryShapes[`${cacheKey}-main-${idx}`] && (
                           <Button
                             variant="outline"
                             size="sm"
