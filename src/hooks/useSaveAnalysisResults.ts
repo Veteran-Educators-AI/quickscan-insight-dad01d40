@@ -470,9 +470,35 @@ export function useSaveAnalysisResults() {
         const coinMultiplier = settings.sister_app_coin_multiplier || 0.25;
         
         try {
+          // Build remediation recommendations from misconceptions and topic
+          const remediationRecommendations: string[] = [];
+          
+          // Add misconceptions as remediation topics
+          if (params.result.misconceptions && params.result.misconceptions.length > 0) {
+            params.result.misconceptions.forEach(misconception => {
+              remediationRecommendations.push(`Address: ${misconception}`);
+            });
+          }
+          
+          // Add topic-based recommendations if grade is low
+          if (finalGrade < 70 && params.topicName) {
+            remediationRecommendations.push(`Review ${params.topicName} fundamentals`);
+            if (params.result.nysStandard) {
+              remediationRecommendations.push(`Practice ${params.result.nysStandard} concepts`);
+            }
+          }
+          
+          // Determine difficulty level based on grade
+          let difficultyLevel = 'C'; // Default to medium
+          if (finalGrade >= 85) difficultyLevel = 'E'; // Challenge level for high performers
+          else if (finalGrade >= 70) difficultyLevel = 'C'; // Medium
+          else if (finalGrade >= 50) difficultyLevel = 'B'; // Easier
+          else difficultyLevel = 'A'; // Foundational
+          
           // Push individual grade to sister app for immediate rewards
           const sisterAppResult = await pushToSisterApp({
             class_id: params.classId || '',
+            source: 'scan_genius',  // Proper source identifier
             title: `Grade: ${params.topicName || 'Assessment'}`,
             description: `${params.studentName || 'Student'} scored ${finalGrade}% - ${params.result.feedback}`,
             standard_code: params.result.nysStandard || params.topicName || undefined,
@@ -482,6 +508,9 @@ export function useSaveAnalysisResults() {
             student_name: params.studentName,
             grade: finalGrade,
             topic_name: params.topicName,
+            // Include remediation data for Scholar app
+            remediation_recommendations: remediationRecommendations,
+            difficulty_level: difficultyLevel,
           });
 
           // Also sync full grade data to Scholar for student grade viewing
