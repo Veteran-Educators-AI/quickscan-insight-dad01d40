@@ -1009,6 +1009,7 @@ export default function Scan() {
   };
 
   // Save all batch results to gradebook directly from BatchQueue
+  // Consolidates duplicate students into one averaged grade
   const handleBatchSaveToGradebook = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -1028,50 +1029,109 @@ export default function Scan() {
       !batchSavedStudents.has(item.studentId)
     );
 
-    try {
-      for (const item of completedItems) {
-        const result = item.result!;
-        // Use overridden grade first, then grade, then percentage
-        const effectiveGrade = result.overriddenGrade ?? result.grade ?? result.totalScore.percentage;
-        const topicName = result.problemIdentified || 'General Assessment';
-        const nysStandard = result.nysStandard || null;
-        const regentsScore = result.regentsScore ?? null;
-        const isOverridden = result.isOverridden || false;
+    // Group items by student ID to consolidate duplicate students
+    const studentGroups = new Map<string, typeof completedItems>();
+    for (const item of completedItems) {
+      const studentId = item.studentId!;
+      if (!studentGroups.has(studentId)) {
+        studentGroups.set(studentId, []);
+      }
+      studentGroups.get(studentId)!.push(item);
+    }
 
-        // Build justification with override info if applicable
-        let gradeJustification = result.gradeJustification || result.feedback || null;
-        if (isOverridden && result.overrideJustification) {
-          gradeJustification = `TEACHER OVERRIDE: ${result.overrideJustification}. ${gradeJustification || ''}`;
+    try {
+      for (const [studentId, studentItems] of studentGroups) {
+        // Calculate averaged grade for students with multiple papers
+        const grades: number[] = [];
+        const regentsScores: number[] = [];
+        const justifications: string[] = [];
+        let topicName = '';
+        let nysStandard: string | null = null;
+        let totalEarned = 0;
+        let totalPossible = 0;
+        let hasOverride = false;
+        let overrideJustification = '';
+
+        for (const item of studentItems) {
+          const result = item.result!;
+          const effectiveGrade = result.overriddenGrade ?? result.grade ?? result.totalScore.percentage;
+          grades.push(effectiveGrade);
+          
+          if (result.regentsScore !== undefined && result.regentsScore !== null) {
+            regentsScores.push(result.regentsScore);
+          }
+          
+          if (!topicName && result.problemIdentified) {
+            topicName = result.problemIdentified;
+          }
+          if (!nysStandard && result.nysStandard) {
+            nysStandard = result.nysStandard;
+          }
+          
+          totalEarned += result.totalScore.earned || 0;
+          totalPossible += result.totalScore.possible || 0;
+          
+          if (result.isOverridden) {
+            hasOverride = true;
+            overrideJustification = result.overrideJustification || '';
+          }
+          
+          if (result.gradeJustification || result.feedback) {
+            justifications.push(result.gradeJustification || result.feedback || '');
+          }
+        }
+
+        // Calculate the averaged grade
+        const averagedGrade = Math.round(grades.reduce((sum, g) => sum + g, 0) / grades.length);
+        const averagedRegentsScore = regentsScores.length > 0 
+          ? Math.round(regentsScores.reduce((sum, s) => sum + s, 0) / regentsScores.length)
+          : null;
+        
+        // Build combined justification
+        let gradeJustification = studentItems.length > 1
+          ? `COMPOSITE GRADE (${studentItems.length} papers averaged: ${grades.join('%, ')}%). `
+          : '';
+        
+        if (hasOverride && overrideJustification) {
+          gradeJustification += `TEACHER OVERRIDE: ${overrideJustification}. `;
+        }
+        
+        // Take first justification for brevity
+        if (justifications.length > 0) {
+          gradeJustification += justifications[0];
         }
 
         // Save to grade_history
         const { error: gradeError } = await supabase
           .from('grade_history')
           .insert({
-            student_id: item.studentId,
-            topic_name: topicName,
-            grade: effectiveGrade,
-            grade_justification: gradeJustification,
-            raw_score_earned: result.totalScore.earned || 0,
-            raw_score_possible: result.totalScore.possible || 0,
+            student_id: studentId,
+            topic_name: topicName || 'General Assessment',
+            grade: averagedGrade,
+            grade_justification: gradeJustification || null,
+            raw_score_earned: totalEarned,
+            raw_score_possible: totalPossible,
             teacher_id: user.id,
-            regents_score: regentsScore,
+            regents_score: averagedRegentsScore,
             nys_standard: nysStandard,
-            regents_justification: result.regentsScoreJustification || null,
+            regents_justification: studentItems[0].result?.regentsScoreJustification || null,
           });
 
         if (gradeError) {
-          console.error('Error saving grade for', item.studentName, ':', gradeError);
+          console.error('Error saving grade for', studentItems[0].studentName, ':', gradeError);
           failCount++;
           continue;
         }
 
         successCount++;
-        setBatchSavedStudents(prev => new Set([...prev, item.studentId!]));
+        setBatchSavedStudents(prev => new Set([...prev, studentId]));
       }
 
       if (successCount > 0 && failCount === 0) {
         toast.success(`Saved ${successCount} student grade(s) to gradebook!`, {
+          description: studentGroups.size !== completedItems.length 
+            ? `${completedItems.length} papers consolidated into ${studentGroups.size} averaged grades`
+            : undefined,
           icon: <Save className="h-4 w-4" />,
         });
       } else if (successCount > 0) {
