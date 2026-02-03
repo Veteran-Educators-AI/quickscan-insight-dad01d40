@@ -109,16 +109,24 @@ export function BatchImageZoomDialog({
     }));
   }, []);
 
-  // Reset view when image changes
+  // Track the last image URL to detect actual changes
+  const lastImageUrlRef = useRef<string>(imageUrl);
+
+  // Reset view only when image actually changes (not on every render)
   useEffect(() => {
-    resetView();
-    setHighlightedError(null);
-    resetDecisions();
-    setCustomRegions({});
-    setIsEditingRegions(false);
-    setIsAnnotating(false);
-    resetAnnotations();
-  }, [imageUrl, resetDecisions, resetAnnotations]);
+    if (lastImageUrlRef.current !== imageUrl) {
+      lastImageUrlRef.current = imageUrl;
+      resetView();
+      setHighlightedError(null);
+      resetDecisions();
+      setCustomRegions({});
+      setIsEditingRegions(false);
+      setIsAnnotating(false);
+      resetAnnotations();
+      setNoErrorConfirmed(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageUrl]);
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.02, 5));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.02, 0.25));
