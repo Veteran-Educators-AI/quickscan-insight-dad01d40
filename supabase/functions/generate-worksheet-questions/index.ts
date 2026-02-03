@@ -989,12 +989,6 @@ ${exampleOutput}`;
       });
 
       console.log('Geometry summary:', { valid: geometryValidCount, invalid: geometryInvalidCount, missing: geometryMissingCount });
-    } catch (parseError: unknown) {
-      console.error('Failed to parse AI response:', content.substring(0, 500));
-      console.error('Parse error details:', parseError);
-      console.error('Response length:', content.length, 'chars');
-      throw new Error('Failed to parse generated questions. The AI response may have been truncated. Please try again with fewer questions.');
-    }
 
     return new Response(JSON.stringify({ questions }), {
       status: 200,
