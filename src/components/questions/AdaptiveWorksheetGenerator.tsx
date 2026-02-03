@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
 import { Loader2, Sparkles, Users, Download, CheckCircle, AlertCircle, TrendingUp, TrendingDown, Minus, Brain, Target, AlertTriangle, QrCode, Eye } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
@@ -91,8 +92,7 @@ const generateQRCodeDataUrl = (studentId: string, worksheetId: string, size: num
     container.style.height = `${size}px`;
     document.body.appendChild(container);
 
-    import('react-dom/client').then(async ({ createRoot }) => {
-      const React = await import('react');
+    try {
       const root = createRoot(container);
 
       const QRWrapper = () => {
@@ -147,10 +147,10 @@ const generateQRCodeDataUrl = (studentId: string, worksheetId: string, size: num
       };
 
       root.render(React.createElement(QRWrapper));
-    }).catch((err) => {
+    } catch (err) {
       document.body.removeChild(container);
       reject(err);
-    });
+    }
   });
 };
 

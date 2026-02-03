@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
 import { Download, Loader2, FileText, Users } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,10 +31,8 @@ const generateQRCodeDataUrl = (studentId: string, worksheetId: string, size: num
       q: worksheetId,
     });
     
-    import('react-dom/client').then(({ createRoot }) => {
+    try {
       const root = createRoot(container);
-      const { QRCodeSVG } = require('qrcode.react');
-      const React = require('react');
       
       root.render(React.createElement(QRCodeSVG, {
         value: qrData,
@@ -83,7 +83,10 @@ const generateQRCodeDataUrl = (studentId: string, worksheetId: string, size: num
           reject(new Error('QR code SVG not found'));
         }
       }, 50);
-    }).catch(reject);
+    } catch (err) {
+      document.body.removeChild(container);
+      reject(err);
+    }
   });
 };
 
