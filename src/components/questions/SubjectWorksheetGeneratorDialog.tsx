@@ -203,13 +203,13 @@ export function SubjectWorksheetGeneratorDialog({
     new Set(preselectedLevel ? [preselectedLevel] : ['intermediate'])
   );
   const [questionCount, setQuestionCount] = useState(6);
-  const [includeGeometry, setIncludeGeometry] = useState(true);
-  const [includeImages, setIncludeImages] = useState(false);
+  // Geometry/images disabled - kept for compatibility but always false
+  const includeGeometry = false;
+  const includeImages = false;
 
-  // Check if subject supports geometry diagrams - explicitly exclude financial math and social studies
-  const noImageSubjects = ['financialmath', 'economics', 'government', 'history'];
-  const supportsGeometry = ['algebra1', 'algebra2', 'geometry', 'precalculus', 'physics'].includes(subjectId) && !noImageSubjects.includes(subjectId);
-  const supportsImages = ['biology', 'chemistry', 'physics', 'earthscience'].includes(subjectId) && !noImageSubjects.includes(subjectId);
+  // Geometry and image features are disabled
+  const supportsGeometry = false;
+  const supportsImages = false;
 
   // Update levels when preselected level changes
   useEffect(() => {
@@ -442,35 +442,7 @@ export function SubjectWorksheetGeneratorDialog({
               </div>
             </div>
 
-            {/* Visual Content Options */}
-            {(supportsGeometry || supportsImages) && (
-              <div className="space-y-3">
-                <Label className="flex items-center gap-2">
-                  <Image className="h-4 w-4" />
-                  Visual Content
-                </Label>
-                <div className="space-y-2">
-                  {supportsGeometry && (
-                    <div className="flex items-center justify-between p-3 rounded-lg border">
-                      <div>
-                        <div className="font-medium text-sm">Include Geometry Diagrams</div>
-                        <div className="text-xs text-muted-foreground">Auto-generate SVG diagrams for applicable questions</div>
-                      </div>
-                      <Switch checked={includeGeometry} onCheckedChange={setIncludeGeometry} />
-                    </div>
-                  )}
-                  {supportsImages && (
-                    <div className="flex items-center justify-between p-3 rounded-lg border">
-                      <div>
-                        <div className="font-medium text-sm">Include AI Images</div>
-                        <div className="text-xs text-muted-foreground">Generate illustrative images (slower)</div>
-                      </div>
-                      <Switch checked={includeImages} onCheckedChange={setIncludeImages} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* Visual Content Options - REMOVED: Geometry shapes and AI images are disabled */}
 
             {/* Relevant Formulas */}
             {relevantFormulas && (

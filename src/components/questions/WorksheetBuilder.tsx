@@ -432,9 +432,10 @@ export function WorksheetBuilder({
   const [includeFormulaSheet, setIncludeFormulaSheet] = useState(false);
   const [includeGraphPaper, setIncludeGraphPaper] = useState(false);
   const [includeCoordinateGeometry, setIncludeCoordinateGeometry] = useState(false);
-  const [useAIImages, setUseAIImages] = useState(false);
-  const [useNanoBanana, setUseNanoBanana] = useState(false); // Use Nano Banana for realistic shape images
-  const [imageSize, setImageSize] = useState(200); // Image size in pixels (100-400)
+  // AI images/geometry shapes disabled - kept for compatibility but always false
+  const useAIImages = false;
+  const useNanoBanana = false;
+  const imageSize = 200;
   const [includeAnswerKey, setIncludeAnswerKey] = useState(false); // Include answer key for teachers
   const [marginSize, setMarginSize] = useState<"small" | "medium" | "large">("medium"); // Page margin size
   const [includeScrapPaper, setIncludeScrapPaper] = useState(false); // Bundle scrap paper with worksheet
@@ -646,8 +647,9 @@ export function WorksheetBuilder({
     setIncludeFormulaSheet(worksheet.settings.includeFormulaSheet ?? false);
     setIncludeGraphPaper(worksheet.settings.includeGraphPaper ?? false);
     setIncludeCoordinateGeometry(worksheet.settings.includeCoordinateGeometry ?? false);
-    setUseAIImages(worksheet.settings.useAIImages ?? worksheet.settings.includeGeometry ?? false);
-    setImageSize(worksheet.settings.imageSize ?? 200);
+    // AI images disabled - skip loading these settings
+    // setUseAIImages(worksheet.settings.useAIImages ?? worksheet.settings.includeGeometry ?? false);
+    // setImageSize(worksheet.settings.imageSize ?? 200);
     setIncludeAnswerKey(worksheet.settings.includeAnswerKey ?? false);
     setIsCompiled(true);
     setShowSavedWorksheets(false);
@@ -4328,97 +4330,7 @@ export function WorksheetBuilder({
                     Include coordinate geometry solutions
                   </Label>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="useAIImages"
-                    checked={useAIImages}
-                    onChange={(e) => setUseAIImages(e.target.checked)}
-                    className="rounded border-input"
-                  />
-                  <Label htmlFor="useAIImages" className="text-sm cursor-pointer">
-                    <span className="flex flex-col">
-                      <span className="flex items-center gap-1">
-                        <Sparkles className="h-3.5 w-3.5 text-purple-500" />
-                        Include AI-generated geometric/scientific diagrams
-                      </span>
-                      <span className="text-xs text-muted-foreground ml-5">
-                        Generates images for shapes, graphs, and coordinate geometry
-                      </span>
-                    </span>
-                  </Label>
-                </div>
-
-                {/* Image Size Slider - shown when AI images are enabled */}
-                {useAIImages && (
-                  <div className="space-y-3 ml-5 pl-2 border-l-2 border-muted">
-                    {/* Nano Banana Option */}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="useNanoBanana"
-                        checked={useNanoBanana}
-                        onChange={(e) => setUseNanoBanana(e.target.checked)}
-                        className="rounded border-input"
-                      />
-                      <Label htmlFor="useNanoBanana" className="text-sm cursor-pointer">
-                        <span className="flex flex-col">
-                          <span className="flex items-center gap-1">
-                            <Palette className="h-3.5 w-3.5 text-primary" />
-                            Use Nano Banana for realistic shapes
-                          </span>
-                          <span className="text-xs text-muted-foreground ml-5">
-                            Generates high-quality images using advanced AI model
-                          </span>
-                        </span>
-                      </Label>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm flex items-center gap-1">
-                        <ImageIcon className="h-3.5 w-3.5" />
-                        Diagram Size
-                      </Label>
-                      <span className="text-xs text-muted-foreground">{imageSize}px</span>
-                    </div>
-                    <Slider
-                      value={[imageSize]}
-                      onValueChange={(value) => setImageSize(value[0])}
-                      min={100}
-                      max={400}
-                      step={25}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Small</span>
-                      <span>Large</span>
-                    </div>
-
-                    {/* Image Library & Review Button */}
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowImageReviewDialog(true)}
-                        className="flex-1 text-xs"
-                      >
-                        <Library className="h-3.5 w-3.5 mr-1" />
-                        Image Library
-                        {pendingCount > 0 && (
-                          <Badge variant="destructive" className="ml-1 h-4 px-1 text-[10px]">
-                            {pendingCount}
-                          </Badge>
-                        )}
-                      </Button>
-                    </div>
-                    {pendingCount > 0 && (
-                      <p className="text-xs text-amber-600 flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {pendingCount} image{pendingCount > 1 ? "s" : ""} pending review
-                      </p>
-                    )}
-                  </div>
-                )}
+                {/* AI Images/Geometry Shapes - DISABLED */}
 
                 {/* Answer Key Option */}
                 <div className="flex items-center gap-2 pt-2 border-t border-dashed">
