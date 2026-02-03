@@ -2254,10 +2254,39 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     standardsMet
   );
   
+  // *** NEW: CORRECT ANSWER + NO ERRORS = HIGH GRADE ***
+  // If the AI says the answer is correct AND there are no real misconceptions, 
+  // the grade should be at least 90, regardless of what grade the AI returned
+  const hasNoRealErrors = result.misconceptions.length === 0 || 
+    result.misconceptions.every(m => 
+      m.toLowerCase().includes('no error') || 
+      m.toLowerCase().includes('no misconception') ||
+      m.toLowerCase().includes('mathematically correct') ||
+      m.toLowerCase().includes('correct and leads to the right answer')
+    );
+  
+  const shouldBeHighGrade = result.studentWorkPresent && 
+    hasSubstantialWork && 
+    result.isAnswerCorrect && 
+    hasNoRealErrors;
+  
+  console.log(`High grade check - AnswerCorrect: ${result.isAnswerCorrect}, NoRealErrors: ${hasNoRealErrors}, ShouldBeHigh: ${shouldBeHighGrade}`);
+  
   // *** PERFECT SCORE OVERRIDE: If analysis indicates full mastery, give 100 ***
   if (shouldGetPerfectScore && hasAnyUnderstanding) {
     result.grade = 100;
     console.log('Full mastery detected in analysis - assigning grade 100');
+  } else if (shouldBeHighGrade) {
+    // CRITICAL: Correct answer with no errors should get AT LEAST 90
+    // Use Regents score to determine exact grade within 90-100 range
+    if (result.regentsScore >= 4) {
+      result.grade = 100;
+    } else if (result.regentsScore >= 3) {
+      result.grade = 95;
+    } else {
+      result.grade = 90;
+    }
+    console.log(`Correct answer with no errors - assigning high grade: ${result.grade}`);
   } else if (gradeMatch) {
     const parsedGrade = parseInt(gradeMatch[1]);
     // CRITICAL: If ANY understanding, minimum is 65
@@ -2296,6 +2325,9 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   // Perfect score override takes priority
   if (shouldGetPerfectScore && hasAnyUnderstanding) {
     result.grade = 100;
+  } else if (shouldBeHighGrade && result.grade < 90) {
+    // Double-check: if we determined this should be high grade, enforce minimum of 90
+    result.grade = 90;
   } else if (hasAnyUnderstanding) {
     result.grade = Math.max(gradeFloorWithEffort, result.grade);
   }
