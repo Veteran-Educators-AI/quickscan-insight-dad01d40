@@ -2659,8 +2659,22 @@ Style: Simple line art, clean educational diagram suitable for projection.`
           console.log("⚠ Coordinate SVG failed validation, trying next step...");
         }
       }
+      console.log("New Changes for debugging.")
+      // STEP 4: Try AI Generation (Nano Banana)
+      if (!imageUrl && useNanoBanana) {
+        console.log("Step 4: Attempting AI generation with Nano Banana...");
+        const aiResult = await generateImageWithNanoBanana(q.imagePrompt);
+        if (aiResult.imageUrl) {
+          imageUrl = aiResult.imageUrl;
+          validation = aiResult.validation || { isValid: true, issues: [], shouldRetry: false };
+          console.log("✓ AI generation successful");
+          diagramSource = 'ai'; // P9.1
+        } else {
+          console.log("⚠ AI generation failed, trying next step...");
+        }
+      }
 
-      // STEP 4: Use hardcoded fallback shapes as last resort
+      // STEP 5: Use hardcoded fallback shapes as last resort
       // IMPORTANT: Only use fallback shapes for math/physics subjects
       // Do NOT show geometry shapes for financial, biology, chemistry, or general subjects
       if (!imageUrl) {
