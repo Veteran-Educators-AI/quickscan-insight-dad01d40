@@ -320,6 +320,8 @@ export function LessonPlanLibrary({ open, onOpenChange, onSelectPlan }: LessonPl
     setIsPushingToSisterApp(true);
     try {
       const result = await pushToSisterApp({
+        type: 'assignment_push',
+        source: 'scan_genius',
         class_id: plan.class_id,
         title: plan.title,
         description: `Lesson on ${plan.topic_name} - ${plan.objective}`,
@@ -327,6 +329,11 @@ export function LessonPlanLibrary({ open, onOpenChange, onSelectPlan }: LessonPl
         topic_name: plan.topic_name,
         xp_reward: 50,
         coin_reward: 25,
+        remediation_recommendations: [
+          `Study ${plan.topic_name}`,
+          `Review ${plan.standard} concepts`,
+        ],
+        difficulty_level: 'C',
       });
 
       if (result.success) {

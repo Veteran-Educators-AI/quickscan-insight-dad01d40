@@ -119,19 +119,30 @@ export function RemediationActions({
         text: q.question,
         difficulty: q.difficulty,
         hint: q.hint,
+        hints: q.hint ? [q.hint] : [],
         targetMisconception: q.targetMisconception,
       }));
 
+      // Build remediation recommendations from misconceptions
+      const remediationRecommendations = misconceptions.map(m => `Address: ${m}`);
+      if (topicName) {
+        remediationRecommendations.push(`Practice ${topicName} concepts`);
+      }
+
       const result = await pushToSisterApp({
+        type: 'assignment_push',
+        source: 'scan_genius',  // Proper source identifier
         class_id: classId,
         title: `Remediation Practice: ${topicName || 'Math Skills'}`,
         description: `Targeted practice for ${misconceptions.length} identified misconception${misconceptions.length > 1 ? 's' : ''}: ${misconceptions.slice(0, 2).join(', ')}${misconceptions.length > 2 ? '...' : ''}`,
         student_id: studentId,
         student_name: studentName,
         topic_name: topicName || 'Remediation Practice',
-        // Include questions as JSON in a custom field
         xp_reward: generatedQuestions.length * 10, // 10 XP per question
         coin_reward: generatedQuestions.length * 5, // 5 coins per question
+        questions: questionsFormatted,  // Include the actual questions
+        remediation_recommendations: remediationRecommendations,
+        difficulty_level: 'B', // Easier level for remediation
       });
 
       if (result.success) {

@@ -35,7 +35,8 @@ const corsHeaders = {
  * Contains class info, assignment details, and student grade data
  */
 interface PushRequest {
-  type?: 'ping' | 'grade' | 'behavior' | 'student_created' | 'student_updated' | 'roster_sync' | 'live_session_completed';   // Request type
+  type?: 'ping' | 'grade' | 'behavior' | 'student_created' | 'student_updated' | 'roster_sync' | 'live_session_completed' | 'assignment_push';   // Request type
+  source?: 'scan_genius' | 'scan_analysis' | 'assignment_push' | 'tutorial_push';  // Source identifier for sister app
   class_id?: string;         // The class this data belongs to
   class_name?: string;       // The class name
   title?: string;            // Assignment or activity title
@@ -54,6 +55,8 @@ interface PushRequest {
   grade?: number;            // The grade (0-100)
   topic_name?: string;       // The topic/subject of the work
   questions?: any[];         // Generated remediation or mastery challenge questions
+  remediation_recommendations?: string[];  // Recommended topics for remediation
+  difficulty_level?: string;  // A, B, C, D, E, or F difficulty
   // Behavior deduction fields
   xp_deduction?: number;     // XP to remove for behavior
   coin_deduction?: number;   // Coins to remove for behavior
@@ -89,11 +92,16 @@ interface ParticipantResult {
  * The receiving endpoint expects 'action' field, not 'type'
  */
 function convertToSisterAppFormat(requestData: PushRequest) {
+  // Determine activity type/source - 'assignment_push' for pushed assignments, 'scan_analysis' for scanned work
+  const activityType = requestData.source || 
+    (requestData.type === 'assignment_push' ? 'scan_genius' : 'scan_analysis');
+  
   return {
     action: 'grade_completed' as const,
     student_id: requestData.student_id,
     data: {
-      activity_type: 'scan_analysis',
+      source: activityType,  // Proper source identifier for sister app
+      activity_type: activityType,
       activity_name: requestData.title,
       score: requestData.grade,
       xp_earned: requestData.xp_reward,
@@ -102,10 +110,14 @@ function convertToSisterAppFormat(requestData: PushRequest) {
       description: requestData.description,
       standard_code: requestData.standard_code,
       class_id: requestData.class_id,
+      class_name: requestData.class_name,
       student_name: requestData.student_name,
+      student_email: requestData.student_email,
       printable_url: requestData.printable_url,
       due_at: requestData.due_at,
       questions: requestData.questions || [], // Include generated questions
+      remediation_recommendations: requestData.remediation_recommendations || [], // Topics to practice
+      difficulty_level: requestData.difficulty_level,
       timestamp: new Date().toISOString(),
     }
   };
