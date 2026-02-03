@@ -445,26 +445,9 @@ DO NOT DO THESE THINGS IN YOUR imagePrompt
 - DO NOT add unnecessary arrows or decorations
 - DO NOT make it overly complex
 - DO NOT forget to specify label positions`;
-    } else if (includeGeometry && isGeometrySubject && !isNoImageSubject) {
-      // SVG mode when useAIImages is false but geometry is needed
-      geometryInstruction = `
-8. For geometry-related questions, you MUST include an "svg" field with a complete, valid SVG string that visually represents the geometric figure described in the question.
-   - The SVG should be self-contained with width="200" height="200" viewBox="0 0 200 200"
-   - Use clear colors: stroke="#1f2937" (dark gray) for lines, fill="none" or fill="#e5e7eb" for shapes
-   - Include labels for vertices, angles, or measurements using <text> elements
-   - Examples of shapes to draw:
-     * Triangles with labeled vertices (A, B, C)
-     * Circles with radius lines and center points
-     * Quadrilaterals (rectangles, squares, parallelograms, trapezoids)
-     * Coordinate grids with plotted points
-     * Angle diagrams with arc indicators
-     * 3D shapes like cubes, prisms, pyramids (using isometric projections)
-   - Make sure the SVG is clean, properly formatted, and renders correctly
-   - For coordinate geometry, include axis lines and grid marks
-   
-   OPTIONALLY, if the geometry uses numeric coordinates (not algebraic), also include a "geometry" field with structured metadata.
-   See the examples in the system prompt for the correct format.`;
     }
+    // NOTE: When useAIImages is false, we do NOT generate SVGs even for geometry subjects.
+    // The "no diagrams" mode means the AI must describe all shapes verbally in the question text.
 
     let formulasInstruction = '';
     if (includeFormulas) {
