@@ -37,6 +37,7 @@ export interface PresentationSlide {
     problem: string;
     steps: string[];
     finalAnswer: string;
+    progressiveReveal?: boolean;
   };
   icon?: 'lightbulb' | 'book' | 'question' | 'award' | 'sparkles';
   image?: SlideImage;
@@ -155,6 +156,9 @@ export function NycologicPresents({
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [showImageGenerator, setShowImageGenerator] = useState(false);
+  // Progressive reveal state for word problems
+  const [revealedStepCount, setRevealedStepCount] = useState(0);
+  const [showFinalAnswer, setShowFinalAnswer] = useState(false);
 
   const slide = presentation.slides[currentSlide];
   const totalSlides = presentation.slides.length;
@@ -176,13 +180,16 @@ export function NycologicPresents({
       setCurrentSlide(index);
       setShowAnswer(false);
       setSelectedOption(null);
+      // Reset progressive reveal state when changing slides
+      setRevealedStepCount(0);
+      setShowFinalAnswer(false);
     }
   }, [totalSlides]);
 
   const nextSlide = useCallback(() => goToSlide(currentSlide + 1), [currentSlide, goToSlide]);
   const prevSlide = useCallback(() => goToSlide(currentSlide - 1), [currentSlide, goToSlide]);
 
-  // Keyboard navigation
+  // Keyboard navigation with progressive reveal support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't intercept keyboard events when user is typing in an input/textarea
@@ -199,9 +206,28 @@ export function NycologicPresents({
           nextSlide();
           break;
         case ' ':
-          // Only use spacebar for navigation if not in any text input context
+          // Spacebar handles progressive reveal for word problems
           e.preventDefault();
-          nextSlide();
+          const currentSlideData = presentation.slides[currentSlide];
+          
+          // Check if this slide has a word problem with progressive reveal
+          if (currentSlideData?.wordProblem?.progressiveReveal) {
+            const totalSteps = currentSlideData.wordProblem.steps.length;
+            
+            if (revealedStepCount < totalSteps) {
+              // Reveal next step
+              setRevealedStepCount(prev => prev + 1);
+            } else if (!showFinalAnswer) {
+              // Reveal final answer
+              setShowFinalAnswer(true);
+            } else {
+              // Everything revealed, go to next slide
+              nextSlide();
+            }
+          } else {
+            // No progressive reveal, just go to next slide
+            nextSlide();
+          }
           break;
         case 'ArrowLeft':
           e.preventDefault();
@@ -222,7 +248,7 @@ export function NycologicPresents({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentSlide, nextSlide, prevSlide, isFullscreen, onClose, editingField]);
+  }, [currentSlide, nextSlide, prevSlide, isFullscreen, onClose, editingField, revealedStepCount, showFinalAnswer, presentation.slides]);
 
   const toggleFullscreen = async () => {
     if (!document.fullscreenElement) {
@@ -771,7 +797,7 @@ export function NycologicPresents({
               </motion.div>
             )}
 
-            {/* Word Problem Section - Math presentations */}
+            {/* Word Problem Section - Math presentations with progressive reveal */}
             {slide.wordProblem && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -779,7 +805,7 @@ export function NycologicPresents({
                 transition={{ delay: 0.35 }}
                 className="mt-8 w-full max-w-5xl mx-auto"
               >
-                {/* Problem Statement */}
+                {/* Problem Statement - Always visible */}
                 <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-white/10 mb-6">
                   <div className="flex items-center gap-3 mb-4">
                     <div 
@@ -791,57 +817,83 @@ export function NycologicPresents({
                     <p className="font-semibold text-lg md:text-xl" style={{ color: colors.accentHex }}>
                       Word Problem
                     </p>
+                    {slide.wordProblem.progressiveReveal && (
+                      <span className="ml-auto text-sm text-white/40">
+                        Press SPACE to reveal solution
+                      </span>
+                    )}
                   </div>
                   <p className="text-white text-xl md:text-2xl leading-relaxed">
                     {renderMathText(slide.wordProblem.problem)}
                   </p>
                 </div>
 
-                {/* Step-by-Step Solution */}
-                <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-emerald-400/20 mb-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-xl">
-                      📋
-                    </div>
-                    <p className="text-emerald-400 font-semibold text-lg md:text-xl">Step-by-Step Solution</p>
-                  </div>
-                  <div className="space-y-4">
-                    {slide.wordProblem.steps.map((step, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.4 + index * 0.1 }}
-                        className="flex items-start gap-4 pl-2"
-                      >
-                        <span className="w-8 h-8 rounded-lg bg-emerald-500/30 flex items-center justify-center text-emerald-300 font-bold text-sm shrink-0 mt-0.5">
-                          {index + 1}
+                {/* Step-by-Step Solution - Progressive reveal or all at once */}
+                {(slide.wordProblem.progressiveReveal ? revealedStepCount > 0 : true) && (
+                  <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-emerald-400/20 mb-6">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-xl">
+                        📋
+                      </div>
+                      <p className="text-emerald-400 font-semibold text-lg md:text-xl">Step-by-Step Solution</p>
+                      {slide.wordProblem.progressiveReveal && (
+                        <span className="ml-auto text-sm text-emerald-400/60">
+                          {revealedStepCount} / {slide.wordProblem.steps.length} steps
                         </span>
-                        <p className="text-white/90 text-lg md:text-xl leading-relaxed">
-                          {renderMathText(step.replace(/^Step \d+:\s*/i, ''))}
-                        </p>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Final Answer */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.6 }}
-                  className="bg-gradient-to-r from-amber-400/20 to-amber-500/10 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-amber-400/30"
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-amber-400/30 flex items-center justify-center">
-                      <span className="text-amber-300 text-xl">✓</span>
+                      )}
                     </div>
-                    <p className="text-amber-400 font-bold text-lg md:text-xl">Final Answer</p>
+                    <div className="space-y-4">
+                      {slide.wordProblem.steps.map((step, index) => {
+                        // For progressive reveal, only show steps up to revealedStepCount
+                        const shouldShow = slide.wordProblem?.progressiveReveal 
+                          ? index < revealedStepCount 
+                          : true;
+                        
+                        if (!shouldShow) return null;
+                        
+                        return (
+                          <motion.div
+                            key={index}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="flex items-start gap-4 pl-2"
+                          >
+                            <span className="w-8 h-8 rounded-lg bg-emerald-500/30 flex items-center justify-center text-emerald-300 font-bold text-sm shrink-0 mt-0.5">
+                              {index + 1}
+                            </span>
+                            <p className="text-white/90 text-lg md:text-xl leading-relaxed">
+                              {renderMathText(step.replace(/^Step \d+:\s*/i, ''))}
+                            </p>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <p className="text-white text-xl md:text-2xl font-medium leading-relaxed">
-                    {renderMathText(slide.wordProblem.finalAnswer)}
-                  </p>
-                </motion.div>
+                )}
+
+                {/* Final Answer - Progressive reveal or show with delay */}
+                <AnimatePresence>
+                  {(slide.wordProblem.progressiveReveal ? showFinalAnswer : true) && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.3 }}
+                      className="bg-gradient-to-r from-amber-400/20 to-amber-500/10 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-amber-400/30"
+                    >
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-xl bg-amber-400/30 flex items-center justify-center">
+                          <span className="text-amber-300 text-xl">✓</span>
+                        </div>
+                        <p className="text-amber-400 font-bold text-lg md:text-xl">Final Answer</p>
+                      </div>
+                      <p className="text-white text-xl md:text-2xl font-medium leading-relaxed">
+                        {renderMathText(slide.wordProblem.finalAnswer)}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
 
