@@ -392,7 +392,21 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
           // Continue with push even if question generation fails
         }
 
+        // Build remediation recommendations from misconceptions
+        const remediationRecommendations = misconceptions.map(m => `Address: ${m}`);
+        if (topicName) {
+          remediationRecommendations.push(`Practice ${topicName}`);
+        }
+        if (item.result?.nysStandard) {
+          remediationRecommendations.push(`Review ${item.result.nysStandard} concepts`);
+        }
+
+        // Determine difficulty level based on student group
+        const difficultyLevel = group.level === 'proficient' ? 'E' : group.level === 'developing' ? 'C' : 'A';
+
         const result = await pushToSisterApp({
+          type: 'assignment_push',
+          source: 'scan_genius',
           class_id: classId,
           title: `${group.remediationType}: ${topicName}`,
           description: group.level === 'proficient' 
@@ -406,6 +420,8 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
           coin_reward: group.coinReward,
           grade: effectiveGrade,
           questions: generatedQuestions,
+          remediation_recommendations: remediationRecommendations,
+          difficulty_level: difficultyLevel,
         });
 
         if (result.success) {

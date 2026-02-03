@@ -1307,6 +1307,8 @@ export function LessonPlanGenerator({
 
     try {
       const result = await pushToSisterApp({
+        type: 'assignment_push',
+        source: 'scan_genius',
         class_id: classId,
         title: lessonPlan.title,
         description: `Lesson on ${lessonPlan.topicName} - ${lessonPlan.objective}`,
@@ -1314,6 +1316,11 @@ export function LessonPlanGenerator({
         topic_name: lessonPlan.topicName,
         xp_reward: 50,
         coin_reward: 25,
+        remediation_recommendations: [
+          `Study ${lessonPlan.topicName}`,
+          `Review ${lessonPlan.standard} concepts`,
+        ],
+        difficulty_level: 'C',
       });
 
       if (result.success) {
