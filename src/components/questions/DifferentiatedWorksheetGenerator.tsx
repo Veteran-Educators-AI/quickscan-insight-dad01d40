@@ -4070,19 +4070,29 @@ const toggleStudent = (studentId: string) => {
                             </div>
                           </div>
                           
-                          {hasData ? (
-                            <Badge 
-                              variant="outline" 
-                              className={`${getLevelColor(student.recommendedLevel)} ${isAdaptiveAdjusted ? 'ring-1 ring-purple-400' : ''}`}
-                            >
-                              Level {student.recommendedLevel}
-                            </Badge>
-                          ) : diagnosticMode && (
+                          <div className="flex items-center gap-2">
+                            {hasData && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`${getLevelColor(student.recommendedLevel)} ${isAdaptiveAdjusted ? 'ring-1 ring-purple-400' : ''} text-[10px] px-1.5`}
+                                    >
+                                      Auto
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">Calculated from performance data</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                             <Select
                               value={student.recommendedLevel}
                               onValueChange={(value) => setStudentLevel(student.id, value as AdvancementLevel)}
                             >
-                              <SelectTrigger className="h-7 w-[100px] text-xs">
+                              <SelectTrigger className={`h-7 w-[100px] text-xs ${hasData ? 'border-dashed' : ''}`}>
                                 <SelectValue placeholder="Level" />
                               </SelectTrigger>
                               <SelectContent>
@@ -4102,7 +4112,7 @@ const toggleStudent = (studentId: string) => {
                                 ))}
                               </SelectContent>
                             </Select>
-                          )}
+                          </div>
                         </div>
                       );
                     })}
