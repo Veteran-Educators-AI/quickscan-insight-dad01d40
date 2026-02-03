@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Send, Loader2, Sparkles, FileText, Users } from 'lucide-react';
+import { Send, Loader2, Sparkles, FileText, Users, History } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -32,6 +32,12 @@ interface ExistingQuestion {
   id: string;
   prompt_text: string | null;
   difficulty: number | null;
+}
+
+interface RecentTopic {
+  topic_name: string;
+  nys_standard: string | null;
+  count: number;
 }
 
 export function PushAssignmentDialog({
@@ -92,6 +98,93 @@ export function PushAssignmentDialog({
     },
     enabled: !!user && open,
   });
+
+  // Fetch recent topics/standards from grade_history for the selected class
+  const { data: recentTopics, isLoading: loadingRecentTopics } = useQuery({
+    queryKey: ['recent-class-topics', selectedClassId, user?.id],
+    queryFn: async () => {
+      // Get students in the class first
+      const { data: classStudents, error: studentsError } = await supabase
+        .from('students')
+        .select('id')
+        .eq('class_id', selectedClassId);
+
+      if (studentsError) throw studentsError;
+      
+      const studentIds = (classStudents || []).map(s => s.id);
+      if (studentIds.length === 0) return [];
+
+      // Get recent grade history for these students
+      const { data: gradeHistory, error } = await supabase
+        .from('grade_history')
+        .select('topic_name, nys_standard')
+        .in('student_id', studentIds)
+        .not('topic_name', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      // Aggregate topics and extract clean standard codes
+      const topicMap = new Map<string, { standard: string | null; count: number }>();
+      
+      for (const entry of gradeHistory || []) {
+        // Clean up topic name (remove question prefixes, truncate long topics)
+        let cleanTopic = (entry.topic_name || '').trim();
+        // Remove "Q1:", "Question 1:" prefixes
+        cleanTopic = cleanTopic.replace(/^(Q\d+:|Question \d+:)\s*/i, '');
+        // Truncate very long topics
+        if (cleanTopic.length > 60) {
+          cleanTopic = cleanTopic.substring(0, 60) + '...';
+        }
+        
+        if (!cleanTopic) continue;
+
+        // Extract standard code (e.g., "G.SRT.B.5" from "G.SRT.B.5 - Description...")
+        let cleanStandard: string | null = null;
+        if (entry.nys_standard) {
+          const standardMatch = entry.nys_standard.match(/^([A-Z0-9\.\-]+)/);
+          if (standardMatch) {
+            cleanStandard = standardMatch[1];
+          }
+        }
+
+        const existing = topicMap.get(cleanTopic);
+        if (existing) {
+          existing.count++;
+          // Keep the first standard found
+        } else {
+          topicMap.set(cleanTopic, { standard: cleanStandard, count: 1 });
+        }
+      }
+
+      // Convert to array and sort by count
+      const topics: RecentTopic[] = [];
+      topicMap.forEach((value, key) => {
+        topics.push({
+          topic_name: key,
+          nys_standard: value.standard,
+          count: value.count,
+        });
+      });
+
+      return topics.sort((a, b) => b.count - a.count).slice(0, 10);
+    },
+    enabled: !!user && open && !!selectedClassId,
+  });
+
+  // Auto-populate topic/standard from most recent graded work when class changes
+  useEffect(() => {
+    if (recentTopics && recentTopics.length > 0 && !defaultTopic) {
+      const mostRecent = recentTopics[0];
+      if (!topic) {
+        setTopic(mostRecent.topic_name);
+      }
+      if (!standard && mostRecent.nys_standard) {
+        setStandard(mostRecent.nys_standard);
+      }
+    }
+  }, [recentTopics, defaultTopic]);
 
   // Fetch existing questions (search by prompt_text since questions table doesn't have topic)
   const { data: existingQuestions, isLoading: loadingQuestions } = useQuery({
@@ -305,6 +398,46 @@ export function PushAssignmentDialog({
               onChange={e => setTopic(e.target.value)}
               placeholder="e.g., Triangle Congruence, Quadratic Equations"
             />
+            
+            {/* Recent Topics from Graded Work */}
+            {selectedClassId && recentTopics && recentTopics.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <History className="h-3 w-3" />
+                  From recent scanned work:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {recentTopics.slice(0, 5).map((rt, idx) => (
+                    <Button
+                      key={idx}
+                      type="button"
+                      variant={topic === rt.topic_name ? "default" : "outline"}
+                      size="sm"
+                      className="h-auto py-1 px-2 text-xs"
+                      onClick={() => {
+                        setTopic(rt.topic_name);
+                        if (rt.nys_standard) {
+                          setStandard(rt.nys_standard);
+                        }
+                      }}
+                    >
+                      {rt.topic_name.length > 30 ? rt.topic_name.substring(0, 30) + '...' : rt.topic_name}
+                      {rt.count > 1 && (
+                        <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                          {rt.count}
+                        </Badge>
+                      )}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {selectedClassId && loadingRecentTopics && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Loading recent topics...
+              </p>
+            )}
           </div>
 
           {/* Standard (optional) */}
