@@ -802,20 +802,40 @@ ${exampleOutput}`;
     try {
       // Clean up the response - remove markdown code blocks if present
       let cleanContent = content.trim();
-      if (cleanContent.startsWith('```json')) {
-        cleanContent = cleanContent.slice(7);
-      }
-      if (cleanContent.startsWith('```')) {
-        cleanContent = cleanContent.slice(3);
-      }
-      if (cleanContent.endsWith('```')) {
-        cleanContent = cleanContent.slice(0, -3);
-      }
+      
+      // Remove markdown fences more aggressively
+      cleanContent = cleanContent.replace(/^```(?:json)?\s*/i, '');
+      cleanContent = cleanContent.replace(/\s*```$/i, '');
       cleanContent = cleanContent.trim();
       
+      // Helper function to sanitize JSON strings (fix common AI output issues)
+      function sanitizeJsonString(str: string): string {
+        // Remove any BOM or weird leading characters
+        str = str.replace(/^\uFEFF/, '');
+        
+        // Fix trailing commas before closing brackets
+        str = str.replace(/,(\s*[\]}])/g, '$1');
+        
+        // Fix unquoted property names (common AI mistake)
+        // Match property names that aren't quoted but should be
+        str = str.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)/g, '$1"$2"$3');
+        
+        // Fix single quotes used instead of double quotes for property names
+        str = str.replace(/'([^']+)'(\s*:)/g, '"$1"$2');
+        
+        // Fix single quotes used for string values (but not apostrophes in text)
+        // This is tricky - only fix obvious cases like 'value' at start of value
+        str = str.replace(/:\s*'([^']*?)'/g, ': "$1"');
+        
+        return str;
+      }
+      
+      // Try to sanitize the JSON first
+      let sanitizedContent = sanitizeJsonString(cleanContent);
+      
       try {
-        // First try standard parsing
-        const parsed = JSON.parse(cleanContent);
+        // First try standard parsing on sanitized content
+        const parsed = JSON.parse(sanitizedContent);
         if (Array.isArray(parsed)) {
           questions = parsed;
         } else if (parsed && Array.isArray(parsed.questions)) {
@@ -828,83 +848,100 @@ ${exampleOutput}`;
         
         // If standard parsing fails, it might be truncated or have the object wrapper
         // Try to find the inner "questions": [...] array if present
-        let arrayContent = cleanContent;
-        const questionsMatch = cleanContent.match(/"questions"\s*:\s*\[/);
+        let arrayContent = sanitizedContent;
+        const questionsMatch = sanitizedContent.match(/"questions"\s*:\s*\[/);
         
         if (questionsMatch) {
           // It looks like an object wrapper, start parsing from the array bracket
           const startIndex = questionsMatch.index! + questionsMatch[0].length - 1;
-          arrayContent = cleanContent.substring(startIndex);
-        } else if (cleanContent.trim().startsWith('{')) {
-             // Maybe it started as an object but the key wasn't found or different format
-             // Let's try to assume the whole thing is the array content if it starts with [
-             // otherwise we might need to look for the first '['
-             const firstBracket = cleanContent.indexOf('[');
-             if (firstBracket !== -1) {
-                 arrayContent = cleanContent.substring(firstBracket);
-             }
+          arrayContent = sanitizedContent.substring(startIndex);
+        } else if (sanitizedContent.trim().startsWith('{')) {
+          // Maybe it started as an object but the key wasn't found or different format
+          const firstBracket = sanitizedContent.indexOf('[');
+          if (firstBracket !== -1) {
+            arrayContent = sanitizedContent.substring(firstBracket);
+          }
         }
 
         // Now run the array recovery logic on the array part
-        // Check if response appears truncated (doesn't end with valid JSON array closing)
-        if (!arrayContent.endsWith(']')) {
-            console.warn('Detected truncated JSON response, attempting to recover...');
-            
-            // More robust recovery: find all complete objects and close the array
-            // Use bracket depth tracking to find complete objects
-            let depth = 0;
-            let inString = false;
-            let escape = false;
-            let lastCompleteObjEnd = -1;
-            let objectCount = 0;
-            
-            for (let i = 0; i < arrayContent.length; i++) {
-            const char = arrayContent[i];
-            
-            if (escape) {
-                escape = false;
-                continue;
+        // Use bracket depth tracking to find all complete question objects
+        console.warn('Attempting bracket-depth recovery...');
+        
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+        let lastCompleteObjEnd = -1;
+        let objectCount = 0;
+        let arrayStarted = false;
+        
+        for (let i = 0; i < arrayContent.length; i++) {
+          const char = arrayContent[i];
+          
+          if (escape) {
+            escape = false;
+            continue;
+          }
+          
+          if (char === '\\') {
+            escape = true;
+            continue;
+          }
+          
+          if (char === '"') {
+            inString = !inString;
+            continue;
+          }
+          
+          if (!inString) {
+            if (char === '[' && !arrayStarted) {
+              arrayStarted = true;
+              continue;
             }
-            
-            if (char === '\\') {
-                escape = true;
-                continue;
+            if (char === '{') {
+              depth++;
+            } else if (char === '}') {
+              depth--;
+              if (depth === 0) {
+                lastCompleteObjEnd = i;
+                objectCount++;
+              }
             }
-            
-            if (char === '"') {
-                inString = !inString;
-                continue;
-            }
-            
-            if (!inString) {
-                if (char === '{') {
-                depth++;
-                } else if (char === '}') {
-                depth--;
-                if (depth === 0) {
-                    lastCompleteObjEnd = i;
-                    objectCount++;
-                }
-                }
-            }
-            }
-            
-            if (lastCompleteObjEnd !== -1) {
-            const recoveredJson = arrayContent.substring(0, lastCompleteObjEnd + 1) + ']';
-            console.log(`Recovered ${objectCount} complete questions from truncated response`);
+          }
+        }
+        
+        if (lastCompleteObjEnd !== -1 && objectCount > 0) {
+          // Build the recovered array from complete objects
+          let recoveredJson = arrayContent.substring(0, lastCompleteObjEnd + 1);
+          
+          // Ensure it starts with '[' and ends with ']'
+          recoveredJson = recoveredJson.trim();
+          if (!recoveredJson.startsWith('[')) {
+            recoveredJson = '[' + recoveredJson;
+          }
+          if (!recoveredJson.endsWith(']')) {
+            recoveredJson = recoveredJson + ']';
+          }
+          
+          // Clean up the recovered JSON
+          recoveredJson = sanitizeJsonString(recoveredJson);
+          
+          console.log(`Recovered ${objectCount} complete questions from response`);
+          
+          try {
             questions = JSON.parse(recoveredJson);
-            } else {
-            throw new Error('Could not recover any complete questions from truncated response');
-            }
+          } catch (recoveryParseError) {
+            console.error('Recovery parse also failed:', recoveryParseError);
+            console.error('Recovered content start:', recoveredJson.substring(0, 300));
+            throw new Error('Could not parse recovered questions');
+          }
         } else {
-             // It ends with ], so try parsing it directly as an array
-             questions = JSON.parse(arrayContent);
+          throw new Error('Could not recover any complete questions from response');
         }
       }
     } catch (parseError) {
       console.error('Failed to parse (or recover) AI response. Content start:', content.substring(0, 500));
       console.error('Parse error:', parseError);
-      throw new Error('Failed to parse generated questions. The AI response may have been truncated. Please try again with fewer questions.');
+      throw new Error('Failed to parse generated questions. The AI response may have been truncated or malformed. Please try again.');
     }
       
       // Parse the JSON
