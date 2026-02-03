@@ -1064,16 +1064,25 @@ Provide your analysis in the following structure:
 - Correct Solution: (your step-by-step solution to the problem)` : '') + `
 - Concepts Demonstrated: (LIST each concept with citation from their work)
 - Student Work Present: (YES or NO - 
-    *** CRITICAL BLANK PAGE DETECTION ***
-    Answer YES ONLY if there is ACTUAL STUDENT HANDWRITING/WORK visible.
-    Answer NO if:
-    - The work areas are completely empty/blank
-    - Only printed question text is visible with no student responses
-    - Student wrote only their name but no mathematical/written work
-    - Work areas contain only dots, stray marks, or smudges - not actual attempts
+    *** CRITICAL: DEFAULT TO YES UNLESS 100% CERTAIN PAGE IS BLANK ***
     
-    This is DIFFERENT from "Coherent Work Shown" - a student could write work that isn't coherent.
-    This question is: DID THE STUDENT WRITE ANYTHING AT ALL in the work/answer areas?)
+    IMPORTANT: You MUST answer YES if you see ANY of the following ANYWHERE on the page:
+    - Handwritten numbers, letters, equations, words, or symbols (even messy or hard to read)
+    - Mathematical expressions like "r = 10", "θ = 30°", "Length = ...", calculations
+    - Student responses in work areas, answer boxes, margins, or anywhere on page
+    - Formulas being set up (e.g., "Area = πr²", "L = (θ/360) × 2πr")
+    - ANY handwriting that is not printed text
+    - Drawings, diagrams, graphs, or geometric constructions
+    - Even a single line of student work = YES
+    
+    Answer NO ONLY if ALL of these are true:
+    - Work areas are COMPLETELY EMPTY with zero handwriting
+    - There are ONLY printed questions with absolutely no student responses
+    - You see nothing but blank white space where work should be
+    
+    *** WHEN IN DOUBT, ANSWER YES ***
+    If there is ANY handwriting visible at all = YES
+    A blank page is RARE - most scanned papers have work on them)
 - Coherent Work Shown: (YES or NO - does the student show logical thinking/work, even if simple? Only relevant if Student Work Present = YES)
 - Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND. If Student Work Present = NO, state "No student work to analyze")
 - Is Correct: (YES or NO - is the final answer correct? If no answer written, answer NO)
@@ -1994,8 +2003,11 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   }
 
   // *** CRITICAL: Parse Student Work Present - Explicit blank page detection ***
+  // DEFAULT TO TRUE - only set to false if AI EXPLICITLY says NO
+  // This prevents false positives where the AI fails to answer or is ambiguous
   const studentWorkMatch = text.match(/Student Work Present[:\s]*(YES|NO)/i);
-  result.studentWorkPresent = studentWorkMatch ? studentWorkMatch[1].toUpperCase() === 'YES' : true;
+  // Only mark as no work if there's an EXPLICIT "NO" - anything else defaults to work present
+  result.studentWorkPresent = studentWorkMatch && studentWorkMatch[1].toUpperCase() === 'NO' ? false : true;
 
   // Parse Coherent Work Shown
   const coherentMatch = text.match(/Coherent Work Shown[:\s]*(YES|NO)/i);
