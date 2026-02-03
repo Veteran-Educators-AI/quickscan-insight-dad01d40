@@ -62,6 +62,7 @@ export function BatchImageZoomDialog({
   const [isEditingRegions, setIsEditingRegions] = useState(false);
   const [customRegions, setCustomRegions] = useState<Record<number, Partial<ErrorRegion>>>({});
   const [isAnnotating, setIsAnnotating] = useState(false);
+  const [noErrorConfirmed, setNoErrorConfirmed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -238,10 +239,12 @@ export function BatchImageZoomDialog({
       topicName,
       feedback,
       aiGrade: grade,
+      noErrorsConfirmed: noErrorConfirmed && misconceptions.length === 0,
     });
 
     if (result.success) {
       resetDecisions();
+      setNoErrorConfirmed(false);
     }
   };
 
@@ -257,6 +260,7 @@ export function BatchImageZoomDialog({
   const hasAnnotatableErrors = errorRegions.length > 0;
   const confirmedCount = Object.values(decisions).filter(d => d === 'confirmed').length;
   const dismissedCount = Object.values(decisions).filter(d => d === 'dismissed').length;
+  const canSaveFeedback = hasDecisions || noErrorConfirmed;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -719,7 +723,106 @@ export function BatchImageZoomDialog({
               </ScrollArea>
 
               {/* Save feedback button */}
-              {hasDecisions && (
+              {canSaveFeedback && (
+                <div className="p-3 border-t bg-muted/30">
+                  <Button
+                    className="w-full gap-2"
+                    onClick={handleSaveFeedback}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Brain className="h-4 w-4" />
+                    )}
+                    Save & Train AI
+                  </Button>
+                  <p className="text-[10px] text-muted-foreground text-center mt-1.5">
+                    Your feedback improves future grading accuracy
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sidebar - No errors found panel */}
+          {!hasMisconceptions && showAnnotations && !isAnnotating && (
+            <div className="w-80 border-l bg-background flex flex-col">
+              <div className="p-3 border-b bg-muted/30">
+                <h3 className="text-sm font-medium flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Errors Found (1)
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Review AI findings and train by confirming or dismissing
+                </p>
+              </div>
+              
+              <ScrollArea className="flex-1">
+                <div className="p-3 space-y-2">
+                  <div className={cn(
+                    "p-3 rounded-lg border transition-all",
+                    noErrorConfirmed && "border-green-400 bg-green-50/50 dark:bg-green-950/20",
+                    !noErrorConfirmed && "border-green-300/50 bg-green-50/50 dark:bg-green-950/20"
+                  )}>
+                    <div className="flex items-start gap-2">
+                      <div className={cn(
+                        "flex items-center justify-center w-6 h-6 rounded-full shrink-0",
+                        noErrorConfirmed ? "bg-green-500 text-white" : "bg-green-100 text-green-600"
+                      )}>
+                        <Check className="h-3 w-3" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs leading-relaxed text-green-700 dark:text-green-400">
+                          No errors found - the student's work is mathematically correct and leads to the right answers for both problems presented.
+                        </p>
+                        
+                        <div className="flex items-center gap-2 mt-2">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant={noErrorConfirmed ? 'default' : 'outline'}
+                                  size="sm"
+                                  className={cn(
+                                    "h-6 px-2 text-xs gap-1",
+                                    noErrorConfirmed && "bg-green-600 hover:bg-green-700"
+                                  )}
+                                  onClick={() => setNoErrorConfirmed(!noErrorConfirmed)}
+                                >
+                                  <Check className="h-3 w-3" />
+                                  {noErrorConfirmed ? 'Confirmed' : 'Confirm'}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>AI correctly identified no errors</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 px-2 text-xs gap-1"
+                                  onClick={() => setNoErrorConfirmed(false)}
+                                  disabled={!noErrorConfirmed}
+                                >
+                                  <X className="h-3 w-3" />
+                                  Dismiss
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>AI missed errors in this work</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ScrollArea>
+
+              {/* Save feedback button */}
+              {noErrorConfirmed && (
                 <div className="p-3 border-t bg-muted/30">
                   <Button
                     className="w-full gap-2"

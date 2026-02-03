@@ -820,6 +820,20 @@ DEDUCTION GUIDELINES FOR CORRECT ANSWERS ONLY:
 - Answer correct but NO work at all → 90% (bare minimum)
 - NEVER grade a correct answer below 90%
 
+*** INCOMPLETE FINAL ANSWER DEDUCTION RULE ***
+If the student's mathematical work/setup is CORRECT but the final answer is:
+- Missing entirely (no boxed/circled answer, no "=" with result)
+- Incomplete (stopped mid-calculation, left as unsimplified expression when simplification was required)
+- Not clearly stated (work ends abruptly without conclusion)
+
+THEN: Deduct 5-10 points from what would have been earned.
+- Good work setup with missing final answer → Deduct 5-10 points
+- Work is 95% quality but no conclusion → Maximum grade is 90%
+- This applies even when all mathematical steps are correct
+
+Example: Student correctly sets up L = (90/360) × 2π × 10 = (1/4) × 20π but doesn't write "L = 5π" as final answer
+→ Deduct 5-10 points for incomplete final answer
+
 *** WHEN THE ANSWER IS INCORRECT - NORMAL GRADING APPLIES ***
 If the student's final answer is WRONG, this 90% minimum rule does NOT apply:
 - Grade based on the concepts they demonstrate understanding of
@@ -829,11 +843,13 @@ If the student's final answer is WRONG, this 90% minimum rule does NOT apply:
 
 SUMMARY:
 - CORRECT answer → Minimum 90%, max 10% deduction for work issues
+- CORRECT work but MISSING/INCOMPLETE final answer → Deduct 5-10 points
 - INCORRECT answer → Normal grading based on understanding shown (55-100 scale)
 
 RATIONALE: A correct answer proves the student understands the concept. 
 Penalizing too harshly for not showing work when the answer is RIGHT is unfair.
-However, when the answer is wrong, we need to evaluate understanding through work shown.
+However, students must learn to complete their work with a clear final answer.
+When the answer is wrong, we need to evaluate understanding through work shown.
 
 FULL-PAGE WORK SCANNING PROTOCOL:
 ** CRITICAL: SCAN THE ENTIRE PAGE FOR STUDENT WORK **
@@ -1048,6 +1064,9 @@ Provide your analysis in the following structure:
 - Correct Solution: (your step-by-step solution to the problem)` : '') + `
 - Concepts Demonstrated: (LIST each concept with citation from their work)
 - Coherent Work Shown: (YES or NO - does the student show logical thinking/work, even if simple?)
+- Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND)
+- Is Correct: (YES or NO - is the final answer correct?)
+- Final Answer Complete: (YES or NO - did student provide a clear, complete final answer? NO if work stops without conclusion, answer is unsimplified when simplification was required, or no boxed/circled/stated final answer)
 - Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND)
 - Is Correct: (YES or NO - is the final answer correct?)
 - Regents Score: (0, 1, 2, 3, or 4 - remember: ANY understanding = Score 1 minimum)
@@ -1910,6 +1929,8 @@ interface ParsedResult {
   grade: number;
   gradeJustification: string;
   feedback: string;
+  isAnswerCorrect: boolean;
+  finalAnswerComplete: boolean;
 }
 
 function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: number = 55, gradeFloorWithEffort: number = 65): ParsedResult {
@@ -1929,6 +1950,8 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     grade: gradeFloorWithEffort, // Default to effort floor - most scans have SOME work
     gradeJustification: '',
     feedback: '',
+    isAnswerCorrect: false,
+    finalAnswerComplete: true, // Default to true, set to false if detected
   };
 
   // Parse Detected Subject
@@ -1959,7 +1982,15 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   const coherentMatch = text.match(/Coherent Work Shown[:\s]*(YES|NO)/i);
   result.coherentWorkShown = coherentMatch ? coherentMatch[1].toUpperCase() === 'YES' : false;
 
-  const approachMatch = text.match(/Approach Analysis[:\s]*([^]*?)(?=Is Correct|Regents Score|Rubric Scores|Misconceptions|$)/i);
+  // Parse Is Correct (final answer correctness)
+  const isCorrectMatch = text.match(/Is Correct[:\s]*(YES|NO)/i);
+  result.isAnswerCorrect = isCorrectMatch ? isCorrectMatch[1].toUpperCase() === 'YES' : false;
+
+  // Parse Final Answer Complete
+  const finalAnswerCompleteMatch = text.match(/Final Answer Complete[:\s]*(YES|NO)/i);
+  result.finalAnswerComplete = finalAnswerCompleteMatch ? finalAnswerCompleteMatch[1].toUpperCase() === 'YES' : true;
+
+  const approachMatch = text.match(/Approach Analysis[:\s]*([^]*?)(?=Is Correct|Final Answer Complete|Regents Score|Rubric Scores|Misconceptions|$)/i);
   if (approachMatch) result.approachAnalysis = approachMatch[1].trim();
 
   // Parse Regents Score (0-4)
@@ -2155,8 +2186,29 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     result.grade = Math.max(gradeFloorWithEffort, result.grade);
   }
   result.grade = Math.max(gradeFloor, result.grade);
+
+  // INCOMPLETE FINAL ANSWER DEDUCTION: If work is correct but final answer is missing/incomplete
+  // Deduct 5-10 points (we use 7 as middle ground)
+  if (!result.finalAnswerComplete && result.isAnswerCorrect && result.grade > gradeFloor) {
+    const incompleteFinalAnswerDeduction = 7; // Deduct 7 points for incomplete final answer
+    const gradeBeforeDeduction = result.grade;
+    result.grade = Math.max(gradeFloor, result.grade - incompleteFinalAnswerDeduction);
+    console.log(`Incomplete final answer deduction: ${gradeBeforeDeduction} -> ${result.grade} (-${incompleteFinalAnswerDeduction} points)`);
+    
+    // Add note to justification if there isn't one about incomplete answer
+    if (!result.gradeJustification.toLowerCase().includes('incomplete') && 
+        !result.gradeJustification.toLowerCase().includes('missing final')) {
+      result.gradeJustification += ' Deduction applied for incomplete/missing final answer despite correct work setup.';
+    }
+  } else if (!result.finalAnswerComplete && hasCoherentWork && result.grade > gradeFloor) {
+    // Even if answer is not marked as correct, if work is coherent but no final answer, still deduct
+    const incompleteDeduction = 5;
+    const gradeBeforeDeduction = result.grade;
+    result.grade = Math.max(gradeFloor, result.grade - incompleteDeduction);
+    console.log(`Incomplete final answer (work shown): ${gradeBeforeDeduction} -> ${result.grade} (-${incompleteDeduction} points)`);
+  }
   
-  console.log(`Final grade: ${result.grade} (Understanding: ${hasAnyUnderstanding}, Perfect: ${shouldGetPerfectScore})`);
+  console.log(`Final grade: ${result.grade} (Understanding: ${hasAnyUnderstanding}, Perfect: ${shouldGetPerfectScore}, FinalAnswerComplete: ${result.finalAnswerComplete})`);
 
   // Grade justification already parsed above for mastery detection
 
