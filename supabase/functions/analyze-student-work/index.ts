@@ -1063,13 +1063,26 @@ Provide your analysis in the following structure:
 - NYS Standard: (CONCISE format ONLY: "[CODE] - [Brief 5-10 word description]". Example: "6.G.A.1 - Finding area of composite shapes". Use subject-appropriate standard prefix. Do NOT include full standard text or long explanations.)` + (isAIMode ? `
 - Correct Solution: (your step-by-step solution to the problem)` : '') + `
 - Concepts Demonstrated: (LIST each concept with citation from their work)
-- Coherent Work Shown: (YES or NO - does the student show logical thinking/work, even if simple?)
-- Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND)
-- Is Correct: (YES or NO - is the final answer correct?)
+- Student Work Present: (YES or NO - 
+    *** CRITICAL BLANK PAGE DETECTION ***
+    Answer YES ONLY if there is ACTUAL STUDENT HANDWRITING/WORK visible.
+    Answer NO if:
+    - The work areas are completely empty/blank
+    - Only printed question text is visible with no student responses
+    - Student wrote only their name but no mathematical/written work
+    - Work areas contain only dots, stray marks, or smudges - not actual attempts
+    
+    This is DIFFERENT from "Coherent Work Shown" - a student could write work that isn't coherent.
+    This question is: DID THE STUDENT WRITE ANYTHING AT ALL in the work/answer areas?)
+- Coherent Work Shown: (YES or NO - does the student show logical thinking/work, even if simple? Only relevant if Student Work Present = YES)
+- Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND. If Student Work Present = NO, state "No student work to analyze")
+- Is Correct: (YES or NO - is the final answer correct? If no answer written, answer NO)
 - Final Answer Complete: (YES or NO - did student provide a clear, complete final answer? NO if work stops without conclusion, answer is unsimplified when simplification was required, or no boxed/circled/stated final answer)
-- Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND)
-- Is Correct: (YES or NO - is the final answer correct?)
-- Regents Score: (0, 1, 2, 3, or 4 - remember: ANY understanding = Score 1 minimum)
+- Regents Score: (0, 1, 2, 3, or 4 - 
+    *** CRITICAL: If Student Work Present = NO, Regents Score MUST be 0 ***
+    A blank page with no student work = Score 0 = Grade 55
+    Do NOT give score 1+ for blank pages just because there are "no errors"
+    No work = no understanding demonstrated = Score 0)
 - Regents Score Justification: (why this score - cite evidence)
 - Rubric Scores: (if teacher rubric provided, score each criterion with points)
 - Misconceptions: (CRITICAL - ONLY list VERIFIED ERRORS that you can directly quote from the student's work.
@@ -1919,6 +1932,7 @@ interface ParsedResult {
   problemIdentified: string;
   nysStandard: string;
   conceptsDemonstrated: string[];
+  studentWorkPresent: boolean; // NEW: Explicit blank page detection
   coherentWorkShown: boolean;
   approachAnalysis: string;
   rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
@@ -1940,6 +1954,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     problemIdentified: '',
     nysStandard: '',
     conceptsDemonstrated: [],
+    studentWorkPresent: true, // Default to true, set to false if detected as blank
     coherentWorkShown: false,
     approachAnalysis: '',
     rubricScores: [],
@@ -1969,7 +1984,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   if (standardMatch) result.nysStandard = standardMatch[1].trim();
 
   // Parse Concepts Demonstrated - KEY for concept-based grading
-  const conceptsMatch = text.match(/Concepts Demonstrated[:\s]*([^]*?)(?=Coherent Work|Approach Analysis|Is Correct|$)/i);
+  const conceptsMatch = text.match(/Concepts Demonstrated[:\s]*([^]*?)(?=Student Work Present|Coherent Work|Approach Analysis|Is Correct|$)/i);
   if (conceptsMatch) {
     const conceptsText = conceptsMatch[1].trim();
     result.conceptsDemonstrated = conceptsText
@@ -1977,6 +1992,10 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
       .map(c => c.trim())
       .filter(c => c.length > 2 && !c.match(/^(none|n\/a|no concepts?)$/i));
   }
+
+  // *** CRITICAL: Parse Student Work Present - Explicit blank page detection ***
+  const studentWorkMatch = text.match(/Student Work Present[:\s]*(YES|NO)/i);
+  result.studentWorkPresent = studentWorkMatch ? studentWorkMatch[1].toUpperCase() === 'YES' : true;
 
   // Parse Coherent Work Shown
   const coherentMatch = text.match(/Coherent Work Shown[:\s]*(YES|NO)/i);
@@ -2054,38 +2073,49 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   // Look for ANY evidence of understanding - this is the KEY determination
   const textLower = text.toLowerCase();
   
-  // Check if EXPLICITLY marked as blank/no work
-  const explicitlyBlank = (textLower.includes('blank response') || 
-                          textLower.includes('completely blank') ||
-                          textLower.includes('completely empty') ||
-                          textLower.includes('nothing written') ||
-                          textLower.includes('no response')) &&
-                          !textLower.includes('some') &&
-                          !textLower.includes('attempt');
+  // *** CRITICAL: Check for NO STUDENT WORK explicitly detected by AI ***
+  // This is the most reliable indicator - if AI says no work present, it's a blank page
+  const noStudentWorkDetected = !result.studentWorkPresent;
   
-  // Check for ANY understanding indicators
-  const hasConceptsDemo = result.conceptsDemonstrated.length > 0;
-  const hasCoherentWork = result.coherentWorkShown;
-  const hasOcrContent = result.ocrText.trim().length > 10;
+  // Check if EXPLICITLY marked as blank/no work (secondary check)
+  const explicitlyBlank = noStudentWorkDetected || (
+    (textLower.includes('blank response') || 
+     textLower.includes('completely blank') ||
+     textLower.includes('completely empty') ||
+     textLower.includes('nothing written') ||
+     textLower.includes('no response') ||
+     textLower.includes('no student work') ||
+     textLower.includes('work areas are empty') ||
+     textLower.includes('no work to analyze')) &&
+    !textLower.includes('some') &&
+    !textLower.includes('attempt'));
+  
+  // Check for ANY understanding indicators - BUT ONLY IF WORK IS PRESENT
+  const hasConceptsDemo = result.studentWorkPresent && result.conceptsDemonstrated.length > 0;
+  const hasCoherentWork = result.studentWorkPresent && result.coherentWorkShown;
+  // OCR content only counts if student work is present (printed question text doesn't count)
+  const hasOcrContent = result.studentWorkPresent && result.ocrText.trim().length > 10;
   const hasPositiveRegents = result.regentsScore >= 1;
   const hasPositiveScore = result.totalScore.earned > 0;
   
-  // Look for understanding keywords in the analysis
-  const showsUnderstanding = textLower.includes('understand') ||
-                             textLower.includes('demonstrates') ||
-                             textLower.includes('shows') ||
-                             textLower.includes('attempt') ||
-                             textLower.includes('tried') ||
-                             textLower.includes('effort') ||
-                             textLower.includes('basic') ||
-                             textLower.includes('some') ||
-                             textLower.includes('partial') ||
-                             textLower.includes('limited') ||
-                             textLower.includes('correct') ||
-                             textLower.includes('concept');
+  // Look for understanding keywords in the analysis - BUT ONLY IF WORK IS PRESENT
+  const showsUnderstanding = result.studentWorkPresent && (
+    textLower.includes('understand') ||
+    textLower.includes('demonstrates') ||
+    textLower.includes('shows') ||
+    textLower.includes('attempt') ||
+    textLower.includes('tried') ||
+    textLower.includes('effort') ||
+    textLower.includes('basic') ||
+    textLower.includes('some') ||
+    textLower.includes('partial') ||
+    textLower.includes('limited') ||
+    textLower.includes('correct') ||
+    textLower.includes('concept'));
   
   // *** CRITICAL: Check for FULL MASTERY / PERFECT SCORE indicators ***
   // If the justification says the student met full standards, got everything correct, etc. -> 100
+  // BUT ONLY IF STUDENT WORK IS ACTUALLY PRESENT
   const fullMasteryIndicators = [
     'complete and correct',
     'complete mastery',
@@ -2117,20 +2147,39 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     'demonstrates proficiency',
   ];
   
-  const hasPerfectIndicators = fullMasteryIndicators.some(indicator => textLower.includes(indicator));
+  // *** "No errors" does NOT mean correct if there's no work to have errors in! ***
+  // Filter out "no errors" indicator if no student work is present
+  const hasPerfectIndicators = result.studentWorkPresent && fullMasteryIndicators.some(indicator => textLower.includes(indicator));
   
   // Check the grade justification and regents justification specifically for mastery signals
   const justificationText = (result.gradeJustification + ' ' + result.regentsScoreJustification).toLowerCase();
-  const justificationHasMastery = fullMasteryIndicators.some(indicator => justificationText.includes(indicator));
+  const justificationHasMastery = result.studentWorkPresent && fullMasteryIndicators.some(indicator => justificationText.includes(indicator));
   
   // If justification explicitly says student met full standards / complete correct work -> override to 100
-  const shouldGetPerfectScore = hasPerfectIndicators || justificationHasMastery;
+  // BUT ONLY IF STUDENT WORK IS ACTUALLY PRESENT
+  const shouldGetPerfectScore = result.studentWorkPresent && (hasPerfectIndicators || justificationHasMastery);
   
-  console.log(`Grade determination - Concepts: ${result.conceptsDemonstrated.length}, Coherent: ${hasCoherentWork}, Understanding: ${showsUnderstanding}, Blank: ${explicitlyBlank}, PerfectIndicators: ${shouldGetPerfectScore}`);
+  console.log(`Grade determination - StudentWorkPresent: ${result.studentWorkPresent}, Concepts: ${result.conceptsDemonstrated.length}, Coherent: ${hasCoherentWork}, Understanding: ${showsUnderstanding}, Blank: ${explicitlyBlank}, PerfectIndicators: ${shouldGetPerfectScore}`);
   
-  // CRITICAL: If ANY understanding is shown, minimum is 65
-  // Only give 55 if COMPLETELY blank with NO understanding whatsoever
-  const hasAnyUnderstanding = !explicitlyBlank && (
+  // *** CRITICAL: NO STUDENT WORK = GRADE 55, NO EXCEPTIONS ***
+  // If student work is not present, there's no understanding to evaluate
+  // This cannot be overridden by "no errors" because blank pages have no errors by definition
+  if (!result.studentWorkPresent || explicitlyBlank) {
+    console.log('NO STUDENT WORK DETECTED - Enforcing grade floor of 55');
+    result.grade = gradeFloor;
+    result.regentsScore = 0;
+    if (!result.gradeJustification.includes('no work')) {
+      result.gradeJustification = 'No student work shown on the page. Grade floor applied. ' + result.gradeJustification;
+    }
+    // Force misconceptions to reflect the blank page
+    if (result.misconceptions.length === 0 || result.misconceptions.some(m => m.toLowerCase().includes('no error'))) {
+      result.misconceptions = ['No student work was submitted. Work areas are blank.'];
+    }
+    return result; // Return early - no further grade adjustments needed
+  }
+  
+  // CRITICAL: If ANY understanding is shown (and work IS present), minimum is 65
+  const hasAnyUnderstanding = (
     hasConceptsDemo ||
     hasCoherentWork ||
     hasOcrContent ||
