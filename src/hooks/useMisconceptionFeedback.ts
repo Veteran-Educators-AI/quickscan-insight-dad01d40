@@ -18,6 +18,7 @@ interface SaveFeedbackParams {
   topicName: string;
   feedback: MisconceptionFeedback[];
   aiGrade?: number;
+  noErrorsConfirmed?: boolean;
 }
 
 export function useMisconceptionFeedback() {
@@ -49,6 +50,35 @@ export function useMisconceptionFeedback() {
     if (!user) {
       toast.error('Not authenticated');
       return { success: false };
+    }
+
+    // Handle "no errors confirmed" case - teacher confirms AI correctly found no errors
+    if (params.noErrorsConfirmed && params.feedback.length === 0) {
+      try {
+        const { error } = await supabase.from('ai_analysis_feedback').insert({
+          teacher_id: user.id,
+          student_id: params.studentId || null,
+          attempt_id: params.attemptId || null,
+          topic_name: params.topicName,
+          ai_grade: params.aiGrade || null,
+          ai_misconceptions: [],
+          critique_type: 'good_analysis',
+          critique_text: 'Teacher confirmed AI correctly identified no errors in the student work.',
+          is_processed: false,
+        });
+
+        if (error) throw error;
+
+        toast.success('Feedback saved! AI confirmed as accurate.', {
+          description: 'No errors analysis verified',
+        });
+
+        return { success: true };
+      } catch (error) {
+        console.error('Error saving no-error confirmation:', error);
+        toast.error('Failed to save feedback');
+        return { success: false };
+      }
     }
 
     if (params.feedback.length === 0) {
