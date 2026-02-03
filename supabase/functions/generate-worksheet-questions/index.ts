@@ -919,7 +919,8 @@ ${exampleOutput}`;
         }
       }
     } catch (parseError) {
-      console.error('Failed to parse (or recover) AI response:', content.substring(0, 200) + '...');
+      console.error('Failed to parse (or recover) AI response. Content start:', content.substring(0, 500));
+      console.error('Parse error:', parseError);
       throw new Error('Failed to parse generated questions. The AI response may have been truncated. Please try again with fewer questions.');
     }
       
