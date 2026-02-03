@@ -449,6 +449,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
   const [regeneratingKey, setRegeneratingKey] = useState<string | null>(null);
   const [selectedRegenerateKeys, setSelectedRegenerateKeys] = useState<Set<string>>(new Set());
   
+  // Hidden geometry state - kept for compatibility but always disabled
+  const [includeGeometry] = useState(false);
+  const [useAIImages] = useState(false);
+  const [preferDeterministicSVG] = useState(false);
+  const [geometryShapes, setGeometryShapes] = useState<Record<string, string>>({});
+  const [regeneratingShapeKey, setRegeneratingShapeKey] = useState<string | null>(null);
+  
+  // Placeholder Shapes icon component (hidden feature)
+  const Shapes = ({ className }: { className?: string }) => null;
+  
   // Image generation warning dialog state
   const [showImageWarning, setShowImageWarning] = useState(false);
   const [pendingImageOption, setPendingImageOption] = useState<'geometry' | 'aiImages' | 'storyboard' | null>(null);
@@ -3837,33 +3847,7 @@ const toggleStudent = (studentId: string) => {
                 <Badge variant="outline">
                   {Object.keys(previewData.questions).length} unique form/level combinations
                 </Badge>
-                {/* Geometry shapes indicator */}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div 
-                        className={`flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer transition-colors ${
-                          includeGeometry 
-                            ? 'bg-blue-100 text-blue-700 border border-blue-300' 
-                            : 'bg-gray-100 text-gray-500 border border-gray-200'
-                        }`}
-                        onClick={() => setIncludeGeometry(!includeGeometry)}
-                      >
-                        <Shapes className="h-3.5 w-3.5" />
-                        <span className="text-xs font-medium">
-                          Shapes {includeGeometry ? 'ON' : 'OFF'}
-                        </span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-xs">
-                        {includeGeometry 
-                          ? 'Geometry shapes will be included in PDF/Word. Click to turn off.' 
-                          : 'Geometry shapes are disabled. Click to enable.'}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                {/* Geometry shapes toggle - HIDDEN */}
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Batch regenerate controls */}
