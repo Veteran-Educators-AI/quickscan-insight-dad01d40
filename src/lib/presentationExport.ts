@@ -306,6 +306,94 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
       });
     }
 
+    // Word Problem section with click-to-reveal animations
+    if (slide.wordProblem) {
+      const hasProgressiveReveal = slide.wordProblem.progressiveReveal;
+      
+      // Problem statement (always visible)
+      yPos += 0.2;
+      pptSlide.addText('📝 Word Problem', {
+        x: 0.5,
+        y: yPos,
+        w: 9,
+        h: 0.4,
+        fontSize: 18,
+        bold: true,
+        color: colors.primary.replace('#', ''),
+        fontFace: 'Arial',
+      });
+      yPos += 0.5;
+      
+      pptSlide.addText(slide.wordProblem.problem, {
+        x: 0.5,
+        y: yPos,
+        w: 9,
+        h: 0.8,
+        fontSize: 20,
+        color: 'FFFFFF',
+        fontFace: 'Arial',
+      });
+      yPos += 1.0;
+      
+      // Steps - each with click animation if progressiveReveal
+      pptSlide.addText('📋 Step-by-Step Solution', {
+        x: 0.5,
+        y: yPos,
+        w: 9,
+        h: 0.4,
+        fontSize: 16,
+        bold: true,
+        color: '10B981', // emerald
+        fontFace: 'Arial',
+      });
+      yPos += 0.5;
+      
+      slide.wordProblem.steps.forEach((step, stepIdx) => {
+        const stepText = step.replace(/^Step \d+:\s*/i, '');
+        const textOpts: any = {
+          x: 0.7,
+          y: yPos,
+          w: 8.3,
+          h: 0.5,
+          fontSize: 16,
+          color: 'EEEEEE',
+          fontFace: 'Arial',
+        };
+        
+        // Add click-to-appear animation for progressive reveal
+        if (hasProgressiveReveal) {
+          textOpts.animate = { type: 'appear', delay: 0 };
+        }
+        
+        pptSlide.addText(`${stepIdx + 1}. ${stepText}`, textOpts);
+        yPos += 0.55;
+      });
+      
+      yPos += 0.3;
+      
+      // Final Answer - with click animation if progressiveReveal
+      const answerOpts: any = {
+        x: 0.5,
+        y: yPos,
+        w: 9,
+        h: 0.6,
+        fontSize: 18,
+        bold: true,
+        color: 'FBBF24', // amber
+        fontFace: 'Arial',
+      };
+      
+      if (hasProgressiveReveal) {
+        answerOpts.animate = { type: 'appear', delay: 0 };
+      }
+      
+      pptSlide.addText(`✓ ${slide.wordProblem.finalAnswer}`, answerOpts);
+      yPos += 0.8;
+      
+      // Add speaker notes with full solution
+      pptSlide.addNotes(`Problem: ${slide.wordProblem.problem}\n\nSolution:\n${slide.wordProblem.steps.join('\n')}\n\nAnswer: ${slide.wordProblem.finalAnswer}`);
+    }
+
     // Question section
     if (slide.type === 'question' && slide.question) {
       yPos += 0.3;

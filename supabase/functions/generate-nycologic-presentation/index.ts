@@ -23,6 +23,7 @@ interface PresentationSlide {
     problem: string;
     steps: string[];
     finalAnswer: string;
+    progressiveReveal?: boolean; // When true, steps and answer are revealed one at a time on spacebar
   };
 }
 
@@ -135,28 +136,29 @@ SECTION 4: DISCOUNT RATE & YIELD - CRITICAL!
     - If Coupon Rate = Market Rate → Bond trades at PAR (PV = Face Value)
 
 ═══════════════════════════════════════════════════════════
-REQUIRED: AT LEAST 6 WORKED EXAMPLES
+REQUIRED: AT LEAST 6 WORKED EXAMPLES WITH PROGRESSIVE REVEAL
 ═══════════════════════════════════════════════════════════
 
-You MUST include AT LEAST 6 complete word problems with step-by-step solutions:
+You MUST include AT LEAST 6 complete word problems with step-by-step solutions.
+CRITICAL: Each wordProblem MUST have "progressiveReveal": true so steps appear one at a time when spacebar is pressed.
 
-EXAMPLE 1 - Present Value Calculation:
+EXAMPLE 1 - Bond Payment Calculation:
+"Calculate the semi-annual coupon payment for a $5,000 corporate bond with a 6% annual coupon rate."
+
+EXAMPLE 2 - Total Bond Earnings:
+"A $10,000 bond pays 5% annually for 20 years. Calculate the total earnings from coupon payments over the life of the bond."
+
+EXAMPLE 3 - Present Value Calculation:
 "A $1,000 bond pays 6% annually and matures in 5 years. If the discount rate is 8%, find the present value."
 
-EXAMPLE 2 - Future Value Calculation:
+EXAMPLE 4 - Future Value Calculation:
 "You invest $2,500 today at 5% annual interest. What is the future value in 10 years?"
-
-EXAMPLE 3 - Coupon Payments & Total Interest:
-"A $5,000 bond with 4% coupon rate paid semi-annually matures in 15 years. Calculate total interest earned."
-
-EXAMPLE 4 - Discount Rate Impact:
-"A $1,000 bond pays $60 annually. Calculate PV using (a) 5% discount rate and (b) 7% discount rate. Explain the difference."
 
 EXAMPLE 5 - Premium vs Discount:
 "A $1,000 bond has a 7% coupon rate. The market rate is 5%. Is this bond at premium or discount? Calculate PV for 10 years."
 
-EXAMPLE 6 - Future Value of Reinvested Coupons:
-"If you receive $50 semi-annually from a bond and reinvest at 4% per period, what's the FV after 20 periods?"
+EXAMPLE 6 - Total Bond Investment Return:
+"Compare the total earnings from two bonds: Bond A ($5,000, 4% for 15 years) vs Bond B ($3,000, 6% for 20 years)."
 
 Use realistic values: Face values $1,000-$10,000, coupon rates 3%-8%, maturities 5-30 years.
 Format all currency with $ and commas: $1,000.00, $5,250.75`;
@@ -383,19 +385,20 @@ ${includeQuestions ? `Include ${qCount} question slides with multiple choice opt
 BOND PRESENTATION STRUCTURE (${slideCount} slides minimum):
 Slide 1: Title slide
 Slide 2: What is a Bond? (definitions: face value, coupon, maturity)
-Slide 3: Present Value Formula - PV = FV / (1 + r)^n with explanation
-Slide 4: Future Value Formula - FV = PV × (1 + r)^n with explanation  
-Slide 5: Discount Rate Explained - What it is, how it affects bond prices
-Slide 6-11: SIX WORKED EXAMPLES (one per slide) - Each with wordProblem field:
-   - Example 1: Calculate Present Value of a bond
-   - Example 2: Calculate Future Value of an investment
-   - Example 3: Calculate total coupon payments
-   - Example 4: Compare PV with different discount rates
+Slide 3: Calculating Bond Payments - Coupon Payment = Face Value × Coupon Rate
+Slide 4: Total Bond Earnings - Total = Coupon Payment × Number of Periods
+Slide 5: Present Value Formula - PV = FV / (1 + r)^n with explanation
+Slide 6: Future Value Formula - FV = PV × (1 + r)^n with explanation  
+Slide 7-12: SIX WORKED EXAMPLES (one per slide) - Each with wordProblem field and "progressiveReveal": true:
+   - Example 1: Calculate semi-annual bond payment
+   - Example 2: Calculate total bond earnings over time
+   - Example 3: Calculate Present Value of a bond
+   - Example 4: Calculate Future Value of an investment
    - Example 5: Determine if bond trades at premium/discount
-   - Example 6: Future Value of reinvested coupons
-Slide 12: Summary of all formulas
+   - Example 6: Compare total earnings from different bonds
+Slide 13: Summary of all formulas
 
-CRITICAL: You MUST include exactly 6 slides with wordProblem objects containing worked examples!`;
+CRITICAL: Every wordProblem object MUST have "progressiveReveal": true so teachers can reveal steps one at a time with spacebar!`;
       }
       
       prompt += `
@@ -407,11 +410,11 @@ For this MATH presentation, include:
   - "steps": array of step-by-step solution strings (5-8 steps each)
   - "finalAnswer": the complete answer with units
 
-${isBond ? `Example BOND Present Value slide:
-{"id":"slide-6","type":"content","title":"**Present Value** Calculation","content":["Using PV = FV / (1 + r)^n"],"wordProblem":{"problem":"Find the present value of a $1,000 bond that pays 6% annually and matures in 5 years. The current discount rate is 8%.","steps":["Step 1: Identify given values: FV = $1,000, Coupon Rate = 6%, n = 5 years, Discount Rate (r) = 8%","Step 2: Calculate annual coupon payment: C = $1,000 × 6% = $60","Step 3: Apply PV formula for coupons: PVA = $60 × [(1 - (1.08)^(-5)) / 0.08]","Step 4: Calculate: PVA = $60 × [(1 - 0.6806) / 0.08] = $60 × 3.9927 = $239.56","Step 5: Calculate PV of face value: PV = $1,000 / (1.08)^5 = $1,000 / 1.4693 = $680.58","Step 6: Add both components: Total PV = $239.56 + $680.58 = $920.14","Step 7: Since PV ($920.14) < Face Value ($1,000), bond trades at DISCOUNT"],"finalAnswer":"Present Value = $920.14 (Bond trades at discount because discount rate 8% > coupon rate 6%)"},"icon":"lightbulb"}
+${isBond ? `Example BOND Payment Calculation slide (with progressive reveal):
+{"id":"slide-7","type":"content","title":"**Bond Payment** Calculation","content":["Using Coupon Payment = Face Value × Coupon Rate"],"wordProblem":{"problem":"Calculate the semi-annual coupon payment for a $5,000 corporate bond with a 6% annual coupon rate.","steps":["Step 1: Identify given values: Face Value = $5,000, Annual Coupon Rate = 6%","Step 2: Calculate annual coupon: $5,000 × 6% = $300 per year","Step 3: For semi-annual payments, divide by 2: $300 ÷ 2 = $150","Step 4: Verify: Two payments of $150 = $300 annual coupon ✓"],"finalAnswer":"Semi-annual coupon payment = $150","progressiveReveal":true},"icon":"lightbulb"}
 
-Example BOND Future Value slide:
-{"id":"slide-7","type":"content","title":"**Future Value** Calculation","content":["Using FV = PV × (1 + r)^n"],"wordProblem":{"problem":"You invest $2,500 today in a savings bond that pays 5% annual interest. What will be the future value in 10 years?","steps":["Step 1: Identify given values: PV = $2,500, r = 5% = 0.05, n = 10 years","Step 2: Write the Future Value formula: FV = PV × (1 + r)^n","Step 3: Substitute values: FV = $2,500 × (1 + 0.05)^10","Step 4: Calculate (1.05)^10 = 1.6289","Step 5: Multiply: FV = $2,500 × 1.6289 = $4,072.25","Step 6: Calculate total interest earned: $4,072.25 - $2,500 = $1,572.25"],"finalAnswer":"Future Value = $4,072.25 (You earn $1,572.25 in interest over 10 years)"},"icon":"lightbulb"}
+Example Total Bond Earnings slide (with progressive reveal):
+{"id":"slide-8","type":"content","title":"**Total Bond Earnings** Over Time","content":["Total Earnings = Coupon Payment × Number of Periods"],"wordProblem":{"problem":"A $10,000 bond pays 5% annually for 20 years. Calculate the total earnings from coupon payments over the life of the bond.","steps":["Step 1: Identify given values: Face Value = $10,000, Coupon Rate = 5%, Term = 20 years","Step 2: Calculate annual coupon: $10,000 × 5% = $500 per year","Step 3: Calculate total coupon payments: $500 × 20 years = $10,000","Step 4: At maturity, bondholder also receives face value: $10,000","Step 5: Total return: $10,000 (coupons) + $10,000 (face value) = $20,000","Step 6: Total profit: $20,000 - $10,000 (initial investment) = $10,000"],"finalAnswer":"Total earnings = $10,000 from coupon payments, doubling the initial investment","progressiveReveal":true},"icon":"lightbulb"}
 
 Example Discount Rate Comparison slide:
 {"id":"slide-8","type":"content","title":"**Discount Rate** Impact","content":["How discount rate affects bond value"],"wordProblem":{"problem":"A $1,000 bond pays $60 annually for 5 years. Calculate the present value using (a) 5% discount rate and (b) 7% discount rate. Explain why the values differ.","steps":["Step 1: Given: Face Value = $1,000, Annual Coupon = $60, n = 5 years","Step 2: At 5% discount rate: PV of coupons = $60 × 4.3295 = $259.77","Step 3: PV of face value at 5% = $1,000 / (1.05)^5 = $783.53","Step 4: Total PV at 5% = $259.77 + $783.53 = $1,043.30","Step 5: At 7% discount rate: PV of coupons = $60 × 4.1002 = $246.01","Step 6: PV of face value at 7% = $1,000 / (1.07)^5 = $712.99","Step 7: Total PV at 7% = $246.01 + $712.99 = $959.00","Step 8: Higher discount rate → Lower present value"],"finalAnswer":"At 5%: PV = $1,043.30 (premium) | At 7%: PV = $959.00 (discount) | Higher discount rates reduce bond value"},"icon":"lightbulb"}` : `Example word problem slide:

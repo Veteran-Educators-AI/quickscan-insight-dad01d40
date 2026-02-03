@@ -18,8 +18,10 @@ import {
   Send,
   Sparkles,
   FileText,
-  Info
+  Info,
+  Rocket
 } from 'lucide-react';
+import { PushAssignmentDialog } from './PushAssignmentDialog';
 import { StudentReportDialog } from './StudentReportDialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -266,6 +268,8 @@ export function Gradebook({ classId }: GradebookProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isSyncingToScholar, setIsSyncingToScholar] = useState(false);
+  const [pushAssignmentOpen, setPushAssignmentOpen] = useState(false);
+  const [pushAssignmentTopic, setPushAssignmentTopic] = useState('');
   
   // Scroll to gradebook and expand when URL params change
   useEffect(() => {
@@ -704,6 +708,14 @@ export function Gradebook({ classId }: GradebookProps) {
                   <img src={nycologicLogo} alt="" className="h-4 w-4 mr-2" />
                 )}
                 Sync to Scholar
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => setPushAssignmentOpen(true)}
+                className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/20"
+              >
+                <Rocket className="h-4 w-4 mr-2" />
+                Push Assignment
               </Button>
             </div>
 
@@ -1184,6 +1196,14 @@ export function Gradebook({ classId }: GradebookProps) {
         onOpenChange={(open) => !open && setSelectedStudentForReport(null)}
         studentId={selectedStudentForReport?.id || ''}
         studentName={selectedStudentForReport?.name || ''}
+      />
+
+      {/* Push Assignment Dialog */}
+      <PushAssignmentDialog
+        open={pushAssignmentOpen}
+        onOpenChange={setPushAssignmentOpen}
+        defaultClassId={classId}
+        defaultTopic={pushAssignmentTopic}
       />
     </Collapsible>
   );
