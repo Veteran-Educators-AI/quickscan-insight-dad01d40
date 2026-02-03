@@ -183,27 +183,45 @@ export function PushAssignmentDialog({
       // Get class info
       const selectedClass = classes?.find(c => c.id === selectedClassId);
       
+      // Map difficulty to level (A-E)
+      const difficultyToLevel: Record<string, string> = {
+        'easy': 'A',
+        'medium': 'C',
+        'hard': 'E',
+        'mixed': 'C',
+      };
+
+      // Generate remediation recommendations based on topic
+      const remediationRecommendations = [
+        topic,
+        ...(standard ? [`Review ${standard} concepts`] : []),
+        `Practice ${topic} fundamentals`,
+      ];
+
       // Push to each student in the class
       let successCount = 0;
       for (const student of students) {
         const result = await pushToSisterApp({
-          type: 'grade',
+          type: 'assignment_push',  // Use dedicated type for pushed assignments
+          source: 'scan_genius',     // Source identifier for sister app
           class_id: selectedClassId,
           class_name: selectedClass?.name,
           title: `Practice: ${topic}`,
-          description: `${questionCount} practice questions on ${topic}`,
+          description: `${questions.length} practice questions on ${topic}`,
           topic_name: topic,
-          standard_code: standard,
+          standard_code: standard || undefined,
           student_id: student.id,
           student_name: `${student.first_name} ${student.last_name}`,
           student_email: student.email || undefined,
           first_name: student.first_name,
           last_name: student.last_name,
-          xp_reward: questionCount * 10, // 10 XP per question as reward
-          coin_reward: questionCount * 5, // 5 coins per question
+          xp_reward: questions.length * 10, // 10 XP per question as reward
+          coin_reward: questions.length * 5, // 5 coins per question
+          difficulty_level: difficultyToLevel[difficulty] || 'C',
+          remediation_recommendations: remediationRecommendations,
           questions: questions.map((q, i) => ({
             number: i + 1,
-            text: q.text || q.question || q.title,
+            text: q.text || q.question || q.prompt_text || q.title,
             difficulty: q.difficulty || difficulty,
             hints: q.hints || [],
             answer: q.answer,
