@@ -95,11 +95,30 @@ export function BatchImageZoomDialog({
   } = useAnnotations();
 
   // Extract error regions from misconceptions and merge with custom positions
+  // Filter out dismissed errors from the overlay
   const baseErrorRegions = extractErrorRegions(misconceptions);
-  const errorRegions = baseErrorRegions.map(region => ({
+  const allErrorRegions = baseErrorRegions.map(region => ({
     ...region,
     ...customRegions[region.id],
   }));
+  
+  // Only show non-dismissed errors on the image overlay
+  const errorRegions = allErrorRegions.filter(region => decisions[region.id] !== 'dismissed');
+  
+  // Calculate adjusted grade based on dismissed errors
+  const calculateAdjustedGrade = () => {
+    if (grade === undefined) return undefined;
+    const totalErrors = misconceptions.length;
+    if (totalErrors === 0) return grade;
+    
+    // Each dismissed error adds points back (errors were incorrectly identified)
+    // Estimate ~5-10 points per dismissed error, capped at effort floor to max
+    const pointsPerError = Math.min(10, (100 - grade) / Math.max(1, totalErrors));
+    const adjustedGrade = Math.min(100, grade + (dismissedCount * pointsPerError));
+    return Math.round(adjustedGrade);
+  };
+  
+  const adjustedGrade = calculateAdjustedGrade();
 
   // Handle region updates (drag/resize)
   const handleRegionUpdate = useCallback((id: number, updates: Partial<ErrorRegion>) => {
@@ -281,9 +300,23 @@ export function BatchImageZoomDialog({
             Paper {paperIndex + 1} of {totalPapers}
             {studentName && ` • ${studentName}`}
             {grade !== undefined && (
-              <Badge className={cn("ml-2", getGradeColor(grade))}>
-                {grade}%
-              </Badge>
+              <>
+                {dismissedCount > 0 && adjustedGrade !== grade ? (
+                  <div className="flex items-center gap-1 ml-2">
+                    <Badge className={cn("opacity-50 line-through", getGradeColor(grade))}>
+                      {grade}%
+                    </Badge>
+                    <span className="text-muted-foreground">→</span>
+                    <Badge className={cn(getGradeColor(adjustedGrade!))}>
+                      {adjustedGrade}%
+                    </Badge>
+                  </div>
+                ) : (
+                  <Badge className={cn("ml-2", getGradeColor(grade))}>
+                    {grade}%
+                  </Badge>
+                )}
+              </>
             )}
           </DialogTitle>
           <div className="flex items-center gap-1">
@@ -556,6 +589,11 @@ export function BatchImageZoomDialog({
                 <p className="text-xs text-muted-foreground">
                   Review AI findings and train by confirming or dismissing
                 </p>
+                {dismissedCount > 0 && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    {dismissedCount} error(s) dismissed — grade adjusted
+                  </p>
+                )}
                 
                 {/* Bulk actions */}
                 <div className="flex items-center gap-2 mt-2">
@@ -633,14 +671,41 @@ export function BatchImageZoomDialog({
                       );
                     }
 
+                    // Show confirmed items as collapsed with undo option
+                    if (decision === 'confirmed') {
+                      return (
+                        <div
+                          key={i}
+                          className="p-2 rounded-lg border border-dashed border-green-200 bg-green-50/30 dark:bg-green-950/10"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400">
+                              <Check className="h-3 w-3" />
+                              <span>Error #{errorNum} confirmed</span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                clearDecision(errorNum);
+                              }}
+                            >
+                              Undo
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div
                         key={i}
                         className={cn(
                           "p-3 rounded-lg border transition-all",
-                          decision === 'confirmed' && "border-green-400 bg-green-50/50 dark:bg-green-950/20",
-                          !decision && isHighlighted && "border-destructive bg-destructive/10 shadow-md",
-                          !decision && !isHighlighted && "border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20"
+                          isHighlighted && "border-destructive bg-destructive/10 shadow-md",
+                          !isHighlighted && "border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20"
                         )}
                         onMouseEnter={() => setHighlightedError(errorNum)}
                         onMouseLeave={() => setHighlightedError(null)}
@@ -648,11 +713,10 @@ export function BatchImageZoomDialog({
                         <div className="flex items-start gap-2">
                           <div className={cn(
                             "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold shrink-0",
-                            decision === 'confirmed' && "bg-green-500 text-white",
-                            !decision && isHighlighted && "bg-destructive text-destructive-foreground",
-                            !decision && !isHighlighted && "bg-amber-500 text-white"
+                            isHighlighted && "bg-destructive text-destructive-foreground",
+                            !isHighlighted && "bg-amber-500 text-white"
                           )}>
-                            {decision === 'confirmed' ? <Check className="h-3 w-3" /> : errorNum}
+                            {errorNum}
                           </div>
                           <div className="flex-1 min-w-0">
                             {region && (
@@ -660,9 +724,8 @@ export function BatchImageZoomDialog({
                                 variant="outline" 
                                 className={cn(
                                   "text-[10px] mb-1.5",
-                                  decision === 'confirmed' && "border-green-400 text-green-700 dark:text-green-300",
-                                  !decision && isHighlighted && "border-destructive text-destructive",
-                                  !decision && !isHighlighted && "border-amber-400 text-amber-700 dark:text-amber-300"
+                                  isHighlighted && "border-destructive text-destructive",
+                                  !isHighlighted && "border-amber-400 text-amber-700 dark:text-amber-300"
                                 )}
                               >
                                 <MapPin className="h-2.5 w-2.5 mr-1" />
@@ -679,23 +742,16 @@ export function BatchImageZoomDialog({
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
-                                      variant={decision === 'confirmed' ? 'default' : 'outline'}
+                                      variant="outline"
                                       size="sm"
-                                      className={cn(
-                                        "h-6 px-2 text-xs gap-1",
-                                        decision === 'confirmed' && "bg-green-600 hover:bg-green-700"
-                                      )}
+                                      className="h-6 px-2 text-xs gap-1"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        if (decision === 'confirmed') {
-                                          clearDecision(errorNum);
-                                        } else {
-                                          confirmError(errorNum);
-                                        }
+                                        confirmError(errorNum);
                                       }}
                                     >
                                       <Check className="h-3 w-3" />
-                                      {decision === 'confirmed' ? 'Confirmed' : 'Confirm'}
+                                      Confirm
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>AI correctly identified this error</TooltipContent>
