@@ -108,11 +108,12 @@ SVG CRITICAL RULES (if generating SVG):
   
 Write questions in a fluid, professional textbook style - complete sentences, clear mathematical language, and elegant formatting.
 
-Return only valid JSON arrays when asked for questions.` },
+Return a JSON OBJECT with a single key "questions" containing the array of generated questions. Do not return a raw array.` },
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
         ...tokenParams,
+        ...(isOpenAIModel ? { response_format: { type: "json_object" } } : {}),
       }),
     });
 
@@ -626,36 +627,42 @@ WARM-UP MODE (Confidence Building):
     const answerExample = includeAnswerKey ? ',\n    "answer": "x = 5 (Divide both sides by 3)"' : '';
 
     const exampleOutput = worksheetMode === 'diagnostic'
-      ? `[
-  {
-    "questionNumber": 1,
-    "topic": "Topic Name",
-    "standard": "G.CO.A.1",
-    "question": "The full question text here",
-    "difficulty": "${allowedDifficulties[0]}",
-    "advancementLevel": "C"${hintExample}${answerExample}${useAIImages ? ',\n    "imagePrompt": "A detailed description of the geometric diagram needed"' : ''}
-  }
-]`
+      ? `{
+  "questions": [
+    {
+      "questionNumber": 1,
+      "topic": "Topic Name",
+      "standard": "G.CO.A.1",
+      "question": "The full question text here",
+      "difficulty": "${allowedDifficulties[0]}",
+      "advancementLevel": "C"${hintExample}${answerExample}${useAIImages ? ',\n      "imagePrompt": "A detailed description of the geometric diagram needed"' : ''}
+    }
+  ]
+}`
       : useAIImages
-        ? `[
-  {
-    "questionNumber": 1,
-    "topic": "Topic Name",
-    "standard": "G.CO.A.1",
-    "question": "The full question text here",
-    "difficulty": "${allowedDifficulties[0]}"${hintExample}${answerExample},
-    "imagePrompt": "A detailed description of the geometric diagram needed"
-  }
-]`
-        : `[
-  {
-    "questionNumber": 1,
-    "topic": "Topic Name",
-    "standard": "G.CO.A.1",
-    "question": "The full question text here",
-    "difficulty": "${allowedDifficulties[0]}"${hintExample}${answerExample}${includeGeometry && isGeometrySubject && !isNoImageSubject ? ',\n    "svg": "<svg width=\\"200\\" height=\\"200\\" viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>"' : ''}
-  }
-]`;
+        ? `{
+  "questions": [
+    {
+      "questionNumber": 1,
+      "topic": "Topic Name",
+      "standard": "G.CO.A.1",
+      "question": "The full question text here",
+      "difficulty": "${allowedDifficulties[0]}"${hintExample}${answerExample},
+      "imagePrompt": "A detailed description of the geometric diagram needed"
+    }
+  ]
+}`
+        : `{
+  "questions": [
+    {
+      "questionNumber": 1,
+      "topic": "Topic Name",
+      "standard": "G.CO.A.1",
+      "question": "The full question text here",
+      "difficulty": "${allowedDifficulties[0]}"${hintExample}${answerExample}${includeGeometry && isGeometrySubject && !isNoImageSubject ? ',\n      "svg": "<svg width=\\"200\\" height=\\"200\\" viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>"' : ''}
+    }
+  ]
+}`;
 
     // Check if this is an English Literature worksheet
     const isEnglishLiterature = englishContext && topics[0]?.subject === 'English';
@@ -789,7 +796,7 @@ ${exampleOutput}`;
     }
 
     // Parse the JSON response with robust handling for truncated responses
-    let questions: GeneratedQuestion[];
+    let questions: GeneratedQuestion[] = [];
     try {
       // Clean up the response - remove markdown code blocks if present
       let cleanContent = content.trim();
@@ -804,82 +811,100 @@ ${exampleOutput}`;
       }
       cleanContent = cleanContent.trim();
       
-      // Check if response appears truncated (doesn't end with valid JSON array closing)
-      if (!cleanContent.endsWith(']')) {
-        console.warn('Detected truncated JSON response, attempting to recover...');
-        console.warn('Last 100 chars:', cleanContent.slice(-100));
-        
-        // More robust recovery: find all complete objects and close the array
-        // Use bracket depth tracking to find complete objects
-        let depth = 0;
-        let inString = false;
-        let escape = false;
-        let lastCompleteObjEnd = -1;
-        let objectCount = 0;
-        
-        for (let i = 0; i < cleanContent.length; i++) {
-          const char = cleanContent[i];
-          
-          if (escape) {
-            escape = false;
-            continue;
-          }
-          
-          if (char === '\\' && inString) {
-            escape = true;
-            continue;
-          }
-          
-          if (char === '"' && !escape) {
-            inString = !inString;
-            continue;
-          }
-          
-          if (!inString) {
-            if (char === '{') {
-              depth++;
-            } else if (char === '}') {
-              depth--;
-              if (depth === 1) { // Back to array level after closing an object
-                lastCompleteObjEnd = i;
-                objectCount++;
-              }
-            } else if (char === '[' && depth === 0) {
-              depth = 1; // Array start
-            }
-          }
-        }
-        
-        if (lastCompleteObjEnd > 0 && objectCount > 0) {
-          cleanContent = cleanContent.substring(0, lastCompleteObjEnd + 1) + ']';
-          console.log(`Recovered ${objectCount} complete question objects from truncated response`);
+      try {
+        // First try standard parsing
+        const parsed = JSON.parse(cleanContent);
+        if (Array.isArray(parsed)) {
+          questions = parsed;
+        } else if (parsed && Array.isArray(parsed.questions)) {
+          questions = parsed.questions;
         } else {
-          // Fallback: try regex patterns
-          const lastCompleteObjMatch = cleanContent.match(/^(\[[\s\S]*\})\s*,?\s*\{[^}]*$/);
-          if (lastCompleteObjMatch) {
-            cleanContent = lastCompleteObjMatch[1] + ']';
-            console.log('Recovered partial response with regex');
-          } else {
-            const arrayMatch = cleanContent.match(/^\[[\s\S]*?\}(?=\s*,\s*\{|\s*\])/);
-            if (arrayMatch) {
-              cleanContent = arrayMatch[0] + ']';
-              console.log('Recovered minimal response');
-            } else {
-              console.error('Cannot recover truncated response:', cleanContent.substring(0, 500));
-              throw new Error('AI response was truncated. Please try with fewer questions or a simpler topic.');
+          throw new Error('Response is not an array or object with questions array');
+        }
+      } catch (e) {
+        console.warn('Standard JSON parse failed, attempting recovery logic:', e);
+        
+        // If standard parsing fails, it might be truncated or have the object wrapper
+        // Try to find the inner "questions": [...] array if present
+        let arrayContent = cleanContent;
+        const questionsMatch = cleanContent.match(/"questions"\s*:\s*\[/);
+        
+        if (questionsMatch) {
+          // It looks like an object wrapper, start parsing from the array bracket
+          const startIndex = questionsMatch.index! + questionsMatch[0].length - 1;
+          arrayContent = cleanContent.substring(startIndex);
+        } else if (cleanContent.trim().startsWith('{')) {
+             // Maybe it started as an object but the key wasn't found or different format
+             // Let's try to assume the whole thing is the array content if it starts with [
+             // otherwise we might need to look for the first '['
+             const firstBracket = cleanContent.indexOf('[');
+             if (firstBracket !== -1) {
+                 arrayContent = cleanContent.substring(firstBracket);
+             }
+        }
+
+        // Now run the array recovery logic on the array part
+        // Check if response appears truncated (doesn't end with valid JSON array closing)
+        if (!arrayContent.endsWith(']')) {
+            console.warn('Detected truncated JSON response, attempting to recover...');
+            
+            // More robust recovery: find all complete objects and close the array
+            // Use bracket depth tracking to find complete objects
+            let depth = 0;
+            let inString = false;
+            let escape = false;
+            let lastCompleteObjEnd = -1;
+            let objectCount = 0;
+            
+            for (let i = 0; i < arrayContent.length; i++) {
+            const char = arrayContent[i];
+            
+            if (escape) {
+                escape = false;
+                continue;
             }
-          }
+            
+            if (char === '\\') {
+                escape = true;
+                continue;
+            }
+            
+            if (char === '"') {
+                inString = !inString;
+                continue;
+            }
+            
+            if (!inString) {
+                if (char === '{') {
+                depth++;
+                } else if (char === '}') {
+                depth--;
+                if (depth === 0) {
+                    lastCompleteObjEnd = i;
+                    objectCount++;
+                }
+                }
+            }
+            }
+            
+            if (lastCompleteObjEnd !== -1) {
+            const recoveredJson = arrayContent.substring(0, lastCompleteObjEnd + 1) + ']';
+            console.log(`Recovered ${objectCount} complete questions from truncated response`);
+            questions = JSON.parse(recoveredJson);
+            } else {
+            throw new Error('Could not recover any complete questions from truncated response');
+            }
+        } else {
+             // It ends with ], so try parsing it directly as an array
+             questions = JSON.parse(arrayContent);
         }
       }
+    } catch (parseError) {
+      console.error('Failed to parse (or recover) AI response:', content.substring(0, 200) + '...');
+      throw new Error('Failed to parse generated questions. The AI response may have been truncated. Please try again with fewer questions.');
+    }
       
       // Parse the JSON
-      questions = JSON.parse(cleanContent);
-      
-      // Validate we got an array
-      if (!Array.isArray(questions)) {
-        throw new Error('Response is not an array');
-      }
-      
       // Filter out any incomplete question objects
       questions = questions.filter(q => 
         q && typeof q === 'object' && 
