@@ -106,7 +106,8 @@ Return only valid JSON arrays when asked for questions.` },
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
-        max_tokens: 12000,
+        // Use max_completion_tokens for newer models like o1/o3-mini (mapped to gpt-5.2)
+        max_completion_tokens: 12000,
       }),
     });
 
