@@ -39,15 +39,21 @@ interface GeneratedQuestion {
   hint?: string;
 }
 
-async function callLovableAI(prompt: string, useAdvancedModel: boolean = false): Promise<string> {
+async function callLovableAI(prompt: string, modelOrAdvanced: boolean | string = false): Promise<string> {
   const apiKey = Deno.env.get('LOVABLE_API_KEY');
   if (!apiKey) {
     throw new Error('LOVABLE_API_KEY not configured');
   }
 
-  // Use GPT-5.2 for Geometry and Physics with shapes/diagrams for better accuracy
-  const model = useAdvancedModel ? 'openai/gpt-5.2' : 'google/gemini-2.5-flash';
-  console.log(`Using AI model: ${model} (advanced: ${useAdvancedModel})`);
+  // Determine model: if string, use it; if boolean, select default advanced/basic
+  let model: string;
+  if (typeof modelOrAdvanced === 'string') {
+    model = modelOrAdvanced;
+  } else {
+    model = modelOrAdvanced ? 'openai/gpt-5.2' : 'google/gemini-2.5-flash';
+  }
+  
+  console.log(`Using AI model: ${model}`);
 
   // OpenAI models (gpt-5.2, etc.) require max_completion_tokens, Gemini uses max_tokens
   const isOpenAIModel = model.startsWith('openai/');
@@ -754,7 +760,20 @@ ${exampleOutput}`;
     
     console.log(`Worksheet generation: subjects=${topics.map(t => t.subject).join(',')}, useAdvancedModel=${useAdvancedModel}`);
     
-    const content = await callLovableAI(prompt, useAdvancedModel);
+    let content: string;
+    try {
+      content = await callLovableAI(prompt, useAdvancedModel);
+      
+      // Safety check for empty/short content
+      if (!content || content.length < 50) {
+        console.warn(`Primary model returned insufficient content (${content?.length} chars). Retrying with fallback...`);
+        throw new Error('Insufficient content');
+      }
+    } catch (e) {
+      console.warn("Primary AI call failed, attempting fallback to Gemini...", e);
+      // Fallback to Gemini 2.0 Flash which is very reliable for formatting
+      content = await callLovableAI(prompt, 'google/gemini-2.0-flash');
+    }
 
     // Function to fix common Unicode encoding issues in math text
     function sanitizeMathText(text: string): string {
