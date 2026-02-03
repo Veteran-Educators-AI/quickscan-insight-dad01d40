@@ -3982,8 +3982,37 @@ const toggleStudent = (studentId: string) => {
                   </CardContent>
                 </Card>
               ) : (
-                <ScrollArea className="h-[280px] border rounded-md p-2">
-                  <div className="space-y-2">
+                <>
+                  {/* Level Key Legend */}
+                  {diagnosticMode && (
+                    <div className="mb-3 p-2 bg-muted/30 rounded-md border">
+                      <p className="text-xs font-medium text-muted-foreground mb-1.5">Difficulty Level Key:</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-green-500" />
+                          <span className="font-medium">A</span> = Advanced
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                          <span className="font-medium">B</span> = Proficient
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                          <span className="font-medium">C</span> = Intermediate
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-orange-500" />
+                          <span className="font-medium">D</span> = Developing
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-red-500" />
+                          <span className="font-medium">E</span> = Foundational
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  <ScrollArea className="h-[280px] border rounded-md p-2">
+                    <div className="space-y-2">
                     {students.map(student => {
                       const hasDiagnostic = !!student.diagnosticResult;
                       const hasData = hasDiagnostic || student.hasAdaptiveData;
@@ -4078,7 +4107,8 @@ const toggleStudent = (studentId: string) => {
                       );
                     })}
                   </div>
-                </ScrollArea>
+                  </ScrollArea>
+                </>
               )}
 
               {/* Level distribution summary */}
