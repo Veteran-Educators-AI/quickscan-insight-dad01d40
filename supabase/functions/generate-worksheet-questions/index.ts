@@ -49,16 +49,17 @@ async function callLovableAI(prompt: string, useAdvancedModel: boolean = false):
   const model = useAdvancedModel ? 'openai/gpt-5.2' : 'google/gemini-2.5-flash';
   console.log(`Using AI model: ${model} (advanced: ${useAdvancedModel})`);
 
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: `You are an expert math educator creating textbook-quality problems. 
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: `You are an expert math educator creating textbook-quality problems. 
 
 CRITICAL FORMATTING REQUIREMENTS - MUST FOLLOW EXACTLY:
 
@@ -102,50 +103,58 @@ SVG CRITICAL RULES (if generating SVG):
 Write questions in a fluid, professional textbook style - complete sentences, clear mathematical language, and elegant formatting.
 
 Return only valid JSON arrays when asked for questions.` },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 12000,
-    }),
-  });
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 12000,
+      }),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Lovable AI error:', response.status, errorText);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Lovable AI error:', response.status, errorText);
+      
+      if (response.status === 429) {
+        throw new Error('Rate limit exceeded. Please try again in a moment.');
+      }
+      if (response.status === 402) {
+        throw new Error('AI credits exhausted. Please add funds to continue.');
+      }
+      // For other errors, include the status code in the message
+      throw new Error(`AI API error: ${response.status} - ${errorText.substring(0, 100)}`);
+    }
+
+    const responseText = await response.text();
     
-    if (response.status === 429) {
-      throw { status: 429, message: 'Rate limit exceeded. Please try again in a moment.' };
+    if (!responseText || responseText.trim() === '') {
+      console.error('Empty response from Lovable AI');
+      throw new Error('AI returned empty response. Please try again.');
     }
-    if (response.status === 402) {
-      throw { status: 402, message: 'AI credits exhausted. Please add funds to continue.' };
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', responseText.substring(0, 500));
+      throw new Error('Invalid response format from AI. Please try again.');
     }
-    throw new Error(`AI API error: ${response.status}`);
+    
+    const content = data.choices?.[0]?.message?.content;
+    
+    if (!content) {
+      console.error('No content in AI response data:', JSON.stringify(data).substring(0, 500));
+      throw new Error('No content in AI response');
+    }
+    
+    return content;
+  } catch (error: any) {
+    console.error("AI Generation Error:", error);
+    // Re-throw errors that are already formatted
+    if (error.message && (error.message.includes("Rate limit") || error.message.includes("credits") || error.message.includes("AI API error"))) {
+      throw error;
+    }
+    throw new Error(`Failed to communicate with AI service: ${error.message || "Unknown error"}`);
   }
-
-  // Get the response text first to handle empty responses
-  const responseText = await response.text();
-  
-  if (!responseText || responseText.trim() === '') {
-    console.error('Empty response from Lovable AI');
-    throw new Error('AI returned empty response. Please try again.');
-  }
-  
-  let data;
-  try {
-    data = JSON.parse(responseText);
-  } catch (parseError) {
-    console.error('Failed to parse AI response:', responseText.substring(0, 500));
-    throw new Error('Invalid response format from AI. Please try again.');
-  }
-  
-  const content = data.choices?.[0]?.message?.content;
-  
-  if (!content) {
-    console.error('No content in AI response data:', JSON.stringify(data).substring(0, 500));
-    throw new Error('No content in AI response');
-  }
-  
-  return content;
 }
 
 serve(async (req) => {
