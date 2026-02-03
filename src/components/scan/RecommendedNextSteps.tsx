@@ -226,6 +226,8 @@ export function RecommendedNextSteps({
           const coinReward = worksheet.difficulty === 'challenge' ? 25 : worksheet.difficulty === 'practice' ? 15 : 10;
 
           const result = await pushToSisterApp({
+            type: 'assignment_push',
+            source: 'scan_genius',
             class_id: classId,
             title: `[Auto] ${worksheet.title}`,
             description: `Auto-generated remediation for ${worksheet.topicName} (${worksheet.standard})`,
@@ -236,6 +238,11 @@ export function RecommendedNextSteps({
             xp_reward: xpReward,
             coin_reward: coinReward,
             grade,
+            remediation_recommendations: [
+              `Practice ${worksheet.topicName}`,
+              worksheet.standard ? `Review ${worksheet.standard} concepts` : null,
+            ].filter(Boolean) as string[],
+            difficulty_level: worksheet.difficulty === 'challenge' ? 'E' : worksheet.difficulty === 'practice' ? 'C' : 'A',
           });
 
           if (result.success) {
@@ -313,6 +320,8 @@ export function RecommendedNextSteps({
       const coinReward = worksheet.difficulty === 'challenge' ? 25 : worksheet.difficulty === 'practice' ? 15 : 10;
 
       const result = await pushToSisterApp({
+        type: 'assignment_push',
+        source: 'scan_genius',
         class_id: classId,
         title: worksheet.title,
         description: `Practice worksheet for ${worksheet.topicName} (${worksheet.standard})`,
@@ -323,6 +332,11 @@ export function RecommendedNextSteps({
         xp_reward: xpReward,
         coin_reward: coinReward,
         grade,
+        remediation_recommendations: [
+          `Practice ${worksheet.topicName}`,
+          worksheet.standard ? `Review ${worksheet.standard} concepts` : null,
+        ].filter(Boolean) as string[],
+        difficulty_level: worksheet.difficulty === 'challenge' ? 'E' : worksheet.difficulty === 'practice' ? 'C' : 'A',
       });
 
       if (result.success) {
@@ -365,16 +379,23 @@ export function RecommendedNextSteps({
         const coinReward = worksheet.difficulty === 'challenge' ? 25 : worksheet.difficulty === 'practice' ? 15 : 10;
 
         const result = await pushToSisterApp({
+          type: 'assignment_push',
+          source: 'scan_genius',
           class_id: classId,
           title: worksheet.title,
           description: `Practice worksheet for ${worksheet.topicName} (${worksheet.standard}) - Assigned to entire class`,
-          student_id: studentId, // If studentId is provided, it's for that student; otherwise class-wide
+          student_id: studentId,
           student_name: studentName,
           topic_name: worksheet.topicName,
           standard_code: worksheet.standard,
           xp_reward: xpReward,
           coin_reward: coinReward,
           grade,
+          remediation_recommendations: [
+            `Practice ${worksheet.topicName}`,
+            worksheet.standard ? `Review ${worksheet.standard} concepts` : null,
+          ].filter(Boolean) as string[],
+          difficulty_level: worksheet.difficulty === 'challenge' ? 'E' : worksheet.difficulty === 'practice' ? 'C' : 'A',
         });
 
         if (result.success) {
