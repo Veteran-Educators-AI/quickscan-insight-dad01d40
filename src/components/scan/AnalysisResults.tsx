@@ -21,6 +21,7 @@ import { TeacherVerificationPanel } from './TeacherVerificationPanel';
 import { TrainingConfidenceIndicator } from './TrainingConfidenceIndicator';
 import { AIAnalysisCritiqueDialog } from './AIAnalysisCritiqueDialog';
 import { OCRCorrectionPanel } from './OCRCorrectionPanel';
+import { TeacherInterpretationPanel } from './TeacherInterpretationPanel';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 
 interface RubricScore {
@@ -324,6 +325,15 @@ export function AnalysisResults({
           }}
         />
       )}
+
+      {/* Teacher Interpretation Panel - Teach AI recognition patterns */}
+      <TeacherInterpretationPanel
+        topicName={topicName || undefined}
+        ocrText={result.ocrText}
+        onInterpretationSaved={() => {
+          console.log('Interpretation saved for AI training');
+        }}
+      />
 
       {result.rubricScores.length > 0 && (
         <Card>

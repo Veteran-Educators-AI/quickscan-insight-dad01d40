@@ -1030,12 +1030,25 @@ Before grading, confirm:
 2. Does it ask for the FULL answer or just a PART?
 3. Only grade what the question ACTUALLY asks - do not penalize for work not requested!
 
+*** MANDATORY 6-ZONE PRE-SCAN FOR BLANK PAGE DETECTION ***
+Before any grading, you MUST scan these 6 zones with a 2-3 inch mental radius around each:
+1. TOP-LEFT: Check margins, corners, any stray work
+2. TOP-RIGHT: Check margins, problem setup area
+3. MIDDLE-LEFT: Check "WORK AREA" label zone and left margin
+4. MIDDLE-RIGHT: Check center of work area and right margin
+5. BOTTOM-LEFT: Check bottom of work area, answer box start
+6. BOTTOM-RIGHT: Check "ANSWER" box, final answer area
+
+For EACH zone, report: ZONE [1-6]: [EMPTY/HANDWRITING FOUND: brief description]
+If ANY zone has handwriting = Student Work Present = YES
+
 STEP 0 - FULL PAGE SCAN (CRITICAL):
 1. Scan the ENTIRE page - all four corners, margins, headers, blank spaces
 2. Look for student work ANYWHERE on the page (not just under answer lines)
 3. Work written in margins, corners, or near diagrams COUNTS as showing work
 4. A calculation like "8x4=32" in the corner IS showing work for area calculation
 5. DO NOT mark students down for "not showing work" if work exists ANYWHERE on page
+6. *** BLANK PAGE = ALL 6 ZONES ARE EMPTY with ZERO handwriting ***
 
 STEP 1 - EVIDENCE COLLECTION (with smart interpretation):
 1. Extract all text/equations from ALL AREAS of the student's work
@@ -1047,7 +1060,7 @@ STEP 2 - CONCEPT-BASED GRADING (cite your sources):
 1. Identify ALL concepts the student demonstrates - cite the specific work showing each
 2. Look for COHERENT work that shows logical thinking (even if basic)
 3. ANY understanding shown = minimum grade of 65
-4. 55 is ONLY for completely blank/no work at all
+4. 55 is ONLY for completely blank/no work at all (ALL 6 zones empty)
 5. More concepts understood with coherent justification = higher grade
 
 STEP 3 - FLAG FOR TEACHER VERIFICATION:
@@ -1056,6 +1069,15 @@ STEP 3 - FLAG FOR TEACHER VERIFICATION:
 3. Teacher will review and confirm flagged items
 
 Provide your analysis in the following structure:
+*** START WITH ZONE SCAN ***
+- Zone Scan Results: (REQUIRED - Report each zone)
+  ZONE 1 (TOP-LEFT): [EMPTY or HANDWRITING: description]
+  ZONE 2 (TOP-RIGHT): [EMPTY or HANDWRITING: description]
+  ZONE 3 (MIDDLE-LEFT): [EMPTY or HANDWRITING: description]
+  ZONE 4 (MIDDLE-RIGHT): [EMPTY or HANDWRITING: description]
+  ZONE 5 (BOTTOM-LEFT): [EMPTY or HANDWRITING: description]
+  ZONE 6 (BOTTOM-RIGHT): [EMPTY or HANDWRITING: description]
+  
 - Detected Subject: (the subject area you identified from the content: Geometry, Algebra I, Algebra II, Biology, Chemistry, Physics, English, History, Financial Math, or Other)
 - OCR Text: (extracted content - include interpretations marked as "[INTERPRETATION - VERIFY: probable reading is X]")
 - Interpretations Made: (LIST any interpretations that need teacher verification)
@@ -1064,25 +1086,22 @@ Provide your analysis in the following structure:
 - Correct Solution: (your step-by-step solution to the problem)` : '') + `
 - Concepts Demonstrated: (LIST each concept with citation from their work)
 - Student Work Present: (YES or NO - 
-    *** CRITICAL: DEFAULT TO YES UNLESS 100% CERTAIN PAGE IS BLANK ***
+    *** CRITICAL: BASE THIS ON YOUR 6-ZONE SCAN ABOVE ***
     
-    IMPORTANT: You MUST answer YES if you see ANY of the following ANYWHERE on the page:
+    If ANY of the 6 zones contains HANDWRITING = Answer YES
+    
+    Answer YES if you found ANY of the following in ANY zone:
     - Handwritten numbers, letters, equations, words, or symbols (even messy or hard to read)
-    - Mathematical expressions like "r = 10", "θ = 30°", "Length = ...", calculations
-    - Student responses in work areas, answer boxes, margins, or anywhere on page
-    - Formulas being set up (e.g., "Area = πr²", "L = (θ/360) × 2πr")
-    - ANY handwriting that is not printed text
+    - Mathematical expressions, calculations, or formulas
+    - Student responses in work areas, answer boxes, margins
     - Drawings, diagrams, graphs, or geometric constructions
-    - Even a single line of student work = YES
     
-    Answer NO ONLY if ALL of these are true:
-    - Work areas are COMPLETELY EMPTY with zero handwriting
-    - There are ONLY printed questions with absolutely no student responses
-    - You see nothing but blank white space where work should be
+    Answer NO ONLY if ALL 6 ZONES are completely EMPTY:
+    - All zones show only printed text or blank white space
+    - Zero handwriting detected in any zone
+    - No student responses anywhere on the page
     
-    *** WHEN IN DOUBT, ANSWER YES ***
-    If there is ANY handwriting visible at all = YES
-    A blank page is RARE - most scanned papers have work on them)
+    *** IF EVEN ONE ZONE HAS HANDWRITING = YES ***)
 - Coherent Work Shown: (YES or NO - does the student show logical thinking/work, even if simple? Only relevant if Student Work Present = YES)
 - Approach Analysis: (evaluation of their method - focus on what they UNDERSTAND. If Student Work Present = NO, state "No student work to analyze")
 - Is Correct: (YES or NO - is the final answer correct? If no answer written, answer NO)
@@ -2002,12 +2021,29 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
       .filter(c => c.length > 2 && !c.match(/^(none|n\/a|no concepts?)$/i));
   }
 
-  // *** CRITICAL: Parse Student Work Present - Explicit blank page detection ***
-  // DEFAULT TO TRUE - only set to false if AI EXPLICITLY says NO
-  // This prevents false positives where the AI fails to answer or is ambiguous
+  // *** CRITICAL: Parse Zone Scan Results for more reliable blank page detection ***
+  const zoneScanMatch = text.match(/Zone Scan Results[:\s]*([^]*?)(?=Detected Subject|OCR Text|$)/i);
+  let zonesWithHandwriting = 0;
+  if (zoneScanMatch) {
+    const zoneScanText = zoneScanMatch[1].toLowerCase();
+    // Count zones that have HANDWRITING
+    const zoneMatches = zoneScanText.match(/zone \d[^:]*:[^\n]*(handwriting|found|has|contains|shows|wrote|written)/gi);
+    zonesWithHandwriting = zoneMatches ? zoneMatches.length : 0;
+    console.log(`Zone scan detected ${zonesWithHandwriting} zones with handwriting`);
+  }
+
+  // *** CRITICAL: Parse Student Work Present - Use ZONE SCAN + explicit detection ***
+  // DEFAULT TO TRUE - only set to false if AI EXPLICITLY says NO AND zone scan confirms all zones empty
   const studentWorkMatch = text.match(/Student Work Present[:\s]*(YES|NO)/i);
-  // Only mark as no work if there's an EXPLICIT "NO" - anything else defaults to work present
-  result.studentWorkPresent = studentWorkMatch && studentWorkMatch[1].toUpperCase() === 'NO' ? false : true;
+  
+  // If zone scan found handwriting in ANY zone, override to YES
+  if (zonesWithHandwriting > 0) {
+    result.studentWorkPresent = true;
+    console.log('Zone scan detected handwriting - overriding studentWorkPresent to TRUE');
+  } else {
+    // Only mark as no work if there's an EXPLICIT "NO" - anything else defaults to work present
+    result.studentWorkPresent = studentWorkMatch && studentWorkMatch[1].toUpperCase() === 'NO' ? false : true;
+  }
 
   // Parse Coherent Work Shown
   const coherentMatch = text.match(/Coherent Work Shown[:\s]*(YES|NO)/i);
