@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil, QrCode, BookOpen, ExternalLink, FileText, Database, MinusCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Users, Printer, Eye, EyeOff, Pencil, QrCode, BookOpen, ExternalLink, FileText, Database, MinusCircle, Rocket } from 'lucide-react';
 import { useStudentDataCoverage } from '@/hooks/useStudentDataCoverage';
 import { StudentOnlyQRCode } from '@/components/print/StudentOnlyQRCode';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ import { Gradebook } from '@/components/reports/Gradebook';
 import { BehaviorPointDeductionDialog } from '@/components/behavior/BehaviorPointDeductionDialog';
 import { EditStudentDialog } from '@/components/classes/EditStudentDialog';
 import { SyncRosterToScholarButton } from '@/components/classes/SyncRosterToScholarButton';
+import { PushAssignmentDialog } from '@/components/reports/PushAssignmentDialog';
 
 interface Student {
   id: string;
@@ -58,6 +59,7 @@ export default function ClassDetail() {
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [behaviorDeductionOpen, setBehaviorDeductionOpen] = useState(false);
+  const [pushAssignmentOpen, setPushAssignmentOpen] = useState(false);
   
   const availablePseudonyms = getAvailablePseudonyms();
   const { coverage, totalAssignments, totalDataPoints, isLoading: coverageLoading } = useStudentDataCoverage(id);
@@ -470,6 +472,15 @@ export default function ClassDetail() {
                   <ExternalLink className="h-3 w-3 mr-1" />
                   Copy Student Portal Link
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setPushAssignmentOpen(true)}
+                  className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/20"
+                >
+                  <Rocket className="h-3 w-3 mr-1" />
+                  Push Assignment
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -851,6 +862,13 @@ export default function ClassDetail() {
           open={behaviorDeductionOpen}
           onOpenChange={setBehaviorDeductionOpen}
           preselectedClassId={id}
+        />
+
+        {/* Push Assignment Dialog */}
+        <PushAssignmentDialog
+          open={pushAssignmentOpen}
+          onOpenChange={setPushAssignmentOpen}
+          defaultClassId={id}
         />
       </div>
     </AppLayout>
