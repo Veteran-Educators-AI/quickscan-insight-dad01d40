@@ -684,9 +684,16 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
     toast({ title: 'Preset deleted' });
   };
 
-  const toggleStudent = (studentId: string) => {
+const toggleStudent = (studentId: string) => {
     setStudents(prev => prev.map(s => 
       s.id === studentId ? { ...s, selected: !s.selected } : s
+    ));
+  };
+
+  // Allow manual level override for students without data
+  const setStudentLevel = (studentId: string, level: AdvancementLevel) => {
+    setStudents(prev => prev.map(s => 
+      s.id === studentId ? { ...s, recommendedLevel: level } : s
     ));
   };
 
@@ -4042,9 +4049,30 @@ export function DifferentiatedWorksheetGenerator({ open, onOpenChange, diagnosti
                               Level {student.recommendedLevel}
                             </Badge>
                           ) : diagnosticMode && (
-                            <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-300">
-                              New (Level C)
-                            </Badge>
+                            <Select
+                              value={student.recommendedLevel}
+                              onValueChange={(value) => setStudentLevel(student.id, value as AdvancementLevel)}
+                            >
+                              <SelectTrigger className="h-7 w-[100px] text-xs">
+                                <SelectValue placeholder="Level" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {LEVELS.map(level => (
+                                  <SelectItem key={level} value={level}>
+                                    <span className="flex items-center gap-1.5">
+                                      <span className={`w-2 h-2 rounded-full ${
+                                        level === 'A' ? 'bg-green-500' :
+                                        level === 'B' ? 'bg-emerald-500' :
+                                        level === 'C' ? 'bg-yellow-500' :
+                                        level === 'D' ? 'bg-orange-500' :
+                                        level === 'E' ? 'bg-red-500' : 'bg-gray-500'
+                                      }`} />
+                                      Level {level}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           )}
                         </div>
                       );
