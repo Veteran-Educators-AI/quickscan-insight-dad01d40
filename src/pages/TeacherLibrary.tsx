@@ -59,7 +59,9 @@ import {
   Eye,
   Presentation,
   FileSpreadsheet,
+  Send,
 } from 'lucide-react';
+import { AssignWorksheetDialog } from '@/components/reports/AssignWorksheetDialog';
 
 // Types
 interface SavedWorksheet {
@@ -71,6 +73,9 @@ interface SavedWorksheet {
   settings: any;
   is_shared?: boolean;
   share_code?: string | null;
+  due_date?: string | null;
+  class_id?: string | null;
+  is_assigned?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -171,6 +176,9 @@ export default function TeacherLibrary() {
         settings: w.settings || {},
         is_shared: w.is_shared,
         share_code: w.share_code,
+        due_date: w.due_date,
+        class_id: w.class_id,
+        is_assigned: w.is_assigned,
         created_at: w.created_at,
         updated_at: w.updated_at,
       }));
@@ -607,8 +615,14 @@ export default function TeacherLibrary() {
                             <CardTitle className="text-lg truncate">{worksheet.title}</CardTitle>
                             <CardDescription className="flex items-center gap-1 mt-1">
                               <Clock className="h-3 w-3" />
-                              {format(new Date(worksheet.created_at), 'MMM d, yyyy')}
+                              Created: {format(new Date(worksheet.created_at), 'MMM d, yyyy')}
                             </CardDescription>
+                            {worksheet.due_date && (
+                              <CardDescription className="flex items-center gap-1 mt-0.5 text-orange-600 dark:text-orange-400">
+                                <Calendar className="h-3 w-3" />
+                                Due: {format(new Date(worksheet.due_date), 'MMM d, yyyy')}
+                              </CardDescription>
+                            )}
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -617,6 +631,21 @@ export default function TeacherLibrary() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {!worksheet.is_assigned && (
+                                <DropdownMenuItem asChild>
+                                  <AssignWorksheetDialog
+                                    worksheetId={worksheet.id}
+                                    worksheetTitle={worksheet.title}
+                                    onAssigned={() => loadWorksheets()}
+                                    trigger={
+                                      <button className="flex items-center w-full px-2 py-1.5 text-sm">
+                                        <Send className="h-4 w-4 mr-2" />
+                                        Assign to Class
+                                      </button>
+                                    }
+                                  />
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => downloadWorksheetAsPDF(worksheet)}>
                                 <Download className="h-4 w-4 mr-2" />
                                 Download PDF
@@ -657,11 +686,18 @@ export default function TeacherLibrary() {
                         </div>
                         <div className="flex items-center justify-between text-sm text-muted-foreground">
                           <span>{(worksheet.questions as any[])?.length || 0} questions</span>
-                          {worksheet.is_shared && (
-                            <Badge variant="outline" className="text-xs">
-                              Shared
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {worksheet.is_assigned && (
+                              <Badge variant="default" className="text-xs bg-green-600">
+                                Assigned
+                              </Badge>
+                            )}
+                            {worksheet.is_shared && (
+                              <Badge variant="outline" className="text-xs">
+                                Shared
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>

@@ -2378,10 +2378,74 @@ export type Database = {
           },
         ]
       }
+      worksheet_submissions: {
+        Row: {
+          class_id: string
+          created_at: string
+          feedback: string | null
+          id: string
+          score: number | null
+          status: string
+          student_id: string
+          submitted_at: string | null
+          updated_at: string
+          worksheet_id: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          score?: number | null
+          status?: string
+          student_id: string
+          submitted_at?: string | null
+          updated_at?: string
+          worksheet_id: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          score?: number | null
+          status?: string
+          student_id?: string
+          submitted_at?: string | null
+          updated_at?: string
+          worksheet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worksheet_submissions_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worksheet_submissions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worksheet_submissions_worksheet_id_fkey"
+            columns: ["worksheet_id"]
+            isOneToOne: false
+            referencedRelation: "worksheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       worksheets: {
         Row: {
+          class_id: string | null
           created_at: string
+          due_date: string | null
           id: string
+          is_assigned: boolean | null
           is_shared: boolean
           questions: Json
           settings: Json
@@ -2393,8 +2457,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          class_id?: string | null
           created_at?: string
+          due_date?: string | null
           id?: string
+          is_assigned?: boolean | null
           is_shared?: boolean
           questions?: Json
           settings?: Json
@@ -2406,8 +2473,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          class_id?: string | null
           created_at?: string
+          due_date?: string | null
           id?: string
+          is_assigned?: boolean | null
           is_shared?: boolean
           questions?: Json
           settings?: Json
@@ -2419,6 +2489,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "worksheets_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "worksheets_teacher_id_fkey"
             columns: ["teacher_id"]
