@@ -17,6 +17,15 @@ const defaultColors = { primary: '#fbbf24', secondary: '#3b82f6', bg: '#1e293b' 
 
 const formatPdfText = (text: string) => sanitizeForPDF(fixEncodingCorruption(text));
 
+// Convert Unicode escape sequences to actual characters for PowerPoint
+const formatPptxText = (text: string): string => {
+  if (!text) return '';
+  // Replace \uXXXX escape sequences with actual Unicode characters
+  return text.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => 
+    String.fromCharCode(parseInt(hex, 16))
+  );
+};
+
 function getThemeColors(theme?: VisualTheme) {
   if (!theme?.id) return defaultColors;
   return themeColors[theme.id] || defaultColors;
@@ -237,7 +246,7 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
 
     // Subtitle/Tag
     if (slide.subtitle) {
-      pptSlide.addText(slide.subtitle.toUpperCase(), {
+      pptSlide.addText(formatPptxText(slide.subtitle.toUpperCase()), {
         x: 0.5,
         y: yPos,
         w: 9,
@@ -252,7 +261,7 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
     }
 
     // Title
-    const cleanTitle = slide.title.replace(/\*\*/g, '');
+    const cleanTitle = formatPptxText(slide.title.replace(/\*\*/g, ''));
     pptSlide.addText(cleanTitle, {
       x: 0.5,
       y: yPos,
@@ -292,7 +301,7 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
     // Content
     if (slide.content.length > 0) {
       slide.content.forEach((item) => {
-        pptSlide.addText(item, {
+        pptSlide.addText(formatPptxText(item), {
           x: 0.5,
           y: yPos,
           w: 9,
@@ -324,7 +333,7 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
       });
       yPos += 0.5;
       
-      pptSlide.addText(slide.wordProblem.problem, {
+      pptSlide.addText(formatPptxText(slide.wordProblem.problem), {
         x: 0.5,
         y: yPos,
         w: 9,
@@ -349,7 +358,7 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
       yPos += 0.5;
       
       slide.wordProblem.steps.forEach((step, stepIdx) => {
-        const stepText = step.replace(/^Step \d+:\s*/i, '');
+        const stepText = formatPptxText(step.replace(/^Step \d+:\s*/i, ''));
         const textOpts: any = {
           x: 0.7,
           y: yPos,
@@ -387,7 +396,7 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
         answerOpts.animate = { type: 'appear', delay: 0 };
       }
       
-      pptSlide.addText(`✓ ${slide.wordProblem.finalAnswer}`, answerOpts);
+      pptSlide.addText(`✓ ${formatPptxText(slide.wordProblem.finalAnswer)}`, answerOpts);
       yPos += 0.8;
       
       // Add speaker notes with full solution
@@ -399,7 +408,7 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
       yPos += 0.3;
       
       // Question prompt
-      pptSlide.addText(slide.question.prompt, {
+      pptSlide.addText(formatPptxText(slide.question.prompt), {
         x: 0.5,
         y: yPos,
         w: 9,
@@ -434,7 +443,7 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
           });
 
           // Option text
-          pptSlide.addText(`${String.fromCharCode(65 + optIdx)}. ${option}`, {
+          pptSlide.addText(`${String.fromCharCode(65 + optIdx)}. ${formatPptxText(option)}`, {
             x: x + 0.15,
             y: y + 0.15,
             w: optionWidth - 0.3,
