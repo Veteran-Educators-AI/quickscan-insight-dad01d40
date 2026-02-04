@@ -228,6 +228,35 @@ export const FORMULA_REFERENCE: Record<string, FormulaCategory> = {
     ],
   },
 
+  // Financial Math - Investment Bonds
+  'INVESTMENT BONDS': {
+    category: 'Bond Investment Formulas',
+    formulas: [
+      { name: 'Annual Coupon Payment', formula: 'Coupon = Face Value × Coupon Rate', description: 'Annual interest payment from bond' },
+      { name: 'Semiannual Coupon Payment', formula: 'Payment = (Face Value × Coupon Rate) / 2', description: 'Payment received every 6 months' },
+      { name: 'Total Coupon Payments', formula: 'Total = Coupon × Years × Payments per Year', description: 'All interest payments over bond life' },
+      { name: 'Current Yield', formula: 'Current Yield = Annual Coupon / Purchase Price', description: 'Annual return based on current price' },
+      { name: 'Total Return (Gain)', formula: 'Gain = (Face Value - Purchase Price) + Total Coupons', description: 'Total profit from bond investment' },
+      { name: 'ROI Percentage', formula: 'ROI = (Total Gain / Purchase Price) × 100%', description: 'Return as percentage of investment' },
+      { name: 'Yield to Maturity (Approx)', formula: 'YTM ≈ (Coupon + (Face - Price)/n) / ((Face + Price)/2)', description: 'Annualized total return if held to maturity' },
+      { name: 'Bond Present Value', formula: 'PV = C × [1 - (1+r)⁻ⁿ]/r + F/(1+r)ⁿ', description: 'C=coupon, r=rate, n=periods, F=face value' },
+      { name: 'Premium Bond', formula: 'Price > Face Value when Coupon Rate > Market Rate' },
+      { name: 'Discount Bond', formula: 'Price < Face Value when Coupon Rate < Market Rate' },
+    ],
+  },
+  'INVESTMENTS': {
+    category: 'General Investment Formulas',
+    formulas: [
+      { name: 'Simple Interest', formula: 'I = P × r × t', description: 'P=principal, r=rate, t=time' },
+      { name: 'Compound Interest', formula: 'A = P(1 + r/n)^(nt)', description: 'n=compounds per year' },
+      { name: 'Continuous Compounding', formula: 'A = Pe^(rt)', description: 'Maximum compounding' },
+      { name: 'Rule of 72', formula: 'Years to Double ≈ 72 / Interest Rate' },
+      { name: 'Future Value', formula: 'FV = PV × (1 + r)^n' },
+      { name: 'Present Value', formula: 'PV = FV / (1 + r)^n' },
+      { name: 'Annuity Payment', formula: 'PMT = PV × r / [1 - (1+r)^(-n)]' },
+    ],
+  },
+
   // Precalculus
   'CONIC SECTIONS': {
     category: 'Conic Section Formulas',

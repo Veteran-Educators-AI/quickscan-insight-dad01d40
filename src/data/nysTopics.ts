@@ -1065,6 +1065,25 @@ export const FINANCIAL_MATH_TOPICS: TopicCategory[] = [
     ],
   },
   {
+    category: 'INVESTMENT BONDS',
+    topics: [
+      { name: 'Bond Fundamentals', standard: 'FIN.14.1', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Bond Face Value and Purchase Price', standard: 'FIN.14.2', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Coupon Rate and Payment Calculations', standard: 'FIN.14.3', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Annual vs Semiannual Coupon Payments', standard: 'FIN.14.4', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Total Bond Payments Over Time', standard: 'FIN.14.5', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Bond Total Return on Investment', standard: 'FIN.14.6', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Current Yield Calculations', standard: 'FIN.14.7', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Yield to Maturity (YTM)', standard: 'FIN.14.8', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Premium vs Discount Bonds', standard: 'FIN.14.9', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Government vs Corporate Bonds', standard: 'FIN.14.10', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Bond Maturity and Interest Rate Risk', standard: 'FIN.14.11', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Municipal Bond Tax Advantages', standard: 'FIN.14.12', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Comparing Bond Investments', standard: 'FIN.14.13', url: 'https://www.ngpf.org/curriculum/investing/' },
+      { name: 'Zero-Coupon Bonds', standard: 'FIN.14.14', url: 'https://www.ngpf.org/curriculum/investing/' },
+    ],
+  },
+  {
     category: 'BUSINESS',
     topics: [
       { name: 'Cost and Revenue Functions', standard: 'FIN.13.1', url: 'https://www.ngpf.org/curriculum/consumer-skills/' },
