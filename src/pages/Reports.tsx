@@ -27,6 +27,7 @@ import { StandardsByClass } from '@/components/reports/StandardsByClass';
 import { AILearningHistory } from '@/components/reports/AILearningHistory';
 import { AttendancePatternsReport } from '@/components/reports/AttendancePatternsReport';
 import { FeatureUsageReport } from '@/components/reports/FeatureUsageReport';
+import { WorksheetSubmissionsTracker } from '@/components/reports/WorksheetSubmissionsTracker';
 import { TrainingConfidenceIndicator } from '@/components/scan/TrainingConfidenceIndicator';
 import { useMasteryData } from '@/hooks/useMasteryData';
 import { useGradeHistoryStats } from '@/hooks/useGradeHistoryStats';
@@ -254,6 +255,9 @@ export default function Reports() {
 
             {/* Strengths and Weaknesses */}
             <TopicStrengthsChart data={students} topics={topics} />
+
+            {/* Worksheet Submissions Tracker */}
+            <WorksheetSubmissionsTracker classId={selectedClassId === 'all' ? undefined : selectedClassId} />
 
             {/* Gradebook - All saved grades */}
             <Gradebook classId={selectedClassId === 'all' ? undefined : selectedClassId} />

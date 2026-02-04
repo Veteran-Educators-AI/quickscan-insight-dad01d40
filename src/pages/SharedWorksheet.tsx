@@ -108,8 +108,15 @@ export default function SharedWorksheet() {
         pdf.setFontSize(12);
         pdf.setFont('helvetica', 'normal');
         pdf.text(`Teacher: ${formatWorksheetTextForPdf(worksheet.teacher_name)}`, pageWidth / 2, yPosition, { align: 'center' });
-        yPosition += 8;
+        yPosition += 6;
       }
+
+      // Add worksheet creation date
+      pdf.setFontSize(10);
+      pdf.setTextColor(100);
+      pdf.text(`Worksheet Created: ${new Date(worksheet.created_at).toLocaleDateString()}`, pageWidth / 2, yPosition, { align: 'center' });
+      pdf.setTextColor(0);
+      yPosition += 8;
 
       pdf.setFontSize(11);
       pdf.text('Name: _______________________   Date: ___________   Period: _____', margin, yPosition);
