@@ -187,6 +187,10 @@ async function fetchImageAsBase64(url: string): Promise<string | null> {
   }
 }
 
+// Helper type for animation options (pptxgenjs types don't expose animate but it works at runtime)
+type AnimatedTextOpts = pptxgen.TextPropsOptions & { animate?: { type: string; delay: number } };
+type AnimatedShapeOpts = pptxgen.ShapeProps & { animate?: { type: string; delay: number } };
+
 // Export to PowerPoint
 export async function exportToPPTX(presentation: NycologicPresentation): Promise<void> {
   const colors = getThemeColors(presentation.visualTheme);
@@ -198,277 +202,219 @@ export async function exportToPPTX(presentation: NycologicPresentation): Promise
   pptx.subject = presentation.topic;
   pptx.company = 'NYClogic';
 
-  // Define master slide
+  // Define master slide with cleaner layout
   pptx.defineSlideMaster({
     title: 'NYCLOGIC_MASTER',
     background: { color: colors.bg.replace('#', '') },
     objects: [
-      // Header text
       {
         text: {
           text: 'NYClogic PRESENTS',
           options: {
             x: 0.5,
-            y: 0.3,
-            w: 4,
-            h: 0.4,
-            fontSize: 14,
+            y: 0.25,
+            w: 3,
+            h: 0.3,
+            fontSize: 11,
             bold: true,
             color: colors.primary.replace('#', ''),
             fontFace: 'Arial',
           },
         },
       },
-      // Presentation title
-      {
-        text: {
-          text: presentation.title,
-          options: {
-            x: 0.5,
-            y: 0.6,
-            w: 6,
-            h: 0.3,
-            fontSize: 11,
-            color: 'FFFFFF',
-            fontFace: 'Arial',
-          },
-        },
-      },
     ],
-    slideNumber: { x: 4.5, y: 7.0, fontSize: 10, color: '999999' },
+    slideNumber: { x: 4.5, y: 7.0, fontSize: 10, color: '666666' },
   });
 
-  // Create slides
   for (const slide of presentation.slides) {
     const pptSlide = pptx.addSlide({ masterName: 'NYCLOGIC_MASTER' });
 
-    let yPos = 2.0;
+    let yPos = 1.0;
+    let animDelay = 0;
 
-    // Subtitle/Tag
+    // Subtitle
     if (slide.subtitle) {
       pptSlide.addText(formatPptxText(slide.subtitle.toUpperCase()), {
-        x: 0.5,
-        y: yPos,
-        w: 9,
-        h: 0.4,
-        fontSize: 16,
-        bold: true,
+        x: 0.5, y: yPos, w: 9, h: 0.35,
+        fontSize: 14, bold: true,
         color: colors.primary.replace('#', ''),
-        align: 'center',
-        fontFace: 'Arial',
+        align: 'left', fontFace: 'Arial',
       });
       yPos += 0.5;
     }
 
     // Title
-    const cleanTitle = formatPptxText(slide.title.replace(/\*\*/g, ''));
-    pptSlide.addText(cleanTitle, {
-      x: 0.5,
-      y: yPos,
-      w: 9,
-      h: 1.2,
-      fontSize: 44,
-      bold: true,
-      color: 'FFFFFF',
-      align: 'center',
-      fontFace: 'Arial',
-      valign: 'middle',
+    pptSlide.addText(formatPptxText(slide.title.replace(/\*\*/g, '')), {
+      x: 0.5, y: yPos, w: 9, h: 1.0,
+      fontSize: 40, bold: true, color: 'FFFFFF',
+      align: 'left', fontFace: 'Arial', valign: 'top',
     });
-    yPos += 1.4;
+    yPos += 1.2;
 
-    // Add slide image if present (geometric shapes, diagrams, etc.)
+    // Image on right
     if (slide.image?.url) {
       try {
-        const imageData = await fetchImageAsBase64(slide.image.url);
-        if (imageData) {
-          // Position image on right side of slide, scaled appropriately
-          const imgW = Math.min(3.5, (slide.image.size?.width || 200) / 100);
-          const imgH = Math.min(3.5, (slide.image.size?.height || 200) / 100);
-          
-          pptSlide.addImage({
-            data: imageData,
-            x: 6.5,
-            y: 2.5,
-            w: imgW,
-            h: imgH,
-          });
+        const imgData = await fetchImageAsBase64(slide.image.url);
+        if (imgData) {
+          const imgW = Math.min(3.0, (slide.image.size?.width || 200) / 100);
+          const imgH = Math.min(3.0, (slide.image.size?.height || 200) / 100);
+          pptSlide.addImage({ data: imgData, x: 6.8, y: 2.0, w: imgW, h: imgH });
         }
-      } catch (imgError) {
-        console.warn('Failed to add image to slide:', imgError);
+      } catch (e) {
+        console.warn('Image embed failed:', e);
       }
     }
 
-    // Content
+    // Content bullets - each appears on click
     if (slide.content.length > 0) {
+      const cw = slide.image?.url ? 5.5 : 9;
       slide.content.forEach((item) => {
-        pptSlide.addText(formatPptxText(item), {
-          x: 0.5,
-          y: yPos,
-          w: 9,
-          h: 0.6,
-          fontSize: 22,
-          color: 'CCCCCC',
-          align: 'center',
-          fontFace: 'Arial',
-        });
-        yPos += 0.7;
-      });
-    }
-
-    // Word Problem section with click-to-reveal animations
-    if (slide.wordProblem) {
-      const hasProgressiveReveal = slide.wordProblem.progressiveReveal;
-      
-      // Problem statement (always visible)
-      yPos += 0.2;
-      pptSlide.addText('📝 Word Problem', {
-        x: 0.5,
-        y: yPos,
-        w: 9,
-        h: 0.4,
-        fontSize: 18,
-        bold: true,
-        color: colors.primary.replace('#', ''),
-        fontFace: 'Arial',
-      });
-      yPos += 0.5;
-      
-      pptSlide.addText(formatPptxText(slide.wordProblem.problem), {
-        x: 0.5,
-        y: yPos,
-        w: 9,
-        h: 0.8,
-        fontSize: 20,
-        color: 'FFFFFF',
-        fontFace: 'Arial',
-      });
-      yPos += 1.0;
-      
-      // Steps - each with click animation if progressiveReveal
-      pptSlide.addText('📋 Step-by-Step Solution', {
-        x: 0.5,
-        y: yPos,
-        w: 9,
-        h: 0.4,
-        fontSize: 16,
-        bold: true,
-        color: '10B981', // emerald
-        fontFace: 'Arial',
-      });
-      yPos += 0.5;
-      
-      slide.wordProblem.steps.forEach((step, stepIdx) => {
-        const stepText = formatPptxText(step.replace(/^Step \d+:\s*/i, ''));
-        const textOpts: any = {
-          x: 0.7,
-          y: yPos,
-          w: 8.3,
-          h: 0.5,
-          fontSize: 16,
-          color: 'EEEEEE',
-          fontFace: 'Arial',
+        const opts: AnimatedTextOpts = {
+          x: 0.5, y: yPos, w: cw, h: 0.5,
+          fontSize: 20, color: 'DDDDDD', align: 'left', fontFace: 'Arial',
+          animate: { type: 'appear', delay: animDelay },
         };
-        
-        // Add click-to-appear animation for progressive reveal
-        if (hasProgressiveReveal) {
-          textOpts.animate = { type: 'appear', delay: 0 };
-        }
-        
-        pptSlide.addText(`${stepIdx + 1}. ${stepText}`, textOpts);
-        yPos += 0.55;
+        pptSlide.addText(`• ${formatPptxText(item)}`, opts as pptxgen.TextPropsOptions);
+        yPos += 0.6;
+        animDelay += 0.5;
       });
-      
-      yPos += 0.3;
-      
-      // Final Answer - with click animation if progressiveReveal
-      const answerOpts: any = {
-        x: 0.5,
-        y: yPos,
-        w: 9,
-        h: 0.6,
-        fontSize: 18,
-        bold: true,
-        color: 'FBBF24', // amber
-        fontFace: 'Arial',
-      };
-      
-      if (hasProgressiveReveal) {
-        answerOpts.animate = { type: 'appear', delay: 0 };
-      }
-      
-      pptSlide.addText(`✓ ${formatPptxText(slide.wordProblem.finalAnswer)}`, answerOpts);
-      yPos += 0.8;
-      
-      // Add speaker notes with full solution
-      pptSlide.addNotes(`Problem: ${slide.wordProblem.problem}\n\nSolution:\n${slide.wordProblem.steps.join('\n')}\n\nAnswer: ${slide.wordProblem.finalAnswer}`);
     }
 
-    // Question section
+    // Word Problem - progressive reveal
+    if (slide.wordProblem) {
+      yPos += 0.4;
+
+      pptSlide.addText('📝 WORD PROBLEM', {
+        x: 0.5, y: yPos, w: 9, h: 0.35,
+        fontSize: 14, bold: true, color: colors.primary.replace('#', ''), fontFace: 'Arial',
+      });
+      yPos += 0.45;
+
+      pptSlide.addText(formatPptxText(slide.wordProblem.problem), {
+        x: 0.5, y: yPos, w: 9, h: 0.7,
+        fontSize: 18, color: 'FFFFFF', fontFace: 'Arial',
+      });
+      yPos += 0.9;
+
+      const solnHdr: AnimatedTextOpts = {
+        x: 0.5, y: yPos, w: 9, h: 0.35,
+        fontSize: 14, bold: true, color: '10B981', fontFace: 'Arial',
+        animate: { type: 'appear', delay: 0 },
+      };
+      pptSlide.addText('📋 STEP-BY-STEP SOLUTION', solnHdr as pptxgen.TextPropsOptions);
+      yPos += 0.45;
+
+      slide.wordProblem.steps.forEach((step, i) => {
+        const txt = formatPptxText(step.replace(/^Step \d+:\s*/i, ''));
+        const so: AnimatedTextOpts = {
+          x: 0.7, y: yPos, w: 8.3, h: 0.45,
+          fontSize: 16, color: 'EEEEEE', fontFace: 'Arial',
+          animate: { type: 'appear', delay: 0 },
+        };
+        pptSlide.addText(`${i + 1}. ${txt}`, so as pptxgen.TextPropsOptions);
+        yPos += 0.5;
+      });
+
+      yPos += 0.3;
+
+      const ansBox: AnimatedShapeOpts = {
+        x: 0.5, y: yPos, w: 9, h: 0.6,
+        fill: { color: 'FBBF24', transparency: 85 },
+        line: { color: 'FBBF24', width: 2 },
+        animate: { type: 'appear', delay: 0 },
+      };
+      pptSlide.addShape('rect' as pptxgen.ShapeType, ansBox as pptxgen.ShapeProps);
+
+      const ansTxt: AnimatedTextOpts = {
+        x: 0.6, y: yPos + 0.1, w: 8.8, h: 0.4,
+        fontSize: 18, bold: true, color: 'FBBF24', fontFace: 'Arial',
+        animate: { type: 'appear', delay: 0 },
+      };
+      pptSlide.addText(`✓ ANSWER: ${formatPptxText(slide.wordProblem.finalAnswer)}`, ansTxt as pptxgen.TextPropsOptions);
+
+      pptSlide.addNotes(`Problem: ${slide.wordProblem.problem}\n\nSteps:\n${slide.wordProblem.steps.join('\n')}\n\nAnswer: ${slide.wordProblem.finalAnswer}`);
+    }
+
+    // Question section - options appear, THEN answer on next click
     if (slide.type === 'question' && slide.question) {
       yPos += 0.3;
-      
-      // Question prompt
-      pptSlide.addText(formatPptxText(slide.question.prompt), {
-        x: 0.5,
-        y: yPos,
-        w: 9,
-        h: 0.8,
-        fontSize: 24,
-        bold: true,
-        color: 'FFFFFF',
-        align: 'center',
-        fontFace: 'Arial',
+      animDelay = 0;
+
+      pptSlide.addText('❓ QUESTION', {
+        x: 0.5, y: yPos, w: 9, h: 0.35,
+        fontSize: 14, bold: true, color: colors.secondary.replace('#', ''), fontFace: 'Arial',
       });
-      yPos += 1.0;
+      yPos += 0.45;
 
-      // Options in 2x2 grid
+      pptSlide.addText(formatPptxText(slide.question.prompt), {
+        x: 0.5, y: yPos, w: 9, h: 0.7,
+        fontSize: 22, bold: true, color: 'FFFFFF', align: 'left', fontFace: 'Arial',
+      });
+      yPos += 0.9;
+
       if (slide.question.options) {
-        const optionWidth = 4.2;
-        const optionHeight = 0.7;
-        
-        slide.question.options.forEach((option, optIdx) => {
-          const col = optIdx % 2;
-          const row = Math.floor(optIdx / 2);
-          const x = 0.5 + col * 4.5;
-          const y = yPos + row * 0.9;
+        const ow = 4.3, oh = 0.55;
+        slide.question.options.forEach((opt, i) => {
+          const col = i % 2, row = Math.floor(i / 2);
+          const x = 0.5 + col * 4.5, y = yPos + row * 0.75;
 
-          // Option box background
-          pptSlide.addShape('rect' as pptxgen.ShapeType, {
-            x,
-            y,
-            w: optionWidth,
-            h: optionHeight,
-            fill: { color: 'FFFFFF', transparency: 90 },
-            line: { color: 'FFFFFF', transparency: 70, width: 1 },
-          });
+          const bx: AnimatedShapeOpts = {
+            x, y, w: ow, h: oh,
+            fill: { color: 'FFFFFF', transparency: 92 },
+            line: { color: 'FFFFFF', transparency: 80, width: 1 },
+            animate: { type: 'appear', delay: animDelay },
+          };
+          pptSlide.addShape('rect' as pptxgen.ShapeType, bx as pptxgen.ShapeProps);
 
-          // Option text
-          pptSlide.addText(`${String.fromCharCode(65 + optIdx)}. ${formatPptxText(option)}`, {
-            x: x + 0.15,
-            y: y + 0.15,
-            w: optionWidth - 0.3,
-            h: optionHeight - 0.3,
-            fontSize: 18,
-            color: 'FFFFFF',
-            fontFace: 'Arial',
-            valign: 'middle',
-          });
+          const tx: AnimatedTextOpts = {
+            x: x + 0.15, y: y + 0.12, w: ow - 0.3, h: oh - 0.2,
+            fontSize: 16, color: 'FFFFFF', fontFace: 'Arial', valign: 'middle',
+            animate: { type: 'appear', delay: animDelay },
+          };
+          pptSlide.addText(`${String.fromCharCode(65 + i)}. ${formatPptxText(opt)}`, tx as pptxgen.TextPropsOptions);
+          animDelay += 0.3;
         });
+        yPos += Math.ceil(slide.question.options.length / 2) * 0.75 + 0.5;
       }
 
-      // Add answer on a separate notes section or speaker notes
+      // Answer reveal - SEPARATE click required
       if (slide.question.answer) {
+        yPos += 0.3;
+
+        const ab: AnimatedShapeOpts = {
+          x: 0.5, y: yPos, w: 9, h: 0.7,
+          fill: { color: '10B981', transparency: 80 },
+          line: { color: '10B981', width: 2 },
+          animate: { type: 'appear', delay: 0 },
+        };
+        pptSlide.addShape('rect' as pptxgen.ShapeType, ab as pptxgen.ShapeProps);
+
+        const at: AnimatedTextOpts = {
+          x: 0.6, y: yPos + 0.15, w: 8.8, h: 0.4,
+          fontSize: 18, bold: true, color: '10B981', fontFace: 'Arial',
+          animate: { type: 'appear', delay: 0 },
+        };
+        pptSlide.addText(`✓ CORRECT ANSWER: ${formatPptxText(slide.question.answer)}`, at as pptxgen.TextPropsOptions);
+
+        if (slide.question.explanation) {
+          yPos += 0.85;
+          const ex: AnimatedTextOpts = {
+            x: 0.5, y: yPos, w: 9, h: 0.5,
+            fontSize: 14, italic: true, color: 'AAAAAA', fontFace: 'Arial',
+            animate: { type: 'appear', delay: 0 },
+          };
+          pptSlide.addText(`💡 ${formatPptxText(slide.question.explanation)}`, ex as pptxgen.TextPropsOptions);
+        }
+
         pptSlide.addNotes(`Answer: ${slide.question.answer}\n\n${slide.question.explanation || ''}`);
       }
     }
 
-    // Add speaker notes if available
     if (slide.speakerNotes) {
       pptSlide.addNotes(slide.speakerNotes);
     }
   }
 
-  // Save the PowerPoint
   const fileName = `${presentation.title.replace(/[^a-z0-9]/gi, '_')}_presentation.pptx`;
   await pptx.writeFile({ fileName });
 }
