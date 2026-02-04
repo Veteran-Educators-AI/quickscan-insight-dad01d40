@@ -87,10 +87,10 @@ export function StudentHandoutDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg w-[95vw]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5" />
+            <FileSpreadsheet className="h-5 w-5 shrink-0" />
             Customize Student Handout
           </DialogTitle>
           <DialogDescription>
@@ -175,22 +175,25 @@ export function StudentHandoutDialog({
                 {slides.map((slide, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
+                    className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
                   >
                     <Checkbox
                       id={`slide-${index}`}
                       checked={selectedSlides.has(index)}
                       onCheckedChange={() => toggleSlide(index)}
+                      className="mt-0.5 shrink-0"
                     />
                     <label
                       htmlFor={`slide-${index}`}
-                      className="flex-1 flex items-center gap-2 cursor-pointer text-sm"
+                      className="flex-1 flex flex-col gap-1 cursor-pointer text-sm min-w-0"
                     >
-                      <span className="text-muted-foreground w-6">#{slide.slideNumber}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getSlideTypeColor(slide.slideType)}`}>
-                        {slide.slideType}
-                      </span>
-                      <span className="truncate">{slide.title}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground shrink-0">#{slide.slideNumber}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium shrink-0 ${getSlideTypeColor(slide.slideType)}`}>
+                          {slide.slideType}
+                        </span>
+                      </div>
+                      <span className="text-foreground break-words">{slide.title}</span>
                     </label>
                   </div>
                 ))}
