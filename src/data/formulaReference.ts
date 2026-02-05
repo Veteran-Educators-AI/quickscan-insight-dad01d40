@@ -242,6 +242,10 @@ export const FORMULA_REFERENCE: Record<string, FormulaCategory> = {
       { name: 'Bond Present Value', formula: 'PV = C × [1 - (1+r)⁻ⁿ]/r + F/(1+r)ⁿ', description: 'C=coupon, r=rate, n=periods, F=face value' },
       { name: 'Premium Bond', formula: 'Price > Face Value when Coupon Rate > Market Rate' },
       { name: 'Discount Bond', formula: 'Price < Face Value when Coupon Rate < Market Rate' },
+      { name: 'Zero-Coupon Bond Price', formula: 'P = F / (1 + r)ⁿ', description: 'F=face value, r=yield, n=years to maturity' },
+      { name: 'Zero-Coupon YTM', formula: 'YTM = (F / P)^(1/n) - 1', description: 'Yield based on purchase price and maturity' },
+      { name: 'Zero-Coupon Bond Gain', formula: 'Gain = Face Value - Purchase Price', description: 'Total profit at maturity (no coupon payments)' },
+      { name: 'Zero-Coupon Accrued Interest', formula: 'Annual Accrual = P × [(1 + YTM)^(1/n) - 1]', description: 'Phantom interest for tax purposes' },
     ],
   },
   'INVESTMENTS': {
