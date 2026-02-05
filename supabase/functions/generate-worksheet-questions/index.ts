@@ -804,9 +804,13 @@ ${exampleOutput}`;
       // Clean up the response - remove markdown code blocks if present
       let cleanContent = content.trim();
       
-      // Remove markdown fences more aggressively
-      cleanContent = cleanContent.replace(/^```(?:json)?\s*/i, '');
-      cleanContent = cleanContent.replace(/\s*```$/i, '');
+      // Remove markdown fences more aggressively - handle various patterns
+      // Pattern 1: ```json at start
+      cleanContent = cleanContent.replace(/^```json\s*/i, '');
+      // Pattern 2: ``` at start (without json)
+      cleanContent = cleanContent.replace(/^```\s*/, '');
+      // Pattern 3: ``` at end
+      cleanContent = cleanContent.replace(/\s*```\s*$/, '');
       cleanContent = cleanContent.trim();
       
       // Helper function to sanitize JSON strings (fix common AI output issues)
@@ -831,48 +835,29 @@ ${exampleOutput}`;
         return str;
       }
       
-      // Try to sanitize the JSON first
-      let sanitizedContent = sanitizeJsonString(cleanContent);
-      
-      try {
-        // First try standard parsing on sanitized content
-        const parsed = JSON.parse(sanitizedContent);
-        if (Array.isArray(parsed)) {
-          questions = parsed;
-        } else if (parsed && Array.isArray(parsed.questions)) {
-          questions = parsed.questions;
+      // Function to extract complete question objects using bracket matching
+      function extractCompleteQuestions(text: string): GeneratedQuestion[] {
+        const results: GeneratedQuestion[] = [];
+        
+        // Find the start of the questions array
+        let arrayStart = -1;
+        const questionsMatch = text.match(/"questions"\s*:\s*\[/);
+        if (questionsMatch && questionsMatch.index !== undefined) {
+          arrayStart = questionsMatch.index + questionsMatch[0].length - 1;
         } else {
-          throw new Error('Response is not an array or object with questions array');
+          // Look for first [ that starts an array
+          arrayStart = text.indexOf('[');
         }
-      } catch (e) {
-        console.warn('Standard JSON parse failed, attempting recovery logic:', e);
         
-        // If standard parsing fails, it might be truncated or have the object wrapper
-        // Try to find the inner "questions": [...] array if present
-        let arrayContent = sanitizedContent;
-        const questionsMatch = sanitizedContent.match(/"questions"\s*:\s*\[/);
+        if (arrayStart === -1) return results;
         
-        if (questionsMatch) {
-          // It looks like an object wrapper, start parsing from the array bracket
-          const startIndex = questionsMatch.index! + questionsMatch[0].length - 1;
-          arrayContent = sanitizedContent.substring(startIndex);
-        } else if (sanitizedContent.trim().startsWith('{')) {
-          // Maybe it started as an object but the key wasn't found or different format
-          const firstBracket = sanitizedContent.indexOf('[');
-          if (firstBracket !== -1) {
-            arrayContent = sanitizedContent.substring(firstBracket);
-          }
-        }
-
-        // Now run the array recovery logic on the array part
-        // Use bracket depth tracking to find all complete question objects
-        console.warn('Attempting bracket-depth recovery...');
+        const arrayContent = text.substring(arrayStart);
         
+        // Track bracket depth to find complete objects
         let depth = 0;
         let inString = false;
         let escape = false;
-        let lastCompleteObjEnd = -1;
-        let objectCount = 0;
+        let objectStart = -1;
         let arrayStarted = false;
         
         for (let i = 0; i < arrayContent.length; i++) {
@@ -899,136 +884,155 @@ ${exampleOutput}`;
               continue;
             }
             if (char === '{') {
+              if (depth === 0) {
+                objectStart = i;
+              }
               depth++;
             } else if (char === '}') {
               depth--;
-              if (depth === 0) {
-                lastCompleteObjEnd = i;
-                objectCount++;
+              if (depth === 0 && objectStart !== -1) {
+                // Found a complete object
+                const objStr = arrayContent.substring(objectStart, i + 1);
+                try {
+                  const sanitizedObj = sanitizeJsonString(objStr);
+                  const parsed = JSON.parse(sanitizedObj);
+                  if (parsed && parsed.question && parsed.topic) {
+                    results.push(parsed);
+                  }
+                } catch (e) {
+                  // This object couldn't be parsed, skip it
+                  console.warn(`Skipping unparseable question object at index ${results.length}`);
+                }
+                objectStart = -1;
               }
             }
           }
         }
         
-        if (lastCompleteObjEnd !== -1 && objectCount > 0) {
-          // Build the recovered array from complete objects
-          let recoveredJson = arrayContent.substring(0, lastCompleteObjEnd + 1);
-          
-          // Ensure it starts with '[' and ends with ']'
-          recoveredJson = recoveredJson.trim();
-          if (!recoveredJson.startsWith('[')) {
-            recoveredJson = '[' + recoveredJson;
-          }
-          if (!recoveredJson.endsWith(']')) {
-            recoveredJson = recoveredJson + ']';
-          }
-          
-          // Clean up the recovered JSON
-          recoveredJson = sanitizeJsonString(recoveredJson);
-          
-          console.log(`Recovered ${objectCount} complete questions from response`);
-          
-          try {
-            questions = JSON.parse(recoveredJson);
-          } catch (recoveryParseError) {
-            console.error('Recovery parse also failed:', recoveryParseError);
-            console.error('Recovered content start:', recoveredJson.substring(0, 300));
-            throw new Error('Could not parse recovered questions');
-          }
+        return results;
+      }
+      
+      // Try to sanitize the JSON first
+      let sanitizedContent = sanitizeJsonString(cleanContent);
+      
+      try {
+        // First try standard parsing on sanitized content
+        const parsed = JSON.parse(sanitizedContent);
+        if (Array.isArray(parsed)) {
+          questions = parsed;
+        } else if (parsed && Array.isArray(parsed.questions)) {
+          questions = parsed.questions;
         } else {
+          throw new Error('Response is not an array or object with questions array');
+        }
+      } catch (e) {
+        console.warn('Standard JSON parse failed, attempting recovery logic:', e);
+        
+        // Use the robust extraction function
+        console.warn('Attempting bracket-depth recovery with individual object parsing...');
+        questions = extractCompleteQuestions(sanitizedContent);
+        
+        if (questions.length === 0) {
+          // Last resort: try to recover from original content (before sanitization)
+          console.warn('Sanitized content recovery failed, trying original content...');
+          questions = extractCompleteQuestions(cleanContent);
+        }
+        
+        if (questions.length === 0) {
           throw new Error('Could not recover any complete questions from response');
         }
+        
+        console.log(`Recovered ${questions.length} complete questions from truncated response`);
       }
     } catch (parseError) {
       console.error('Failed to parse (or recover) AI response. Content start:', content.substring(0, 500));
       console.error('Parse error:', parseError);
       throw new Error('Failed to parse generated questions. The AI response may have been truncated or malformed. Please try again.');
     }
-      
-      // Parse the JSON
-      // Filter out any incomplete question objects
-      questions = questions.filter(q => 
-        q && typeof q === 'object' && 
-        q.question && typeof q.question === 'string' &&
-        q.topic && typeof q.topic === 'string'
-      );
-      
-      if (questions.length === 0) {
-        throw new Error('No valid questions in response');
-      }
-      
-      console.log(`Successfully parsed ${questions.length} questions`);
-      
-      // CRITICAL: Strip visual data (svg, imagePrompt) when useAIImages is false
-      // This is the "Shapes OFF" mode - no diagrams should appear in the worksheet
-      if (!useAIImages) {
-        console.log('Shapes OFF mode: stripping svg and imagePrompt fields from all questions');
-        questions = questions.map(q => {
-          const { svg, imagePrompt, imageUrl, geometry, ...rest } = q;
-          return rest;
-        });
-      }
-      
-      // Also strip visual data for non-image subjects (Financial Math, History, etc.)
-      if (isNoImageSubject) {
-        console.log('Non-image subject detected: stripping visual fields');
-        questions = questions.map(q => {
-          const { svg, imagePrompt, imageUrl, geometry, ...rest } = q;
-          return rest;
-        });
-      }
-      
-      // Sanitize all question text to fix encoding issues
-      questions = questions.map(q => ({
-        ...q,
-        question: sanitizeMathText(q.question),
-        answer: q.answer ? sanitizeMathText(q.answer) : q.answer,
-        hint: q.hint ? sanitizeMathText(q.hint) : q.hint,
-        imagePrompt: q.imagePrompt ? sanitizeMathText(q.imagePrompt) : q.imagePrompt,
-      }));
 
-      // ═══════════════════════════════════════════════════════════════════════
-      // PHASE 2: Parse and Validate Geometry Metadata (P2.2)
-      // ═══════════════════════════════════════════════════════════════════════
-      
-      console.log('Validating geometry metadata for', questions.length, 'questions...');
-      let geometryValidCount = 0;
-      let geometryInvalidCount = 0;
-      let geometryMissingCount = 0;
-
-      questions = questions.map((q, index) => {
-        if (!q.geometry) {
-          geometryMissingCount++;
-          return q;
-        }
-
-        try {
-          const validationResult = validateGeometryMetadata(q.geometry, {
-            useExtendedBounds: false,
-            strictMode: false,
-          });
-
-          if (validationResult.isValid) {
-            geometryValidCount++;
-            console.log(`✓ Q${q.questionNumber || index + 1}: Valid ${q.geometry.type}`);
-            return { ...q, geometryValidation: validationResult };
-          } else {
-            geometryInvalidCount++;
-            console.warn(`⚠ Q${q.questionNumber || index + 1}: Invalid geometry`);
-            console.log('[GEOMETRY_ERROR]', JSON.stringify({
-              q: q.questionNumber || index + 1,
-              type: q.geometry.type,
-              errors: validationResult.errors.map(e => e.code),
-            }));
-            return { ...q, geometry: undefined, geometryValidation: validationResult };
-          }
-        } catch (error) {
-          geometryInvalidCount++;
-          return { ...q, geometry: undefined };
-        }
+    // Filter out any incomplete question objects
+    questions = questions.filter(q => 
+      q && typeof q === 'object' && 
+      q.question && typeof q.question === 'string' &&
+      q.topic && typeof q.topic === 'string'
+    );
+    
+    if (questions.length === 0) {
+      throw new Error('No valid questions in response');
+    }
+    
+    console.log(`Successfully parsed ${questions.length} questions`);
+    
+    // CRITICAL: Strip visual data (svg, imagePrompt) when useAIImages is false
+    // This is the "Shapes OFF" mode - no diagrams should appear in the worksheet
+    if (!useAIImages) {
+      console.log('Shapes OFF mode: stripping svg and imagePrompt fields from all questions');
+      questions = questions.map(q => {
+        const { svg, imagePrompt, imageUrl, geometry, ...rest } = q;
+        return rest;
       });
+    }
+    
+    // Also strip visual data for non-image subjects (Financial Math, History, etc.)
+    if (isNoImageSubject) {
+      console.log('Non-image subject detected: stripping visual fields');
+      questions = questions.map(q => {
+        const { svg, imagePrompt, imageUrl, geometry, ...rest } = q;
+        return rest;
+      });
+    }
+    
+    // Sanitize all question text to fix encoding issues
+    questions = questions.map(q => ({
+      ...q,
+      question: sanitizeMathText(q.question),
+      answer: q.answer ? sanitizeMathText(q.answer) : q.answer,
+      hint: q.hint ? sanitizeMathText(q.hint) : q.hint,
+      imagePrompt: q.imagePrompt ? sanitizeMathText(q.imagePrompt) : q.imagePrompt,
+    }));
 
-      console.log('Geometry summary:', { valid: geometryValidCount, invalid: geometryInvalidCount, missing: geometryMissingCount });
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 2: Parse and Validate Geometry Metadata (P2.2)
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    console.log('Validating geometry metadata for', questions.length, 'questions...');
+    let geometryValidCount = 0;
+    let geometryInvalidCount = 0;
+    let geometryMissingCount = 0;
+
+    questions = questions.map((q, index) => {
+      if (!q.geometry) {
+        geometryMissingCount++;
+        return q;
+      }
+
+      try {
+        const validationResult = validateGeometryMetadata(q.geometry, {
+          useExtendedBounds: false,
+          strictMode: false,
+        });
+
+        if (validationResult.isValid) {
+          geometryValidCount++;
+          console.log(`✓ Q${q.questionNumber || index + 1}: Valid ${q.geometry.type}`);
+          return { ...q, geometryValidation: validationResult };
+        } else {
+          geometryInvalidCount++;
+          console.warn(`⚠ Q${q.questionNumber || index + 1}: Invalid geometry`);
+          console.log('[GEOMETRY_ERROR]', JSON.stringify({
+            q: q.questionNumber || index + 1,
+            type: q.geometry.type,
+            errors: validationResult.errors.map(e => e.code),
+          }));
+          return { ...q, geometry: undefined, geometryValidation: validationResult };
+        }
+      } catch (error) {
+        geometryInvalidCount++;
+        return { ...q, geometry: undefined };
+      }
+    });
+
+    console.log('Geometry summary:', { valid: geometryValidCount, invalid: geometryInvalidCount, missing: geometryMissingCount });
 
     return new Response(JSON.stringify({ questions }), {
       status: 200,
