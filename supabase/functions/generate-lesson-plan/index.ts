@@ -27,6 +27,65 @@ interface LessonPlan {
   }[];
 }
 
+// Detailed Zero-Coupon Bond lesson content for enhanced generation
+const ZERO_COUPON_BOND_CONTENT = `
+## Zero-Coupon Bond Comprehensive Lesson
+
+### Key Formulas:
+- Purchase Price = Face Value ÷ (1 + r)^n
+- Yield to Maturity (YTM) = (Face Value ÷ Purchase Price)^(1/n) - 1
+- Total Gain = Face Value - Purchase Price
+- ROI % = (Total Gain ÷ Purchase Price) × 100%
+- Phantom Income (Annual) = Previous Value × YTM
+
+### Example 1: Basic Price Calculation
+An investor wants to buy a zero-coupon bond with a face value of $1,000 that matures in 10 years. The current yield is 5%.
+Solution:
+- Purchase Price = $1,000 ÷ (1.05)^10
+- Purchase Price = $1,000 ÷ 1.6289
+- Purchase Price = $613.91
+The investor pays $613.91 and receives $1,000 at maturity.
+
+### Example 2: Finding the Yield
+An investor buys a zero-coupon bond for $750 that will pay $1,000 in 5 years. What is the YTM?
+Solution:
+- YTM = ($1,000 ÷ $750)^(1/5) - 1
+- YTM = (1.3333)^0.2 - 1
+- YTM = 1.0592 - 1 = 5.92%
+
+### Example 3: Total Return Analysis
+Purchase a 20-year zero-coupon Treasury bond with $10,000 face value for $3,769.
+Solution:
+- Total Gain = $10,000 - $3,769 = $6,231
+- ROI = ($6,231 ÷ $3,769) × 100% = 165.3%
+- Annualized Yield = ($10,000 ÷ $3,769)^(1/20) - 1 = 5.0%
+
+### Example 4: College Savings
+Parents want $25,000 for college in 15 years at 4.5% yield.
+Solution:
+- Price = $25,000 ÷ (1.045)^15
+- Price = $25,000 ÷ 1.9353 = $12,918.71
+
+### Example 5: Phantom Income (Tax Implications)
+Buy a 5-year zero-coupon bond for $783.53 (FV=$1,000, YTM=5%).
+Year 0: Value = $783.53
+Year 1: Value = $783.53 × 1.05 = $822.71, Phantom Income = $39.18
+Year 2: Value = $822.71 × 1.05 = $863.84, Phantom Income = $41.13
+Even though no cash is received, investor owes taxes on phantom income.
+
+### Key Vocabulary:
+- Zero-Coupon Bond: Bond that pays no periodic interest, sold at discount
+- Face Value: Amount received at maturity (typically $1,000)
+- Discount: Difference between face value and purchase price
+- Imputed Interest: Phantom income reported for taxes annually
+- Accreted Value: Bond's value as it grows toward face value
+
+### Common Misconceptions:
+- Students confuse total return with annual yield
+- Students forget to account for phantom income taxes
+- Students may use simple interest instead of compound interest
+`;
+
 async function callLovableAI(prompt: string): Promise<string> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
@@ -70,6 +129,14 @@ async function callLovableAI(prompt: string): Promise<string> {
   return data.choices?.[0]?.message?.content || "";
 }
 
+// Check if topic is Zero-Coupon Bonds related
+function isZeroCouponBondTopic(topicName: string): boolean {
+  const lowerTopic = topicName.toLowerCase();
+  return lowerTopic.includes('zero-coupon') || 
+         lowerTopic.includes('zero coupon') ||
+         lowerTopic.includes('zerocoupon');
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -87,10 +154,15 @@ serve(async (req) => {
 
     console.log(`Generating lesson plan for: ${topicName} (${standard})`);
 
+    // Add specialized content for Zero-Coupon Bonds
+    const specializedContent = isZeroCouponBondTopic(topicName) 
+      ? `\n\nUSE THE FOLLOWING DETAILED CONTENT AND EXAMPLES IN YOUR LESSON:\n${ZERO_COUPON_BOND_CONTENT}\n\nYou MUST include at least 5 worked examples from this content.`
+      : '';
+
     const prompt = `Create a comprehensive PowerPoint-style lesson plan for teaching "${topicName}" aligned to NYS Regents standard ${standard}.
 
 Subject: ${subject || 'Mathematics'}
-Duration: ${lessonDuration}
+Duration: ${lessonDuration}${specializedContent}
 ${relatedTopics?.length > 0 ? `Related topics to reference: ${relatedTopics.map((t: any) => t.topicName).join(', ')}` : ''}
 
 Generate a lesson plan with the following structure as a JSON object:
