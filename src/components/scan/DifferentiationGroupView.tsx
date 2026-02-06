@@ -595,17 +595,18 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
                         </div>
                       )}
 
-                      {/* Student List - Clean Column Layout with Zebra Striping */}
+                      {/* Student List with Per-Student Focus Areas */}
                       {group.students.length > 0 ? (
                         <div className="divide-y divide-border/30">
                           {group.students.map((item, index) => {
                             const grade = getEffectiveGrade(item.result);
                             const isSelected = isStudentSelected(group.level, item.id);
                             const isEven = index % 2 === 0;
+                            const studentMisconceptions = item.result?.misconceptions || [];
                             return (
                               <div
                                 key={item.id}
-                                className={`flex items-center gap-3 py-2.5 px-2 cursor-pointer transition-colors ${
+                                className={`py-2.5 px-2 cursor-pointer transition-colors ${
                                   isSelected 
                                     ? 'bg-primary/10' 
                                     : isEven 
@@ -614,15 +615,32 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
                                 } hover:bg-accent/50`}
                                 onClick={() => toggleStudentSelection(group.level, item.id)}
                               >
-                                <Checkbox
-                                  checked={isSelected}
-                                  onCheckedChange={() => toggleStudentSelection(group.level, item.id)}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                                <span className="text-sm font-medium flex-1">{item.studentName}</span>
-                                <span className={`text-sm font-semibold tabular-nums ${group.color}`}>
-                                  {grade}%
-                                </span>
+                                <div className="flex items-center gap-3">
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={() => toggleStudentSelection(group.level, item.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <span className="text-sm font-medium flex-1">{item.studentName}</span>
+                                  <span className={`text-sm font-semibold tabular-nums ${group.color}`}>
+                                    {grade}%
+                                  </span>
+                                </div>
+                                {/* Per-student focus areas */}
+                                {studentMisconceptions.length > 0 && (
+                                  <div className="ml-8 mt-1 flex flex-wrap gap-1">
+                                    {studentMisconceptions.slice(0, 3).map((m, i) => (
+                                      <span key={i} className="text-xs text-muted-foreground bg-muted/50 rounded px-1.5 py-0.5">
+                                        {m}
+                                      </span>
+                                    ))}
+                                    {studentMisconceptions.length > 3 && (
+                                      <span className="text-xs text-muted-foreground">
+                                        +{studentMisconceptions.length - 3} more
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -633,11 +651,11 @@ export function DifferentiationGroupView({ items, classId, getEffectiveGrade, on
                         </p>
                       )}
 
-                      {/* Common Misconceptions - Clean List */}
+                      {/* Group Summary - Aggregated Focus Areas */}
                       {misconceptions.length > 0 && (
                         <div className="pt-3 mt-3 border-t border-border/50">
                           <p className="text-xs font-medium text-muted-foreground mb-2">
-                            Common focus areas for this group:
+                            Most frequent focus areas across this group (individual topics vary per student):
                           </p>
                           <div className="space-y-1.5">
                             {misconceptions.map((m, i) => (
