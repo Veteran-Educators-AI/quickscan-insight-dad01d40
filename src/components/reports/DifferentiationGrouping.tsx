@@ -8,7 +8,7 @@ import { Users, ChevronDown, ChevronRight, Target, BookOpen, Sparkles, AlertTria
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
-import { PrintRemediationDialog } from '@/components/print/PrintRemediationDialog';
+import { PrintRemediationDialog, type StudentWithWeakTopics } from '@/components/print/PrintRemediationDialog';
 import { ExportGroupPDFDialog } from './ExportGroupPDFDialog';
 import type { StudentMastery } from './MasteryHeatMap';
 
@@ -89,7 +89,7 @@ export function DifferentiationGrouping({ students, topics }: DifferentiationGro
   const { user } = useAuth();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['needs-support', 'developing']));
   const [creatingAssessment, setCreatingAssessment] = useState<string | null>(null);
-  const [printDialogGroup, setPrintDialogGroup] = useState<StudentGroup | null>(null);
+  const [printDialogStudents, setPrintDialogStudents] = useState<{ label: string; students: StudentWithWeakTopics[] } | null>(null);
   const [exportPDFGroup, setExportPDFGroup] = useState<StudentGroup | null>(null);
 
   const groups = useMemo(() => {
@@ -395,69 +395,74 @@ export function DifferentiationGrouping({ students, topics }: DifferentiationGro
                       </div>
                     )}
 
-                    {/* Suggested remediation questions */}
-                    {group.suggestedQuestions.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-                          <Sparkles className="h-3 w-3" />
-                          Suggested Remediation (max 5 questions)
-                        </h4>
-                        <div className="bg-muted/30 rounded-lg p-3 space-y-2">
-                          {group.suggestedQuestions.map((suggestion, idx) => (
-                            <div key={idx} className="flex items-center justify-between text-sm">
-                              <div>
-                                <span className="font-medium">{suggestion.topic}</span>
-                                <span className="text-muted-foreground ml-2">
-                                  • {suggestion.difficulty}
-                                </span>
-                              </div>
-                              <Badge variant="outline" className="text-xs">
-                                {suggestion.count} Q{suggestion.count !== 1 ? 's' : ''}
-                              </Badge>
-                            </div>
-                          ))}
-                          <div className="pt-2 border-t mt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                            <p className="text-xs text-muted-foreground">
-                              💡 Assign lower-level versions of these standards as practice.
-                            </p>
-                            <div className="flex flex-wrap gap-2 shrink-0">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setPrintDialogGroup(group)}
-                                className="shrink-0"
-                              >
-                                <Printer className="h-3 w-3 mr-1" />
-                                Print
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setExportPDFGroup(group)}
-                                className="shrink-0"
-                              >
-                                <Download className="h-3 w-3 mr-1" />
-                                Export PDFs
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => createRemediationAssessment(group)}
-                                disabled={creatingAssessment === group.level}
-                                className="shrink-0"
-                              >
-                                {creatingAssessment === group.level ? (
-                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                ) : (
-                                  <ClipboardPlus className="h-3 w-3 mr-1" />
-                                )}
-                                Create Assessment
-                              </Button>
-                            </div>
+                    {/* Personalized Remediation */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <Sparkles className="h-3 w-3" />
+                        Personalized Remediation
+                      </h4>
+                      <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          Each student will receive different questions based on their individual weak topics — no shared class remediation.
+                        </p>
+                        {group.weakTopics.length > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            Common areas across group: {group.weakTopics.slice(0, 3).map(t => t.topicName).join(', ')}
+                          </div>
+                        )}
+                        <div className="pt-2 border-t mt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                          <p className="text-xs text-muted-foreground">
+                            💡 Print or export to give each student their own targeted practice.
+                          </p>
+                          <div className="flex flex-wrap gap-2 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setPrintDialogStudents({
+                                label: group.label,
+                                students: group.students.map(s => ({
+                                  studentId: s.studentId,
+                                  studentName: s.studentName,
+                                  overallMastery: s.overallMastery,
+                                  weakTopics: s.topics
+                                    .filter(t => t.totalAttempts > 0 && t.avgScore < 70)
+                                    .sort((a, b) => a.avgScore - b.avgScore)
+                                    .slice(0, 5)
+                                    .map(t => ({ topicId: t.topicId, topicName: t.topicName, avgScore: t.avgScore })),
+                                })),
+                              })}
+                              className="shrink-0"
+                            >
+                              <Printer className="h-3 w-3 mr-1" />
+                              Print
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setExportPDFGroup(group)}
+                              className="shrink-0"
+                            >
+                              <Download className="h-3 w-3 mr-1" />
+                              Export PDFs
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => createRemediationAssessment(group)}
+                              disabled={creatingAssessment === group.level}
+                              className="shrink-0"
+                            >
+                              {creatingAssessment === group.level ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : (
+                                <ClipboardPlus className="h-3 w-3 mr-1" />
+                              )}
+                              Create Assessment
+                            </Button>
                           </div>
                         </div>
                       </div>
-                    )}
+                    </div>
                   </>
                 )}
               </CollapsibleContent>
@@ -467,13 +472,12 @@ export function DifferentiationGrouping({ students, topics }: DifferentiationGro
       </CardContent>
 
       {/* Print Remediation Dialog */}
-      {printDialogGroup && (
+      {printDialogStudents && (
         <PrintRemediationDialog
-          open={!!printDialogGroup}
-          onOpenChange={(open) => !open && setPrintDialogGroup(null)}
-          groupLabel={printDialogGroup.label}
-          students={printDialogGroup.students}
-          weakTopics={printDialogGroup.weakTopics}
+          open={!!printDialogStudents}
+          onOpenChange={(open) => !open && setPrintDialogStudents(null)}
+          groupLabel={printDialogStudents.label}
+          students={printDialogStudents.students}
         />
       )}
 

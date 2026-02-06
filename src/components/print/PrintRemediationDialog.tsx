@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Printer, Loader2 } from 'lucide-react';
+import { Printer, Loader2, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -11,16 +11,11 @@ import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 import { PrintableWorksheet } from './PrintableWorksheet';
 
-interface Student {
+export interface StudentWithWeakTopics {
   studentId: string;
   studentName: string;
   overallMastery: number;
-}
-
-interface WeakTopic {
-  topicId: string;
-  topicName: string;
-  avgScore: number;
+  weakTopics: { topicId: string; topicName: string; avgScore: number }[];
 }
 
 interface Question {
@@ -35,8 +30,7 @@ interface PrintRemediationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   groupLabel: string;
-  students: Student[];
-  weakTopics: WeakTopic[];
+  students: StudentWithWeakTopics[];
 }
 
 export function PrintRemediationDialog({
@@ -44,38 +38,44 @@ export function PrintRemediationDialog({
   onOpenChange,
   groupLabel,
   students,
-  weakTopics,
 }: PrintRemediationDialogProps) {
   const { user } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
 
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set());
+  const [studentQuestions, setStudentQuestions] = useState<Map<string, Question[]>>(new Map());
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     if (open) {
-      fetchQuestionsForTopics();
-      // Select all students by default
       setSelectedStudents(new Set(students.map(s => s.studentId)));
+      fetchQuestionsForAllStudents();
     } else {
       setShowPreview(false);
     }
-  }, [open, students, weakTopics]);
+  }, [open, students]);
 
-  async function fetchQuestionsForTopics() {
-    if (!user || weakTopics.length === 0) {
-      setQuestions([]);
+  async function fetchQuestionsForAllStudents() {
+    if (!user || students.length === 0) {
+      setStudentQuestions(new Map());
       return;
     }
 
     setLoading(true);
     try {
-      const weakTopicIds = weakTopics.map(t => t.topicId);
+      const newMap = new Map<string, Question[]>();
 
-      // Find questions that match these topics
+      // Collect all unique topic IDs across all students
+      const allTopicIds = new Set<string>();
+      students.forEach(s => s.weakTopics.forEach(t => allTopicIds.add(t.topicId)));
+
+      if (allTopicIds.size === 0) {
+        setStudentQuestions(newMap);
+        return;
+      }
+
+      // Fetch all questions for all weak topics in one query
       const { data: questionTopics, error: qtError } = await supabase
         .from('question_topics')
         .select(`
@@ -84,32 +84,54 @@ export function PrintRemediationDialog({
           questions!inner(id, jmap_id, prompt_text, prompt_image_url, difficulty, teacher_id),
           topics!inner(name)
         `)
-        .in('topic_id', weakTopicIds)
+        .in('topic_id', Array.from(allTopicIds))
         .eq('questions.teacher_id', user.id);
 
       if (qtError) throw qtError;
 
-      // Deduplicate and format questions
-      const questionMap = new Map<string, Question>();
+      // Build a map of topicId -> questions
+      const topicQuestions = new Map<string, Question[]>();
       questionTopics?.forEach(qt => {
         const q = qt.questions as any;
         const t = qt.topics as any;
-        if (q && !questionMap.has(q.id)) {
-          questionMap.set(q.id, {
+        if (q) {
+          const question: Question = {
             id: q.id,
             jmap_id: q.jmap_id,
             prompt_text: q.prompt_text,
             prompt_image_url: q.prompt_image_url,
             topicName: t?.name || 'Unknown',
-          });
+          };
+          if (!topicQuestions.has(qt.topic_id)) {
+            topicQuestions.set(qt.topic_id, []);
+          }
+          const existing = topicQuestions.get(qt.topic_id)!;
+          if (!existing.find(eq => eq.id === question.id)) {
+            existing.push(question);
+          }
         }
       });
 
-      const sortedQuestions = Array.from(questionMap.values()).slice(0, 10);
-      setQuestions(sortedQuestions);
-      
-      // Auto-select up to 5 questions
-      setSelectedQuestions(new Set(sortedQuestions.slice(0, 5).map(q => q.id)));
+      // For each student, pick up to 5 questions from their individual weak topics
+      students.forEach(student => {
+        const questions: Question[] = [];
+        const usedIds = new Set<string>();
+
+        for (const weakTopic of student.weakTopics) {
+          const available = topicQuestions.get(weakTopic.topicId) || [];
+          for (const q of available) {
+            if (!usedIds.has(q.id) && questions.length < 5) {
+              questions.push(q);
+              usedIds.add(q.id);
+            }
+          }
+          if (questions.length >= 5) break;
+        }
+
+        newMap.set(student.studentId, questions);
+      });
+
+      setStudentQuestions(newMap);
     } catch (error) {
       console.error('Error fetching questions:', error);
       toast.error('Failed to load questions');
@@ -128,48 +150,42 @@ export function PrintRemediationDialog({
     setSelectedStudents(newSelected);
   };
 
-  const toggleQuestion = (questionId: string) => {
-    const newSelected = new Set(selectedQuestions);
-    if (newSelected.has(questionId)) {
-      newSelected.delete(questionId);
-    } else if (newSelected.size < 5) {
-      newSelected.add(questionId);
-    } else {
-      toast.error('Maximum 5 questions allowed for remediation worksheets');
-    }
-    setSelectedQuestions(newSelected);
-  };
-
   const selectAllStudents = () => {
     setSelectedStudents(new Set(students.map(s => s.studentId)));
   };
 
-  const getSelectedStudents = () => {
-    return students
-      .filter(s => selectedStudents.has(s.studentId))
-      .map(s => ({
-        id: s.studentId,
-        first_name: s.studentName.split(' ')[0] || '',
-        last_name: s.studentName.split(' ').slice(1).join(' ') || '',
-        student_id: null,
-      }));
+  const deselectAllStudents = () => {
+    setSelectedStudents(new Set());
   };
 
-  const getSelectedQuestions = () => questions.filter(q => selectedQuestions.has(q.id));
+  const getStudentForWorksheet = (student: StudentWithWeakTopics) => ({
+    id: student.studentId,
+    first_name: student.studentName.split(' ')[0] || '',
+    last_name: student.studentName.split(' ').slice(1).join(' ') || '',
+    student_id: null,
+  });
 
   const handlePrint = () => {
-    if (selectedStudents.size === 0 || selectedQuestions.size === 0) {
-      toast.error('Please select at least one student and one question');
+    const studentsWithQuestions = students.filter(
+      s => selectedStudents.has(s.studentId) && (studentQuestions.get(s.studentId)?.length || 0) > 0
+    );
+
+    if (studentsWithQuestions.length === 0) {
+      toast.error('No selected students have matching questions');
       return;
     }
-    setShowPreview(true);
 
+    setShowPreview(true);
     setTimeout(() => {
       window.print();
     }, 100);
   };
 
-  const canPrint = selectedStudents.size > 0 && selectedQuestions.size > 0;
+  const selectedCount = students.filter(s => selectedStudents.has(s.studentId)).length;
+  const printableCount = students.filter(
+    s => selectedStudents.has(s.studentId) && (studentQuestions.get(s.studentId)?.length || 0) > 0
+  ).length;
+  const canPrint = printableCount > 0 && !loading;
   const assessmentName = `Remediation - ${groupLabel}`;
 
   return (
@@ -177,105 +193,123 @@ export function PrintRemediationDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle>Print Remediation Worksheets - {groupLabel}</DialogTitle>
+            <DialogTitle>Print Personalized Remediation - {groupLabel}</DialogTitle>
             <DialogDescription>
-              Generate worksheets with questions targeting weak topics for this student group (max 5 questions)
+              Each student receives different questions based on their individual weak topics (max 5 questions per student)
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Weak Topics Summary */}
-            <div className="bg-muted/50 rounded-lg p-3">
-              <Label className="text-sm font-medium">Targeting Weak Topics:</Label>
-              <div className="flex flex-wrap gap-1 mt-2">
-                {weakTopics.map(topic => (
-                  <Badge key={topic.topicId} variant="secondary" className="text-xs">
-                    {topic.topicName} ({topic.avgScore}%)
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Students Selection */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Students ({selectedStudents.size}/{students.length})</Label>
+            {/* Students with their individual weak topics and questions */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Students ({selectedCount}/{students.length} selected)</Label>
+                <div className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={selectAllStudents}>
                     Select All
                   </Button>
+                  <Button variant="ghost" size="sm" onClick={deselectAllStudents}>
+                    Deselect All
+                  </Button>
                 </div>
-                <ScrollArea className="h-48 border rounded-md p-2">
-                  {students.map((student) => (
-                    <div key={student.studentId} className="flex items-center gap-2 py-1">
-                      <Checkbox
-                        id={`student-${student.studentId}`}
-                        checked={selectedStudents.has(student.studentId)}
-                        onCheckedChange={() => toggleStudent(student.studentId)}
-                      />
-                      <Label htmlFor={`student-${student.studentId}`} className="text-sm cursor-pointer flex-1">
-                        {student.studentName}
-                      </Label>
-                      <Badge variant="outline" className="text-xs">
-                        {student.overallMastery}%
-                      </Badge>
-                    </div>
-                  ))}
-                  {students.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No students in this group
-                    </p>
-                  )}
-                </ScrollArea>
               </div>
 
-              {/* Questions Selection */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Questions ({selectedQuestions.size}/5 max)</Label>
-                </div>
-                <ScrollArea className="h-48 border rounded-md p-2">
-                  {loading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    </div>
-                  ) : (
-                    questions.map((question) => (
-                      <div key={question.id} className="flex items-center gap-2 py-1">
-                        <Checkbox
-                          id={`question-${question.id}`}
-                          checked={selectedQuestions.has(question.id)}
-                          onCheckedChange={() => toggleQuestion(question.id)}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <Label htmlFor={`question-${question.id}`} className="text-sm cursor-pointer block truncate">
-                            {question.jmap_id || question.prompt_text?.slice(0, 40) || 'Question'}
-                          </Label>
-                          {question.topicName && (
-                            <span className="text-xs text-muted-foreground">{question.topicName}</span>
-                          )}
+              <ScrollArea className="h-[350px] border rounded-md">
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    <span className="text-sm text-muted-foreground">Loading personalized questions...</span>
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {students.map((student) => {
+                      const questions = studentQuestions.get(student.studentId) || [];
+                      const isSelected = selectedStudents.has(student.studentId);
+
+                      return (
+                        <div
+                          key={student.studentId}
+                          className={`p-3 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Checkbox
+                              id={`student-${student.studentId}`}
+                              checked={isSelected}
+                              onCheckedChange={() => toggleStudent(student.studentId)}
+                              className="mt-0.5"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Label
+                                  htmlFor={`student-${student.studentId}`}
+                                  className="text-sm font-medium cursor-pointer"
+                                >
+                                  {student.studentName}
+                                </Label>
+                                <Badge variant="outline" className="text-xs shrink-0">
+                                  {student.overallMastery}%
+                                </Badge>
+                                <Badge
+                                  variant={questions.length > 0 ? 'secondary' : 'destructive'}
+                                  className="text-xs shrink-0"
+                                >
+                                  {questions.length} Q{questions.length !== 1 ? 's' : ''}
+                                </Badge>
+                              </div>
+
+                              {/* Per-student weak topics */}
+                              {student.weakTopics.length > 0 ? (
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                  {student.weakTopics.map(topic => (
+                                    <Badge
+                                      key={topic.topicId}
+                                      variant="outline"
+                                      className="text-xs font-normal text-muted-foreground"
+                                    >
+                                      {topic.topicName} ({topic.avgScore}%)
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  No weak topics identified
+                                </p>
+                              )}
+
+                              {/* Per-student question preview */}
+                              {questions.length > 0 && (
+                                <div className="mt-1.5 text-xs text-muted-foreground">
+                                  Questions: {questions.map(q => q.jmap_id || q.topicName || 'Q').join(', ')}
+                                </div>
+                              )}
+                              {questions.length === 0 && student.weakTopics.length > 0 && (
+                                <p className="text-xs text-amber-600 mt-1">
+                                  No matching questions found — create questions tagged with these topics
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))
-                  )}
-                  {!loading && questions.length === 0 && (
-                    <div className="text-sm text-muted-foreground text-center py-4">
-                      <p>No questions found for these topics.</p>
-                      <p className="text-xs mt-1">Create questions tagged with these topics first.</p>
-                    </div>
-                  )}
-                </ScrollArea>
-              </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </ScrollArea>
             </div>
 
             {/* Summary */}
             <div className="bg-muted/50 rounded-lg p-3 text-sm">
               <p>
-                <strong>Ready to print:</strong> {selectedStudents.size} worksheet(s) with {selectedQuestions.size} question(s) each
+                <strong>Ready to print:</strong> {printableCount} personalized worksheet{printableCount !== 1 ? 's' : ''}
               </p>
               <p className="text-muted-foreground mt-1">
-                Each worksheet includes QR codes for automatic student identification when scanning.
+                Each worksheet targets the student's individual weak topics with up to 5 unique questions. QR codes are included for automatic student identification when scanning.
               </p>
+              {selectedCount > printableCount && (
+                <p className="text-amber-600 mt-1 text-xs">
+                  {selectedCount - printableCount} selected student(s) have no matching questions and will be skipped.
+                </p>
+              )}
             </div>
           </div>
 
@@ -285,7 +319,7 @@ export function PrintRemediationDialog({
             </Button>
             <Button onClick={handlePrint} disabled={!canPrint}>
               <Printer className="h-4 w-4 mr-2" />
-              Print {selectedStudents.size} Worksheet(s)
+              Print {printableCount} Worksheet{printableCount !== 1 ? 's' : ''}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -301,14 +335,16 @@ export function PrintRemediationDialog({
             </Button>
           </div>
           <div ref={printRef}>
-            {getSelectedStudents().map((student) => (
-              <PrintableWorksheet
-                key={student.id}
-                student={student}
-                questions={getSelectedQuestions()}
-                assessmentName={assessmentName}
-              />
-            ))}
+            {students
+              .filter(s => selectedStudents.has(s.studentId) && (studentQuestions.get(s.studentId)?.length || 0) > 0)
+              .map((student) => (
+                <PrintableWorksheet
+                  key={student.studentId}
+                  student={getStudentForWorksheet(student)}
+                  questions={studentQuestions.get(student.studentId) || []}
+                  assessmentName={assessmentName}
+                />
+              ))}
           </div>
         </div>
       )}
