@@ -22,6 +22,7 @@ import {
   Rocket
 } from 'lucide-react';
 import { PushAssignmentDialog } from './PushAssignmentDialog';
+import { PushStudentPracticeDialog } from './PushStudentPracticeDialog';
 import { StudentReportDialog } from './StudentReportDialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -308,6 +309,15 @@ export function Gradebook({ classId }: GradebookProps) {
   const [selectedStudentForReport, setSelectedStudentForReport] = useState<{
     id: string;
     name: string;
+  } | null>(null);
+
+  // Per-student push practice state
+  const [pushPracticeStudent, setPushPracticeStudent] = useState<{
+    studentId: string;
+    studentName: string;
+    topicName?: string;
+    standard?: string;
+    classId?: string;
   } | null>(null);
 
   // Fetch grade history with class names
@@ -995,6 +1005,32 @@ export function Gradebook({ classId }: GradebookProps) {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-primary hover:text-primary"
+                                    onClick={() => {
+                                      const studentName = grade.student
+                                        ? getDisplayName(grade.student_id, grade.student.first_name, grade.student.last_name)
+                                        : 'Student';
+                                      setPushPracticeStudent({
+                                        studentId: grade.student_id,
+                                        studentName,
+                                        topicName: grade.topic_name,
+                                        standard: grade.nys_standard || undefined,
+                                        classId: grade.student?.class_id,
+                                      });
+                                    }}
+                                  >
+                                    <Send className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Send practice to this student</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                             <Button 
                               variant="ghost" 
                               size="icon"
@@ -1204,6 +1240,19 @@ export function Gradebook({ classId }: GradebookProps) {
         onOpenChange={setPushAssignmentOpen}
         defaultClassId={classId}
       />
+
+      {/* Per-Student Push Practice Dialog */}
+      {pushPracticeStudent && (
+        <PushStudentPracticeDialog
+          open={!!pushPracticeStudent}
+          onOpenChange={(open) => !open && setPushPracticeStudent(null)}
+          studentId={pushPracticeStudent.studentId}
+          studentName={pushPracticeStudent.studentName}
+          classId={pushPracticeStudent.classId || classId}
+          preselectedTopic={pushPracticeStudent.topicName}
+          preselectedStandard={pushPracticeStudent.standard}
+        />
+      )}
     </Collapsible>
   );
 }
