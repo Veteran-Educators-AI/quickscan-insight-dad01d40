@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, XCircle, AlertTriangle, Lightbulb, Save, UserPlus, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, Lightbulb, Save, UserPlus, Loader2, FileX } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,10 @@ interface AnalysisResult {
   nysStandard?: string;
   regentsScore?: number;
   regentsScoreJustification?: string;
+  /** Set to true if the page was auto-detected as blank / no response */
+  noResponse?: boolean;
+  /** The detection reason when noResponse is true */
+  noResponseReason?: string;
 }
 
 interface RemediationQuestion {
@@ -171,6 +175,28 @@ export function AnalysisResults({
 
       {/* Training Confidence Indicator - Compact version at top */}
       <TrainingConfidenceIndicator compact className="mb-2" />
+
+      {/* No Response / Blank Page Banner */}
+      {result.noResponse && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+              <FileX className="h-5 w-5 text-destructive" />
+            </div>
+            <div>
+              <p className="font-semibold text-destructive text-sm">No Response Detected</p>
+              <p className="text-xs text-muted-foreground">
+                {result.gradeJustification || 'No work shown on this page; score assigned per no-response policy.'}
+              </p>
+              {result.noResponseReason && (
+                <Badge variant="outline" className="mt-1 text-[10px]">
+                  Detection: {result.noResponseReason}
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Prominent Score Display */}
       <Card className={`${isOverridden ? 'border-primary' : 'border-2'}`}>

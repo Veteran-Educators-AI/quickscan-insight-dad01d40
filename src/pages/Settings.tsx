@@ -12,6 +12,7 @@ import { ApiKeySettings } from '@/components/settings/ApiKeySettings';
 import { CustomRubricSettings } from '@/components/settings/CustomRubricSettings';
 import { GradeFloorSettings } from '@/components/settings/GradeFloorSettings';
 import { ScanSettings } from '@/components/settings/ScanSettings';
+import { BlankPageSettings } from '@/components/settings/BlankPageSettings';
 import { GradeDataCleanup } from '@/components/settings/GradeDataCleanup';
 import { PerformanceDropAlertSettings } from '@/components/settings/PerformanceDropAlertSettings';
 import { useOnboardingTour } from '@/hooks/useOnboardingTour';
@@ -164,6 +165,8 @@ export default function Settings() {
         <GradeFloorSettings />
 
         <ScanSettings />
+
+        <BlankPageSettings />
 
         <GradeDataCleanup />
 

@@ -1,0 +1,73 @@
+/**
+ * Blank page detection utility.
+ *
+ * Phase 1: text-based detection.
+ * Normalizes extracted OCR text by stripping whitespace, common
+ * headers/footers (e.g. "Name:", "Date:", "Period:"), standalone
+ * page numbers, and worksheet boilerplate.  If the remaining
+ * meaningful content is fewer than `threshold` characters the page
+ * is considered blank.
+ */
+
+/** Patterns that are considered boilerplate / not student work */
+const BOILERPLATE_PATTERNS = [
+  /^name\s*[:.]?\s*/gim,
+  /^date\s*[:.]?\s*/gim,
+  /^period\s*[:.]?\s*/gim,
+  /^class\s*[:.]?\s*/gim,
+  /^page\s*\d+/gim,
+  /^side\s*[ab]/gim,
+  /^#?\s*\d+\s*$/gm, // standalone numbers (page numbers, question numbers alone)
+  /^question\s*\d*\s*[:.]?\s*$/gim,
+  /^q\d+\s*[:.]?\s*$/gim,
+  /^problem\s*\d*\s*[:.]?\s*$/gim,
+  /^directions?\s*[:.]?\s*/gim,
+  /^instructions?\s*[:.]?\s*/gim,
+  /^show\s+your\s+work/gim,
+  /^answer\s*[:.]?\s*$/gim,
+  /^work\s*[:.]?\s*$/gim,
+  /^\s*[-–—_]{3,}\s*$/gm, // horizontal rules / lines
+];
+
+export interface BlankPageResult {
+  isBlank: boolean;
+  /** Length of text after normalization */
+  normalizedLength: number;
+  /** Why the page was flagged */
+  detectionReason: 'TEXT_LENGTH' | 'NOT_BLANK';
+  /** The cleaned text (useful for debugging) */
+  normalizedText: string;
+}
+
+/**
+ * Detect whether extracted text represents a blank / no-response page.
+ *
+ * @param rawText  – The OCR-extracted text for a single page.
+ * @param threshold – Minimum meaningful character count (default 20).
+ */
+export function detectBlankPage(rawText: string | null | undefined, threshold = 20): BlankPageResult {
+  if (!rawText) {
+    return { isBlank: true, normalizedLength: 0, detectionReason: 'TEXT_LENGTH', normalizedText: '' };
+  }
+
+  let text = rawText;
+
+  // Strip each boilerplate pattern
+  for (const pattern of BOILERPLATE_PATTERNS) {
+    // Reset lastIndex for global patterns
+    pattern.lastIndex = 0;
+    text = text.replace(pattern, '');
+  }
+
+  // Collapse all whitespace (spaces, tabs, newlines) and trim
+  text = text.replace(/\s+/g, ' ').trim();
+
+  const isBlank = text.length < threshold;
+
+  return {
+    isBlank,
+    normalizedLength: text.length,
+    detectionReason: isBlank ? 'TEXT_LENGTH' : 'NOT_BLANK',
+    normalizedText: text,
+  };
+}

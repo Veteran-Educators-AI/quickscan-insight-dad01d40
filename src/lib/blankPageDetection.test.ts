@@ -1,0 +1,83 @@
+import { describe, it, expect } from 'vitest';
+import { detectBlankPage } from './blankPageDetection';
+
+describe('detectBlankPage', () => {
+  it('flags a truly blank page (null text)', () => {
+    const result = detectBlankPage(null);
+    expect(result.isBlank).toBe(true);
+    expect(result.normalizedLength).toBe(0);
+    expect(result.detectionReason).toBe('TEXT_LENGTH');
+  });
+
+  it('flags a truly blank page (empty string)', () => {
+    const result = detectBlankPage('');
+    expect(result.isBlank).toBe(true);
+    expect(result.normalizedLength).toBe(0);
+    expect(result.detectionReason).toBe('TEXT_LENGTH');
+  });
+
+  it('flags a truly blank page (whitespace only)', () => {
+    const result = detectBlankPage('   \n\n  \t  ');
+    expect(result.isBlank).toBe(true);
+    expect(result.normalizedLength).toBe(0);
+    expect(result.detectionReason).toBe('TEXT_LENGTH');
+  });
+
+  it('flags a page with only a page number "2"', () => {
+    const result = detectBlankPage('2');
+    expect(result.isBlank).toBe(true);
+    expect(result.detectionReason).toBe('TEXT_LENGTH');
+  });
+
+  it('flags a page with only a page number "Page 3"', () => {
+    const result = detectBlankPage('Page 3');
+    expect(result.isBlank).toBe(true);
+  });
+
+  it('flags a page with only boilerplate headers', () => {
+    const result = detectBlankPage('Name:\nDate:\nPeriod:\n3');
+    expect(result.isBlank).toBe(true);
+  });
+
+  it('flags a page with only "Answer:" and a line', () => {
+    const result = detectBlankPage('Answer:\n___________');
+    expect(result.isBlank).toBe(true);
+  });
+
+  it('flags "Question 1:" with no answer as blank', () => {
+    const result = detectBlankPage('Question 1:\nShow your work');
+    expect(result.isBlank).toBe(true);
+  });
+
+  it('does NOT flag a short but real student response (>= 20 chars)', () => {
+    const result = detectBlankPage('x^2 + 3x - 4 = 0 so x = 1');
+    expect(result.isBlank).toBe(false);
+    expect(result.detectionReason).toBe('NOT_BLANK');
+  });
+
+  it('does NOT flag a typical student work page', () => {
+    const result = detectBlankPage(
+      'Name: John\nDate: 1/1/25\n\nFind the area of the rectangle.\nA = l × w = 8 × 4 = 32 square units'
+    );
+    expect(result.isBlank).toBe(false);
+    expect(result.normalizedLength).toBeGreaterThanOrEqual(20);
+  });
+
+  it('does NOT flag a page with substantial math work', () => {
+    const result = detectBlankPage(
+      '3x + 5 = 20\n3x = 15\nx = 5\n\nCheck: 3(5) + 5 = 15 + 5 = 20 ✓'
+    );
+    expect(result.isBlank).toBe(false);
+  });
+
+  it('respects custom threshold', () => {
+    const shortText = 'x = 5'; // 5 chars after normalization
+    expect(detectBlankPage(shortText, 3).isBlank).toBe(false);
+    expect(detectBlankPage(shortText, 10).isBlank).toBe(true);
+  });
+
+  it('handles undefined input', () => {
+    const result = detectBlankPage(undefined);
+    expect(result.isBlank).toBe(true);
+  });
+});
