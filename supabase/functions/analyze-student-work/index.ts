@@ -345,6 +345,52 @@ function formatImageForLovableAI(imageBase64: string) {
   };
 }
 
+// ─── Blank Page Detection (server-side, duplicated from src/lib/blankPageDetection.ts) ───
+const BOILERPLATE_PATTERNS_SERVER = [
+  /^name\s*[:.]?\s*/gim,
+  /^date\s*[:.]?\s*/gim,
+  /^period\s*[:.]?\s*/gim,
+  /^class\s*[:.]?\s*/gim,
+  /^page\s*\d+/gim,
+  /^side\s*[ab]/gim,
+  /^#?\s*\d+\s*$/gm,
+  /^question\s*\d*\s*[:.]?\s*$/gim,
+  /^q\d+\s*[:.]?\s*$/gim,
+  /^problem\s*\d*\s*[:.]?\s*$/gim,
+  /^directions?\s*[:.]?\s*/gim,
+  /^instructions?\s*[:.]?\s*/gim,
+  /^show\s+your\s+work/gim,
+  /^answer\s*[:.]?\s*$/gim,
+  /^work\s*[:.]?\s*$/gim,
+  /^\s*[-–—_]{3,}\s*$/gm,
+];
+
+function detectBlankPageFromText(rawText: string | null | undefined, threshold = 20): {
+  isBlank: boolean;
+  normalizedLength: number;
+  detectionReason: 'TEXT_LENGTH' | 'NOT_BLANK';
+  normalizedText: string;
+} {
+  if (!rawText || rawText.toUpperCase().includes('BLANK_PAGE')) {
+    return { isBlank: true, normalizedLength: 0, detectionReason: 'TEXT_LENGTH', normalizedText: '' };
+  }
+
+  let text = rawText;
+  for (const pattern of BOILERPLATE_PATTERNS_SERVER) {
+    pattern.lastIndex = 0;
+    text = text.replace(pattern, '');
+  }
+  text = text.replace(/\s+/g, ' ').trim();
+
+  const isBlank = text.length < threshold;
+  return {
+    isBlank,
+    normalizedLength: text.length,
+    detectionReason: isBlank ? 'TEXT_LENGTH' : 'NOT_BLANK',
+    normalizedText: text,
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -388,7 +434,7 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const { imageBase64, additionalImages, solutionBase64, answerGuideBase64, questionId, rubricSteps, identifyOnly, detectPageType, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric, gradeFloor: customGradeFloor, gradeFloorWithEffort: customGradeFloorWithEffort, useLearnedStyle } = await req.json();
+    const { imageBase64, additionalImages, solutionBase64, answerGuideBase64, questionId, rubricSteps, identifyOnly, detectPageType, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric, gradeFloor: customGradeFloor, gradeFloorWithEffort: customGradeFloorWithEffort, useLearnedStyle, blankPageSettings } = await req.json();
     
     // Ensure teacherId matches authenticated user
     const effectiveTeacherId = teacherId || authenticatedUserId;
@@ -451,6 +497,61 @@ serve(async (req) => {
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // ─── Blank Page Detection (Phase 1) ───────────────────────────────
+    // If the caller passed blankPageSettings.enabled, run a quick lightweight
+    // OCR pass to extract text, then check if the page is blank.
+    // This avoids the expensive grading LLM call for empty pages.
+    if (blankPageSettings?.enabled) {
+      console.log('Blank page detection enabled — running lightweight OCR pre-check...');
+      try {
+        const quickOcrResult = await callLovableAI([
+          { role: 'system', content: 'You are an OCR tool. Extract ALL visible text from this image exactly as written. Include handwritten text, printed text, numbers, equations, and any symbols. If the page is completely blank or only has printed headers/instructions with no student work, say "BLANK_PAGE". Output ONLY the extracted text, nothing else.' },
+          { role: 'user', content: [
+            { type: 'text', text: 'Extract all text from this image:' },
+            formatImageForLovableAI(imageBase64),
+          ] },
+        ], LOVABLE_API_KEY, 'blank-page-ocr-check');
+
+        // Normalize the OCR result using the same logic as the client-side utility
+        const blankCheckResult = detectBlankPageFromText(quickOcrResult);
+        console.log(`Blank page check: isBlank=${blankCheckResult.isBlank}, normalizedLength=${blankCheckResult.normalizedLength}, text="${blankCheckResult.normalizedText.substring(0, 80)}"`);
+
+        if (blankCheckResult.isBlank) {
+          console.log('Page detected as BLANK — skipping LLM grading, returning configured score');
+          const blankScore = blankPageSettings.score ?? 55;
+          const blankComment = blankPageSettings.comment ?? 'No work shown on this page; score assigned per no-response policy.';
+
+          const blankResult = {
+            ocrText: quickOcrResult || '',
+            problemIdentified: 'No student work detected',
+            approachAnalysis: 'No student work to analyze',
+            rubricScores: [],
+            misconceptions: [],
+            totalScore: { earned: 0, possible: 4, percentage: 0 },
+            grade: blankScore,
+            gradeJustification: blankComment,
+            feedback: 'This page appears to have no student work. If this is incorrect, please re-scan with better lighting or check that the correct page was uploaded.',
+            regentsScore: 0,
+            regentsScoreJustification: 'No student work present — Score 0',
+            noResponse: true,
+            noResponseReason: blankCheckResult.detectionReason,
+          };
+
+          return new Response(JSON.stringify({
+            success: true,
+            analysis: blankResult,
+            rawAnalysis: `[BLANK PAGE DETECTED] OCR text: "${quickOcrResult}". Normalized length: ${blankCheckResult.normalizedLength}. Detection reason: ${blankCheckResult.detectionReason}.`,
+            blankPageDetected: true,
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      } catch (blankCheckError) {
+        console.error('Blank page pre-check failed, continuing with normal analysis:', blankCheckError);
+        // Non-fatal — continue to regular analysis
+      }
     }
 
     console.log('Analyzing student work image...');

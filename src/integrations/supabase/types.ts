@@ -1838,6 +1838,9 @@ export type Database = {
           auto_push_threshold: number | null
           auto_push_worksheet_count: number | null
           auto_qr_scan_enabled: boolean | null
+          blank_page_auto_score: boolean | null
+          blank_page_comment: string | null
+          blank_page_score: number | null
           created_at: string
           grade_curve_percent: number | null
           grade_floor: number | null
@@ -1874,6 +1877,9 @@ export type Database = {
           auto_push_threshold?: number | null
           auto_push_worksheet_count?: number | null
           auto_qr_scan_enabled?: boolean | null
+          blank_page_auto_score?: boolean | null
+          blank_page_comment?: string | null
+          blank_page_score?: number | null
           created_at?: string
           grade_curve_percent?: number | null
           grade_floor?: number | null
@@ -1910,6 +1916,9 @@ export type Database = {
           auto_push_threshold?: number | null
           auto_push_worksheet_count?: number | null
           auto_qr_scan_enabled?: boolean | null
+          blank_page_auto_score?: boolean | null
+          blank_page_comment?: string | null
+          blank_page_score?: number | null
           created_at?: string
           grade_curve_percent?: number | null
           grade_floor?: number | null

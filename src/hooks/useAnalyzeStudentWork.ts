@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
+import { detectBlankPage } from '@/lib/blankPageDetection';
+import { useBlankPageSettings } from '@/hooks/useBlankPageSettings';
 
 interface RubricStep {
   step_number: number;
@@ -44,6 +46,8 @@ interface AnalysisResult {
   gradeJustification?: string;
   feedback: string;
   gradingSource?: 'ai' | 'teacher-guided';
+  noResponse?: boolean;
+  noResponseReason?: string;
 }
 
 interface ComparisonResult {
@@ -121,6 +125,7 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
   const [rawAnalysis, setRawAnalysis] = useState<string | null>(null);
   const [customRubric, setCustomRubric] = useState<CustomRubric | null>(null);
   const [isCancelled, setIsCancelled] = useState(false);
+  const { settings: blankPageSettings } = useBlankPageSettings();
 
   // Load custom rubric from localStorage
   useEffect(() => {
@@ -158,6 +163,10 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
     setIsCancelled(false);
 
     try {
+      // --- Blank page pre-check (client-side, Phase 1: text-based) ---
+      // The edge function also does OCR and returns text, but we pass
+      // the setting so the server can skip LLM grading for blank pages.
+
       const { data, error: fnError } = await supabase.functions.invoke('analyze-student-work', {
         body: {
           imageBase64: imageDataUrl,
@@ -165,11 +174,17 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
           rubricSteps,
           studentName,
           teacherId: user?.id,
-          assessmentMode: assessmentMode || 'ai', // Default to AI mode for NYS standards alignment
+          assessmentMode: assessmentMode || 'ai',
           promptText,
           standardCode,
           topicName,
-          customRubric, // Pass custom rubric if available
+          customRubric,
+          // Pass blank page settings so the server can short-circuit
+          blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
+            enabled: true,
+            score: blankPageSettings.blankPageScore,
+            comment: blankPageSettings.blankPageComment,
+          } : undefined,
         },
       });
 
