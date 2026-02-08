@@ -297,9 +297,9 @@ async function callLovableAI(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash-lite',
+      model: 'google/gemini-2.5-flash',
       messages,
-      max_tokens: 4000,
+      max_tokens: 5000,
     }),
   });
 
@@ -321,7 +321,7 @@ async function callLovableAI(
   
   // Log token usage for cost monitoring
   const usage = data.usage || {};
-  console.log(`[TOKEN_USAGE] function=${functionName} model=gemini-2.5-flash-lite prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
+  console.log(`[TOKEN_USAGE] function=${functionName} model=gemini-2.5-flash prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
   
   // Log to database if supabase client is provided
   if (supabase && userId) {
@@ -1002,6 +1002,26 @@ When extracting OCR text:
    - BUT flag significant interpretations so teachers can verify: "[INTERPRETATION - VERIFY: ...]"
    - Do NOT fabricate entire solutions or understanding that has no basis in visible work
    - Do NOT penalize for work not asked by the question
+
+6. *** EVIDENCE-BASED GRADING MANDATE ***
+   CRITICAL: EVERY grade justification, strength, and error MUST directly quote the student's actual handwritten work.
+   
+   YOU MUST USE THIS FORMAT for citing student work:
+   - "Student wrote: '[exact text/equation copied from their paper]'"
+   - "In [location on page], student shows: '[exact quote]'"
+   
+   NEVER use vague language like:
+   ✗ "Student showed understanding" (WHAT did they write that shows this?)
+   ✗ "Work demonstrates knowledge" (QUOTE the specific work!)
+   ✗ "Some errors were present" (QUOTE the exact errors!)
+   ✗ "Student attempted the problem" (WHAT specifically did they write?)
+   
+   ALWAYS use specific language like:
+   ✓ "Student wrote: 'A = πr² = π(5)² = 25π' correctly applying the area formula"
+   ✓ "Student wrote: '2πr = 2π(5) = 10π' using circumference formula instead of area"
+   ✓ "Student's equation 'y = 3x + 2' correctly identifies slope as 3"
+   
+   If you cannot quote specific student work, you cannot claim they demonstrated or failed to demonstrate understanding.
 `;
 
     if (isAIMode) {
@@ -1265,13 +1285,13 @@ Provide your analysis in the following structure:
     • 65-69 = Basic/limited understanding shown (DEFAULT if ANY work with understanding)
     • 55 = ONLY if completely blank or NO understanding whatsoever)
 ` + (feedbackVerbosity === 'detailed' ? `
-- Grade Justification: (DETAILED - 150-200 words. Include: 1) Complete breakdown of each error with exact citations from student work, 2) Explanation of WHY each error is mathematically incorrect, 3) What the correct approach should have been step-by-step, 4) How each error affected the final grade. Be thorough and educational.)
-- What Student Did Correctly: (REQUIRED - 50-100 words. List SPECIFIC things the student did right: correct formulas chosen, correct setup, correct operations, correct units, correct final answer, etc. Cite their actual work. If nothing is correct, say "No correct work identified.")
-- What Student Got Wrong: (REQUIRED - 50-100 words. List SPECIFIC errors and mistakes with exact citations from their work. Explain WHY each is wrong and what the correct approach should be. If no errors, say "No errors found - work is correct.")
+- Grade Justification: (DETAILED - 150-200 words. MUST directly quote the student's written work using "Student wrote: '[exact quote]'" format. Include: 1) Complete breakdown of each error with exact citations from student work, 2) Explanation of WHY each error is mathematically incorrect, 3) What the correct approach should have been step-by-step, 4) How each error affected the final grade. Every claim must reference specific student writing.)
+- What Student Did Correctly: (REQUIRED - 50-100 words. MUST directly quote the student's actual written equations, steps, or reasoning. Format: "Student correctly wrote '[exact equation/step from their paper]' which shows [concept]. They also demonstrated [skill] by writing '[another exact quote]'." If nothing is correct, say "No correct work identified.")
+- What Student Got Wrong: (REQUIRED - 50-100 words. MUST directly quote the student's actual errors. Format: "Student wrote '[exact incorrect equation/step]' but the correct approach is [correct method]. This error in their work '[quote]' shows [misconception]." Explain WHY each quoted error is wrong. If no errors, say "No errors found - work is correct.")
 - Feedback: (DETAILED - 100-150 words. Provide comprehensive suggestions for improvement including: specific practice topics, common pitfalls to avoid, study strategies, and encouragement. Be constructive and educational.)` : `
-- Grade Justification: (REQUIRED - 50-100 words. MUST include: 1) What specific work earned credit, 2) What specific errors cost points, 3) How you arrived at this grade. Format: "EARNED CREDIT FOR: [cite correct work]. DEDUCTIONS FOR: [cite errors]. RESULT: [grade reasoning]")
-- What Student Did Correctly: (REQUIRED - 30-60 words. List the SPECIFIC correct steps, formulas, or reasoning the student demonstrated. Cite their actual written work. Example: "Student correctly identified the formula A = πr², substituted r = 5, and computed 25π." If nothing correct, say "No correct work identified.")
-- What Student Got Wrong: (REQUIRED - 30-60 words. List SPECIFIC errors with citations. Explain what was wrong and what it should have been. Example: "Student wrote '2πr²' instead of 'πr²' for the area formula, leading to an answer twice the correct value." If no errors, say "No errors found - work is correct.")
+- Grade Justification: (REQUIRED - 60-120 words. MUST directly quote the student's written work to justify every point earned or deducted. Format: "EARNED CREDIT FOR: Student wrote '[exact equation/step from paper]' showing [concept understood]. DEDUCTIONS FOR: Student wrote '[exact error quote from paper]' which is incorrect because [reason]. RESULT: Grade of [X] because [specific reasoning tied to quoted evidence]." Every claim must cite exact student writing — never use vague language like "student showed understanding" without quoting their specific work.)
+- What Student Did Correctly: (REQUIRED - 30-60 words. MUST directly quote the student's actual written equations, steps, or reasoning from the scanned paper. Format: "Student correctly wrote '[exact equation/step]' demonstrating [concept]. Student also showed '[another exact quote from their work]'." Example: "Student correctly wrote 'A = πr² = π(5)² = 25π' showing proper area formula application." If nothing correct, say "No correct work identified.")
+- What Student Got Wrong: (REQUIRED - 30-60 words. MUST directly quote the student's actual errors from the scanned paper. Format: "Student wrote '[exact incorrect work]' but should have written '[correct version]'. This shows [specific misconception]." Example: "Student wrote 'A = 2πr² = 2π(5)² = 50π' using circumference formula instead of area formula." If no errors, say "No errors found - work is correct.")
 - Feedback: (constructive suggestions - under 40 words)`) + `\``;
 
     // Build messages for Lovable AI
