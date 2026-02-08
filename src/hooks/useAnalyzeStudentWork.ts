@@ -43,6 +43,8 @@ interface AnalysisResult {
   regentsScoreJustification?: string;
   grade?: number;
   gradeJustification?: string;
+  whatStudentDidCorrectly?: string;
+  whatStudentGotWrong?: string;
   feedback: string;
   gradingSource?: 'ai' | 'teacher-guided';
   noResponse?: boolean;

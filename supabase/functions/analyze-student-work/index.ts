@@ -531,7 +531,9 @@ serve(async (req) => {
             misconceptions: [],
             totalScore: { earned: 0, possible: 4, percentage: 0 },
             grade: blankScore,
-            gradeJustification: blankComment,
+            gradeJustification: `EARNED CREDIT FOR: No student work was submitted. DEDUCTIONS FOR: No response was provided, so no work or final answer could be evaluated. RESULT: Final grade ${blankScore}% assigned per no-response policy.`,
+            whatStudentDidCorrectly: 'No student work was submitted; the page shows only printed content or blank space, so there is no correct work to cite.',
+            whatStudentGotWrong: 'No response was provided. The missing work and missing final answer are the basis for deductions.',
             feedback: 'This page appears to have no student work. If this is incorrect, please re-scan with better lighting or check that the correct page was uploaded.',
             regentsScore: 0,
             regentsScoreJustification: 'No student work present — Score 0',
@@ -1265,9 +1267,13 @@ Provide your analysis in the following structure:
     • 65-69 = Basic/limited understanding shown (DEFAULT if ANY work with understanding)
     • 55 = ONLY if completely blank or NO understanding whatsoever)
 ` + (feedbackVerbosity === 'detailed' ? `
-- Grade Justification: (DETAILED - 150-200 words. Include: 1) Complete breakdown of each error with exact citations from student work, 2) Explanation of WHY each error is mathematically incorrect, 3) What the correct approach should have been step-by-step, 4) How each error affected the final grade. Be thorough and educational.)
+- What Student Did Correctly: (50-100 words. Cite the student's actual work/steps from the page. Use direct evidence from OCR text or zones.)
+- What Student Got Wrong: (50-100 words. Include specific error citations from the student's work AND the corrected approach.)
+- Grade Justification: (DETAILED - 150-200 words. REQUIRED FORMAT: "EARNED CREDIT FOR: ... DEDUCTIONS FOR: ... RESULT: ...". Include: 1) Complete breakdown of each error with exact citations, 2) WHY each error is incorrect, 3) Correct approach step-by-step, 4) How errors affected the final grade.)
 - Feedback: (DETAILED - 100-150 words. Provide comprehensive suggestions for improvement including: specific practice topics, common pitfalls to avoid, study strategies, and encouragement. Be constructive and educational.)` : `
-- Grade Justification: (CONCISE - under 75 words. Format: "DEDUCTIONS: [specific errors]. STRENGTHS: [what was correct]. RESULT: [final reasoning]")
+- What Student Did Correctly: (30-60 words. Cite the student's actual work/steps from the page.)
+- What Student Got Wrong: (30-60 words. Include specific error citations AND the corrected approach.)
+- Grade Justification: (CONCISE - under 90 words. REQUIRED FORMAT: "EARNED CREDIT FOR: ... DEDUCTIONS FOR: ... RESULT: ...")
 - Feedback: (constructive suggestions - under 40 words)`) + `\``;
 
     // Build messages for Lovable AI
@@ -2105,6 +2111,15 @@ function levenshteinDistance(str1: string, str2: string): number {
   return matrix[str2.length][str1.length];
 }
 
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function truncateText(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars - 1).trim()}…`;
+}
+
 interface ParsedResult {
   detectedSubject: string;
   ocrText: string;
@@ -2121,9 +2136,13 @@ interface ParsedResult {
   regentsScoreJustification: string;
   grade: number;
   gradeJustification: string;
+  whatStudentDidCorrectly: string;
+  whatStudentGotWrong: string;
   feedback: string;
   isAnswerCorrect: boolean;
   finalAnswerComplete: boolean;
+  noResponse?: boolean;
+  noResponseReason?: string;
 }
 
 function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: number = 55, gradeFloorWithEffort: number = 65): ParsedResult {
@@ -2143,9 +2162,12 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     regentsScoreJustification: '',
     grade: gradeFloorWithEffort, // Default to effort floor - most scans have SOME work
     gradeJustification: '',
+    whatStudentDidCorrectly: '',
+    whatStudentGotWrong: '',
     feedback: '',
     isAnswerCorrect: false,
     finalAnswerComplete: true, // Default to true, set to false if detected
+    noResponse: false,
   };
 
   // Parse Detected Subject
@@ -2270,6 +2292,14 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   const justificationMatch = text.match(/Grade Justification[:\s]*([^]*?)(?=Feedback|$)/i);
   if (justificationMatch) result.gradeJustification = justificationMatch[1].trim();
 
+  // Parse What Student Did Correctly
+  const didCorrectMatch = text.match(/What Student Did (?:Correctly|Well|Right)[:\s]*([^]*?)(?=What Student Got Wrong|What Student Needs Improvement|Grade Justification|Feedback|$)/i);
+  if (didCorrectMatch) result.whatStudentDidCorrectly = didCorrectMatch[1].trim();
+
+  // Parse What Student Got Wrong / Needs Improvement
+  const gotWrongMatch = text.match(/What Student (?:Got Wrong|Needs Improvement)[:\s]*([^]*?)(?=Grade Justification|Feedback|$)/i);
+  if (gotWrongMatch) result.whatStudentGotWrong = gotWrongMatch[1].trim();
+
   // Parse grade (55-100 scale) based on CONCEPT UNDERSTANDING
   const gradeMatch = text.match(/Grade[:\s]*(\d+)/i);
   const standardsMetMatch = text.match(/Standards Met[:\s]*(YES|NO)/i);
@@ -2391,9 +2421,13 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     console.log('NO STUDENT WORK DETECTED - Enforcing grade floor of 55');
     result.grade = gradeFloor;
     result.regentsScore = 0;
-    if (!result.gradeJustification.includes('no work')) {
-      result.gradeJustification = 'No student work shown on the page. Grade floor applied. ' + result.gradeJustification;
-    }
+    const blankEarned = 'No student work was submitted; there is no correct work to cite.';
+    const blankDeductions = 'No response was provided, so no work or final answer could be evaluated.';
+    result.noResponse = true;
+    result.noResponseReason = 'AI_BLANK_DETECTED';
+    result.whatStudentDidCorrectly = blankEarned;
+    result.whatStudentGotWrong = blankDeductions;
+    result.gradeJustification = `EARNED CREDIT FOR: ${blankEarned} DEDUCTIONS FOR: ${blankDeductions} RESULT: Final grade ${result.grade}% assigned per no-response policy.`;
     // Force misconceptions to reflect the blank page
     if (result.misconceptions.length === 0 || result.misconceptions.some(m => m.toLowerCase().includes('no error'))) {
       result.misconceptions = ['No student work was submitted. Work areas are blank.'];
@@ -2534,6 +2568,72 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
         });
       });
     }
+  }
+
+  const minCorrectWords = 30;
+  const minWrongWords = 30;
+  const minJustificationWords = 40;
+  const ocrSnippet = result.ocrText.trim();
+  const evidenceSnippet = ocrSnippet ? `"${truncateText(ocrSnippet, 140)}"` : '';
+
+  const buildCorrectSummary = () => {
+    if (!result.studentWorkPresent) {
+      return 'No student work was submitted; the page shows only printed content or blank space, so there is no correct work to cite.';
+    }
+    const segments: string[] = [];
+    if (result.conceptsDemonstrated.length > 0) {
+      segments.push(`Concepts demonstrated: ${result.conceptsDemonstrated.slice(0, 3).join(', ')}.`);
+    }
+    if (result.coherentWorkShown) {
+      segments.push('The work shows a coherent approach to the problem setup.');
+    }
+    if (result.isAnswerCorrect) {
+      segments.push('The final answer is marked correct based on the student work.');
+    }
+    if (evidenceSnippet) {
+      segments.push(`Evidence from the page includes: ${evidenceSnippet}.`);
+    }
+    if (segments.length === 0) {
+      segments.push('The student attempted the problem and showed effort in the written work, but details were limited.');
+    }
+    return segments.join(' ');
+  };
+
+  const buildWrongSummary = () => {
+    if (!result.studentWorkPresent) {
+      return 'No response was provided. The missing work and missing final answer are the basis for deductions.';
+    }
+    if (result.misconceptions.length > 0) {
+      const citedErrors = result.misconceptions.slice(0, 2).join(' ');
+      return `Key errors cited from the work: ${citedErrors} Correcting those steps and applying the appropriate method would improve the result.`;
+    }
+    const missingFinal = !result.finalAnswerComplete ? 'The final answer is missing or incomplete.' : '';
+    const incorrectFinal = !result.isAnswerCorrect ? 'The final answer is incorrect.' : '';
+    if (missingFinal || incorrectFinal) {
+      return `${missingFinal} ${incorrectFinal}`.trim() + (evidenceSnippet ? ` Evidence from the page includes: ${evidenceSnippet}.` : '');
+    }
+    return 'No errors were found in the student work; no deductions were necessary beyond rubric constraints.';
+  };
+
+  if (countWords(result.whatStudentDidCorrectly) < minCorrectWords) {
+    result.whatStudentDidCorrectly = buildCorrectSummary();
+  }
+
+  if (countWords(result.whatStudentGotWrong) < minWrongWords) {
+    result.whatStudentGotWrong = buildWrongSummary();
+  }
+
+  const hasRequiredHeadings = /earned credit for:/i.test(result.gradeJustification) &&
+    /deductions for:/i.test(result.gradeJustification) &&
+    /result:/i.test(result.gradeJustification);
+
+  if (countWords(result.gradeJustification) < minJustificationWords || !hasRequiredHeadings) {
+    const earnedCredit = result.whatStudentDidCorrectly || buildCorrectSummary();
+    const deductions = result.whatStudentGotWrong || buildWrongSummary();
+    const scoreContext = result.totalScore.possible > 0
+      ? `${result.totalScore.earned}/${result.totalScore.possible} points`
+      : `Regents score ${result.regentsScore}/4`;
+    result.gradeJustification = `EARNED CREDIT FOR: ${earnedCredit} DEDUCTIONS FOR: ${deductions} RESULT: Final grade ${result.grade}% based on ${scoreContext}.`;
   }
 
   return result;

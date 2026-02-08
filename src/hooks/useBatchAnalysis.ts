@@ -36,6 +36,8 @@ export interface AnalysisResult {
   feedback: string;
   grade?: number;
   gradeJustification?: string;
+  whatStudentDidCorrectly?: string;
+  whatStudentGotWrong?: string;
   nysStandard?: string;
   regentsScore?: number;
   regentsScoreJustification?: string;

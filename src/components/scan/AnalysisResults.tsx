@@ -40,6 +40,8 @@ interface AnalysisResult {
   totalScore: { earned: number; possible: number; percentage: number };
   grade?: number;
   gradeJustification?: string;
+  whatStudentDidCorrectly?: string;
+  whatStudentGotWrong?: string;
   feedback: string;
   nysStandard?: string;
   regentsScore?: number;
@@ -163,6 +165,11 @@ export function AnalysisResults({
   // CRITICAL: Never show 0 - always apply minimum floor
   const grade = overriddenGrade?.grade ?? Math.max(minGrade, flooredAiGrade);
   const gradeJustification = overriddenGrade?.justification ?? result.gradeJustification;
+  const whatStudentDidWell = result.whatStudentDidCorrectly?.trim() || '';
+  const whatStudentNeedsImprovement = result.whatStudentGotWrong?.trim() || '';
+  const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
+  const missingDetailedExplanation = !result.noResponse &&
+    (countWords(whatStudentDidWell) < 30 || countWords(whatStudentNeedsImprovement) < 30);
   const isOverridden = overriddenGrade !== null;
   const gradeBadge = getGradeBadge(grade);
 
@@ -292,6 +299,47 @@ export function AnalysisResults({
         </CardContent>
       </Card>
 
+      {/* Always-visible explanation cards */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="border-green-200 bg-green-50/60 dark:bg-green-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2 text-green-700 dark:text-green-300">
+              <CheckCircle2 className="h-4 w-4" />
+              What the Student Did Well
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-green-900 dark:text-green-100">
+              {whatStudentDidWell || 'Detailed strengths were not provided. Please review the work and add specifics.'}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-amber-200 bg-amber-50/60 dark:bg-amber-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2 text-amber-700 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4" />
+              What Needs Improvement
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-amber-900 dark:text-amber-100">
+              {whatStudentNeedsImprovement || 'Detailed errors were not provided. Please review the work and add citations.'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {missingDetailedExplanation && (
+        <Card className="border-amber-300 bg-amber-50/80 dark:bg-amber-950/30">
+          <CardContent className="p-3 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <p className="text-xs text-amber-800 dark:text-amber-200">
+              A detailed explanation is required before finalizing the grade. Please review and update the notes.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Action Buttons */}
       {(onSaveAnalytics || onAssociateStudent) && (
         <Card className="border-primary/20 bg-primary/5">
@@ -300,7 +348,7 @@ export function AnalysisResults({
               {onSaveAnalytics && (
                 <Button 
                   onClick={onSaveAnalytics}
-                  disabled={isSaving}
+                  disabled={isSaving || missingDetailedExplanation}
                   className="flex-1"
                   variant="hero"
                 >

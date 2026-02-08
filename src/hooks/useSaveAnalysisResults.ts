@@ -25,6 +25,8 @@ interface AnalysisResult {
   totalScore: { earned: number; possible: number; percentage: number };
   grade?: number;
   gradeJustification?: string;
+  whatStudentDidCorrectly?: string;
+  whatStudentGotWrong?: string;
   feedback: string;
   nysStandard?: string;
   regentsScore?: number;
@@ -214,6 +216,17 @@ export function useSaveAnalysisResults() {
 
       if (scoreError) throw scoreError;
 
+      const buildGradeJustification = (gradeValue: number) => {
+        if (params.result.gradeJustification?.trim()) {
+          return params.result.gradeJustification.trim();
+        }
+        const earned = params.result.whatStudentDidCorrectly?.trim()
+          || 'No student work was submitted; there is no correct work to cite.';
+        const deductions = params.result.whatStudentGotWrong?.trim()
+          || 'No response was provided, so no work or final answer could be evaluated.';
+        return `EARNED CREDIT FOR: ${earned} DEDUCTIONS FOR: ${deductions} RESULT: Final grade ${gradeValue}%.`;
+      };
+
       // 4. Save grade history if we have grade info
       // Calculate grade: minimum 55, but only if no standards met
       // If they earned any points, minimum should be 60
@@ -226,6 +239,7 @@ export function useSaveAnalysisResults() {
       
       // Ensure grade is never below 55
       const finalGrade = Math.max(55, Math.min(100, grade));
+      const normalizedJustification = buildGradeJustification(finalGrade);
       
       if (params.topicName) {
         const { data: gradeHistoryData, error: gradeHistoryError } = await supabase
@@ -235,7 +249,7 @@ export function useSaveAnalysisResults() {
             topic_id: params.topicId || null,
             topic_name: params.topicName,
             grade: finalGrade,
-            grade_justification: params.result.gradeJustification || null,
+            grade_justification: normalizedJustification,
             raw_score_earned: params.result.totalScore.earned,
             raw_score_possible: params.result.totalScore.possible,
             attempt_id: attempt.id,

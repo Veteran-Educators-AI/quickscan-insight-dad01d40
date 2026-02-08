@@ -46,6 +46,8 @@ interface AnalysisResult {
   totalScore: { earned: number; possible: number; percentage: number };
   grade?: number;
   gradeJustification?: string;
+  whatStudentDidCorrectly?: string;
+  whatStudentGotWrong?: string;
   feedback: string;
   nysStandard?: string;
   regentsScore?: number;
