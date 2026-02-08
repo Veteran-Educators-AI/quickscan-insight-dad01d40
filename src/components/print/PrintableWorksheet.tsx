@@ -431,6 +431,19 @@ export function PrintableWorksheet({
             <span>Period: _______</span>
           </div>
         </div>
+
+        {/* Worksheet Created Date & Tracking ID */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          padding: '0.25rem 1rem 0',
+          fontSize: '0.65rem',
+          color: '#9ca3af',
+          fontFamily: 'Helvetica, Arial, sans-serif',
+        }}>
+          <span>Worksheet Created: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+          <span>ID: WS-{Date.now().toString(36).toUpperCase().slice(-6)}</span>
+        </div>
       </div>
 
       {/* Student Level Indicator - Only shown for Advanced students or when explicitly allowed */}
