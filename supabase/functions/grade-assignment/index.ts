@@ -30,21 +30,30 @@ interface GradeRequest {
   exam_type?: string;
 }
 
+interface QuestionAnalysis {
+  question_id: string;
+  is_correct: boolean;
+  correct_answer: string;
+  student_answer: string;
+  explanation: string;
+  what_went_right: string;
+  what_went_wrong: string;
+  tip: string;
+}
+
 interface GradeResult {
   score: number;
   total_questions: number;
   percentage: number;
   meets_threshold: boolean;
   feedback: string;
+  detailed_feedback: string;
+  strengths: string[];
+  areas_to_improve: string[];
   incorrect_topics: string[];
   xp_earned: number;
   coins_earned: number;
-  question_results: {
-    question_id: string;
-    is_correct: boolean;
-    correct_answer: string;
-    student_answer: string;
-  }[];
+  question_results: QuestionAnalysis[];
   geoblox_unlocked?: boolean;
 }
 
@@ -95,13 +104,17 @@ function gradeFillBlank(studentAnswer: string, correctAnswers: string[]): boolea
   }
 }
 
-// Use AI to grade short answer questions
+// Use AI to grade short answer questions with detailed analysis
 async function gradeShortAnswer(
   studentAnswer: string,
   correctAnswer: string | string[],
   prompt: string
-): Promise<{ isCorrect: boolean; feedback: string }> {
+): Promise<{ isCorrect: boolean; feedback: string; explanation: string; what_went_right: string; what_went_wrong: string; tip: string }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  
+  const defaultRight = "Student attempted the question.";
+  const defaultWrong = "";
+  const defaultTip = "";
   
   if (!LOVABLE_API_KEY) {
     // Fallback to simple string matching if no AI key
@@ -111,7 +124,16 @@ async function gradeShortAnswer(
       normalizedStudent === ans.toLowerCase().trim() ||
       normalizedStudent.includes(ans.toLowerCase().trim())
     );
-    return { isCorrect, feedback: isCorrect ? "Correct!" : "Not quite right." };
+    return { 
+      isCorrect, 
+      feedback: isCorrect ? "Correct!" : "Not quite right.", 
+      explanation: isCorrect 
+        ? `Your answer "${studentAnswer}" matches the expected answer.` 
+        : `The correct answer is "${Array.isArray(correctAnswer) ? correctAnswer[0] : correctAnswer}". You answered "${studentAnswer}".`,
+      what_went_right: isCorrect ? "You provided the correct answer!" : defaultRight,
+      what_went_wrong: isCorrect ? "" : `Your answer "${studentAnswer}" doesn't match the expected answer "${Array.isArray(correctAnswer) ? correctAnswer[0] : correctAnswer}".`,
+      tip: isCorrect ? "" : "Review the topic and try again. Focus on understanding the key concepts behind the question."
+    };
   }
 
   try {
@@ -126,12 +148,21 @@ async function gradeShortAnswer(
         messages: [
           {
             role: "system",
-            content: `You are a friendly teacher grading student work. Be encouraging but accurate.
-            
-Given a question, the correct answer(s), and a student's answer, determine if the student's answer is correct.
+            content: `You are a friendly, encouraging teacher grading student work. Your goal is to help the student learn from their answer.
+
+Given a question, the correct answer(s), and a student's answer, provide a detailed analysis.
+
 Consider spelling variations, equivalent answers, and partial credit for short answers.
 
-Respond with JSON only: {"isCorrect": boolean, "feedback": "brief encouraging feedback"}`
+Respond with JSON only:
+{
+  "isCorrect": boolean,
+  "feedback": "brief encouraging feedback (1-2 sentences)",
+  "explanation": "detailed explanation of WHY the answer is right or wrong (2-3 sentences). If wrong, explain what the correct answer means and why it's correct.",
+  "what_went_right": "specific things the student did well (even if answer is wrong, credit partial understanding, relevant vocabulary used, etc.)",
+  "what_went_wrong": "specific mistakes or misunderstandings shown in the answer. If correct, leave empty string.",
+  "tip": "one concrete, actionable study tip to help the student improve on this topic. If correct, suggest how to deepen understanding."
+}`
           },
           {
             role: "user",
@@ -139,7 +170,7 @@ Respond with JSON only: {"isCorrect": boolean, "feedback": "brief encouraging fe
 Correct Answer(s): ${JSON.stringify(correctAnswer)}
 Student's Answer: ${studentAnswer}
 
-Is this correct?`
+Provide detailed analysis:`
           }
         ],
         temperature: 0.3,
@@ -159,12 +190,16 @@ Is this correct?`
       const result = JSON.parse(jsonMatch[0]);
       return {
         isCorrect: result.isCorrect === true,
-        feedback: result.feedback || (result.isCorrect ? "Correct!" : "Not quite right.")
+        feedback: result.feedback || (result.isCorrect ? "Correct!" : "Not quite right."),
+        explanation: result.explanation || "",
+        what_went_right: result.what_went_right || defaultRight,
+        what_went_wrong: result.what_went_wrong || defaultWrong,
+        tip: result.tip || defaultTip
       };
     }
     
     // Fallback
-    return { isCorrect: false, feedback: "Unable to grade this answer." };
+    return { isCorrect: false, feedback: "Unable to grade this answer.", explanation: "", what_went_right: defaultRight, what_went_wrong: "", tip: "" };
   } catch (error) {
     console.error("AI grading error:", error);
     // Fallback to simple matching
@@ -173,7 +208,16 @@ Is this correct?`
     const isCorrect = correctAnswers.some(ans => 
       normalizedStudent === ans.toLowerCase().trim()
     );
-    return { isCorrect, feedback: isCorrect ? "Correct!" : "Not quite right." };
+    return { 
+      isCorrect, 
+      feedback: isCorrect ? "Correct!" : "Not quite right.",
+      explanation: isCorrect 
+        ? `Your answer "${studentAnswer}" is correct!` 
+        : `The correct answer is "${Array.isArray(correctAnswer) ? correctAnswer[0] : correctAnswer}".`,
+      what_went_right: isCorrect ? "You provided the correct answer!" : defaultRight,
+      what_went_wrong: isCorrect ? "" : `Your answer doesn't match the expected answer.`,
+      tip: isCorrect ? "" : "Review this topic and try again."
+    };
   }
 }
 
@@ -255,9 +299,11 @@ Deno.serve(async (req) => {
 
     const { student_id, assignment_id, attempt_id, answers, questions, exam_type } = gradeRequest;
     
-    // Grade each question
-    const questionResults: GradeResult["question_results"] = [];
+    // Grade each question with detailed analysis
+    const questionResults: QuestionAnalysis[] = [];
     const incorrectTopics: string[] = [];
+    const strengths: string[] = [];
+    const areasToImprove: string[] = [];
     let correctCount = 0;
 
     for (const question of questions) {
@@ -266,25 +312,50 @@ Deno.serve(async (req) => {
       
       let isCorrect = false;
       let correctAnswerStr = "";
+      let explanation = "";
+      let whatWentRight = "";
+      let whatWentWrong = "";
+      let tip = "";
 
       switch (question.question_type) {
-        case "multiple_choice":
+        case "multiple_choice": {
           // Simple exact match for multiple choice
           const mcCorrect = Array.isArray(question.answer_key) 
             ? question.answer_key[0] 
             : question.answer_key;
           correctAnswerStr = String(mcCorrect);
           isCorrect = studentAnswer === correctAnswerStr;
+          
+          if (isCorrect) {
+            explanation = `Correct! You selected "${studentAnswer}" which is the right answer.`;
+            whatWentRight = `You correctly identified the answer to: "${question.prompt.substring(0, 80)}${question.prompt.length > 80 ? '...' : ''}"`;
+          } else if (!studentAnswer) {
+            explanation = `No answer was selected. The correct answer is "${correctAnswerStr}".`;
+            whatWentWrong = `This question was left blank. Make sure to attempt every question.`;
+            tip = "Even if you're unsure, try to eliminate wrong choices and make your best guess.";
+          } else {
+            explanation = `You selected "${studentAnswer}" but the correct answer is "${correctAnswerStr}".`;
+            whatWentWrong = `The answer "${studentAnswer}" is incorrect for this question.`;
+            tip = question.skill_tag 
+              ? `Review the concept of "${question.skill_tag}" to strengthen your understanding.`
+              : "Review this topic and think about why the correct answer works better.";
+          }
           break;
+        }
 
-        case "short_answer":
-          // Use AI for short answer grading
+        case "short_answer": {
+          // Use AI for short answer grading with detailed analysis
           const gradeResult = await gradeShortAnswer(
             studentAnswer,
             question.answer_key as string | string[],
             question.prompt
           );
           isCorrect = gradeResult.isCorrect;
+          explanation = gradeResult.explanation;
+          whatWentRight = gradeResult.what_went_right;
+          whatWentWrong = gradeResult.what_went_wrong;
+          tip = gradeResult.tip;
+          
           const saAnswerKey = question.answer_key;
           if (Array.isArray(saAnswerKey) && typeof saAnswerKey[0] === 'string') {
             correctAnswerStr = saAnswerKey[0];
@@ -294,38 +365,79 @@ Deno.serve(async (req) => {
             correctAnswerStr = JSON.stringify(saAnswerKey);
           }
           break;
+        }
 
-        case "drag_order":
+        case "drag_order": {
           // Check if order matches
           const orderCorrect = question.answer_key as string[];
           isCorrect = gradeDragOrder(studentAnswer, orderCorrect);
           correctAnswerStr = JSON.stringify(orderCorrect);
+          
+          if (isCorrect) {
+            explanation = "You placed all items in the correct order!";
+            whatWentRight = "You demonstrated understanding of the correct sequence.";
+          } else {
+            explanation = `The items are not in the correct order. The correct order is: ${orderCorrect.join(" → ")}`;
+            whatWentWrong = "The sequence you provided doesn't match the expected order.";
+            tip = "Think about the logical relationship between each step and what must come first.";
+          }
           break;
+        }
 
-        case "matching":
+        case "matching": {
           // Check if all pairs are matched correctly
           const pairs = question.answer_key as { left: string; right: string }[];
           isCorrect = gradeMatching(studentAnswer, pairs);
           correctAnswerStr = JSON.stringify(pairs);
+          
+          if (isCorrect) {
+            explanation = "All pairs are matched correctly!";
+            whatWentRight = "You correctly identified the relationship between all paired items.";
+          } else {
+            const correctPairsStr = pairs.map(p => `${p.left} → ${p.right}`).join(", ");
+            explanation = `Some matches are incorrect. The correct pairings are: ${correctPairsStr}`;
+            whatWentWrong = "One or more of your matches don't align with the correct pairings.";
+            tip = "Focus on the defining characteristics of each item to find the right match.";
+          }
           break;
+        }
 
-        case "fill_blank":
+        case "fill_blank": {
           // Check if all blanks are filled correctly
           const blankAnswers = question.answer_key as string[];
           isCorrect = gradeFillBlank(studentAnswer, blankAnswers);
           correctAnswerStr = JSON.stringify(blankAnswers);
+          
+          if (isCorrect) {
+            explanation = "All blanks are filled in correctly!";
+            whatWentRight = "You correctly completed the sentence with the right terms.";
+          } else {
+            explanation = `The correct answers for the blanks are: ${blankAnswers.join(", ")}`;
+            whatWentWrong = "One or more blanks have incorrect answers.";
+            tip = "Review the key vocabulary and concepts for this topic.";
+          }
           break;
+        }
 
         default:
           console.warn(`Unknown question type: ${question.question_type}`);
           isCorrect = false;
           correctAnswerStr = "Unknown";
+          explanation = "Unable to grade this question type.";
       }
 
       if (isCorrect) {
         correctCount++;
-      } else if (question.skill_tag && !incorrectTopics.includes(question.skill_tag)) {
-        incorrectTopics.push(question.skill_tag);
+        if (whatWentRight) {
+          strengths.push(whatWentRight);
+        }
+      } else {
+        if (question.skill_tag && !incorrectTopics.includes(question.skill_tag)) {
+          incorrectTopics.push(question.skill_tag);
+        }
+        if (whatWentWrong) {
+          areasToImprove.push(whatWentWrong);
+        }
       }
 
       questionResults.push({
@@ -333,6 +445,10 @@ Deno.serve(async (req) => {
         is_correct: isCorrect,
         correct_answer: correctAnswerStr,
         student_answer: studentAnswer,
+        explanation,
+        what_went_right: whatWentRight,
+        what_went_wrong: whatWentWrong,
+        tip,
       });
     }
 
@@ -347,20 +463,45 @@ Deno.serve(async (req) => {
     const xpEarned = meetsThreshold ? baseXp * correctCount : 0;
     const coinsEarned = meetsThreshold ? baseCoin * correctCount : 0;
 
-    // Generate feedback
+    // Generate detailed feedback
     let feedback = "";
+    let detailedFeedback = "";
+    
     if (percentage === 100) {
-      feedback = "Perfect score! You're a superstar! 🌟";
+      feedback = "Perfect score! You demonstrated complete mastery of this material!";
+      detailedFeedback = `Outstanding work! You got all ${totalQuestions} questions correct, showing a thorough understanding of every concept covered. Keep up this excellent level of preparation!`;
     } else if (percentage >= 90) {
-      feedback = "Amazing work! You really know your stuff!";
+      feedback = "Excellent work! You have a strong understanding of this material.";
+      const wrongCount = totalQuestions - correctCount;
+      detailedFeedback = `You answered ${correctCount} out of ${totalQuestions} questions correctly. You demonstrated strong knowledge across most areas. ${wrongCount === 1 ? 'There was just 1 question' : `There were ${wrongCount} questions`} to review${incorrectTopics.length > 0 ? ` in: ${incorrectTopics.join(', ')}` : ''}.`;
     } else if (percentage >= 80) {
-      feedback = "Great job! Keep up the excellent work!";
+      feedback = "Great job! You understand most of the concepts well.";
+      detailedFeedback = `You answered ${correctCount} out of ${totalQuestions} questions correctly (${percentage}%). You showed good understanding of the core material. To improve further, focus on: ${incorrectTopics.length > 0 ? incorrectTopics.join(', ') : 'reviewing the questions you missed'}.`;
     } else if (meetsThreshold) {
-      feedback = "Good effort! You passed!";
+      feedback = "Good effort! You passed, but there's room to grow.";
+      detailedFeedback = `You answered ${correctCount} out of ${totalQuestions} questions correctly (${percentage}%). You demonstrated understanding of the basics but there are several areas that need more practice${incorrectTopics.length > 0 ? `: ${incorrectTopics.join(', ')}` : ''}. Review the explanations for each question you missed.`;
     } else if (percentage >= 50) {
-      feedback = "You're getting there! A little more practice and you'll nail it!";
+      feedback = "You're making progress! Let's keep building your skills.";
+      detailedFeedback = `You answered ${correctCount} out of ${totalQuestions} questions correctly (${percentage}%). You showed some understanding but need more practice in several areas${incorrectTopics.length > 0 ? `: ${incorrectTopics.join(', ')}` : ''}. Go through each question explanation below and try to understand why the correct answer is right.`;
     } else {
-      feedback = "Keep trying! Practice makes perfect!";
+      feedback = "This is a learning opportunity! Review the material and try again.";
+      detailedFeedback = `You answered ${correctCount} out of ${totalQuestions} questions correctly (${percentage}%). Don't be discouraged - this shows which areas need your attention. ${incorrectTopics.length > 0 ? `Focus your study on: ${incorrectTopics.join(', ')}. ` : ''}Review each question's explanation below to build your understanding.`;
+    }
+    
+    // Ensure we always have at least one strength
+    if (strengths.length === 0 && correctCount > 0) {
+      strengths.push(`You correctly answered ${correctCount} out of ${totalQuestions} questions.`);
+    } else if (strengths.length === 0) {
+      strengths.push("You attempted the assignment, which is an important first step.");
+    }
+    
+    // Ensure we have areas to improve if needed
+    if (areasToImprove.length === 0 && correctCount < totalQuestions) {
+      if (incorrectTopics.length > 0) {
+        areasToImprove.push(`Review the following topics: ${incorrectTopics.join(', ')}`);
+      } else {
+        areasToImprove.push("Review the questions you got wrong and study the correct answers.");
+      }
     }
 
     // Track if this is a geometry exam for GeoBlox unlock
@@ -377,6 +518,9 @@ Deno.serve(async (req) => {
       percentage,
       meets_threshold: meetsThreshold,
       feedback,
+      detailed_feedback: detailedFeedback,
+      strengths,
+      areas_to_improve: areasToImprove,
       incorrect_topics: incorrectTopics,
       xp_earned: xpEarned,
       coins_earned: coinsEarned,

@@ -24,7 +24,10 @@ import {
   X,
   Move,
   RefreshCw,
-  Loader2
+  Loader2,
+  ThumbsUp,
+  Target,
+  BookOpen
 } from 'lucide-react';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 import { MisconceptionComparison, extractErrorRegions } from './MisconceptionComparison';
@@ -41,6 +44,8 @@ interface AnalysisResult {
   ocrText: string;
   problemIdentified: string;
   approachAnalysis: string;
+  strengthsAnalysis?: string[];
+  areasForImprovement?: string[];
   rubricScores: RubricScore[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
@@ -381,6 +386,61 @@ export function StudentWorkDetailDialog({
                   </Card>
                 )}
 
+                {/* Detailed Analysis: What Student Did Right */}
+                {result.strengthsAnalysis && result.strengthsAnalysis.length > 0 && (
+                  <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/20">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <ThumbsUp className="h-4 w-4 text-green-600" />
+                        What the Student Did Right
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {result.strengthsAnalysis.map((strength, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mt-0.5 shrink-0" />
+                          <p className="text-xs">{strength}</p>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Detailed Analysis: Areas for Improvement */}
+                {result.areasForImprovement && result.areasForImprovement.length > 0 && (
+                  <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Target className="h-4 w-4 text-orange-600" />
+                        Areas for Improvement
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {result.areasForImprovement.map((area, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <AlertTriangle className="h-3.5 w-3.5 text-orange-500 mt-0.5 shrink-0" />
+                          <p className="text-xs">{area}</p>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Approach Analysis - Now shown prominently */}
+                {result.approachAnalysis && result.approachAnalysis !== 'No student work to analyze' && (
+                  <Card className="border-purple-200 bg-purple-50/50 dark:bg-purple-950/20">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-purple-600" />
+                        Approach Analysis
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-xs">{result.approachAnalysis}</p>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Rubric Breakdown */}
                 {result.rubricScores.length > 0 && (
                   <Card>
@@ -466,12 +526,15 @@ export function StudentWorkDetailDialog({
                     </AccordionContent>
                   </AccordionItem>
 
-                  <AccordionItem value="approach">
-                    <AccordionTrigger className="text-sm">Approach Analysis</AccordionTrigger>
-                    <AccordionContent>
-                      <p className="text-sm text-muted-foreground">{result.approachAnalysis || 'No analysis available'}</p>
-                    </AccordionContent>
-                  </AccordionItem>
+                  {/* Approach Analysis moved to prominent card above - only in accordion if card didn't render */}
+                  {(!result.approachAnalysis || result.approachAnalysis === 'No student work to analyze') && (
+                    <AccordionItem value="approach">
+                      <AccordionTrigger className="text-sm">Approach Analysis</AccordionTrigger>
+                      <AccordionContent>
+                        <p className="text-sm text-muted-foreground">{result.approachAnalysis || 'No analysis available'}</p>
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
 
                   <AccordionItem value="ocr">
                     <AccordionTrigger className="text-sm">Extracted Text (OCR)</AccordionTrigger>

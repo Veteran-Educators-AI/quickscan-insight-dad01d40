@@ -12,6 +12,8 @@ interface AnalysisResult {
   ocrText: string;
   problemIdentified: string;
   approachAnalysis: string;
+  strengthsAnalysis?: string[];
+  areasForImprovement?: string[];
   rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };

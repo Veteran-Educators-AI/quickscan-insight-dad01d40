@@ -280,15 +280,79 @@ async function logAIUsage(
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI MODEL CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// TIER SYSTEM:
+// - LITE: Fast/cheap for simple tasks (OCR, blank detection, identification)
+// - STANDARD: Default for main grading analysis with detailed feedback
+// - PREMIUM: Best quality for handwriting OCR + deep educational analysis (GPT-4o)
+//
+// ANALYSIS PROVIDER (teacher-selectable via Settings):
+// - 'gemini'  → standard tier uses Gemini 2.5 Flash       (~$0.15/1M tokens)
+// - 'gpt4o'   → standard tier uses GPT-4o                 (~$2.50/1M input, $10/1M output)
+// - 'gpt4o-mini' → standard tier uses GPT-4o Mini         (~$0.15/1M input, $0.60/1M output)
+//
+// GPT-4o ADVANTAGES for student work analysis:
+// - Superior handwriting recognition (especially messy/young student writing)
+// - Better at structured educational feedback
+// - More accurate OCR of mathematical notation and diagrams
+// - Higher cost but significantly better analysis quality
+//
+// GPT-4o Mini is a great middle ground:
+// - Much better handwriting OCR than Gemini Flash Lite
+// - Comparable to Gemini Flash for analysis quality
+// - Similar cost to Gemini Flash
+//
+// COST COMPARISON per scan (approximate):
+// - Gemini Flash Lite (helper calls only): ~$0.001
+// - Gemini Flash (main analysis):          ~$0.01-0.02
+// - GPT-4o Mini (main analysis):           ~$0.01-0.03
+// - GPT-4o (main analysis):                ~$0.05-0.15
+// ═══════════════════════════════════════════════════════════════════════════════
+
+type AnalysisProvider = 'gemini' | 'gpt4o' | 'gpt4o-mini';
+
+// Model used for the main grading analysis based on teacher preference
+function getAnalysisModel(provider: AnalysisProvider): string {
+  switch (provider) {
+    case 'gpt4o':
+      return 'openai/gpt-4o';           // Best quality: superior handwriting OCR + analysis
+    case 'gpt4o-mini':
+      return 'openai/gpt-4o-mini';      // Good balance: better OCR than Gemini, similar cost
+    case 'gemini':
+    default:
+      return 'google/gemini-2.5-flash';  // Default: good quality, fast, affordable
+  }
+}
+
+// Lite model for simple helper tasks (always Gemini Flash Lite - cheapest)
+const LITE_MODEL = 'google/gemini-2.5-flash-lite';
+
+type AIModelTier = 'lite' | 'standard';
+
 // Helper function to call Lovable AI Gateway with token logging
 async function callLovableAI(
   messages: any[], 
   apiKey: string, 
   functionName: string = 'analyze-student-work',
   supabase?: any,
-  userId?: string
+  userId?: string,
+  modelTier: AIModelTier = 'lite',
+  analysisProvider: AnalysisProvider = 'gemini'
 ) {
+  const model = modelTier === 'standard' ? getAnalysisModel(analysisProvider) : LITE_MODEL;
+  const isOpenAIModel = model.startsWith('openai/');
+  const maxTokens = modelTier === 'standard' ? 6000 : 4000;
   const startTime = Date.now();
+  
+  console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier} provider=${analysisProvider}`);
+  
+  // OpenAI models use max_completion_tokens instead of max_tokens
+  const tokenParams = isOpenAIModel 
+    ? { max_completion_tokens: maxTokens }
+    : { max_tokens: maxTokens };
   
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -297,9 +361,9 @@ async function callLovableAI(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-pro',
+      model,
       messages,
-      max_tokens: 5000,
+      ...tokenParams,
     }),
   });
 
@@ -321,7 +385,7 @@ async function callLovableAI(
   
   // Log token usage for cost monitoring
   const usage = data.usage || {};
-  console.log(`[TOKEN_USAGE] function=${functionName} model=gemini-2.5-pro prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
+  console.log(`[TOKEN_USAGE] function=${functionName} model=${model} tier=${modelTier} provider=${analysisProvider} prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
   
   // Log to database if supabase client is provided
   if (supabase && userId) {
@@ -559,17 +623,18 @@ serve(async (req) => {
     console.log('Assessment mode:', assessmentMode || 'teacher');
     console.log('Rubric steps provided:', rubricSteps?.length || 0);
 
-    // Fetch teacher settings early (for verbosity, grade floor, and training mode)
+    // Fetch teacher settings early (for verbosity, grade floor, training mode, and AI provider)
     let feedbackVerbosity = 'concise';
     let gradeFloor = customGradeFloor || 55;
     let gradeFloorWithEffort = customGradeFloorWithEffort || 65;
     let aiTrainingMode = 'learning';
+    let analysisProvider: AnalysisProvider = 'gemini';
     
     if (effectiveTeacherId && supabase) {
       try {
         const { data: settingsData } = await supabase
           .from('settings')
-          .select('grade_floor, grade_floor_with_effort, ai_feedback_verbosity, ai_training_mode')
+          .select('grade_floor, grade_floor_with_effort, ai_feedback_verbosity, ai_training_mode, analysis_provider')
           .eq('teacher_id', effectiveTeacherId)
           .maybeSingle();
         
@@ -580,6 +645,11 @@ serve(async (req) => {
           }
           feedbackVerbosity = settingsData.ai_feedback_verbosity ?? 'concise';
           aiTrainingMode = settingsData.ai_training_mode ?? 'learning';
+          // Read teacher's preferred AI provider for analysis
+          const provider = settingsData.analysis_provider;
+          if (provider === 'gpt4o' || provider === 'gpt4o-mini' || provider === 'gemini') {
+            analysisProvider = provider;
+          }
         }
       } catch (settingsError) {
         console.error('Error fetching teacher settings:', settingsError);
@@ -587,6 +657,7 @@ serve(async (req) => {
     }
     console.log('Feedback verbosity:', feedbackVerbosity);
     console.log('AI training mode:', aiTrainingMode);
+    console.log('Analysis provider:', analysisProvider);
 
     // Fetch grading corrections for AI training (if training mode is enabled or useLearnedStyle is true)
     let gradingStyleContext = '';
@@ -1234,6 +1305,38 @@ Provide your analysis in the following structure:
     No work = no understanding demonstrated = Score 0)
 - Regents Score Justification: (why this score - cite evidence)
 - Rubric Scores: (if teacher rubric provided, score each criterion with points)
+- Strengths Analysis: (DETAILED - List SPECIFIC things the student is doing RIGHT. For each strength, cite the evidence from their work.
+    FORMAT each strength as a complete sentence:
+    "STRENGTH: [What the student did correctly]. EVIDENCE: [Exact quote or reference from their work showing this]."
+    
+    Examples of good strengths:
+    ✓ "STRENGTH: Student correctly identified the formula for area of a circle (A = πr²). EVIDENCE: Student wrote 'A = π(5)²' showing correct formula application."
+    ✓ "STRENGTH: Student set up the problem correctly by identifying all given information. EVIDENCE: Student listed 'r = 10, h = 5' at the top of their work."
+    ✓ "STRENGTH: Student showed clear step-by-step work with logical progression. EVIDENCE: Work flows from equation setup through substitution to simplification."
+    
+    RULES:
+    - List AT LEAST 2 strengths if ANY work is present (even partial work has something positive)
+    - Be SPECIFIC - don't just say "good effort", explain WHAT was good
+    - If the answer is correct, that should be the FIRST strength listed
+    - Credit correct formulas, proper notation, logical reasoning, good organization, correct intermediate steps
+    - If work is minimal, still find positives: "attempted the problem", "identified the correct operation", etc.
+    - If page is blank, write "No student work present to evaluate.")
+- Areas for Improvement: (DETAILED - List SPECIFIC things the student needs to work on. For each area, explain WHY it's wrong and HOW to fix it.
+    FORMAT each area as a complete, educational explanation:
+    "AREA: [What the student got wrong or needs to improve]. WHY: [Explanation of why this is incorrect or incomplete]. FIX: [Clear explanation of the correct approach or what to do differently]."
+    
+    Examples of good improvement areas:
+    ✓ "AREA: Student used the wrong formula for circumference (used A = πr² instead of C = 2πr). WHY: Area and circumference are different measurements - area measures the space inside the circle while circumference measures the distance around it. FIX: For circumference, use C = 2πr or C = πd."
+    ✓ "AREA: Student made an arithmetic error in the final calculation (wrote 3 × 8 = 21). WHY: This multiplication error carried through to the final answer, making it incorrect. FIX: 3 × 8 = 24. Double-check multiplication by using repeated addition: 8 + 8 + 8 = 24."
+    ✓ "AREA: Student did not show work for the intermediate steps. WHY: Without shown work, partial credit cannot be awarded if the answer is wrong, and the teacher cannot identify where understanding breaks down. FIX: Write out each step of the calculation, even if it seems obvious."
+    
+    RULES:
+    - For EACH error, explain WHY it's wrong and provide the CORRECT approach (the FIX)
+    - Be EDUCATIONAL - the goal is to help the student learn, not just identify mistakes
+    - Include the correct method/formula/approach so the student can learn from this
+    - If the answer is correct but work is minimal, suggest showing more work for full credit
+    - If the student's work is completely correct, write "No areas for improvement identified - excellent work!"
+    - If page is blank, write "Student needs to attempt the problem. Start by identifying what the question is asking and what information is given.")
 - Misconceptions: (CRITICAL - ONLY list VERIFIED ERRORS that you can directly quote from the student's work.
     
     *** ANTI-HALLUCINATION RULES FOR ERROR REPORTING ***
@@ -1304,14 +1407,8 @@ Provide your analysis in the following structure:
 - What Student Did Correctly: (REQUIRED - 50-100 words. MUST directly quote the student's actual written equations, steps, or reasoning. Format: "Student correctly wrote '[exact equation/step from their paper]' which shows [concept]. They also demonstrated [skill] by writing '[another exact quote]'." If nothing is correct, say "No correct work identified.")
 - What Student Got Wrong: (REQUIRED - 50-100 words. MUST directly quote the student's actual errors. Format: "Student wrote '[exact incorrect equation/step]' but the correct approach is [correct method]. This error in their work '[quote]' shows [misconception]." Explain WHY each quoted error is wrong. If no errors, say "No errors found - work is correct.")
 - Feedback: (DETAILED - 100-150 words. Provide comprehensive suggestions for improvement including: specific practice topics, common pitfalls to avoid, study strategies, and encouragement. Be constructive and educational.)` : `
-- Grade Justification: (REQUIRED - 60-120 words. MUST directly quote the student's written work to justify every point earned or deducted. Structure:
-    EARNED: "Student wrote: '[exact quote from paper]' — demonstrates [concept]."
-    DEDUCTED: "Student wrote: '[exact error quote]' — incorrect because [reason]."
-    RESULT: "Grade of [X] because [specific reasoning with point breakdown]."
-    Every claim must cite exact student writing — never use vague language like "student showed understanding" without quoting their specific work.)
-- What Student Did Correctly: (REQUIRED - 30-60 words. MUST directly quote the student's actual written equations, steps, or reasoning from the scanned paper. Format: "Student correctly wrote '[exact equation/step]' demonstrating [concept]. Student also showed '[another exact quote from their work]'." Example: "Student correctly wrote 'A = πr² = π(5)² = 25π' showing proper area formula application." If nothing correct, say "No correct work identified.")
-- What Student Got Wrong: (REQUIRED - 30-60 words. MUST directly quote the student's actual errors from the scanned paper. Format: "Student wrote '[exact incorrect work]' but should have written '[correct version]'. This shows [specific misconception]." Example: "Student wrote 'A = 2πr² = 2π(5)² = 50π' using circumference formula instead of area formula." If no errors, say "No errors found - work is correct.")
-- Feedback: (constructive suggestions - under 40 words)`) + `\``;
+- Grade Justification: (75-120 words. Format: "STRENGTHS: [what was correct and why it shows understanding]. DEDUCTIONS: [specific errors with brief explanation]. RESULT: [final reasoning for grade]")
+- Feedback: (60-100 words. Include: 1) One specific thing the student did well, 2) One specific area to practice, 3) A concrete next step for improvement. Be constructive and encouraging.)`) + `\``;
 
     // Build messages for Lovable AI
     // If additionalImages provided, include all pages as a multi-page paper
@@ -1342,7 +1439,22 @@ Provide your analysis in the following structure:
       }
     ];
 
-    const analysisText = await callLovableAI(messages, LOVABLE_API_KEY);
+    // Use the STANDARD tier model for main grading - provides much better
+    // detailed analysis (strengths, areas for improvement, educational feedback)
+    // compared to the lite model used for simpler tasks like OCR/blank detection.
+    // The teacher's analysisProvider setting controls which model is used:
+    // - 'gemini' → Gemini 2.5 Flash (default, fast, affordable)
+    // - 'gpt4o'  → GPT-4o (best handwriting OCR + analysis quality, higher cost)
+    // - 'gpt4o-mini' → GPT-4o Mini (better OCR than Gemini, similar cost)
+    const analysisText = await callLovableAI(
+      messages, 
+      LOVABLE_API_KEY, 
+      'analyze-student-work', 
+      supabase, 
+      effectiveTeacherId, 
+      'standard',
+      analysisProvider
+    );
 
     if (!analysisText) {
       throw new Error('No analysis returned from AI');
@@ -1495,7 +1607,7 @@ Provide your analysis in this exact JSON format:
     }
   ];
 
-  const content = await callLovableAI(messages, apiKey);
+  const content = await callLovableAI(messages, apiKey, 'compare-with-solution', undefined, undefined, 'standard');
   
   console.log('Comparison raw response:', content);
 
@@ -2157,8 +2269,8 @@ interface ParsedResult {
   studentWorkPresent: boolean; // NEW: Explicit blank page detection
   coherentWorkShown: boolean;
   approachAnalysis: string;
-  whatStudentDidCorrectly: string;
-  whatStudentGotWrong: string;
+  strengthsAnalysis: string[]; // Detailed list of what student did right
+  areasForImprovement: string[]; // Detailed list of what student needs to work on
   rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
@@ -2181,8 +2293,8 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     studentWorkPresent: true, // Default to true, set to false if detected as blank
     coherentWorkShown: false,
     approachAnalysis: '',
-    whatStudentDidCorrectly: '',
-    whatStudentGotWrong: '',
+    strengthsAnalysis: [],
+    areasForImprovement: [],
     rubricScores: [],
     misconceptions: [],
     totalScore: { earned: 0, possible: 0, percentage: 0 },
@@ -2262,16 +2374,38 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   const finalAnswerCompleteMatch = text.match(/Final Answer Complete[:\s]*(YES|NO)/i);
   result.finalAnswerComplete = finalAnswerCompleteMatch ? finalAnswerCompleteMatch[1].toUpperCase() === 'YES' : true;
 
-  const approachMatch = text.match(/Approach Analysis[:\s]*([^]*?)(?=Is Correct|Final Answer Complete|Regents Score|Rubric Scores|Misconceptions|What Student Did Correctly|$)/i);
+  const approachMatch = text.match(/Approach Analysis[:\s]*([^]*?)(?=Is Correct|Final Answer Complete|Strengths Analysis|Regents Score|Rubric Scores|Misconceptions|$)/i);
   if (approachMatch) result.approachAnalysis = approachMatch[1].trim();
 
-  // Parse What Student Did Correctly
-  const correctlyMatch = text.match(/What Student Did Correctly[:\s]*([^]*?)(?=What Student Got Wrong|Misconceptions|Feedback|Grade Justification|$)/i);
-  if (correctlyMatch) result.whatStudentDidCorrectly = correctlyMatch[1].trim();
+  // Parse Strengths Analysis - what student did right
+  const strengthsMatch = text.match(/Strengths Analysis[:\s]*([^]*?)(?=Areas for Improvement|Misconceptions|Total Score|Regents Score|$)/i);
+  if (strengthsMatch) {
+    const strengthsText = strengthsMatch[1].trim();
+    result.strengthsAnalysis = strengthsText
+      .split(/\n/)
+      .map(s => s.replace(/^[-•*✓]\s*/, '').trim())
+      .filter(s => {
+        // Filter out empty/placeholder entries
+        const isLongEnough = s.length >= 15;
+        const isNotNone = !s.match(/^(none|n\/a|no strengths?|no student work)$/i);
+        return isLongEnough && isNotNone;
+      });
+  }
 
-  // Parse What Student Got Wrong
-  const wrongMatch = text.match(/What Student Got Wrong[:\s]*([^]*?)(?=Feedback|Grade Justification|$)/i);
-  if (wrongMatch) result.whatStudentGotWrong = wrongMatch[1].trim();
+  // Parse Areas for Improvement - what student needs to work on
+  const areasMatch = text.match(/Areas for Improvement[:\s]*([^]*?)(?=Misconceptions|Total Score|Needs Teacher|Standards Met|Regents Score|$)/i);
+  if (areasMatch) {
+    const areasText = areasMatch[1].trim();
+    result.areasForImprovement = areasText
+      .split(/\n/)
+      .map(a => a.replace(/^[-•*]\s*/, '').trim())
+      .filter(a => {
+        // Filter out empty/placeholder entries
+        const isLongEnough = a.length >= 15;
+        const isNotNone = !a.match(/^(none|n\/a|no areas?|no improvement|excellent work)$/i);
+        return isLongEnough && isNotNone;
+      });
+  }
 
   // Parse Regents Score (0-4)
   const regentsScoreMatch = text.match(/Regents Score[:\s]*(\d)/i);
@@ -2282,7 +2416,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   const regentsJustificationMatch = text.match(/Regents Score Justification[:\s]*([^]*?)(?=Rubric Scores|Misconceptions|$)/i);
   if (regentsJustificationMatch) result.regentsScoreJustification = regentsJustificationMatch[1].trim();
 
-  const misconceptionsMatch = text.match(/Misconceptions[:\s]*([^]*?)(?=Total Score|Needs Teacher|Standards Met|Feedback|$)/i);
+  const misconceptionsMatch = text.match(/Misconceptions[:\s]*([^]*?)(?=Needs Teacher|Total Score|Standards Met|Grade Justification|Feedback|$)/i);
   if (misconceptionsMatch) {
     const misconceptionsText = misconceptionsMatch[1].trim();
     // Split on newlines but preserve complete sentences

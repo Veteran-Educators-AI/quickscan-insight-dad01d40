@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, XCircle, AlertTriangle, Lightbulb, Save, UserPlus, Loader2, FileX } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, Lightbulb, Save, UserPlus, Loader2, FileX, ThumbsUp, Target, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,8 +35,8 @@ interface AnalysisResult {
   ocrText: string;
   problemIdentified: string;
   approachAnalysis: string;
-  whatStudentDidCorrectly?: string;
-  whatStudentGotWrong?: string;
+  strengthsAnalysis?: string[];
+  areasForImprovement?: string[];
   rubricScores: RubricScore[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
@@ -370,6 +370,61 @@ export function AnalysisResults({
         </Card>
       )}
 
+      {/* Detailed Analysis: What Student Did Right */}
+      {result.strengthsAnalysis && result.strengthsAnalysis.length > 0 && (
+        <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ThumbsUp className="h-4 w-4 text-green-600" />
+              What the Student Did Right
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {result.strengthsAnalysis.map((strength, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                <p className="text-sm">{strength}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Detailed Analysis: Areas for Improvement */}
+      {result.areasForImprovement && result.areasForImprovement.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Target className="h-4 w-4 text-orange-600" />
+              Areas for Improvement
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {result.areasForImprovement.map((area, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
+                <p className="text-sm">{area}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Approach Analysis - Now visible by default (not hidden in accordion) */}
+      {result.approachAnalysis && result.approachAnalysis !== 'No student work to analyze' && (
+        <Card className="border-purple-200 bg-purple-50/50 dark:bg-purple-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-purple-600" />
+              Approach Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm">{result.approachAnalysis}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Teacher Verification Panel - Shows flagged interpretations */}
       {rawAnalysis && (
         <TeacherVerificationPanel
@@ -509,6 +564,16 @@ export function AnalysisResults({
             <p className="text-sm">{result.problemIdentified || 'Not identified'}</p>
           </AccordionContent>
         </AccordionItem>
+
+        {/* Approach Analysis moved to prominent card above - only show in accordion if card didn't render */}
+        {(!result.approachAnalysis || result.approachAnalysis === 'No student work to analyze') && (
+          <AccordionItem value="approach">
+            <AccordionTrigger className="text-sm">Approach Analysis</AccordionTrigger>
+            <AccordionContent>
+              <p className="text-sm">{result.approachAnalysis || 'No analysis available'}</p>
+            </AccordionContent>
+          </AccordionItem>
+        )}
 
         {rawAnalysis && (
           <AccordionItem value="raw">

@@ -39,6 +39,8 @@ interface AnalysisResult {
   extractedText?: string;
   problemIdentification?: string;
   approachAnalysis?: string;
+  strengthsAnalysis?: string[];
+  areasForImprovement?: string[];
   rubricScores?: RubricScore[];
   totalScore?: {
     earned: number;
