@@ -1724,17 +1724,19 @@ Respond in this exact JSON format (no markdown, just raw JSON):
               questionId: qrData.q,
               version: 1,
             };
-            matchedId = qrData.s;
             matchedQuestionId = qrData.q;
             
+            // Only set matchedId if student exists in roster
             if (studentRoster && studentRoster.length > 0) {
               const student = studentRoster.find(s => s.id === qrData.s);
               if (student) {
+                matchedId = qrData.s;
                 matchedName = `${student.first_name} ${student.last_name}`;
+                console.log('Parsed v1 QR code matched to roster:', matchedName);
+              } else {
+                console.log('v1 QR code student ID not in roster, will fall back to name matching:', qrData.s);
               }
             }
-            
-            console.log('Parsed v1 QR code (student+question):', parsedQRCode);
           }
           // Version 2: Student-only QR code
           else if (qrData.v === 2 && qrData.type === 'student' && qrData.s) {
@@ -1742,16 +1744,17 @@ Respond in this exact JSON format (no markdown, just raw JSON):
               studentId: qrData.s,
               version: 2,
             };
-            matchedId = qrData.s;
             
             if (studentRoster && studentRoster.length > 0) {
               const student = studentRoster.find(s => s.id === qrData.s);
               if (student) {
+                matchedId = qrData.s;
                 matchedName = `${student.first_name} ${student.last_name}`;
+                console.log('Parsed v2 QR code matched to roster:', matchedName);
+              } else {
+                console.log('v2 QR code student ID not in roster, will fall back to name matching:', qrData.s);
               }
             }
-            
-            console.log('Parsed v2 QR code (student-only):', parsedQRCode);
           }
           // Version 3: Student + Page QR code (for multi-page worksheets)
           else if (qrData.v === 3 && qrData.type === 'student-page' && qrData.s) {
@@ -1761,16 +1764,17 @@ Respond in this exact JSON format (no markdown, just raw JSON):
               pageNumber: qrData.p,
               totalPages: qrData.t,
             };
-            matchedId = qrData.s;
             
             if (studentRoster && studentRoster.length > 0) {
               const student = studentRoster.find(s => s.id === qrData.s);
               if (student) {
+                matchedId = qrData.s;
                 matchedName = `${student.first_name} ${student.last_name}`;
+                console.log('Parsed v3 QR code matched to roster:', matchedName);
+              } else {
+                console.log('v3 QR code student ID not in roster, will fall back to name matching:', qrData.s);
               }
             }
-            
-            console.log('Parsed v3 QR code (student+page):', parsedQRCode);
           }
           // Fallback: Try to extract student ID from any "s" field
           else if (qrData.s) {
@@ -1779,20 +1783,34 @@ Respond in this exact JSON format (no markdown, just raw JSON):
               questionId: qrData.q,
               version: qrData.v || 0,
             };
-            matchedId = qrData.s;
             if (qrData.q) matchedQuestionId = qrData.q;
             
             if (studentRoster && studentRoster.length > 0) {
               const student = studentRoster.find(s => s.id === qrData.s);
               if (student) {
+                matchedId = qrData.s;
                 matchedName = `${student.first_name} ${student.last_name}`;
+                console.log('Parsed generic QR code matched to roster:', matchedName);
+              } else {
+                console.log('Generic QR code student ID not in roster, will fall back to name matching:', qrData.s);
               }
             }
-            
-            console.log('Parsed generic QR code with student ID:', parsedQRCode);
+          } else {
+            console.log('QR code parsed but no student ID ("s" field) found:', qrData);
           }
         } catch (qrParseError) {
-          console.log('QR content is not structured JSON, using raw content:', parsed.qr_code_content);
+          console.log('QR content is not valid JSON (likely AI hallucination), ignoring:', parsed.qr_code_content);
+        }
+      }
+      
+      // CRITICAL FIX: If AI reported a matched_student_id, verify it exists in roster
+      // AI vision models often hallucinate UUIDs that look plausible but don't match anyone
+      if (matchedId && studentRoster && studentRoster.length > 0) {
+        const verifiedStudent = studentRoster.find(s => s.id === matchedId);
+        if (!verifiedStudent) {
+          console.log('AI-reported matched_student_id not found in roster, clearing:', matchedId);
+          matchedId = null;
+          matchedName = null;
         }
       }
       
@@ -1809,10 +1827,37 @@ Respond in this exact JSON format (no markdown, just raw JSON):
       
       // Fall back to handwritten name
       if (!matchedId && parsed.handwritten_name && studentRoster && studentRoster.length > 0) {
+        console.log('Trying to match handwritten name:', parsed.handwritten_name);
         const match = fuzzyMatchStudent(parsed.handwritten_name, studentRoster);
         if (match) {
           matchedId = match.id;
           matchedName = `${match.first_name} ${match.last_name}`;
+          console.log('Matched handwritten name to student:', matchedName);
+        }
+      }
+      
+      // Also try student_id_found field if present (numeric student IDs)
+      if (!matchedId && parsed.student_id_found && studentRoster && studentRoster.length > 0) {
+        console.log('Trying to match student_id_found:', parsed.student_id_found);
+        const match = studentRoster.find(s => s.student_id === parsed.student_id_found);
+        if (match) {
+          matchedId = match.id;
+          matchedName = `${match.first_name} ${match.last_name}`;
+          console.log('Matched student ID number to student:', matchedName);
+        }
+      }
+      
+      // Determine confidence based on how we matched
+      let finalConfidence: 'high' | 'medium' | 'low' | 'none' = 'none';
+      if (matchedId) {
+        if (parsedQRCode && studentRoster?.find(s => s.id === parsedQRCode!.studentId)) {
+          finalConfidence = 'high'; // QR code matched to roster
+        } else if (parsed.printed_name) {
+          finalConfidence = 'high'; // Printed name is reliable
+        } else if (parsed.handwritten_name) {
+          finalConfidence = parsed.confidence === 'high' ? 'medium' : (parsed.confidence || 'low');
+        } else {
+          finalConfidence = parsed.confidence || 'medium';
         }
       }
       
@@ -1820,11 +1865,11 @@ Respond in this exact JSON format (no markdown, just raw JSON):
         qrCodeDetected: parsed.qr_code_detected || false,
         qrCodeContent: parsed.qr_code_content || null,
         parsedQRCode,
-        handwrittenName: parsed.handwritten_name || null,
+        handwrittenName: parsed.handwritten_name || parsed.printed_name || null,
         matchedStudentId: matchedId || null,
         matchedStudentName: matchedName || null,
         matchedQuestionId,
-        confidence: parsedQRCode ? 'high' : (parsed.confidence || 'none'),
+        confidence: finalConfidence,
         rawExtraction: content,
       };
     }
@@ -1890,13 +1935,16 @@ function fuzzyMatchStudent(name: string, roster: StudentRosterItem[]): StudentRo
     const firstName = student.first_name.toLowerCase();
     const lastName = student.last_name.toLowerCase();
     
-    if (cleanedInput.includes(firstName) && cleanedInput.includes(lastName)) {
+    // Both first and last name must appear in the input
+    if (firstName.length >= 2 && lastName.length >= 2 &&
+        cleanedInput.includes(firstName) && cleanedInput.includes(lastName)) {
       console.log('Containment match:', student);
       return student;
     }
     
-    // Check if input ends with last name (common pattern: "John S" for "John Smith")
-    if (cleanedInput.endsWith(lastName) || cleanedInput.startsWith(lastName)) {
+    // Check if input ends/starts with last name (common pattern: "John S" for "John Smith")
+    // Only match if the last name is long enough to be meaningful (>= 3 chars)
+    if (lastName.length >= 3 && (cleanedInput.endsWith(lastName) || cleanedInput.startsWith(lastName))) {
       console.log('Ends/starts with last name match:', student);
       return student;
     }

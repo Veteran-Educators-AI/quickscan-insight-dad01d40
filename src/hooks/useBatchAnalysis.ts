@@ -861,84 +861,122 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   // Local QR code scanning function - supports student-only, student+question, and student+page QR codes
   const scanQRCodeFromImage = async (imageDataUrl: string): Promise<{ studentId: string; questionId?: string; pageNumber?: number; totalPages?: number; type: 'student-only' | 'student-question' | 'student-page' } | null> => {
     return new Promise((resolve) => {
+      // Add timeout to prevent hanging on large/broken images
+      const timeoutId = setTimeout(() => {
+        console.warn('[scanQRCodeFromImage] Timed out after 10s');
+        resolve(null);
+      }, 10000);
+
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        
-        if (!ctx) {
-          resolve(null);
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0);
-        
-        // Calculate region sizes based on image dimensions
-        // QR codes are 70-80px with borders, so look for appropriately sized regions
-        const cornerSize = Math.max(200, Math.min(500, Math.floor(img.width / 2.5)));
-        const edgeWidth = Math.max(150, Math.min(400, Math.floor(img.width / 3)));
-        
-        // Try scanning different regions - TOP-RIGHT FIRST (where student QR is placed)
-        // Order matters: most common locations first for performance
-        const regions = [
-          // TOP-RIGHT CORNER (PRIMARY - this is where StudentOnlyQRCode is placed on worksheets)
-          { x: Math.max(0, img.width - cornerSize), y: 0, w: cornerSize, h: cornerSize },
-          // Top edge full width (header area - catches QR even if slightly off)
-          { x: 0, y: 0, w: img.width, h: Math.min(400, img.height / 3) },
-          // Top-left corner (for question QRs)
-          { x: 0, y: 0, w: cornerSize, h: cornerSize },
-          // Right edge full height (catches QR if page slightly rotated)
-          { x: Math.max(0, img.width - edgeWidth), y: 0, w: edgeWidth, h: img.height },
-          // Upper half of image (most QRs are in top portion)
-          { x: 0, y: 0, w: img.width, h: Math.floor(img.height / 2) },
-          // Bottom corners (legacy support)
-          { x: Math.max(0, img.width - cornerSize), y: Math.max(0, img.height - cornerSize), w: cornerSize, h: cornerSize },
-          { x: 0, y: Math.max(0, img.height - cornerSize), w: cornerSize, h: cornerSize },
-          // Full image (final fallback)
-          { x: 0, y: 0, w: img.width, h: img.height },
-        ];
-
-        for (const region of regions) {
-          try {
-            const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
-            // Use inversionAttempts for better detection in varied lighting conditions
-            const code = jsQR(imageData.data, region.w, region.h, {
-              inversionAttempts: 'attemptBoth',
-            });
-            
-            if (code) {
-              // Try unified parser first (handles v1, v2, and v3 with page numbers)
-              const fullUnified = parseUnifiedStudentQRCode(code.data);
-              if (fullUnified) {
-                resolve(fullUnified);
-                return;
-              }
-              
-              // Fallback to v2 parser
-              const unified = parseAnyStudentQRCode(code.data);
-              if (unified) {
-                resolve(unified);
-                return;
-              }
-              
-              // Fallback to legacy v1 parser
-              const parsed = parseStudentQRCode(code.data);
-              if (parsed) {
-                resolve({ ...parsed, type: 'student-question' as const });
-                return;
-              }
-            }
-          } catch (e) {
-            // Continue to next region
+        clearTimeout(timeoutId);
+        try {
+          const canvas = document.createElement('canvas');
+          
+          // Limit canvas size for very large images to prevent memory issues
+          const maxDim = 3000;
+          let drawWidth = img.width;
+          let drawHeight = img.height;
+          if (drawWidth > maxDim || drawHeight > maxDim) {
+            const scale = maxDim / Math.max(drawWidth, drawHeight);
+            drawWidth = Math.floor(drawWidth * scale);
+            drawHeight = Math.floor(drawHeight * scale);
+            console.log(`[scanQRCodeFromImage] Scaling image from ${img.width}x${img.height} to ${drawWidth}x${drawHeight}`);
           }
-        }
+          
+          canvas.width = drawWidth;
+          canvas.height = drawHeight;
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            console.warn('[scanQRCodeFromImage] Failed to get canvas context');
+            resolve(null);
+            return;
+          }
 
-        resolve(null);
+          ctx.drawImage(img, 0, 0, drawWidth, drawHeight);
+          
+          // Calculate region sizes based on image dimensions
+          const cornerSize = Math.max(200, Math.min(500, Math.floor(drawWidth / 2.5)));
+          const edgeWidth = Math.max(150, Math.min(400, Math.floor(drawWidth / 3)));
+          
+          // Try scanning different regions - TOP-RIGHT FIRST (where student QR is placed)
+          const regions = [
+            // TOP-RIGHT CORNER (PRIMARY - StudentOnlyQRCode placement)
+            { x: Math.max(0, drawWidth - cornerSize), y: 0, w: cornerSize, h: cornerSize },
+            // Top edge full width (header area)
+            { x: 0, y: 0, w: drawWidth, h: Math.min(400, Math.floor(drawHeight / 3)) },
+            // Top-left corner (for question QRs)
+            { x: 0, y: 0, w: cornerSize, h: cornerSize },
+            // Right edge full height
+            { x: Math.max(0, drawWidth - edgeWidth), y: 0, w: edgeWidth, h: drawHeight },
+            // Upper half of image
+            { x: 0, y: 0, w: drawWidth, h: Math.floor(drawHeight / 2) },
+            // Bottom corners (legacy support)
+            { x: Math.max(0, drawWidth - cornerSize), y: Math.max(0, drawHeight - cornerSize), w: cornerSize, h: cornerSize },
+            { x: 0, y: Math.max(0, drawHeight - cornerSize), w: cornerSize, h: cornerSize },
+            // Full image (final fallback)
+            { x: 0, y: 0, w: drawWidth, h: drawHeight },
+          ];
+
+          for (const region of regions) {
+            try {
+              // Ensure region dimensions are valid (> 0)
+              if (region.w <= 0 || region.h <= 0) continue;
+              
+              const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
+              const code = jsQR(imageData.data, region.w, region.h, {
+                inversionAttempts: 'attemptBoth',
+              });
+              
+              if (code && code.data) {
+                console.log(`[scanQRCodeFromImage] QR code found in region (${region.x},${region.y},${region.w},${region.h}): ${code.data.substring(0, 80)}`);
+                
+                // Try unified parser first (handles v1, v2, and v3 with page numbers)
+                const fullUnified = parseUnifiedStudentQRCode(code.data);
+                if (fullUnified) {
+                  console.log('[scanQRCodeFromImage] Parsed as unified:', fullUnified.type);
+                  resolve(fullUnified);
+                  return;
+                }
+                
+                // Fallback to v2 parser
+                const unified = parseAnyStudentQRCode(code.data);
+                if (unified) {
+                  console.log('[scanQRCodeFromImage] Parsed as v2:', unified.type);
+                  resolve(unified);
+                  return;
+                }
+                
+                // Fallback to legacy v1 parser
+                const parsed = parseStudentQRCode(code.data);
+                if (parsed) {
+                  console.log('[scanQRCodeFromImage] Parsed as v1 student-question');
+                  resolve({ ...parsed, type: 'student-question' as const });
+                  return;
+                }
+                
+                // QR found but not a student QR - log for debugging
+                console.log('[scanQRCodeFromImage] QR found but not a student QR code:', code.data.substring(0, 100));
+              }
+            } catch (e) {
+              // Continue to next region
+            }
+          }
+
+          console.log('[scanQRCodeFromImage] No student QR code found in any region');
+          resolve(null);
+        } catch (err) {
+          console.error('[scanQRCodeFromImage] Error processing image:', err);
+          resolve(null);
+        }
       };
 
-      img.onerror = () => resolve(null);
+      img.onerror = (err) => {
+        clearTimeout(timeoutId);
+        console.error('[scanQRCodeFromImage] Image failed to load:', err);
+        resolve(null);
+      };
       img.src = imageDataUrl;
     });
   };
