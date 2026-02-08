@@ -297,7 +297,7 @@ async function callLovableAI(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
+      model: 'google/gemini-2.5-pro',
       messages,
       max_tokens: 5000,
     }),
@@ -321,7 +321,7 @@ async function callLovableAI(
   
   // Log token usage for cost monitoring
   const usage = data.usage || {};
-  console.log(`[TOKEN_USAGE] function=${functionName} model=gemini-2.5-flash prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
+  console.log(`[TOKEN_USAGE] function=${functionName} model=gemini-2.5-pro prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
   
   // Log to database if supabase client is provided
   if (supabase && userId) {
