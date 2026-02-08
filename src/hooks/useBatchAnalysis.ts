@@ -30,6 +30,8 @@ export interface AnalysisResult {
   ocrText: string;
   problemIdentified: string;
   approachAnalysis: string;
+  strengthsAnalysis?: string[];
+  areasForImprovement?: string[];
   rubricScores: RubricScore[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };

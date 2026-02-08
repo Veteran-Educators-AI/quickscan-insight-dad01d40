@@ -299,7 +299,7 @@ async function callLovableAI(
     body: JSON.stringify({
       model: 'google/gemini-2.5-flash-lite',
       messages,
-      max_tokens: 4000,
+      max_tokens: 6000,
     }),
   });
 
@@ -1214,6 +1214,38 @@ Provide your analysis in the following structure:
     No work = no understanding demonstrated = Score 0)
 - Regents Score Justification: (why this score - cite evidence)
 - Rubric Scores: (if teacher rubric provided, score each criterion with points)
+- Strengths Analysis: (DETAILED - List SPECIFIC things the student is doing RIGHT. For each strength, cite the evidence from their work.
+    FORMAT each strength as a complete sentence:
+    "STRENGTH: [What the student did correctly]. EVIDENCE: [Exact quote or reference from their work showing this]."
+    
+    Examples of good strengths:
+    ✓ "STRENGTH: Student correctly identified the formula for area of a circle (A = πr²). EVIDENCE: Student wrote 'A = π(5)²' showing correct formula application."
+    ✓ "STRENGTH: Student set up the problem correctly by identifying all given information. EVIDENCE: Student listed 'r = 10, h = 5' at the top of their work."
+    ✓ "STRENGTH: Student showed clear step-by-step work with logical progression. EVIDENCE: Work flows from equation setup through substitution to simplification."
+    
+    RULES:
+    - List AT LEAST 2 strengths if ANY work is present (even partial work has something positive)
+    - Be SPECIFIC - don't just say "good effort", explain WHAT was good
+    - If the answer is correct, that should be the FIRST strength listed
+    - Credit correct formulas, proper notation, logical reasoning, good organization, correct intermediate steps
+    - If work is minimal, still find positives: "attempted the problem", "identified the correct operation", etc.
+    - If page is blank, write "No student work present to evaluate.")
+- Areas for Improvement: (DETAILED - List SPECIFIC things the student needs to work on. For each area, explain WHY it's wrong and HOW to fix it.
+    FORMAT each area as a complete, educational explanation:
+    "AREA: [What the student got wrong or needs to improve]. WHY: [Explanation of why this is incorrect or incomplete]. FIX: [Clear explanation of the correct approach or what to do differently]."
+    
+    Examples of good improvement areas:
+    ✓ "AREA: Student used the wrong formula for circumference (used A = πr² instead of C = 2πr). WHY: Area and circumference are different measurements - area measures the space inside the circle while circumference measures the distance around it. FIX: For circumference, use C = 2πr or C = πd."
+    ✓ "AREA: Student made an arithmetic error in the final calculation (wrote 3 × 8 = 21). WHY: This multiplication error carried through to the final answer, making it incorrect. FIX: 3 × 8 = 24. Double-check multiplication by using repeated addition: 8 + 8 + 8 = 24."
+    ✓ "AREA: Student did not show work for the intermediate steps. WHY: Without shown work, partial credit cannot be awarded if the answer is wrong, and the teacher cannot identify where understanding breaks down. FIX: Write out each step of the calculation, even if it seems obvious."
+    
+    RULES:
+    - For EACH error, explain WHY it's wrong and provide the CORRECT approach (the FIX)
+    - Be EDUCATIONAL - the goal is to help the student learn, not just identify mistakes
+    - Include the correct method/formula/approach so the student can learn from this
+    - If the answer is correct but work is minimal, suggest showing more work for full credit
+    - If the student's work is completely correct, write "No areas for improvement identified - excellent work!"
+    - If page is blank, write "Student needs to attempt the problem. Start by identifying what the question is asking and what information is given.")
 - Misconceptions: (CRITICAL - ONLY list VERIFIED ERRORS that you can directly quote from the student's work.
     
     *** ANTI-HALLUCINATION RULES FOR ERROR REPORTING ***
@@ -1267,8 +1299,8 @@ Provide your analysis in the following structure:
 ` + (feedbackVerbosity === 'detailed' ? `
 - Grade Justification: (DETAILED - 150-200 words. Include: 1) Complete breakdown of each error with exact citations from student work, 2) Explanation of WHY each error is mathematically incorrect, 3) What the correct approach should have been step-by-step, 4) How each error affected the final grade. Be thorough and educational.)
 - Feedback: (DETAILED - 100-150 words. Provide comprehensive suggestions for improvement including: specific practice topics, common pitfalls to avoid, study strategies, and encouragement. Be constructive and educational.)` : `
-- Grade Justification: (CONCISE - under 75 words. Format: "DEDUCTIONS: [specific errors]. STRENGTHS: [what was correct]. RESULT: [final reasoning]")
-- Feedback: (constructive suggestions - under 40 words)`) + `\``;
+- Grade Justification: (75-120 words. Format: "STRENGTHS: [what was correct and why it shows understanding]. DEDUCTIONS: [specific errors with brief explanation]. RESULT: [final reasoning for grade]")
+- Feedback: (60-100 words. Include: 1) One specific thing the student did well, 2) One specific area to practice, 3) A concrete next step for improvement. Be constructive and encouraging.)`) + `\``;
 
     // Build messages for Lovable AI
     // If additionalImages provided, include all pages as a multi-page paper
@@ -2112,6 +2144,8 @@ interface ParsedResult {
   studentWorkPresent: boolean; // NEW: Explicit blank page detection
   coherentWorkShown: boolean;
   approachAnalysis: string;
+  strengthsAnalysis: string[]; // Detailed list of what student did right
+  areasForImprovement: string[]; // Detailed list of what student needs to work on
   rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
@@ -2134,6 +2168,8 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     studentWorkPresent: true, // Default to true, set to false if detected as blank
     coherentWorkShown: false,
     approachAnalysis: '',
+    strengthsAnalysis: [],
+    areasForImprovement: [],
     rubricScores: [],
     misconceptions: [],
     totalScore: { earned: 0, possible: 0, percentage: 0 },
@@ -2206,8 +2242,38 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   const finalAnswerCompleteMatch = text.match(/Final Answer Complete[:\s]*(YES|NO)/i);
   result.finalAnswerComplete = finalAnswerCompleteMatch ? finalAnswerCompleteMatch[1].toUpperCase() === 'YES' : true;
 
-  const approachMatch = text.match(/Approach Analysis[:\s]*([^]*?)(?=Is Correct|Final Answer Complete|Regents Score|Rubric Scores|Misconceptions|$)/i);
+  const approachMatch = text.match(/Approach Analysis[:\s]*([^]*?)(?=Is Correct|Final Answer Complete|Strengths Analysis|Regents Score|Rubric Scores|Misconceptions|$)/i);
   if (approachMatch) result.approachAnalysis = approachMatch[1].trim();
+
+  // Parse Strengths Analysis - what student did right
+  const strengthsMatch = text.match(/Strengths Analysis[:\s]*([^]*?)(?=Areas for Improvement|Misconceptions|Total Score|Regents Score|$)/i);
+  if (strengthsMatch) {
+    const strengthsText = strengthsMatch[1].trim();
+    result.strengthsAnalysis = strengthsText
+      .split(/\n/)
+      .map(s => s.replace(/^[-•*✓]\s*/, '').trim())
+      .filter(s => {
+        // Filter out empty/placeholder entries
+        const isLongEnough = s.length >= 15;
+        const isNotNone = !s.match(/^(none|n\/a|no strengths?|no student work)$/i);
+        return isLongEnough && isNotNone;
+      });
+  }
+
+  // Parse Areas for Improvement - what student needs to work on
+  const areasMatch = text.match(/Areas for Improvement[:\s]*([^]*?)(?=Misconceptions|Total Score|Needs Teacher|Standards Met|Regents Score|$)/i);
+  if (areasMatch) {
+    const areasText = areasMatch[1].trim();
+    result.areasForImprovement = areasText
+      .split(/\n/)
+      .map(a => a.replace(/^[-•*]\s*/, '').trim())
+      .filter(a => {
+        // Filter out empty/placeholder entries
+        const isLongEnough = a.length >= 15;
+        const isNotNone = !a.match(/^(none|n\/a|no areas?|no improvement|excellent work)$/i);
+        return isLongEnough && isNotNone;
+      });
+  }
 
   // Parse Regents Score (0-4)
   const regentsScoreMatch = text.match(/Regents Score[:\s]*(\d)/i);
@@ -2218,7 +2284,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   const regentsJustificationMatch = text.match(/Regents Score Justification[:\s]*([^]*?)(?=Rubric Scores|Misconceptions|$)/i);
   if (regentsJustificationMatch) result.regentsScoreJustification = regentsJustificationMatch[1].trim();
 
-  const misconceptionsMatch = text.match(/Misconceptions[:\s]*([^]*?)(?=Total Score|Needs Teacher|Standards Met|Feedback|$)/i);
+  const misconceptionsMatch = text.match(/Misconceptions[:\s]*([^]*?)(?=Needs Teacher|Total Score|Standards Met|Grade Justification|Feedback|$)/i);
   if (misconceptionsMatch) {
     const misconceptionsText = misconceptionsMatch[1].trim();
     // Split on newlines but preserve complete sentences
