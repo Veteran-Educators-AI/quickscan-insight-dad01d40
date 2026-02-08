@@ -1713,15 +1713,21 @@ export function WorksheetBuilder({
           </div>
         `;
       }
+      const worksheetCreatedDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      const worksheetTrackingId = 'WS-' + Date.now().toString(36).toUpperCase().slice(-6);
       headerHtml += `
-        <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="text-align: center; margin-bottom: 1rem;">
           <h1 style="font-size: 1.5rem; font-weight: bold; color: black; margin: 0;">${worksheetTitle}</h1>
           ${teacherName ? `<p style="color: #4b5563; margin-top: 0.25rem; font-size: 0.875rem;">Teacher: ${teacherName}</p>` : ""}
         </div>
-        <div style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 1.5rem; border-bottom: 1px solid #d1d5db; padding-bottom: 1rem; color: black;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 0.5rem; border-bottom: 1px solid #d1d5db; padding-bottom: 0.75rem; color: black;">
           <span>Name: _______________________</span>
           <span>Date: ___________</span>
           <span>Period: _____</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; margin-bottom: 1rem; color: #9ca3af;">
+          <span>Worksheet Created: ${worksheetCreatedDate}</span>
+          <span>ID: ${worksheetTrackingId}</span>
         </div>
       `;
       const headerElement = createSection(headerHtml);
@@ -2964,7 +2970,20 @@ export function WorksheetBuilder({
           children: [
             new TextRun({ text: "Name: _______________________   Date: ___________   Period: _____", size: 22 }),
           ],
-          spacing: { before: 200, after: 300 },
+          spacing: { before: 200, after: 100 },
+        }),
+      );
+
+      // Worksheet Created date & tracking ID
+      const wordCreatedDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      const wordTrackingId = 'WS-' + worksheetId.slice(-6).toUpperCase();
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: `Worksheet Created: ${wordCreatedDate}`, size: 16, color: "999999" }),
+            new TextRun({ text: `          ID: ${wordTrackingId}`, size: 16, color: "999999" }),
+          ],
+          spacing: { after: 300 },
         }),
       );
 
@@ -5297,14 +5316,18 @@ export function WorksheetBuilder({
                       </div>
                     )}
 
-                    <div className="text-center mb-6">
+                    <div className="text-center mb-4">
                       <h1 className="text-2xl font-bold text-black">{worksheetTitle}</h1>
                       {teacherName && <p className="text-gray-600 mt-1">Teacher: {teacherName}</p>}
                     </div>
-                    <div className="flex justify-between text-sm mb-6 border-b border-gray-300 pb-4 text-black">
+                    <div className="flex justify-between text-sm mb-2 border-b border-gray-300 pb-3 text-black">
                       <span>Name: _______________________</span>
                       <span>Date: ___________</span>
                       <span>Period: _____</span>
+                    </div>
+                    <div className="flex justify-between text-xs mb-4 text-gray-400">
+                      <span>Worksheet Created: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                      <span>ID: WS-{Date.now().toString(36).toUpperCase().slice(-6)}</span>
                     </div>
                     <div style={{ width: "100%" }}>
                       {compiledQuestions.map((question) => (
@@ -5614,6 +5637,9 @@ export function WorksheetBuilder({
                       >
                         <h2 className="text-xl font-bold text-center mb-2 text-black">ANSWER KEY</h2>
                         <p className="text-center text-sm text-gray-600 mb-1">{worksheetTitle}</p>
+                        <p className="text-center text-xs text-gray-400 mb-1">
+                          Created: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </p>
                         <p className="text-center text-xs text-red-600 italic mb-6">FOR TEACHER USE ONLY</p>
 
                         <div className="space-y-4">
