@@ -507,7 +507,7 @@ serve(async (req) => {
       console.log('Blank page detection enabled — running lightweight OCR pre-check...');
       try {
         const quickOcrResult = await callLovableAI([
-          { role: 'system', content: 'You are an OCR tool. Extract ALL visible text from this image exactly as written. Include handwritten text, printed text, numbers, equations, and any symbols. If the page is completely blank or only has printed headers/instructions with no student work, say "BLANK_PAGE". Output ONLY the extracted text, nothing else.' },
+          { role: 'system', content: 'You are an OCR tool. Extract ALL visible text from this image exactly as written. Include handwritten text, printed text, numbers, equations, and any symbols. If the page contains ONLY printed content (questions, headers, instructions) and NO student handwriting/marks, say "BLANK_PAGE". Output ONLY the extracted text, nothing else.' },
           { role: 'user', content: [
             { type: 'text', text: 'Extract all text from this image:' },
             formatImageForLovableAI(imageBase64),
@@ -1663,9 +1663,11 @@ const prompt = `Analyze this image of student work to identify the student. CRIT
 2. PRINTED/TYPED STUDENT NAME: Look for a PRINTED name at the top of the page (not handwritten).
    - Worksheets often have the student name printed in the center-top header
    - Look for patterns like "StudentName - Level X" or just "FirstName LastName" centered at top
+   - Look for labels like "Student Name", "Name:", or "Student:" and read the text immediately following
+   - Ignore printed questions/directions when extracting the name
    - This is often BOLD and clearly visible
    
-3. HANDWRITTEN NAME: Also look for any handwritten student name.
+3. HANDWRITTEN NAME: Also look for any handwritten student name (especially on a "Name:" line).
 4. STUDENT ID: Look for any printed or handwritten student ID number.
 ${rosterInfo}
 
@@ -2173,12 +2175,15 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   // *** CRITICAL: Parse Zone Scan Results for more reliable blank page detection ***
   const zoneScanMatch = text.match(/Zone Scan Results[:\s]*([^]*?)(?=Detected Subject|OCR Text|$)/i);
   let zonesWithHandwriting = 0;
+  let zonesScanned = 0;
   if (zoneScanMatch) {
     const zoneScanText = zoneScanMatch[1].toLowerCase();
+    const zoneCountMatches = zoneScanText.match(/zone\s*\d/gi);
+    zonesScanned = zoneCountMatches ? zoneCountMatches.length : 0;
     // Count zones that have HANDWRITING
     const zoneMatches = zoneScanText.match(/zone \d[^:]*:[^\n]*(handwriting|found|has|contains|shows|wrote|written)/gi);
     zonesWithHandwriting = zoneMatches ? zoneMatches.length : 0;
-    console.log(`Zone scan detected ${zonesWithHandwriting} zones with handwriting`);
+    console.log(`Zone scan detected ${zonesWithHandwriting} zones with handwriting (zones scanned: ${zonesScanned})`);
   }
 
   // *** CRITICAL: Parse Student Work Present - Use ZONE SCAN + explicit detection ***
@@ -2189,6 +2194,10 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   if (zonesWithHandwriting > 0) {
     result.studentWorkPresent = true;
     console.log('Zone scan detected handwriting - overriding studentWorkPresent to TRUE');
+  } else if (zonesScanned >= 4) {
+    // If the zone scan ran and found no handwriting in multiple zones, treat as blank
+    result.studentWorkPresent = false;
+    console.log('Zone scan found no handwriting across zones - overriding studentWorkPresent to FALSE');
   } else {
     // Only mark as no work if there's an EXPLICIT "NO" - anything else defaults to work present
     result.studentWorkPresent = studentWorkMatch && studentWorkMatch[1].toUpperCase() === 'NO' ? false : true;

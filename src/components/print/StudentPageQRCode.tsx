@@ -16,14 +16,14 @@ interface StudentPageQRCodeProps {
  * IMPORTANT: QR codes are optimized for scanning with:
  * - High error correction (H = 30% recovery)
  * - Sufficient quiet zone margin
- * - Minimum size of 64px for reliable scanning
+ * - Minimum size of 80px for reliable scanning
  * - High contrast black on white
  */
 export function StudentPageQRCode({ 
   studentId, 
   pageNumber, 
   totalPages,
-  size = 64 
+  size = 84 
 }: StudentPageQRCodeProps) {
   const qrData = JSON.stringify({
     v: 3, // version 3 for student+page codes

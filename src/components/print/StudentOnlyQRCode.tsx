@@ -13,10 +13,10 @@ interface StudentOnlyQRCodeProps {
  * IMPORTANT: QR codes are optimized for scanning with:
  * - High error correction (H = 30% recovery)
  * - Sufficient quiet zone margin
- * - Minimum size of 72px for reliable scanning
+ * - Minimum size of 84px for reliable scanning
  * - High contrast black on white
  */
-export function StudentOnlyQRCode({ studentId, size = 72 }: StudentOnlyQRCodeProps) {
+export function StudentOnlyQRCode({ studentId, size = 88 }: StudentOnlyQRCodeProps) {
   const qrData = JSON.stringify({
     v: 2, // version 2 for student-only codes
     type: 'student',
