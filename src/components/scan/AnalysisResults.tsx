@@ -37,6 +37,8 @@ interface AnalysisResult {
   approachAnalysis: string;
   strengthsAnalysis?: string[];
   areasForImprovement?: string[];
+  whatStudentDidCorrectly?: string;
+  whatStudentGotWrong?: string;
   rubricScores: RubricScore[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };

@@ -32,6 +32,8 @@ export interface AnalysisResult {
   approachAnalysis: string;
   strengthsAnalysis?: string[];
   areasForImprovement?: string[];
+  whatStudentDidCorrectly?: string;
+  whatStudentGotWrong?: string;
   rubricScores: RubricScore[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
@@ -525,15 +527,18 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         console.warn('[addPdfPagesWithAutoGrouping] QR scan failed:', qrError);
       }
       
-      if (qrResult && qrResult.type === 'student-page' && qrResult.pageNumber !== undefined) {
-        // We have page number info from QR code - use it for grouping
+      if (qrResult && qrResult.studentId) {
+        // We have a student ID from QR code - use it for grouping regardless of QR type
         const matchedStudent = studentRoster.find(s => s.id === qrResult.studentId);
         
-        // Check if this is a continuation of a previous page for the same student
+        // Check if this student already has a group (handles interleaved pages: A, B, A)
         const existingGroup = studentGroups.find(g => g.studentId === qrResult.studentId);
         
-        if (existingGroup && qrResult.pageNumber > 1) {
-          // This is a continuation page (e.g., page 2, back of paper)
+        const isPageType = qrResult.type === 'student-page' && qrResult.pageNumber !== undefined;
+        const isContinuation = isPageType ? qrResult.pageNumber > 1 : !!existingGroup;
+        
+        if (existingGroup && isContinuation) {
+          // This is a continuation page for an already-seen student
           pagesLinked++;
           existingGroup.pageIds.push(pageId);
           
@@ -558,12 +563,12 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
           });
           currentGroup = existingGroup;
         } else {
-          // First page or new student
+          // First page for this student (or page 1 of student-page type)
           if (matchedStudent) studentsIdentified++;
           
           currentGroup = {
             primaryId: pageId,
-            studentId: matchedStudent?.id,
+            studentId: matchedStudent?.id || qrResult.studentId,
             studentName: matchedStudent ? `${matchedStudent.first_name} ${matchedStudent.last_name}` : undefined,
             pageIds: [pageId],
           };
@@ -573,7 +578,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
             pageType: 'new',
             pageNumber: qrResult.pageNumber,
             totalPages: qrResult.totalPages,
-            studentId: matchedStudent?.id,
+            studentId: matchedStudent?.id || qrResult.studentId,
             studentName: matchedStudent ? `${matchedStudent.first_name} ${matchedStudent.last_name}` : undefined,
             autoAssigned: !!matchedStudent,
             identification: {
@@ -661,27 +666,47 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
                 autoAssigned: !!currentGroup!.studentId,
               });
             } else {
-              // Different student - start new group
+              // Different student detected by handwriting - identify and check ALL groups
               onProgress?.(i + 1, pages.length, 'New student detected, identifying...');
               
               try {
                 const identResult = await identifyStudent(baseItem, studentRoster);
                 
-                currentGroup = {
-                  primaryId: pageId,
-                  studentId: identResult.studentId,
-                  studentName: identResult.studentName,
-                  pageIds: [pageId],
-                };
+                // Check ALL existing groups for this student (handles interleaved pages)
+                const existingGroupForStudent = identResult.studentId 
+                  ? studentGroups.find(g => g.studentId === identResult.studentId)
+                  : null;
                 
-                if (identResult.studentId) studentsIdentified++;
-                
-                newItems.push({
-                  ...identResult,
-                  pageType: 'new',
-                  handwritingSimilarity,
-                });
-                studentGroups.push(currentGroup);
+                if (existingGroupForStudent) {
+                  // Student already seen earlier - link as continuation
+                  pagesLinked++;
+                  existingGroupForStudent.pageIds.push(pageId);
+                  
+                  newItems.push({
+                    ...identResult,
+                    pageType: 'continuation',
+                    continuationOf: existingGroupForStudent.primaryId,
+                    handwritingSimilarity,
+                  });
+                  currentGroup = existingGroupForStudent;
+                } else {
+                  // Truly new student
+                  currentGroup = {
+                    primaryId: pageId,
+                    studentId: identResult.studentId,
+                    studentName: identResult.studentName,
+                    pageIds: [pageId],
+                  };
+                  
+                  if (identResult.studentId) studentsIdentified++;
+                  
+                  newItems.push({
+                    ...identResult,
+                    pageType: 'new',
+                    handwritingSimilarity,
+                  });
+                  studentGroups.push(currentGroup);
+                }
               } catch (err) {
                 console.error('Student identification failed:', err);
                 currentGroup = {
@@ -703,19 +728,24 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
             try {
               const identResult = await identifyStudent(baseItem, studentRoster);
               
-              // Check if this matches the current group's student
-              if (currentGroup?.studentId && identResult.studentId === currentGroup.studentId) {
-                // Same student by name - link as continuation
+              // Check ALL existing groups for this student (not just currentGroup)
+              const existingGroupForStudent = identResult.studentId 
+                ? studentGroups.find(g => g.studentId === identResult.studentId)
+                : null;
+              
+              if (existingGroupForStudent) {
+                // Same student already seen earlier - link as continuation
                 pagesLinked++;
-                currentGroup.pageIds.push(pageId);
+                existingGroupForStudent.pageIds.push(pageId);
                 
                 newItems.push({
                   ...identResult,
                   pageType: 'continuation',
-                  continuationOf: currentGroup.primaryId,
+                  continuationOf: existingGroupForStudent.primaryId,
                 });
+                currentGroup = existingGroupForStudent;
               } else if (identResult.studentId) {
-                // Different student
+                // New student not seen before
                 studentsIdentified++;
                 currentGroup = {
                   primaryId: pageId,
@@ -1587,24 +1617,32 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   }, []);
 
   // Group pages by the same student - automatically links front/back pages
+  // Uses functional state update to always read the latest items (avoids stale closure)
   const groupPagesByStudent = useCallback((): { studentsGrouped: number; pagesLinked: number } => {
-    // Build a map of studentId -> list of item indices (in order)
-    const studentPages: Map<string, number[]> = new Map();
-    
-    items.forEach((item, index) => {
-      const studentId = item.studentId || item.identification?.matchedStudentId;
-      if (studentId) {
-        const existing = studentPages.get(studentId) || [];
-        existing.push(index);
-        studentPages.set(studentId, existing);
-      }
-    });
-
     let studentsGrouped = 0;
     let pagesLinked = 0;
 
-    // For each student with multiple pages, link them
     setItems(prev => {
+      // Build a map of studentId -> list of item indices (in order) from LATEST state
+      const studentPages: Map<string, number[]> = new Map();
+      
+      prev.forEach((item, index) => {
+        const studentId = item.studentId || item.identification?.matchedStudentId;
+        if (studentId) {
+          const existing = studentPages.get(studentId) || [];
+          existing.push(index);
+          studentPages.set(studentId, existing);
+        }
+      });
+
+      // Check if any grouping is needed
+      let needsUpdate = false;
+      studentPages.forEach((indices) => {
+        if (indices.length > 1) needsUpdate = true;
+      });
+      
+      if (!needsUpdate) return prev;
+
       const updated = [...prev];
       
       studentPages.forEach((indices, studentId) => {
@@ -1615,18 +1653,25 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         const primaryId = updated[primaryIndex].id;
         const primaryItem = updated[primaryIndex];
         
+        // Merge existing continuation IDs with new ones
+        const existingContinuations = primaryItem.continuationPages || [];
+        const newContinuationIds = indices.slice(1).map(idx => updated[idx].id);
+        const allContinuationIds = [...new Set([...existingContinuations, ...newContinuationIds])];
+        
         // Mark primary as 'new' with continuation pages
-        const continuationIds = indices.slice(1).map(idx => updated[idx].id);
         updated[primaryIndex] = {
           ...primaryItem,
           pageType: 'new',
           continuationOf: undefined,
-          continuationPages: continuationIds,
+          continuationPages: allContinuationIds,
         };
 
         // Mark subsequent pages as continuations
         indices.slice(1).forEach(idx => {
-          pagesLinked++;
+          // Only count as newly linked if not already a continuation of this primary
+          if (updated[idx].continuationOf !== primaryId) {
+            pagesLinked++;
+          }
           updated[idx] = {
             ...updated[idx],
             pageType: 'continuation',
@@ -1643,7 +1688,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     });
 
     return { studentsGrouped, pagesLinked };
-  }, [items]);
+  }, []);
 
   // Group pages by worksheet topic AND student name - for multi-page papers from same student on same topic
   const groupPagesByWorksheetTopic = useCallback((): { topicsGrouped: number; pagesLinked: number } => {
