@@ -280,15 +280,31 @@ async function logAIUsage(
   }
 }
 
+// AI Model tier selection:
+// - LITE: Fast/cheap for simple tasks (OCR, blank detection, identification)
+// - STANDARD: Balanced for main grading analysis with detailed feedback
+// - REASONING: Deep reasoning for complex problem verification (uses DeepSeek R1)
+const AI_MODELS = {
+  lite: 'google/gemini-2.5-flash-lite',       // ~$0.02/1M tokens - OCR, blank detection, page type
+  standard: 'google/gemini-2.5-flash',         // ~$0.15/1M tokens - main grading analysis with detailed feedback
+} as const;
+
+type AIModelTier = keyof typeof AI_MODELS;
+
 // Helper function to call Lovable AI Gateway with token logging
 async function callLovableAI(
   messages: any[], 
   apiKey: string, 
   functionName: string = 'analyze-student-work',
   supabase?: any,
-  userId?: string
+  userId?: string,
+  modelTier: AIModelTier = 'lite'
 ) {
+  const model = AI_MODELS[modelTier];
+  const maxTokens = modelTier === 'standard' ? 6000 : 4000;
   const startTime = Date.now();
+  
+  console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier}`);
   
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -297,9 +313,9 @@ async function callLovableAI(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash-lite',
+      model,
       messages,
-      max_tokens: 6000,
+      max_tokens: maxTokens,
     }),
   });
 
@@ -321,7 +337,7 @@ async function callLovableAI(
   
   // Log token usage for cost monitoring
   const usage = data.usage || {};
-  console.log(`[TOKEN_USAGE] function=${functionName} model=gemini-2.5-flash-lite prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
+  console.log(`[TOKEN_USAGE] function=${functionName} model=${model} tier=${modelTier} prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
   
   // Log to database if supabase client is provided
   if (supabase && userId) {
@@ -1331,7 +1347,17 @@ Provide your analysis in the following structure:
       }
     ];
 
-    const analysisText = await callLovableAI(messages, LOVABLE_API_KEY);
+    // Use the STANDARD tier model for main grading - provides much better
+    // detailed analysis (strengths, areas for improvement, educational feedback)
+    // compared to the lite model used for simpler tasks like OCR/blank detection
+    const analysisText = await callLovableAI(
+      messages, 
+      LOVABLE_API_KEY, 
+      'analyze-student-work', 
+      supabase, 
+      effectiveTeacherId, 
+      'standard'
+    );
 
     if (!analysisText) {
       throw new Error('No analysis returned from AI');
@@ -1484,7 +1510,7 @@ Provide your analysis in this exact JSON format:
     }
   ];
 
-  const content = await callLovableAI(messages, apiKey);
+  const content = await callLovableAI(messages, apiKey, 'compare-with-solution', undefined, undefined, 'standard');
   
   console.log('Comparison raw response:', content);
 
