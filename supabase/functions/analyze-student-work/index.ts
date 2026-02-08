@@ -1278,18 +1278,37 @@ Provide your analysis in the following structure:
 - Needs Teacher Review: (list items flagged for verification)
 - Total Score: (IMPORTANT: This is points from teacher rubric criteria ONLY. If no teacher rubric was provided, use the Regents score converted: Score 4=4/4, Score 3=3/4, Score 2=2/4, Score 1=1/4, Score 0=0/4. Format: earned/possible)
 - Standards Met: (YES or NO - does work show ANY understanding of the standards?)
-- Grade: (55-100 scale based on concepts understood:
-    • 90-100 = Full mastery of all concepts
-    • 80-89 = Strong understanding of most concepts  
-    • 70-79 = Partial understanding, some concepts grasped
-    • 65-69 = Basic/limited understanding shown (DEFAULT if ANY work with understanding)
-    • 55 = ONLY if completely blank or NO understanding whatsoever)
+- Grade: (55-100 scale. YOUR GRADE MUST MATCH YOUR OWN EVIDENCE.
+    *** GRADE CONSISTENCY RULE - CRITICAL ***
+    Your grade MUST be logically consistent with your error analysis:
+    - If you found NO errors and work is present → Grade MUST be 85-100
+    - If you found only MINOR errors → Grade MUST be 75-90
+    - If you found SIGNIFICANT errors but student shows partial understanding → Grade 65-79
+    - If work is blank/no understanding → Grade 55
+    
+    NEVER give a low grade (below 85) while simultaneously saying "no errors found" or "work is mathematically correct."
+    NEVER give a high grade (above 85) while listing multiple significant errors.
+    
+    Scale:
+    • 90-100 = Full mastery, no errors or only trivial notation issues
+    • 85-89 = Strong understanding, no mathematical errors but minor presentation issues
+    • 75-84 = Good understanding with some errors
+    • 65-74 = Partial understanding with significant gaps
+    • 55-64 = Minimal or no understanding shown)
 ` + (feedbackVerbosity === 'detailed' ? `
-- Grade Justification: (DETAILED - 150-200 words. MUST directly quote the student's written work using "Student wrote: '[exact quote]'" format. Include: 1) Complete breakdown of each error with exact citations from student work, 2) Explanation of WHY each error is mathematically incorrect, 3) What the correct approach should have been step-by-step, 4) How each error affected the final grade. Every claim must reference specific student writing.)
+- Grade Justification: (DETAILED - 150-200 words. MUST directly quote the student's written work using "Student wrote: '[exact quote]'" format. Structure:
+    POINTS EARNED: For each concept the student demonstrates, quote their work: "Student wrote: '[exact quote]' — this shows understanding of [concept] (+X points)."
+    POINTS DEDUCTED: For each error, quote their work: "Student wrote: '[exact quote]' — this is incorrect because [reason] (-X points)."
+    FINAL CALCULATION: "Starting from 100, earned [X] for [concepts], deducted [Y] for [errors] = Grade [Z]."
+    Every claim must reference specific student writing.)
 - What Student Did Correctly: (REQUIRED - 50-100 words. MUST directly quote the student's actual written equations, steps, or reasoning. Format: "Student correctly wrote '[exact equation/step from their paper]' which shows [concept]. They also demonstrated [skill] by writing '[another exact quote]'." If nothing is correct, say "No correct work identified.")
 - What Student Got Wrong: (REQUIRED - 50-100 words. MUST directly quote the student's actual errors. Format: "Student wrote '[exact incorrect equation/step]' but the correct approach is [correct method]. This error in their work '[quote]' shows [misconception]." Explain WHY each quoted error is wrong. If no errors, say "No errors found - work is correct.")
 - Feedback: (DETAILED - 100-150 words. Provide comprehensive suggestions for improvement including: specific practice topics, common pitfalls to avoid, study strategies, and encouragement. Be constructive and educational.)` : `
-- Grade Justification: (REQUIRED - 60-120 words. MUST directly quote the student's written work to justify every point earned or deducted. Format: "EARNED CREDIT FOR: Student wrote '[exact equation/step from paper]' showing [concept understood]. DEDUCTIONS FOR: Student wrote '[exact error quote from paper]' which is incorrect because [reason]. RESULT: Grade of [X] because [specific reasoning tied to quoted evidence]." Every claim must cite exact student writing — never use vague language like "student showed understanding" without quoting their specific work.)
+- Grade Justification: (REQUIRED - 60-120 words. MUST directly quote the student's written work to justify every point earned or deducted. Structure:
+    EARNED: "Student wrote: '[exact quote from paper]' — demonstrates [concept]."
+    DEDUCTED: "Student wrote: '[exact error quote]' — incorrect because [reason]."
+    RESULT: "Grade of [X] because [specific reasoning with point breakdown]."
+    Every claim must cite exact student writing — never use vague language like "student showed understanding" without quoting their specific work.)
 - What Student Did Correctly: (REQUIRED - 30-60 words. MUST directly quote the student's actual written equations, steps, or reasoning from the scanned paper. Format: "Student correctly wrote '[exact equation/step]' demonstrating [concept]. Student also showed '[another exact quote from their work]'." Example: "Student correctly wrote 'A = πr² = π(5)² = 25π' showing proper area formula application." If nothing correct, say "No correct work identified.")
 - What Student Got Wrong: (REQUIRED - 30-60 words. MUST directly quote the student's actual errors from the scanned paper. Format: "Student wrote '[exact incorrect work]' but should have written '[correct version]'. This shows [specific misconception]." Example: "Student wrote 'A = 2πr² = 2π(5)² = 50π' using circumference formula instead of area formula." If no errors, say "No errors found - work is correct.")
 - Feedback: (constructive suggestions - under 40 words)`) + `\``;
@@ -2448,9 +2467,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     standardsMet
   );
   
-  // *** NEW: CORRECT ANSWER + NO ERRORS = HIGH GRADE ***
-  // If the AI says the answer is correct AND there are no real misconceptions, 
-  // the grade should be at least 90, regardless of what grade the AI returned
+  // *** CORRECT ANSWER + NO ERRORS = HIGH GRADE ***
   const hasNoRealErrors = result.misconceptions.length === 0 || 
     result.misconceptions.every(m => 
       m.toLowerCase().includes('no error') || 
@@ -2466,13 +2483,23 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   
   console.log(`High grade check - AnswerCorrect: ${result.isAnswerCorrect}, NoRealErrors: ${hasNoRealErrors}, ShouldBeHigh: ${shouldBeHighGrade}`);
   
+  // *** CONSISTENCY CHECK: If "no errors found" + work present, grade must be at least 85 ***
+  // This prevents the contradictory scenario where AI says "no errors" but assigns 70
+  const noErrorsButWorkPresent = result.studentWorkPresent && 
+    hasSubstantialWork && 
+    hasNoRealErrors &&
+    !explicitlyBlank;
+  
+  if (noErrorsButWorkPresent) {
+    console.log('CONSISTENCY CHECK: No errors detected with work present - enforcing minimum grade of 85');
+  }
+  
   // *** PERFECT SCORE OVERRIDE: If analysis indicates full mastery, give 100 ***
   if (shouldGetPerfectScore && hasAnyUnderstanding) {
     result.grade = 100;
     console.log('Full mastery detected in analysis - assigning grade 100');
   } else if (shouldBeHighGrade) {
     // CRITICAL: Correct answer with no errors should get AT LEAST 90
-    // Use Regents score to determine exact grade within 90-100 range
     if (result.regentsScore >= 4) {
       result.grade = 100;
     } else if (result.regentsScore >= 3) {
@@ -2483,45 +2510,49 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     console.log(`Correct answer with no errors - assigning high grade: ${result.grade}`);
   } else if (gradeMatch) {
     const parsedGrade = parseInt(gradeMatch[1]);
-    // CRITICAL: If ANY understanding, minimum is 65
-    if (hasAnyUnderstanding) {
+    
+    // *** PRIMARY: TRUST THE AI's GRADE when it's well-reasoned ***
+    // The AI was given a consistency rule: its grade must match its evidence.
+    // Only override for floor enforcement, not to second-guess the AI.
+    if (noErrorsButWorkPresent) {
+      // AI said no errors but gave a low grade - override to at least 85
+      result.grade = Math.max(85, Math.min(100, parsedGrade));
+    } else if (hasAnyUnderstanding) {
       // Student shows understanding - enforce minimum of 65
       result.grade = Math.max(gradeFloorWithEffort, Math.min(100, parsedGrade));
     } else if (parsedGrade < gradeFloor) {
-      // No understanding AND grade below floor - apply absolute minimum
       result.grade = gradeFloor;
     } else {
       result.grade = Math.min(100, parsedGrade);
     }
   } else if (result.regentsScore >= 0) {
     // Convert Regents score to grade based on concept understanding
-    // More concepts = higher in the range
     const conceptBonus = Math.min(result.conceptsDemonstrated.length * 2, 5);
     
     const regentsToGrade: Record<number, number> = {
-      4: 95,  // Full mastery
-      3: 85,  // Strong understanding
-      2: 75,  // Partial understanding
-      1: gradeFloorWithEffort + 2,  // Basic understanding - slightly above floor
-      0: hasAnyUnderstanding ? gradeFloorWithEffort : gradeFloor,  // Understanding gets floor, blank gets minimum
+      4: 95,
+      3: 85,
+      2: 75,
+      1: gradeFloorWithEffort + 2,
+      0: hasAnyUnderstanding ? gradeFloorWithEffort : gradeFloor,
     };
     result.grade = Math.min(100, (regentsToGrade[result.regentsScore] ?? gradeFloorWithEffort) + conceptBonus);
   } else if (result.totalScore.percentage > 0) {
-    // Fallback: convert percentage but ensure minimum based on understanding
     const scaledGrade = Math.round(gradeFloorWithEffort + (result.totalScore.percentage / 100) * (100 - gradeFloorWithEffort));
     result.grade = hasAnyUnderstanding ? Math.max(gradeFloorWithEffort, scaledGrade) : Math.max(gradeFloor, scaledGrade);
   } else if (hasAnyUnderstanding) {
-    // Has understanding but no score parsed - default to effort floor
     result.grade = gradeFloorWithEffort;
   }
 
-  // FINAL SAFEGUARD: Absolute enforcement of grade floors based on understanding
-  // Perfect score override takes priority
+  // FINAL SAFEGUARD: Absolute enforcement of grade floors and consistency
   if (shouldGetPerfectScore && hasAnyUnderstanding) {
     result.grade = 100;
   } else if (shouldBeHighGrade && result.grade < 90) {
-    // Double-check: if we determined this should be high grade, enforce minimum of 90
     result.grade = 90;
+  } else if (noErrorsButWorkPresent && result.grade < 85) {
+    // CONSISTENCY: Never give below 85 when no errors detected and work is present
+    result.grade = 85;
+    console.log('CONSISTENCY SAFEGUARD: Bumped grade to 85 (no errors + work present)');
   } else if (hasAnyUnderstanding) {
     result.grade = Math.max(gradeFloorWithEffort, result.grade);
   }
