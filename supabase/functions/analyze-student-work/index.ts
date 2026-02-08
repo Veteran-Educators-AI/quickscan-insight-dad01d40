@@ -571,7 +571,7 @@ serve(async (req) => {
       console.log('Blank page detection enabled — running lightweight OCR pre-check...');
       try {
         const quickOcrResult = await callLovableAI([
-          { role: 'system', content: 'You are an OCR tool. Extract ALL visible text from this image exactly as written. Include handwritten text, printed text, numbers, equations, and any symbols. If the page is completely blank or only has printed headers/instructions with no student work, say "BLANK_PAGE". Output ONLY the extracted text, nothing else.' },
+          { role: 'system', content: 'You are an OCR tool. Extract ALL visible text from this image exactly as written. Include handwritten text, printed text, numbers, equations, and any symbols. If the page contains ONLY printed content (questions, headers, instructions) and NO student handwriting/marks, say "BLANK_PAGE". Output ONLY the extracted text, nothing else.' },
           { role: 'user', content: [
             { type: 'text', text: 'Extract all text from this image:' },
             formatImageForLovableAI(imageBase64),
@@ -1073,6 +1073,26 @@ When extracting OCR text:
    - BUT flag significant interpretations so teachers can verify: "[INTERPRETATION - VERIFY: ...]"
    - Do NOT fabricate entire solutions or understanding that has no basis in visible work
    - Do NOT penalize for work not asked by the question
+
+6. *** EVIDENCE-BASED GRADING MANDATE ***
+   CRITICAL: EVERY grade justification, strength, and error MUST directly quote the student's actual handwritten work.
+   
+   YOU MUST USE THIS FORMAT for citing student work:
+   - "Student wrote: '[exact text/equation copied from their paper]'"
+   - "In [location on page], student shows: '[exact quote]'"
+   
+   NEVER use vague language like:
+   ✗ "Student showed understanding" (WHAT did they write that shows this?)
+   ✗ "Work demonstrates knowledge" (QUOTE the specific work!)
+   ✗ "Some errors were present" (QUOTE the exact errors!)
+   ✗ "Student attempted the problem" (WHAT specifically did they write?)
+   
+   ALWAYS use specific language like:
+   ✓ "Student wrote: 'A = πr² = π(5)² = 25π' correctly applying the area formula"
+   ✓ "Student wrote: '2πr = 2π(5) = 10π' using circumference formula instead of area"
+   ✓ "Student's equation 'y = 3x + 2' correctly identifies slope as 3"
+   
+   If you cannot quote specific student work, you cannot claim they demonstrated or failed to demonstrate understanding.
 `;
 
     if (isAIMode) {
@@ -1361,14 +1381,31 @@ Provide your analysis in the following structure:
 - Needs Teacher Review: (list items flagged for verification)
 - Total Score: (IMPORTANT: This is points from teacher rubric criteria ONLY. If no teacher rubric was provided, use the Regents score converted: Score 4=4/4, Score 3=3/4, Score 2=2/4, Score 1=1/4, Score 0=0/4. Format: earned/possible)
 - Standards Met: (YES or NO - does work show ANY understanding of the standards?)
-- Grade: (55-100 scale based on concepts understood:
-    • 90-100 = Full mastery of all concepts
-    • 80-89 = Strong understanding of most concepts  
-    • 70-79 = Partial understanding, some concepts grasped
-    • 65-69 = Basic/limited understanding shown (DEFAULT if ANY work with understanding)
-    • 55 = ONLY if completely blank or NO understanding whatsoever)
+- Grade: (55-100 scale. YOUR GRADE MUST MATCH YOUR OWN EVIDENCE.
+    *** GRADE CONSISTENCY RULE - CRITICAL ***
+    Your grade MUST be logically consistent with your error analysis:
+    - If you found NO errors and work is present → Grade MUST be 85-100
+    - If you found only MINOR errors → Grade MUST be 75-90
+    - If you found SIGNIFICANT errors but student shows partial understanding → Grade 65-79
+    - If work is blank/no understanding → Grade 55
+    
+    NEVER give a low grade (below 85) while simultaneously saying "no errors found" or "work is mathematically correct."
+    NEVER give a high grade (above 85) while listing multiple significant errors.
+    
+    Scale:
+    • 90-100 = Full mastery, no errors or only trivial notation issues
+    • 85-89 = Strong understanding, no mathematical errors but minor presentation issues
+    • 75-84 = Good understanding with some errors
+    • 65-74 = Partial understanding with significant gaps
+    • 55-64 = Minimal or no understanding shown)
 ` + (feedbackVerbosity === 'detailed' ? `
-- Grade Justification: (DETAILED - 150-200 words. Include: 1) Complete breakdown of each error with exact citations from student work, 2) Explanation of WHY each error is mathematically incorrect, 3) What the correct approach should have been step-by-step, 4) How each error affected the final grade. Be thorough and educational.)
+- Grade Justification: (DETAILED - 150-200 words. MUST directly quote the student's written work using "Student wrote: '[exact quote]'" format. Structure:
+    POINTS EARNED: For each concept the student demonstrates, quote their work: "Student wrote: '[exact quote]' — this shows understanding of [concept] (+X points)."
+    POINTS DEDUCTED: For each error, quote their work: "Student wrote: '[exact quote]' — this is incorrect because [reason] (-X points)."
+    FINAL CALCULATION: "Starting from 100, earned [X] for [concepts], deducted [Y] for [errors] = Grade [Z]."
+    Every claim must reference specific student writing.)
+- What Student Did Correctly: (REQUIRED - 50-100 words. MUST directly quote the student's actual written equations, steps, or reasoning. Format: "Student correctly wrote '[exact equation/step from their paper]' which shows [concept]. They also demonstrated [skill] by writing '[another exact quote]'." If nothing is correct, say "No correct work identified.")
+- What Student Got Wrong: (REQUIRED - 50-100 words. MUST directly quote the student's actual errors. Format: "Student wrote '[exact incorrect equation/step]' but the correct approach is [correct method]. This error in their work '[quote]' shows [misconception]." Explain WHY each quoted error is wrong. If no errors, say "No errors found - work is correct.")
 - Feedback: (DETAILED - 100-150 words. Provide comprehensive suggestions for improvement including: specific practice topics, common pitfalls to avoid, study strategies, and encouragement. Be constructive and educational.)` : `
 - Grade Justification: (75-120 words. Format: "STRENGTHS: [what was correct and why it shows understanding]. DEDUCTIONS: [specific errors with brief explanation]. RESULT: [final reasoning for grade]")
 - Feedback: (60-100 words. Include: 1) One specific thing the student did well, 2) One specific area to practice, 3) A concrete next step for improvement. Be constructive and encouraging.)`) + `\``;
@@ -1781,9 +1818,11 @@ const prompt = `Analyze this image of student work to identify the student. CRIT
 2. PRINTED/TYPED STUDENT NAME: Look for a PRINTED name at the top of the page (not handwritten).
    - Worksheets often have the student name printed in the center-top header
    - Look for patterns like "StudentName - Level X" or just "FirstName LastName" centered at top
+   - Look for labels like "Student Name", "Name:", or "Student:" and read the text immediately following
+   - Ignore printed questions/directions when extracting the name
    - This is often BOLD and clearly visible
    
-3. HANDWRITTEN NAME: Also look for any handwritten student name.
+3. HANDWRITTEN NAME: Also look for any handwritten student name (especially on a "Name:" line).
 4. STUDENT ID: Look for any printed or handwritten student ID number.
 ${rosterInfo}
 
@@ -2295,12 +2334,15 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   // *** CRITICAL: Parse Zone Scan Results for more reliable blank page detection ***
   const zoneScanMatch = text.match(/Zone Scan Results[:\s]*([^]*?)(?=Detected Subject|OCR Text|$)/i);
   let zonesWithHandwriting = 0;
+  let zonesScanned = 0;
   if (zoneScanMatch) {
     const zoneScanText = zoneScanMatch[1].toLowerCase();
+    const zoneCountMatches = zoneScanText.match(/zone\s*\d/gi);
+    zonesScanned = zoneCountMatches ? zoneCountMatches.length : 0;
     // Count zones that have HANDWRITING
     const zoneMatches = zoneScanText.match(/zone \d[^:]*:[^\n]*(handwriting|found|has|contains|shows|wrote|written)/gi);
     zonesWithHandwriting = zoneMatches ? zoneMatches.length : 0;
-    console.log(`Zone scan detected ${zonesWithHandwriting} zones with handwriting`);
+    console.log(`Zone scan detected ${zonesWithHandwriting} zones with handwriting (zones scanned: ${zonesScanned})`);
   }
 
   // *** CRITICAL: Parse Student Work Present - Use ZONE SCAN + explicit detection ***
@@ -2311,6 +2353,10 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   if (zonesWithHandwriting > 0) {
     result.studentWorkPresent = true;
     console.log('Zone scan detected handwriting - overriding studentWorkPresent to TRUE');
+  } else if (zonesScanned >= 4) {
+    // If the zone scan ran and found no handwriting in multiple zones, treat as blank
+    result.studentWorkPresent = false;
+    console.log('Zone scan found no handwriting across zones - overriding studentWorkPresent to FALSE');
   } else {
     // Only mark as no work if there's an EXPLICIT "NO" - anything else defaults to work present
     result.studentWorkPresent = studentWorkMatch && studentWorkMatch[1].toUpperCase() === 'NO' ? false : true;
@@ -2555,9 +2601,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     standardsMet
   );
   
-  // *** NEW: CORRECT ANSWER + NO ERRORS = HIGH GRADE ***
-  // If the AI says the answer is correct AND there are no real misconceptions, 
-  // the grade should be at least 90, regardless of what grade the AI returned
+  // *** CORRECT ANSWER + NO ERRORS = HIGH GRADE ***
   const hasNoRealErrors = result.misconceptions.length === 0 || 
     result.misconceptions.every(m => 
       m.toLowerCase().includes('no error') || 
@@ -2573,13 +2617,23 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   
   console.log(`High grade check - AnswerCorrect: ${result.isAnswerCorrect}, NoRealErrors: ${hasNoRealErrors}, ShouldBeHigh: ${shouldBeHighGrade}`);
   
+  // *** CONSISTENCY CHECK: If "no errors found" + work present, grade must be at least 85 ***
+  // This prevents the contradictory scenario where AI says "no errors" but assigns 70
+  const noErrorsButWorkPresent = result.studentWorkPresent && 
+    hasSubstantialWork && 
+    hasNoRealErrors &&
+    !explicitlyBlank;
+  
+  if (noErrorsButWorkPresent) {
+    console.log('CONSISTENCY CHECK: No errors detected with work present - enforcing minimum grade of 85');
+  }
+  
   // *** PERFECT SCORE OVERRIDE: If analysis indicates full mastery, give 100 ***
   if (shouldGetPerfectScore && hasAnyUnderstanding) {
     result.grade = 100;
     console.log('Full mastery detected in analysis - assigning grade 100');
   } else if (shouldBeHighGrade) {
     // CRITICAL: Correct answer with no errors should get AT LEAST 90
-    // Use Regents score to determine exact grade within 90-100 range
     if (result.regentsScore >= 4) {
       result.grade = 100;
     } else if (result.regentsScore >= 3) {
@@ -2590,45 +2644,49 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     console.log(`Correct answer with no errors - assigning high grade: ${result.grade}`);
   } else if (gradeMatch) {
     const parsedGrade = parseInt(gradeMatch[1]);
-    // CRITICAL: If ANY understanding, minimum is 65
-    if (hasAnyUnderstanding) {
+    
+    // *** PRIMARY: TRUST THE AI's GRADE when it's well-reasoned ***
+    // The AI was given a consistency rule: its grade must match its evidence.
+    // Only override for floor enforcement, not to second-guess the AI.
+    if (noErrorsButWorkPresent) {
+      // AI said no errors but gave a low grade - override to at least 85
+      result.grade = Math.max(85, Math.min(100, parsedGrade));
+    } else if (hasAnyUnderstanding) {
       // Student shows understanding - enforce minimum of 65
       result.grade = Math.max(gradeFloorWithEffort, Math.min(100, parsedGrade));
     } else if (parsedGrade < gradeFloor) {
-      // No understanding AND grade below floor - apply absolute minimum
       result.grade = gradeFloor;
     } else {
       result.grade = Math.min(100, parsedGrade);
     }
   } else if (result.regentsScore >= 0) {
     // Convert Regents score to grade based on concept understanding
-    // More concepts = higher in the range
     const conceptBonus = Math.min(result.conceptsDemonstrated.length * 2, 5);
     
     const regentsToGrade: Record<number, number> = {
-      4: 95,  // Full mastery
-      3: 85,  // Strong understanding
-      2: 75,  // Partial understanding
-      1: gradeFloorWithEffort + 2,  // Basic understanding - slightly above floor
-      0: hasAnyUnderstanding ? gradeFloorWithEffort : gradeFloor,  // Understanding gets floor, blank gets minimum
+      4: 95,
+      3: 85,
+      2: 75,
+      1: gradeFloorWithEffort + 2,
+      0: hasAnyUnderstanding ? gradeFloorWithEffort : gradeFloor,
     };
     result.grade = Math.min(100, (regentsToGrade[result.regentsScore] ?? gradeFloorWithEffort) + conceptBonus);
   } else if (result.totalScore.percentage > 0) {
-    // Fallback: convert percentage but ensure minimum based on understanding
     const scaledGrade = Math.round(gradeFloorWithEffort + (result.totalScore.percentage / 100) * (100 - gradeFloorWithEffort));
     result.grade = hasAnyUnderstanding ? Math.max(gradeFloorWithEffort, scaledGrade) : Math.max(gradeFloor, scaledGrade);
   } else if (hasAnyUnderstanding) {
-    // Has understanding but no score parsed - default to effort floor
     result.grade = gradeFloorWithEffort;
   }
 
-  // FINAL SAFEGUARD: Absolute enforcement of grade floors based on understanding
-  // Perfect score override takes priority
+  // FINAL SAFEGUARD: Absolute enforcement of grade floors and consistency
   if (shouldGetPerfectScore && hasAnyUnderstanding) {
     result.grade = 100;
   } else if (shouldBeHighGrade && result.grade < 90) {
-    // Double-check: if we determined this should be high grade, enforce minimum of 90
     result.grade = 90;
+  } else if (noErrorsButWorkPresent && result.grade < 85) {
+    // CONSISTENCY: Never give below 85 when no errors detected and work is present
+    result.grade = 85;
+    console.log('CONSISTENCY SAFEGUARD: Bumped grade to 85 (no errors + work present)');
   } else if (hasAnyUnderstanding) {
     result.grade = Math.max(gradeFloorWithEffort, result.grade);
   }

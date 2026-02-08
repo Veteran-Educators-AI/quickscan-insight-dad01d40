@@ -24,6 +24,7 @@ import { useAuth } from '@/lib/auth';
 import { useFeatureTracking } from '@/hooks/useFeatureTracking';
 import { useAdaptiveLevels } from '@/hooks/useAdaptiveLevels';
 import { fixEncodingCorruption, renderMathText, sanitizeForPDF, sanitizeForWord } from '@/lib/mathRenderer';
+import { generateQRCodePngDataUrl, generateStudentQuestionQRData, QR_PRINT_RENDER_SIZE } from '@/lib/qrCodeUtils';
 import jsPDF from 'jspdf';
 import { Document, Packer, Paragraph, TextRun, PageOrientation, BorderStyle, AlignmentType, convertInchesToTwip, ImageRun, Table, TableRow, TableCell, WidthType, VerticalAlign, Header, Footer } from 'docx';
 
@@ -242,103 +243,13 @@ const svgToPngDataUrl = async (svgInput: string, width: number = 200, height: nu
 };
 
 // Generate QR code as PNG data URL for PDF embedding
-const generateQRCodeDataUrl = (studentId: string, worksheetId: string, size: number = 100): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    // Create QR data matching StudentQRCode format
-    const qrData = JSON.stringify({
-      v: 1,
-      s: studentId,
-      q: worksheetId,
-    });
-    
-    // Create a canvas-based QR code using a simple approach
-    // We'll create an SVG string manually and convert to PNG
-    const container = document.createElement('div');
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    container.style.width = `${size}px`;
-    container.style.height = `${size}px`;
-    document.body.appendChild(container);
-    
-    // Use ReactDOM to render QRCodeSVG
-    import('react-dom/client').then(async ({ createRoot }) => {
-      const React = await import('react');
-      
-      const root = createRoot(container);
-      
-      // Create a promise-based approach with a ref
-      const QRWrapper = () => {
-        const ref = React.useRef<HTMLDivElement>(null);
-        
-        React.useEffect(() => {
-          // Small delay to ensure SVG is rendered
-          const timer = setTimeout(() => {
-            if (ref.current) {
-              const svg = ref.current.querySelector('svg');
-              if (svg) {
-                // Get the SVG as a string
-                const svgData = new XMLSerializer().serializeToString(svg);
-                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(svgBlob);
-                
-                const img = new Image();
-                img.onload = () => {
-                  const canvas = document.createElement('canvas');
-                  canvas.width = size;
-                  canvas.height = size;
-                  const ctx = canvas.getContext('2d');
-                  if (ctx) {
-                    ctx.fillStyle = 'white';
-                    ctx.fillRect(0, 0, size, size);
-                    ctx.drawImage(img, 0, 0, size, size);
-                    const pngDataUrl = canvas.toDataURL('image/png');
-                    URL.revokeObjectURL(url);
-                    root.unmount();
-                    document.body.removeChild(container);
-                    resolve(pngDataUrl);
-                  } else {
-                    URL.revokeObjectURL(url);
-                    root.unmount();
-                    document.body.removeChild(container);
-                    reject(new Error('Could not get canvas context'));
-                  }
-                };
-                img.onerror = () => {
-                  URL.revokeObjectURL(url);
-                  root.unmount();
-                  document.body.removeChild(container);
-                  reject(new Error('Failed to load QR SVG'));
-                };
-                img.src = url;
-              } else {
-                root.unmount();
-                document.body.removeChild(container);
-                reject(new Error('QR code SVG not found'));
-              }
-            }
-          }, 100);
-          
-          return () => clearTimeout(timer);
-        }, []);
-        
-        return React.createElement('div', { ref },
-          React.createElement(QRCodeSVG, {
-            value: qrData,
-            size: size,
-            level: 'M',
-            includeMargin: true,
-            bgColor: '#FFFFFF',
-            fgColor: '#000000',
-          })
-        );
-      };
-      
-      root.render(React.createElement(QRWrapper));
-    }).catch((err) => {
-      document.body.removeChild(container);
-      reject(err);
-    });
-  });
+const generateQRCodeDataUrl = async (
+  studentId: string,
+  worksheetId: string,
+  size: number = QR_PRINT_RENDER_SIZE
+): Promise<string> => {
+  const renderSize = Math.max(size, QR_PRINT_RENDER_SIZE);
+  return generateQRCodePngDataUrl(generateStudentQuestionQRData(studentId, worksheetId), renderSize);
 };
 
 interface ClassOption {
@@ -2589,7 +2500,7 @@ const toggleStudent = (studentId: string) => {
                     q: `diag_${selectedTopics[0]?.substring(0, 10) || 'math'}_${student.recommendedLevel}_${assignedForm}`,
                   })}
                   size={32}
-                  level="M"
+                  level="H"
                   includeMargin={false}
                   bgColor="transparent"
                   fgColor="#000000"
@@ -2972,7 +2883,7 @@ const toggleStudent = (studentId: string) => {
                 q: `diag_${selectedTopics[0]?.substring(0, 10) || 'math'}_${student.recommendedLevel}_${assignedForm}_${Date.now()}`,
               })}
               size={48}
-              level="M"
+              level="H"
               includeMargin={true}
               bgColor="#FFFFFF"
               fgColor="#000000"

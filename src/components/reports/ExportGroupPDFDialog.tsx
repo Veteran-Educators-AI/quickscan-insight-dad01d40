@@ -12,79 +12,18 @@ import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
+import { generateQRCodePngDataUrl, generateStudentQuestionQRData, QR_PRINT_RENDER_SIZE } from '@/lib/qrCodeUtils';
 
 const formatPdfMathText = (text: string) => sanitizeForPDF(renderMathText(fixEncodingCorruption(text)));
 
 // Generate QR code as PNG data URL for PDF embedding
-const generateQRCodeDataUrl = (studentId: string, worksheetId: string, size: number = 100): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const container = document.createElement('div');
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    document.body.appendChild(container);
-    
-    const qrData = JSON.stringify({
-      v: 1,
-      s: studentId,
-      q: worksheetId,
-    });
-    
-    import('react-dom/client').then(({ createRoot }) => {
-      const root = createRoot(container);
-      const { QRCodeSVG } = require('qrcode.react');
-      const React = require('react');
-      
-      root.render(React.createElement(QRCodeSVG, {
-        value: qrData,
-        size: size,
-        level: 'M',
-        includeMargin: true,
-      }));
-      
-      setTimeout(() => {
-        const svg = container.querySelector('svg');
-        if (svg) {
-          const svgData = new XMLSerializer().serializeToString(svg);
-          const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-          const url = URL.createObjectURL(svgBlob);
-          
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.fillStyle = 'white';
-              ctx.fillRect(0, 0, size, size);
-              ctx.drawImage(img, 0, 0, size, size);
-              const pngDataUrl = canvas.toDataURL('image/png');
-              URL.revokeObjectURL(url);
-              root.unmount();
-              document.body.removeChild(container);
-              resolve(pngDataUrl);
-            } else {
-              URL.revokeObjectURL(url);
-              root.unmount();
-              document.body.removeChild(container);
-              reject(new Error('Could not get canvas context'));
-            }
-          };
-          img.onerror = () => {
-            URL.revokeObjectURL(url);
-            root.unmount();
-            document.body.removeChild(container);
-            reject(new Error('Failed to load QR SVG'));
-          };
-          img.src = url;
-        } else {
-          root.unmount();
-          document.body.removeChild(container);
-          reject(new Error('QR code SVG not found'));
-        }
-      }, 50);
-    }).catch(reject);
-  });
+const generateQRCodeDataUrl = async (
+  studentId: string,
+  worksheetId: string,
+  size: number = QR_PRINT_RENDER_SIZE
+): Promise<string> => {
+  const renderSize = Math.max(size, QR_PRINT_RENDER_SIZE);
+  return generateQRCodePngDataUrl(generateStudentQuestionQRData(studentId, worksheetId), renderSize);
 };
 
 interface Student {
@@ -314,7 +253,7 @@ export function ExportGroupPDFDialog({
         // Add small QR code next to student name
         try {
           const worksheetId = `rem_${groupLabel.replace(/\s+/g, '_')}_${Date.now()}`;
-          const qrDataUrl = await generateQRCodeDataUrl(student.studentId, worksheetId, 80);
+          const qrDataUrl = await generateQRCodeDataUrl(student.studentId, worksheetId);
           const qrSize = 12; // smaller QR for header
           const nameWidth = pdf.getTextWidth(`Name: ${student.studentName}`);
           pdf.addImage(qrDataUrl, 'PNG', marginLeft + nameWidth + 3, yPosition - 8, qrSize, qrSize);

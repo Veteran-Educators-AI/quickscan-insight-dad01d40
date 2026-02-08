@@ -294,6 +294,46 @@ export function AnalysisResults({
         </CardContent>
       </Card>
 
+      {/* ═══ Analysis Breakdown (Always Visible) ═══ */}
+      {!result.noResponse && (
+        <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              What the Student Did Well
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm whitespace-pre-wrap">
+              {result.whatStudentDidCorrectly || result.approachAnalysis || 'No analysis available'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!result.noResponse && (result.whatStudentGotWrong || (result.misconceptions && result.misconceptions.length > 0)) && (
+        <Card className="border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
+              What Needs Improvement
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {result.whatStudentGotWrong && (
+              <p className="text-sm whitespace-pre-wrap">{result.whatStudentGotWrong}</p>
+            )}
+            {!result.whatStudentGotWrong && result.misconceptions.length > 0 && (
+              <ul className="text-sm space-y-1 list-disc list-inside">
+                {result.misconceptions.map((m, i) => (
+                  <li key={i}>{m}</li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Action Buttons */}
       {(onSaveAnalytics || onAssociateStudent) && (
         <Card className="border-primary/20 bg-primary/5">

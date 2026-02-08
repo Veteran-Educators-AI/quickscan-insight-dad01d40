@@ -1,6 +1,6 @@
 /**
  * Utility functions for generating QR codes as images for document embedding.
- * Uses the qrcode.react library (via QRCodeSVG) for reliable, scannable QR codes.
+ * Uses the qrcode.react library (via QRCodeCanvas) for reliable, scannable QR codes.
  * 
  * IMPORTANT: This replaces the custom matrix generation with proper QR encoding
  * to ensure codes are reliably scannable by the jsQR library in useQRCodeScanner.
@@ -10,11 +10,13 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 
+export const QR_PRINT_RENDER_SIZE = 180;
+
 /**
  * Generate a QR code as PNG data URL for embedding in Word documents.
  * Creates a proper QR code by rendering to DOM, then converting to canvas.
  * 
- * Size recommendation: 100-120px minimum for reliable scanning from scanned documents.
+ * Size recommendation: 160-200px minimum for reliable scanning from printed/scanned documents.
  */
 export async function generateQRCodePngDataUrl(
   data: string, 
@@ -56,8 +58,8 @@ export async function generateQRCodePngDataUrl(
           
           if (canvas) {
             // Canvas found - get data URL directly
-            const padding = 8;
-            const borderWidth = 3;
+            const padding = Math.max(8, Math.round(size * 0.08));
+            const borderWidth = Math.max(3, Math.round(size * 0.03));
             const totalSize = size + (padding * 2) + (borderWidth * 2);
             
             const finalCanvas = document.createElement('canvas');
@@ -66,6 +68,7 @@ export async function generateQRCodePngDataUrl(
             
             const ctx = finalCanvas.getContext('2d');
             if (ctx) {
+              ctx.imageSmoothingEnabled = false;
               // White background
               ctx.fillStyle = '#ffffff';
               ctx.fillRect(0, 0, totalSize, totalSize);
@@ -95,8 +98,8 @@ export async function generateQRCodePngDataUrl(
             
             const img = new Image();
             img.onload = () => {
-              const padding = 8;
-              const borderWidth = 3;
+            const padding = Math.max(8, Math.round(size * 0.08));
+            const borderWidth = Math.max(3, Math.round(size * 0.03));
               const totalSize = size + (padding * 2) + (borderWidth * 2);
               
               const finalCanvas = document.createElement('canvas');
@@ -105,6 +108,7 @@ export async function generateQRCodePngDataUrl(
               
               const ctx = finalCanvas.getContext('2d');
               if (ctx) {
+                ctx.imageSmoothingEnabled = false;
                 // White background
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, totalSize, totalSize);
@@ -191,6 +195,18 @@ export function generateStudentOnlyQRData(studentId: string): string {
 }
 
 /**
+ * Generate student + question QR code data.
+ * Format matches what parseStudentQRCode expects.
+ */
+export function generateStudentQuestionQRData(studentId: string, questionId: string): string {
+  return JSON.stringify({
+    v: 1, // version 1 for student + question codes
+    s: studentId,
+    q: questionId,
+  });
+}
+
+/**
  * Generate worksheet identification QR code data.
  * Encodes worksheet ID for linking scanned work to worksheets.
  */
@@ -204,7 +220,7 @@ export function generateWorksheetQRData(worksheetId: string): string {
 
 /**
  * Helper to fetch QR code image as ArrayBuffer for Word document embedding.
- * Uses a larger size (100px) for reliable scanning from printed documents.
+ * Uses a higher render size for reliable scanning from printed documents.
  */
 export async function fetchQRCodeAsArrayBuffer(
   studentId: string,
@@ -216,8 +232,8 @@ export async function fetchQRCodeAsArrayBuffer(
       ? generateStudentPageQRData(studentId, pageNumber, totalPages)
       : generateStudentOnlyQRData(studentId);
     
-    // Use 100px size for reliable scanning
-    const dataUrl = await generateQRCodePngDataUrl(qrData, 100);
+    // Use higher render size for reliable printing/scanning
+    const dataUrl = await generateQRCodePngDataUrl(qrData, QR_PRINT_RENDER_SIZE);
     
     if (!dataUrl) return null;
     
@@ -245,8 +261,8 @@ export async function fetchWorksheetQRCodeAsArrayBuffer(
   try {
     const qrData = generateWorksheetQRData(worksheetId);
     
-    // Use 100px size for reliable scanning
-    const dataUrl = await generateQRCodePngDataUrl(qrData, 100);
+    // Use higher render size for reliable printing/scanning
+    const dataUrl = await generateQRCodePngDataUrl(qrData, QR_PRINT_RENDER_SIZE);
     
     if (!dataUrl) return null;
     

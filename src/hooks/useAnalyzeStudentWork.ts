@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
-import { detectBlankPage } from '@/lib/blankPageDetection';
 import { useBlankPageSettings } from '@/hooks/useBlankPageSettings';
 
 interface RubricStep {
@@ -258,6 +257,11 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
           standardCode: options?.standardCode,
           topicName: options?.topicName,
           customRubric,
+          blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
+            enabled: true,
+            score: blankPageSettings.blankPageScore,
+            comment: blankPageSettings.blankPageComment,
+          } : undefined,
         },
       });
 
@@ -329,6 +333,11 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
             standardCode: options?.standardCode,
             topicName: options?.topicName,
             customRubric,
+            blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
+              enabled: true,
+              score: blankPageSettings.blankPageScore,
+              comment: blankPageSettings.blankPageComment,
+            } : undefined,
           },
         }),
         supabase.functions.invoke('analyze-student-work', {
@@ -344,6 +353,11 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
             standardCode: options?.standardCode,
             topicName: options?.topicName,
             customRubric,
+            blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
+              enabled: true,
+              score: blankPageSettings.blankPageScore,
+              comment: blankPageSettings.blankPageComment,
+            } : undefined,
           },
         }),
       ]);

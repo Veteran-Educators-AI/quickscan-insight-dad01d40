@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, Sparkles, Users, Download, CheckCircle, AlertCircle, TrendingUp, TrendingDown, Minus, Brain, Target, AlertTriangle, QrCode, Eye } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useStudentWeaknesses, type StudentPerformanceProfile, type AdvancementLevel } from '@/hooks/useStudentWeaknesses';
 import { fixEncodingCorruption, renderMathText, sanitizeForPDF } from '@/lib/mathRenderer';
+import { generateQRCodePngDataUrl, generateStudentQuestionQRData, QR_PRINT_RENDER_SIZE } from '@/lib/qrCodeUtils';
 import jsPDF from 'jspdf';
 
 interface AdaptiveWorksheetGeneratorProps {
@@ -81,77 +81,13 @@ const getTrendIcon = (trend: 'improving' | 'stable' | 'declining') => {
 };
 
 // Generate QR code as PNG data URL
-const generateQRCodeDataUrl = (studentId: string, worksheetId: string, size: number = 100): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const qrData = JSON.stringify({ v: 1, s: studentId, q: worksheetId });
-    const container = document.createElement('div');
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    container.style.width = `${size}px`;
-    container.style.height = `${size}px`;
-    document.body.appendChild(container);
-
-    import('react-dom/client').then(async ({ createRoot }) => {
-      const React = await import('react');
-      const root = createRoot(container);
-
-      const QRWrapper = () => {
-        const ref = React.useRef<HTMLDivElement>(null);
-        React.useEffect(() => {
-          const timer = setTimeout(() => {
-            if (ref.current) {
-              const svg = ref.current.querySelector('svg');
-              if (svg) {
-                const svgData = new XMLSerializer().serializeToString(svg);
-                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(svgBlob);
-                const img = new Image();
-                img.onload = () => {
-                  const canvas = document.createElement('canvas');
-                  canvas.width = size;
-                  canvas.height = size;
-                  const ctx = canvas.getContext('2d');
-                  if (ctx) {
-                    ctx.fillStyle = 'white';
-                    ctx.fillRect(0, 0, size, size);
-                    ctx.drawImage(img, 0, 0, size, size);
-                    const pngDataUrl = canvas.toDataURL('image/png');
-                    URL.revokeObjectURL(url);
-                    root.unmount();
-                    document.body.removeChild(container);
-                    resolve(pngDataUrl);
-                  } else {
-                    reject(new Error('Could not get canvas context'));
-                  }
-                };
-                img.onerror = () => reject(new Error('Failed to load QR SVG'));
-                img.src = url;
-              } else {
-                reject(new Error('QR code SVG not found'));
-              }
-            }
-          }, 100);
-          return () => clearTimeout(timer);
-        }, []);
-
-        return React.createElement('div', { ref },
-          React.createElement(QRCodeSVG, {
-            value: qrData,
-            size: size,
-            level: 'M',
-            includeMargin: true,
-            bgColor: '#FFFFFF',
-            fgColor: '#000000',
-          })
-        );
-      };
-
-      root.render(React.createElement(QRWrapper));
-    }).catch((err) => {
-      document.body.removeChild(container);
-      reject(err);
-    });
-  });
+const generateQRCodeDataUrl = async (
+  studentId: string,
+  worksheetId: string,
+  size: number = QR_PRINT_RENDER_SIZE
+): Promise<string> => {
+  const renderSize = Math.max(size, QR_PRINT_RENDER_SIZE);
+  return generateQRCodePngDataUrl(generateStudentQuestionQRData(studentId, worksheetId), renderSize);
 };
 
 export function AdaptiveWorksheetGenerator({ open, onOpenChange }: AdaptiveWorksheetGeneratorProps) {
@@ -410,7 +346,7 @@ export function AdaptiveWorksheetGenerator({ open, onOpenChange }: AdaptiveWorks
         if (includeQR) {
           try {
             const worksheetId = `adaptive_${worksheet.studentId}_${Date.now()}`;
-            const qrDataUrl = await generateQRCodeDataUrl(worksheet.studentId, worksheetId, 80);
+            const qrDataUrl = await generateQRCodeDataUrl(worksheet.studentId, worksheetId);
             pdf.addImage(qrDataUrl, 'PNG', pageWidth - margin - 15, yPosition - 8, 12, 12);
           } catch (e) {
             console.error('QR generation failed:', e);

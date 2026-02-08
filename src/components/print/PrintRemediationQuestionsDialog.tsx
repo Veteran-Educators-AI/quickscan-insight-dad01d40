@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { QRCodeSVG } from 'qrcode.react';
 import { fixEncodingCorruption, renderMathText } from '@/lib/mathRenderer';
+import { generateStudentOnlyQRData, generateWorksheetQRData } from '@/lib/qrCodeUtils';
 
 interface RemediationQuestion {
   questionNumber: number;
@@ -49,14 +50,10 @@ export function PrintRemediationQuestionsDialog({
 
   // Generate unique worksheet ID for QR code
   const worksheetId = `WS-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-  const qrCodeData = JSON.stringify({
-    worksheetId,
-    studentName,
-    studentId,
-    topic: topicName,
-    timestamp: new Date().toISOString(),
-    questionCount: questions.length,
-  });
+  const qrCodeData = studentId
+    ? generateStudentOnlyQRData(studentId)
+    : generateWorksheetQRData(worksheetId);
+  const qrLabel = studentId ? 'Student QR' : worksheetId;
 
   const getDifficultyLabel = (difficulty: string) => {
     switch (difficulty) {
@@ -302,9 +299,24 @@ export function PrintRemediationQuestionsDialog({
                 {/* QR Code for Tracking */}
                 {includeQRCode && (
                   <div style={{ flexShrink: 0, textAlign: 'center' }}>
-                    <QRCodeSVG value={qrCodeData} size={56} level="M" />
+                    <div style={{ 
+                      padding: '4px', 
+                      backgroundColor: '#ffffff', 
+                      border: '2px solid #000000',
+                      borderRadius: '4px',
+                      display: 'inline-block',
+                    }}>
+                      <QRCodeSVG
+                        value={qrCodeData}
+                        size={88}
+                        level="H"
+                        includeMargin={true}
+                        bgColor="#ffffff"
+                        fgColor="#000000"
+                      />
+                    </div>
                     <p style={{ fontSize: '0.55rem', color: '#666', marginTop: '0.125rem', fontFamily: 'monospace' }}>
-                      {worksheetId}
+                      {qrLabel}
                     </p>
                   </div>
                 )}
