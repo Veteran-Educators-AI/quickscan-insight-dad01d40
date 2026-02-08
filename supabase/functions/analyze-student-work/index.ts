@@ -1266,8 +1266,12 @@ Provide your analysis in the following structure:
     • 55 = ONLY if completely blank or NO understanding whatsoever)
 ` + (feedbackVerbosity === 'detailed' ? `
 - Grade Justification: (DETAILED - 150-200 words. Include: 1) Complete breakdown of each error with exact citations from student work, 2) Explanation of WHY each error is mathematically incorrect, 3) What the correct approach should have been step-by-step, 4) How each error affected the final grade. Be thorough and educational.)
+- What Student Did Correctly: (REQUIRED - 50-100 words. List SPECIFIC things the student did right: correct formulas chosen, correct setup, correct operations, correct units, correct final answer, etc. Cite their actual work. If nothing is correct, say "No correct work identified.")
+- What Student Got Wrong: (REQUIRED - 50-100 words. List SPECIFIC errors and mistakes with exact citations from their work. Explain WHY each is wrong and what the correct approach should be. If no errors, say "No errors found - work is correct.")
 - Feedback: (DETAILED - 100-150 words. Provide comprehensive suggestions for improvement including: specific practice topics, common pitfalls to avoid, study strategies, and encouragement. Be constructive and educational.)` : `
-- Grade Justification: (CONCISE - under 75 words. Format: "DEDUCTIONS: [specific errors]. STRENGTHS: [what was correct]. RESULT: [final reasoning]")
+- Grade Justification: (REQUIRED - 50-100 words. MUST include: 1) What specific work earned credit, 2) What specific errors cost points, 3) How you arrived at this grade. Format: "EARNED CREDIT FOR: [cite correct work]. DEDUCTIONS FOR: [cite errors]. RESULT: [grade reasoning]")
+- What Student Did Correctly: (REQUIRED - 30-60 words. List the SPECIFIC correct steps, formulas, or reasoning the student demonstrated. Cite their actual written work. Example: "Student correctly identified the formula A = πr², substituted r = 5, and computed 25π." If nothing correct, say "No correct work identified.")
+- What Student Got Wrong: (REQUIRED - 30-60 words. List SPECIFIC errors with citations. Explain what was wrong and what it should have been. Example: "Student wrote '2πr²' instead of 'πr²' for the area formula, leading to an answer twice the correct value." If no errors, say "No errors found - work is correct.")
 - Feedback: (constructive suggestions - under 40 words)`) + `\``;
 
     // Build messages for Lovable AI
@@ -2114,6 +2118,8 @@ interface ParsedResult {
   studentWorkPresent: boolean; // NEW: Explicit blank page detection
   coherentWorkShown: boolean;
   approachAnalysis: string;
+  whatStudentDidCorrectly: string;
+  whatStudentGotWrong: string;
   rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
@@ -2136,6 +2142,8 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     studentWorkPresent: true, // Default to true, set to false if detected as blank
     coherentWorkShown: false,
     approachAnalysis: '',
+    whatStudentDidCorrectly: '',
+    whatStudentGotWrong: '',
     rubricScores: [],
     misconceptions: [],
     totalScore: { earned: 0, possible: 0, percentage: 0 },
@@ -2215,8 +2223,16 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   const finalAnswerCompleteMatch = text.match(/Final Answer Complete[:\s]*(YES|NO)/i);
   result.finalAnswerComplete = finalAnswerCompleteMatch ? finalAnswerCompleteMatch[1].toUpperCase() === 'YES' : true;
 
-  const approachMatch = text.match(/Approach Analysis[:\s]*([^]*?)(?=Is Correct|Final Answer Complete|Regents Score|Rubric Scores|Misconceptions|$)/i);
+  const approachMatch = text.match(/Approach Analysis[:\s]*([^]*?)(?=Is Correct|Final Answer Complete|Regents Score|Rubric Scores|Misconceptions|What Student Did Correctly|$)/i);
   if (approachMatch) result.approachAnalysis = approachMatch[1].trim();
+
+  // Parse What Student Did Correctly
+  const correctlyMatch = text.match(/What Student Did Correctly[:\s]*([^]*?)(?=What Student Got Wrong|Misconceptions|Feedback|Grade Justification|$)/i);
+  if (correctlyMatch) result.whatStudentDidCorrectly = correctlyMatch[1].trim();
+
+  // Parse What Student Got Wrong
+  const wrongMatch = text.match(/What Student Got Wrong[:\s]*([^]*?)(?=Feedback|Grade Justification|$)/i);
+  if (wrongMatch) result.whatStudentGotWrong = wrongMatch[1].trim();
 
   // Parse Regents Score (0-4)
   const regentsScoreMatch = text.match(/Regents Score[:\s]*(\d)/i);
