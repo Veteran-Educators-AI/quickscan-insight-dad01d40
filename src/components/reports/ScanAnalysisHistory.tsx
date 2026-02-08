@@ -139,6 +139,18 @@ export function ScanAnalysisHistory({ classId }: ScanAnalysisHistoryProps) {
     };
   };
 
+  // IMPORTANT: useMemo hooks must be called before any early returns
+  // to comply with React's Rules of Hooks (hooks must be called in the
+  // same order every render). Moving these before conditional returns
+  // fixes "Cannot access 'Gt' before initialization" crash.
+  const analyzedStudentIds = useMemo(() => {
+    return [...new Set(attempts?.map(a => a.student.id) || [])];
+  }, [attempts]);
+
+  const analyzedStudentNames = useMemo(() => {
+    return [...new Set(attempts?.map(a => getDisplayName(a.student.id, a.student.first_name, a.student.last_name)) || [])];
+  }, [attempts, getDisplayName]);
+
   if (isLoading) {
     return (
       <Card>
@@ -173,15 +185,6 @@ export function ScanAnalysisHistory({ classId }: ScanAnalysisHistoryProps) {
       </Card>
     );
   }
-
-  // Get unique analyzed student IDs and names for roster comparison
-  const analyzedStudentIds = useMemo(() => {
-    return [...new Set(attempts?.map(a => a.student.id) || [])];
-  }, [attempts]);
-
-  const analyzedStudentNames = useMemo(() => {
-    return [...new Set(attempts?.map(a => getDisplayName(a.student.id, a.student.first_name, a.student.last_name)) || [])];
-  }, [attempts, getDisplayName]);
 
   return (
     <>
