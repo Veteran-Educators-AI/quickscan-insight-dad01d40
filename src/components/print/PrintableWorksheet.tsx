@@ -282,11 +282,11 @@ export function PrintableWorksheet({
                   studentId={student.id} 
                   pageNumber={pageNumber}
                   totalPages={totalPages}
-                  size={65} 
+                  size={84} 
                 />
               ) : (
                 <>
-                  <StudentOnlyQRCode studentId={student.id} size={70} />
+                  <StudentOnlyQRCode studentId={student.id} size={88} />
                   <p style={{ 
                     fontSize: '0.6rem', 
                     color: '#6b7280', 
@@ -587,7 +587,7 @@ export function PrintableWorksheet({
                   <StudentQRCode 
                     studentId={student.id} 
                     questionId={question.id} 
-                    size={65}
+                    size={80}
                   />
                   <p style={{ 
                     fontSize: '0.75rem', 
@@ -609,7 +609,7 @@ export function PrintableWorksheet({
               <div style={{ 
                 flex: 1, 
                 minWidth: 0,
-                maxWidth: showQRCodes ? 'calc(100% - 90px)' : '100%',
+                maxWidth: showQRCodes ? 'calc(100% - 110px)' : '100%',
                 overflow: 'hidden',
                 wordWrap: 'break-word',
                 overflowWrap: 'break-word',
