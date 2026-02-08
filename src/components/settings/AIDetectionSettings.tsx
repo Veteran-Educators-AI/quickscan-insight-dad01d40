@@ -21,6 +21,7 @@ interface AIDetectionSettingsData {
   level_a_notifications: boolean;
   ai_feedback_verbosity: 'concise' | 'detailed';
   ai_training_mode: 'off' | 'learning' | 'trained';
+  analysis_provider: 'gemini' | 'gpt4o' | 'gpt4o-mini';
 }
 
 export function AIDetectionSettings() {
@@ -37,6 +38,7 @@ export function AIDetectionSettings() {
     level_a_notifications: true,
     ai_feedback_verbosity: 'concise',
     ai_training_mode: 'learning',
+    analysis_provider: 'gemini',
   });
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export function AIDetectionSettings() {
       const [settingsResult, correctionsResult] = await Promise.all([
         supabase
           .from('settings')
-          .select('ai_detection_enabled, ai_detection_threshold, ai_auto_reject_enabled, parent_ai_notifications, level_drop_notifications, level_a_notifications, ai_feedback_verbosity, ai_training_mode')
+          .select('ai_detection_enabled, ai_detection_threshold, ai_auto_reject_enabled, parent_ai_notifications, level_drop_notifications, level_a_notifications, ai_feedback_verbosity, ai_training_mode, analysis_provider')
           .eq('teacher_id', user!.id)
           .maybeSingle(),
         supabase
@@ -71,6 +73,7 @@ export function AIDetectionSettings() {
           level_a_notifications: settingsResult.data.level_a_notifications ?? true,
           ai_feedback_verbosity: (settingsResult.data.ai_feedback_verbosity as 'concise' | 'detailed') ?? 'concise',
           ai_training_mode: (settingsResult.data.ai_training_mode as 'off' | 'learning' | 'trained') ?? 'learning',
+          analysis_provider: (settingsResult.data.analysis_provider as 'gemini' | 'gpt4o' | 'gpt4o-mini') ?? 'gemini',
         });
       }
 
@@ -99,6 +102,7 @@ export function AIDetectionSettings() {
           level_a_notifications: settings.level_a_notifications,
           ai_feedback_verbosity: settings.ai_feedback_verbosity,
           ai_training_mode: settings.ai_training_mode,
+          analysis_provider: settings.analysis_provider,
         }, { onConflict: 'teacher_id' });
 
       if (error) throw error;
@@ -251,6 +255,51 @@ export function AIDetectionSettings() {
           </Select>
           <p className="text-xs text-muted-foreground">
             Controls how verbose AI grading justifications and feedback are
+          </p>
+        </div>
+
+        {/* AI Analysis Model Selection */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <Label>AI Analysis Model</Label>
+          </div>
+          <Select
+            value={settings.analysis_provider}
+            onValueChange={(value: 'gemini' | 'gpt4o' | 'gpt4o-mini') => 
+              setSettings(prev => ({ ...prev, analysis_provider: value }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="gemini">
+                <div className="flex flex-col items-start">
+                  <span className="font-medium">Gemini 2.5 Flash</span>
+                  <span className="text-xs text-muted-foreground">Fast &amp; affordable — good for most work (~$0.01/scan)</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="gpt4o-mini">
+                <div className="flex flex-col items-start">
+                  <span className="font-medium">GPT-4o Mini</span>
+                  <span className="text-xs text-muted-foreground">Better handwriting reading, similar cost (~$0.02/scan)</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="gpt4o">
+                <div className="flex flex-col items-start">
+                  <span className="font-medium">GPT-4o</span>
+                  <span className="text-xs text-muted-foreground">Best handwriting &amp; analysis quality (~$0.08/scan)</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {settings.analysis_provider === 'gpt4o' 
+              ? 'GPT-4o provides the best handwriting recognition and most detailed educational analysis. Recommended for difficult-to-read student work.'
+              : settings.analysis_provider === 'gpt4o-mini'
+              ? 'GPT-4o Mini offers improved handwriting reading over Gemini at a similar cost. Good balance of quality and affordability.'
+              : 'Gemini Flash is fast and affordable. Works well for clearly written student work.'}
           </p>
         </div>
 

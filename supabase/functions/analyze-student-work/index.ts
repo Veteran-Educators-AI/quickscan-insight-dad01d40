@@ -280,16 +280,57 @@ async function logAIUsage(
   }
 }
 
-// AI Model tier selection:
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI MODEL CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// TIER SYSTEM:
 // - LITE: Fast/cheap for simple tasks (OCR, blank detection, identification)
-// - STANDARD: Balanced for main grading analysis with detailed feedback
-// - REASONING: Deep reasoning for complex problem verification (uses DeepSeek R1)
-const AI_MODELS = {
-  lite: 'google/gemini-2.5-flash-lite',       // ~$0.02/1M tokens - OCR, blank detection, page type
-  standard: 'google/gemini-2.5-flash',         // ~$0.15/1M tokens - main grading analysis with detailed feedback
-} as const;
+// - STANDARD: Default for main grading analysis with detailed feedback
+// - PREMIUM: Best quality for handwriting OCR + deep educational analysis (GPT-4o)
+//
+// ANALYSIS PROVIDER (teacher-selectable via Settings):
+// - 'gemini'  → standard tier uses Gemini 2.5 Flash       (~$0.15/1M tokens)
+// - 'gpt4o'   → standard tier uses GPT-4o                 (~$2.50/1M input, $10/1M output)
+// - 'gpt4o-mini' → standard tier uses GPT-4o Mini         (~$0.15/1M input, $0.60/1M output)
+//
+// GPT-4o ADVANTAGES for student work analysis:
+// - Superior handwriting recognition (especially messy/young student writing)
+// - Better at structured educational feedback
+// - More accurate OCR of mathematical notation and diagrams
+// - Higher cost but significantly better analysis quality
+//
+// GPT-4o Mini is a great middle ground:
+// - Much better handwriting OCR than Gemini Flash Lite
+// - Comparable to Gemini Flash for analysis quality
+// - Similar cost to Gemini Flash
+//
+// COST COMPARISON per scan (approximate):
+// - Gemini Flash Lite (helper calls only): ~$0.001
+// - Gemini Flash (main analysis):          ~$0.01-0.02
+// - GPT-4o Mini (main analysis):           ~$0.01-0.03
+// - GPT-4o (main analysis):                ~$0.05-0.15
+// ═══════════════════════════════════════════════════════════════════════════════
 
-type AIModelTier = keyof typeof AI_MODELS;
+type AnalysisProvider = 'gemini' | 'gpt4o' | 'gpt4o-mini';
+
+// Model used for the main grading analysis based on teacher preference
+function getAnalysisModel(provider: AnalysisProvider): string {
+  switch (provider) {
+    case 'gpt4o':
+      return 'openai/gpt-4o';           // Best quality: superior handwriting OCR + analysis
+    case 'gpt4o-mini':
+      return 'openai/gpt-4o-mini';      // Good balance: better OCR than Gemini, similar cost
+    case 'gemini':
+    default:
+      return 'google/gemini-2.5-flash';  // Default: good quality, fast, affordable
+  }
+}
+
+// Lite model for simple helper tasks (always Gemini Flash Lite - cheapest)
+const LITE_MODEL = 'google/gemini-2.5-flash-lite';
+
+type AIModelTier = 'lite' | 'standard';
 
 // Helper function to call Lovable AI Gateway with token logging
 async function callLovableAI(
@@ -298,13 +339,20 @@ async function callLovableAI(
   functionName: string = 'analyze-student-work',
   supabase?: any,
   userId?: string,
-  modelTier: AIModelTier = 'lite'
+  modelTier: AIModelTier = 'lite',
+  analysisProvider: AnalysisProvider = 'gemini'
 ) {
-  const model = AI_MODELS[modelTier];
+  const model = modelTier === 'standard' ? getAnalysisModel(analysisProvider) : LITE_MODEL;
+  const isOpenAIModel = model.startsWith('openai/');
   const maxTokens = modelTier === 'standard' ? 6000 : 4000;
   const startTime = Date.now();
   
-  console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier}`);
+  console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier} provider=${analysisProvider}`);
+  
+  // OpenAI models use max_completion_tokens instead of max_tokens
+  const tokenParams = isOpenAIModel 
+    ? { max_completion_tokens: maxTokens }
+    : { max_tokens: maxTokens };
   
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -315,7 +363,7 @@ async function callLovableAI(
     body: JSON.stringify({
       model,
       messages,
-      max_tokens: maxTokens,
+      ...tokenParams,
     }),
   });
 
@@ -337,7 +385,7 @@ async function callLovableAI(
   
   // Log token usage for cost monitoring
   const usage = data.usage || {};
-  console.log(`[TOKEN_USAGE] function=${functionName} model=${model} tier=${modelTier} prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
+  console.log(`[TOKEN_USAGE] function=${functionName} model=${model} tier=${modelTier} provider=${analysisProvider} prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
   
   // Log to database if supabase client is provided
   if (supabase && userId) {
@@ -575,17 +623,18 @@ serve(async (req) => {
     console.log('Assessment mode:', assessmentMode || 'teacher');
     console.log('Rubric steps provided:', rubricSteps?.length || 0);
 
-    // Fetch teacher settings early (for verbosity, grade floor, and training mode)
+    // Fetch teacher settings early (for verbosity, grade floor, training mode, and AI provider)
     let feedbackVerbosity = 'concise';
     let gradeFloor = customGradeFloor || 55;
     let gradeFloorWithEffort = customGradeFloorWithEffort || 65;
     let aiTrainingMode = 'learning';
+    let analysisProvider: AnalysisProvider = 'gemini';
     
     if (effectiveTeacherId && supabase) {
       try {
         const { data: settingsData } = await supabase
           .from('settings')
-          .select('grade_floor, grade_floor_with_effort, ai_feedback_verbosity, ai_training_mode')
+          .select('grade_floor, grade_floor_with_effort, ai_feedback_verbosity, ai_training_mode, analysis_provider')
           .eq('teacher_id', effectiveTeacherId)
           .maybeSingle();
         
@@ -596,6 +645,11 @@ serve(async (req) => {
           }
           feedbackVerbosity = settingsData.ai_feedback_verbosity ?? 'concise';
           aiTrainingMode = settingsData.ai_training_mode ?? 'learning';
+          // Read teacher's preferred AI provider for analysis
+          const provider = settingsData.analysis_provider;
+          if (provider === 'gpt4o' || provider === 'gpt4o-mini' || provider === 'gemini') {
+            analysisProvider = provider;
+          }
         }
       } catch (settingsError) {
         console.error('Error fetching teacher settings:', settingsError);
@@ -603,6 +657,7 @@ serve(async (req) => {
     }
     console.log('Feedback verbosity:', feedbackVerbosity);
     console.log('AI training mode:', aiTrainingMode);
+    console.log('Analysis provider:', analysisProvider);
 
     // Fetch grading corrections for AI training (if training mode is enabled or useLearnedStyle is true)
     let gradingStyleContext = '';
@@ -1349,14 +1404,19 @@ Provide your analysis in the following structure:
 
     // Use the STANDARD tier model for main grading - provides much better
     // detailed analysis (strengths, areas for improvement, educational feedback)
-    // compared to the lite model used for simpler tasks like OCR/blank detection
+    // compared to the lite model used for simpler tasks like OCR/blank detection.
+    // The teacher's analysisProvider setting controls which model is used:
+    // - 'gemini' → Gemini 2.5 Flash (default, fast, affordable)
+    // - 'gpt4o'  → GPT-4o (best handwriting OCR + analysis quality, higher cost)
+    // - 'gpt4o-mini' → GPT-4o Mini (better OCR than Gemini, similar cost)
     const analysisText = await callLovableAI(
       messages, 
       LOVABLE_API_KEY, 
       'analyze-student-work', 
       supabase, 
       effectiveTeacherId, 
-      'standard'
+      'standard',
+      analysisProvider
     );
 
     if (!analysisText) {
