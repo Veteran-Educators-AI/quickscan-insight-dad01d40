@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,49 @@ import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 import { MisconceptionComparison, extractErrorRegions } from './MisconceptionComparison';
 import { ImageErrorOverlay } from './ImageErrorOverlay';
 import { AIAnalysisCritiqueDialog } from './AIAnalysisCritiqueDialog';
+
+/** Local error boundary to catch render errors inside the dialog without crashing the whole app */
+class DialogErrorBoundary extends React.Component<
+  { children: React.ReactNode; onClose?: () => void },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; onClose?: () => void }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('StudentWorkDetailDialog error:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-center space-y-4">
+          <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto" />
+          <p className="text-sm font-medium">Failed to render analysis details</p>
+          <p className="text-xs text-muted-foreground">{this.state.error?.message}</p>
+          <div className="flex gap-2 justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => this.setState({ hasError: false, error: null })}
+            >
+              Retry
+            </Button>
+            {this.props.onClose && (
+              <Button variant="default" size="sm" onClick={this.props.onClose}>
+                Close
+              </Button>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 interface RubricScore {
   criterion: string;
   score: number;
@@ -223,6 +266,7 @@ export function StudentWorkDetailDialog({
             </div>
           </DialogHeader>
 
+          <DialogErrorBoundary onClose={() => onOpenChange(false)}>
           <div className="grid grid-cols-1 lg:grid-cols-2 h-[calc(95vh-80px)]">
             {/* Left Panel - Image with zoom controls */}
             <div className="border-r flex flex-col bg-muted/30">
@@ -559,6 +603,7 @@ export function StudentWorkDetailDialog({
               </div>
             </ScrollArea>
           </div>
+          </DialogErrorBoundary>
         </DialogContent>
       </Dialog>
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { CheckCircle2, XCircle, AlertTriangle, Lightbulb, Save, UserPlus, Loader2, FileX, ThumbsUp, Target, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,41 @@ import { AIAnalysisCritiqueDialog } from './AIAnalysisCritiqueDialog';
 import { OCRCorrectionPanel } from './OCRCorrectionPanel';
 import { TeacherInterpretationPanel } from './TeacherInterpretationPanel';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
+
+/** Local error boundary to prevent analysis render errors from crashing the entire app */
+class AnalysisErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('AnalysisResults render error:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-6 text-center space-y-3">
+          <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto" />
+          <p className="text-sm font-medium">Unable to display analysis results</p>
+          <p className="text-xs text-muted-foreground">{this.state.error?.message}</p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="text-xs text-primary underline hover:no-underline"
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface RubricScore {
   criterion: string;
@@ -171,6 +206,7 @@ export function AnalysisResults({
   const gradeBadge = getGradeBadge(grade);
 
   return (
+    <AnalysisErrorBoundary>
     <div className="space-y-4">
       {/* Logo Header */}
       <div className="flex justify-center py-2">
@@ -589,5 +625,6 @@ export function AnalysisResults({
         )}
       </Accordion>
     </div>
+    </AnalysisErrorBoundary>
   );
 }

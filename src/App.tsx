@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { StudentNameProvider } from "@/lib/StudentNameContext";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
@@ -49,14 +49,28 @@ import { BetaFeedbackButton } from "./components/BetaFeedbackButton";
 
 const queryClient = new QueryClient();
 
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
-  constructor(props: { children: React.ReactNode }) {
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode; resetKey?: string },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; resetKey?: string }) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
+  }
+
+  componentDidUpdate(prevProps: { resetKey?: string }) {
+    // Reset error state when the route (resetKey) changes
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
   }
 
   render() {
@@ -66,12 +80,29 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
           <div className="max-w-md text-center">
             <h1 className="text-xl font-bold text-red-600 mb-2">Something went wrong</h1>
             <p className="text-sm text-gray-600 mb-4">{this.state.error?.message}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Reload Page
-            </button>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => this.setState({ hasError: false, error: null })}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                  window.history.back();
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Reload Page
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -79,6 +110,19 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
     return this.props.children;
   }
+}
+
+/**
+ * Wrapper that passes the current route location to the ErrorBoundary
+ * so it can auto-reset when the user navigates to a different page.
+ */
+function RouteErrorBoundary({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  return (
+    <ErrorBoundary resetKey={location.pathname}>
+      {children}
+    </ErrorBoundary>
+  );
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -186,11 +230,13 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <OnboardingTour />
-              <DemoTour />
-              <WhatsNewDialog />
-              <BetaFeedbackButton />
-              <AppRoutes />
+              <RouteErrorBoundary>
+                <OnboardingTour />
+                <DemoTour />
+                <WhatsNewDialog />
+                <BetaFeedbackButton />
+                <AppRoutes />
+              </RouteErrorBoundary>
             </BrowserRouter>
           </TooltipProvider>
         </StudentNameProvider>

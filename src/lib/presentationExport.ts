@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import { fixEncodingCorruption, sanitizeForPDF } from '@/lib/mathRenderer';
 import pptxgen from 'pptxgenjs';
-import type { NycologicPresentation, VisualTheme } from '@/components/presentation/NycologicPresents';
+import type { NycologicPresentation, VisualTheme } from '@/components/presentation/presentationTypes';
 
 // Theme color mappings for exports
 const themeColors: Record<string, { primary: string; secondary: string; bg: string }> = {
