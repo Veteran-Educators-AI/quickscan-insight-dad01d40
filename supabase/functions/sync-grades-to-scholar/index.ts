@@ -246,18 +246,40 @@ serve(async (req) => {
       console.error('Error fetching grades:', gradesError);
     }
 
-    // Fetch misconceptions from attempts
-    const { data: attempts } = await supabase
-      .from('attempts')
-      .select('student_id, attempt_misconceptions(misconception_id, confidence, misconception_tags(name, description, topics(name)))')
-      .in('student_id', studentIds);
+    // Fetch misconceptions from attempts (with graceful fallback)
+    let attempts: any[] | null = null;
+    try {
+      const { data: attemptData, error: attemptError } = await supabase
+        .from('attempts')
+        .select('student_id, attempt_misconceptions(misconception_id, confidence, misconception_tags(name, description, topics(name)))')
+        .in('student_id', studentIds);
+      
+      if (attemptError) {
+        console.error('Error fetching attempt misconceptions (non-fatal):', attemptError.message);
+      } else {
+        attempts = attemptData;
+      }
+    } catch (err) {
+      console.error('Failed to fetch attempt misconceptions:', err);
+    }
 
     // Fetch analysis_misconceptions which have structured data including standards and remedies
-    const { data: analysisMisconceptions } = await supabase
-      .from('analysis_misconceptions')
-      .select('student_id, topic_name, misconception_text, severity, suggested_remedies, grade_history_id, grade_history(nys_standard, topic_name)')
-      .in('student_id', studentIds)
-      .eq('teacher_id', user.id);
+    let analysisMisconceptions: any[] | null = null;
+    try {
+      const { data: misData, error: misError } = await supabase
+        .from('analysis_misconceptions')
+        .select('student_id, topic_name, misconception_text, severity, suggested_remedies, grade_history_id')
+        .in('student_id', studentIds)
+        .eq('teacher_id', user.id);
+      
+      if (misError) {
+        console.error('Error fetching analysis misconceptions (non-fatal):', misError.message);
+      } else {
+        analysisMisconceptions = misData;
+      }
+    } catch (err) {
+      console.error('Failed to fetch analysis misconceptions:', err);
+    }
 
     // Fetch worksheets for problem set names
     const { data: worksheets } = await supabase
@@ -306,9 +328,10 @@ serve(async (req) => {
       }
 
       // Add misconceptions from analysis_misconceptions (has standards and remedies)
-      const studentAnalysisMisconceptions = (analysisMisconceptions || []).filter(m => m.student_id === student.id);
+      const studentAnalysisMisconceptions = (analysisMisconceptions || []).filter((m: any) => m.student_id === student.id);
       for (const am of studentAnalysisMisconceptions) {
-        const gradeHistory = am.grade_history as any;
+        // grade_history join may not be available; gracefully handle
+        const gradeHistory = (am as any).grade_history;
         const standard = gradeHistory?.nys_standard || null;
         
         // Find associated worksheet/problem set from grade history topic
@@ -462,16 +485,20 @@ serve(async (req) => {
           responseData = { raw: responseText };
         }
 
-        // Log the sync action
-        await supabase.from('sister_app_sync_log').insert({
-          teacher_id: user.id,
-          action: 'batch_sync',
-          data: {
-            ...batchPayload.summary,
-            class_id,
-            response: responseData,
-          },
-        });
+        // Log the sync action (non-fatal if logging fails)
+        try {
+          await supabase.from('sister_app_sync_log').insert({
+            teacher_id: user.id,
+            action: 'batch_sync',
+            data: {
+              ...batchPayload.summary,
+              class_id,
+              response: responseData,
+            },
+          });
+        } catch (logErr) {
+          console.error('Non-fatal: Failed to log sync action:', logErr);
+        }
 
         return new Response(
           JSON.stringify({ 
@@ -622,25 +649,29 @@ serve(async (req) => {
     
     console.log(`All batches complete: ${syncResults.successful} synced, ${syncResults.failed} failed`);
 
-    // Log the sync action with response for dashboard status display
-    await supabase.from('sister_app_sync_log').insert({
-      teacher_id: user.id,
-      action: 'individual_sync',
-      data: {
-        ...batchPayload.summary,
-        class_id,
-        sync_results: syncResults,
-        response: {
-          success: syncResults.failed === 0 || syncResults.successful > 0,
-          message: `Synced ${syncResults.successful} students`,
-          processed: {
-            students_synced: syncResults.successful,
-            grades_received: (grades || []).length,
-            misconceptions_tracked: totalMisconceptions,
+    // Log the sync action with response for dashboard status display (non-fatal)
+    try {
+      await supabase.from('sister_app_sync_log').insert({
+        teacher_id: user.id,
+        action: 'individual_sync',
+        data: {
+          ...batchPayload.summary,
+          class_id,
+          sync_results: syncResults,
+          response: {
+            success: syncResults.failed === 0 || syncResults.successful > 0,
+            message: `Synced ${syncResults.successful} students`,
+            processed: {
+              students_synced: syncResults.successful,
+              grades_received: (grades || []).length,
+              misconceptions_tracked: totalMisconceptions,
+            },
           },
         },
-      },
-    });
+      });
+    } catch (logErr) {
+      console.error('Non-fatal: Failed to log sync action:', logErr);
+    }
 
     const allSucceeded = syncResults.failed === 0;
     const partialSuccess = syncResults.successful > 0 && syncResults.failed > 0;

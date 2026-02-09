@@ -192,11 +192,28 @@ serve(async (req) => {
     // Search the teacher_api_keys table for a matching hash.
     // If found, we get the teacher_id to know whose account this key belongs to.
     // -------------------------------------------------------------------------
-    const { data: keyRecord, error: keyError } = await supabaseAdmin
+    // Try api_key_hash first (new column name), fall back to key_hash (original column name)
+    let keyRecord: any = null;
+    let keyError: any = null;
+
+    const { data: keyData1, error: keyErr1 } = await supabaseAdmin
       .from('teacher_api_keys')
       .select('id, teacher_id, is_active')
       .eq('api_key_hash', apiKeyHash)
-      .single();
+      .maybeSingle();
+
+    if (keyData1) {
+      keyRecord = keyData1;
+    } else {
+      // Fallback: try original column name 'key_hash'
+      const { data: keyData2, error: keyErr2 } = await supabaseAdmin
+        .from('teacher_api_keys')
+        .select('id, teacher_id, is_active')
+        .eq('key_hash', apiKeyHash)
+        .maybeSingle();
+      keyRecord = keyData2;
+      keyError = keyErr2;
+    }
 
     // If no matching key found, reject the request
     if (keyError || !keyRecord) {
@@ -300,27 +317,31 @@ serve(async (req) => {
       for (const participant of participantResults) {
         participantsProcessed++;
         
-        // Log each participant's results
-        await supabaseAdmin.from('sister_app_sync_log').insert({
-          teacher_id: keyRecord.teacher_id,
-          student_id: participant.student_id,
-          action: 'live_session_participation',
-          data: {
-            activity_name: body.data?.activity_name,
-            topic_name: body.data?.topic_name,
-            student_name: participant.student_name,
-            total_questions_answered: participant.total_questions_answered,
-            correct_answers: participant.correct_answers,
-            accuracy: participant.accuracy,
-            credit_awarded: participant.credit_awarded,
-            participated: participant.participated,
-            answers: participant.answers,
-            session_code: body.data?.session_code,
-          },
-          source_app: 'scholar_app',
-          processed: true,
-          processed_at: new Date().toISOString(),
-        });
+        // Log each participant's results (non-fatal if logging fails)
+        try {
+          await supabaseAdmin.from('sister_app_sync_log').insert({
+            teacher_id: keyRecord.teacher_id,
+            student_id: participant.student_id,
+            action: 'live_session_participation',
+            data: {
+              activity_name: body.data?.activity_name,
+              topic_name: body.data?.topic_name,
+              student_name: participant.student_name,
+              total_questions_answered: participant.total_questions_answered,
+              correct_answers: participant.correct_answers,
+              accuracy: participant.accuracy,
+              credit_awarded: participant.credit_awarded,
+              participated: participant.participated,
+              answers: participant.answers,
+              session_code: body.data?.session_code,
+            },
+            source_app: 'scholar_app',
+            processed: true,
+            processed_at: new Date().toISOString(),
+          });
+        } catch (logErr) {
+          console.error('Non-fatal: Failed to log participant sync:', logErr);
+        }
 
         // If participated, create a grade entry for tracking
         if (participant.participated && participant.total_questions_answered > 0) {
@@ -608,11 +629,11 @@ serve(async (req) => {
         .single();
 
       if (logError) {
-        console.error('Error logging sync data:', logError);
-        return new Response(
-          JSON.stringify({ success: false, error: 'Failed to log sync data' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // Log the error but don't fail the request - the sync log is secondary
+        // to actually processing the incoming data. Previous versions would
+        // return 500 here, causing the sister app to think the sync failed.
+        console.error('Error logging sync data (non-fatal):', logError);
+        console.error('Will continue processing the request despite log failure');
       }
 
       logEntry = singleLogEntry;
@@ -659,14 +680,16 @@ serve(async (req) => {
           break;
       }
 
-      // Mark single event as processed
-      await supabaseAdmin
-        .from('sister_app_sync_log')
-        .update({ 
-          processed: true, 
-          processed_at: new Date().toISOString() 
-        })
-        .eq('id', logEntry.id);
+      // Mark single event as processed (only if log entry was created)
+      if (logEntry?.id) {
+        await supabaseAdmin
+          .from('sister_app_sync_log')
+          .update({ 
+            processed: true, 
+            processed_at: new Date().toISOString() 
+          })
+          .eq('id', logEntry.id);
+      }
     }
 
     // -------------------------------------------------------------------------
@@ -679,21 +702,6 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         log_id: logEntry?.id,
-        processed: processedResult 
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-    // -------------------------------------------------------------------------
-    // STEP 11: RETURN SUCCESS RESPONSE
-    // -------------------------------------------------------------------------
-    // Let the sister app know the request was successful.
-    // Include the log ID so they can reference it if needed.
-    // -------------------------------------------------------------------------
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        log_id: logEntry.id,
         processed: processedResult 
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -533,13 +533,17 @@ export function useSaveAnalysisResults() {
             timestamp: new Date().toISOString(),
           };
 
-          // Log the sync for audit purposes
-          await supabase.from('sister_app_sync_log').insert({
-            teacher_id: user.id,
-            student_id: params.studentId,
-            action: 'auto_grade_sync',
-            data: gradePayload,
-          });
+          // Log the sync for audit purposes (non-fatal if logging fails)
+          try {
+            await supabase.from('sister_app_sync_log').insert({
+              teacher_id: user.id,
+              student_id: params.studentId,
+              action: 'auto_grade_sync',
+              data: gradePayload,
+            });
+          } catch (logErr) {
+            console.error('Non-fatal: Failed to log sync action:', logErr);
+          }
 
           if (sisterAppResult.success) {
             setSyncStatus(prev => ({ 
