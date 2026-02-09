@@ -51,6 +51,11 @@ Guidelines:
       }
     ];
 
+    const model = 'gpt-5-mini';
+    const tokenParams = model.startsWith('gpt-5')
+      ? { max_completion_tokens: 500 }
+      : { max_tokens: 500 };
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -58,9 +63,9 @@ Guidelines:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model,
         messages: messages,
-        max_tokens: 500,
+        ...tokenParams,
         temperature: 0.7,
       }),
     });
