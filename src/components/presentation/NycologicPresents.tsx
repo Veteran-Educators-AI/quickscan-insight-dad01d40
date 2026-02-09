@@ -11,6 +11,7 @@ import { exportToPDF, exportToPPTX } from '@/lib/presentationExport';
 import { renderMathText } from '@/lib/mathRenderer';
 import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 import { SlideImageGenerator, GeneratedImageData } from './SlideImageGenerator';
+import type { SlideImage, PresentationSlide, VisualTheme, NycologicPresentation } from './presentationTypes';
 
 // Re-export shared types from presentationTypes.ts for backward compatibility.
 // IMPORTANT: The canonical definitions live in presentationTypes.ts to avoid
