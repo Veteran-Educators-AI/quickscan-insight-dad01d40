@@ -52,10 +52,14 @@ const SimpleModeResponse = React.lazy(() => import("./pages/SimpleModeResponse")
 
 const queryClient = new QueryClient();
 
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+// Key for tracking auto-reload attempts to prevent infinite reload loops
+const RELOAD_KEY = 'app-error-auto-reload';
+const MAX_AUTO_RELOADS = 2;
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null; autoReloading: boolean }> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, autoReloading: false };
   }
 
   static getDerivedStateFromError(error: Error) {
@@ -64,15 +68,60 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('ErrorBoundary caught error:', error, errorInfo);
+    
+    // Detect "Cannot access 'X' before initialization" TDZ errors
+    // These are caused by stale cached JavaScript chunks after a deployment.
+    // Auto-reloading fetches fresh chunks and resolves the issue.
+    const isTDZError = error.message?.includes('before initialization');
+    const isChunkError = error.message?.includes('Failed to fetch dynamically imported module') ||
+                         error.message?.includes('Loading chunk') ||
+                         error.message?.includes('Importing a module script failed');
+    
+    if (isTDZError || isChunkError) {
+      const reloadCount = parseInt(sessionStorage.getItem(RELOAD_KEY) || '0', 10);
+      
+      if (reloadCount < MAX_AUTO_RELOADS) {
+        console.log(`[ErrorBoundary] TDZ/chunk error detected (attempt ${reloadCount + 1}/${MAX_AUTO_RELOADS}), auto-reloading to fetch fresh chunks...`);
+        sessionStorage.setItem(RELOAD_KEY, String(reloadCount + 1));
+        this.setState({ autoReloading: true });
+        // Small delay so the user sees the reloading message
+        setTimeout(() => window.location.reload(), 500);
+        return;
+      } else {
+        console.warn('[ErrorBoundary] Max auto-reloads reached, showing error to user');
+        // Clear counter so next manual reload starts fresh
+        sessionStorage.removeItem(RELOAD_KEY);
+      }
+    } else {
+      // Non-TDZ error: clear reload counter
+      sessionStorage.removeItem(RELOAD_KEY);
+    }
   }
 
   render() {
+    if (this.state.autoReloading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+          <div className="max-w-md text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-sm text-muted-foreground">Updating to latest version...</p>
+          </div>
+        </div>
+      );
+    }
+
     if (this.state.hasError) {
+      const isTDZError = this.state.error?.message?.includes('before initialization');
+      
       return (
         <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
           <div className="max-w-md text-center">
             <h1 className="text-xl font-bold text-red-600 mb-2">Something went wrong</h1>
-            <p className="text-sm text-gray-600 mb-4">{this.state.error?.message}</p>
+            <p className="text-sm text-gray-600 mb-4">
+              {isTDZError 
+                ? 'A cached version of the app is causing issues. Please reload the page.'
+                : this.state.error?.message}
+            </p>
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => this.setState({ hasError: false, error: null })}
@@ -90,7 +139,14 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
                 Go Back
               </button>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  // Clear cached modules and reload
+                  sessionStorage.removeItem(RELOAD_KEY);
+                  if ('caches' in window) {
+                    caches.keys().then(names => names.forEach(name => caches.delete(name)));
+                  }
+                  window.location.reload();
+                }}
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
               >
                 Reload Page
