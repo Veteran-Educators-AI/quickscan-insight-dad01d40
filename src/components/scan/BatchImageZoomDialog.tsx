@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, Move, AlertTriangle, MapPin, Check, X, Save, Brain, Loader2, Pencil, PenTool } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, Move, AlertTriangle, MapPin, Check, X, Save, Brain, Loader2, Pencil, PenTool, CheckCircle2, Lightbulb, BookOpen, Target, ThumbsUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -36,6 +36,16 @@ interface BatchImageZoomDialogProps {
   studentId?: string;
   attemptId?: string;
   topicName?: string;
+  // Analysis details for sidebar display
+  gradeJustification?: string;
+  feedback?: string;
+  whatStudentDidCorrectly?: string;
+  whatStudentGotWrong?: string;
+  approachAnalysis?: string;
+  strengthsAnalysis?: string[];
+  areasForImprovement?: string[];
+  regentsScore?: number;
+  regentsScoreJustification?: string;
 }
 
 export function BatchImageZoomDialog({
@@ -51,6 +61,15 @@ export function BatchImageZoomDialog({
   studentId,
   attemptId,
   topicName = 'Unknown Topic',
+  gradeJustification,
+  feedback,
+  whatStudentDidCorrectly,
+  whatStudentGotWrong,
+  approachAnalysis,
+  strengthsAnalysis,
+  areasForImprovement,
+  regentsScore,
+  regentsScoreJustification,
 }: BatchImageZoomDialogProps) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -783,6 +802,30 @@ export function BatchImageZoomDialog({
                       </div>
                     );
                   })}
+
+                  {/* Analysis details in misconceptions sidebar */}
+                  {(gradeJustification || feedback) && (
+                    <div className="mt-3 pt-3 border-t border-muted">
+                      {gradeJustification && (
+                        <div className="p-2.5 rounded-lg border border-blue-200 bg-blue-50/30 dark:bg-blue-950/10 mb-2">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <BookOpen className="h-3 w-3 text-blue-600" />
+                            <span className="text-[10px] font-medium text-blue-700 dark:text-blue-400">Grade Justification</span>
+                          </div>
+                          <p className="text-[11px] leading-relaxed text-foreground/80">{gradeJustification}</p>
+                        </div>
+                      )}
+                      {feedback && (
+                        <div className="p-2.5 rounded-lg border border-purple-200 bg-purple-50/30 dark:bg-purple-950/10">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Lightbulb className="h-3 w-3 text-purple-600" />
+                            <span className="text-[10px] font-medium text-purple-700 dark:text-purple-400">Feedback</span>
+                          </div>
+                          <p className="text-[11px] leading-relaxed text-foreground/80">{feedback}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
 
@@ -809,7 +852,7 @@ export function BatchImageZoomDialog({
             </div>
           )}
 
-          {/* Sidebar - No errors found panel */}
+          {/* Sidebar - No errors found panel with analysis details */}
           {!hasMisconceptions && showAnnotations && !isAnnotating && (
             <div className="w-80 border-l bg-background flex flex-col">
               <div className="p-3 border-b bg-muted/30">
@@ -904,6 +947,108 @@ export function BatchImageZoomDialog({
                           </div>
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Analysis Details Section - What the student did well */}
+                  {(whatStudentDidCorrectly || approachAnalysis) && (
+                    <div className="p-3 rounded-lg border border-green-200 bg-green-50/30 dark:bg-green-950/10">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                        <span className="text-xs font-medium text-green-700 dark:text-green-400">What the Student Did Well</span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-foreground/80">
+                        {whatStudentDidCorrectly || approachAnalysis}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Strengths Analysis */}
+                  {strengthsAnalysis && strengthsAnalysis.length > 0 && (
+                    <div className="p-3 rounded-lg border border-green-200 bg-green-50/30 dark:bg-green-950/10">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <ThumbsUp className="h-3.5 w-3.5 text-green-600" />
+                        <span className="text-xs font-medium text-green-700 dark:text-green-400">Strengths</span>
+                      </div>
+                      <ul className="space-y-1">
+                        {strengthsAnalysis.map((s, i) => (
+                          <li key={i} className="text-xs leading-relaxed text-foreground/80 flex items-start gap-1">
+                            <span className="text-green-500 mt-0.5 shrink-0">+</span>
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Areas for Improvement */}
+                  {areasForImprovement && areasForImprovement.length > 0 && (
+                    <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/30 dark:bg-amber-950/10">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Target className="h-3.5 w-3.5 text-amber-600" />
+                        <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Areas for Improvement</span>
+                      </div>
+                      <ul className="space-y-1">
+                        {areasForImprovement.map((a, i) => (
+                          <li key={i} className="text-xs leading-relaxed text-foreground/80 flex items-start gap-1">
+                            <span className="text-amber-500 mt-0.5 shrink-0">-</span>
+                            <span>{a}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* What Student Got Wrong - if any text response */}
+                  {whatStudentGotWrong && (
+                    <div className="p-3 rounded-lg border border-orange-200 bg-orange-50/30 dark:bg-orange-950/10">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5 text-orange-600" />
+                        <span className="text-xs font-medium text-orange-700 dark:text-orange-400">What Needs Correction</span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-foreground/80">
+                        {whatStudentGotWrong}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Grade Justification */}
+                  {gradeJustification && (
+                    <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/30 dark:bg-blue-950/10">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <BookOpen className="h-3.5 w-3.5 text-blue-600" />
+                        <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Grade Justification</span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-foreground/80">
+                        {gradeJustification}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Feedback & Suggestions */}
+                  {feedback && (
+                    <div className="p-3 rounded-lg border border-purple-200 bg-purple-50/30 dark:bg-purple-950/10">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Lightbulb className="h-3.5 w-3.5 text-purple-600" />
+                        <span className="text-xs font-medium text-purple-700 dark:text-purple-400">Feedback & Suggestions</span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-foreground/80">
+                        {feedback}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Regents Score & Justification */}
+                  {regentsScore !== undefined && (
+                    <div className="p-3 rounded-lg border border-muted bg-muted/30">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">NYS Regents Score: {regentsScore}/4</span>
+                      </div>
+                      {regentsScoreJustification && (
+                        <p className="text-xs leading-relaxed text-foreground/80">
+                          {regentsScoreJustification}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

@@ -1090,6 +1090,15 @@ export function BatchQueue({
         grade={items[zoomPreviewIndex].result?.grade}
         studentId={items[zoomPreviewIndex].studentId}
         topicName={items[zoomPreviewIndex].worksheetTopic || items[zoomPreviewIndex].result?.problemIdentified || 'Unknown Topic'}
+        gradeJustification={items[zoomPreviewIndex].result?.gradeJustification}
+        feedback={items[zoomPreviewIndex].result?.feedback}
+        whatStudentDidCorrectly={items[zoomPreviewIndex].result?.whatStudentDidCorrectly}
+        whatStudentGotWrong={items[zoomPreviewIndex].result?.whatStudentGotWrong}
+        approachAnalysis={items[zoomPreviewIndex].result?.approachAnalysis}
+        strengthsAnalysis={items[zoomPreviewIndex].result?.strengthsAnalysis}
+        areasForImprovement={items[zoomPreviewIndex].result?.areasForImprovement}
+        regentsScore={items[zoomPreviewIndex].result?.regentsScore}
+        regentsScoreJustification={items[zoomPreviewIndex].result?.regentsScoreJustification}
         onNavigate={(direction) => {
           if (direction === 'prev' && zoomPreviewIndex > 0) {
             setZoomPreviewIndex(zoomPreviewIndex - 1);

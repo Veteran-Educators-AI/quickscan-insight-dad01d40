@@ -79,7 +79,7 @@ export function useGradeFloorSettings() {
     if (regentsScore !== undefined && regentsScore >= 0) {
       const regentsToGrade: Record<number, number> = {
         4: 95,  // Exceeding Standards - max without override
-        3: 85,  // Meeting Standards
+        3: 90,  // Meeting Standards - no errors should be 90+
         2: 75,  // Approaching Standards
         1: Math.max(gradeFloorWithEffort, 67),  // Limited understanding
         0: gradeFloorWithEffort,  // Has work but completely wrong

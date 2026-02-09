@@ -1384,19 +1384,19 @@ Provide your analysis in the following structure:
 - Grade: (55-100 scale. YOUR GRADE MUST MATCH YOUR OWN EVIDENCE.
     *** GRADE CONSISTENCY RULE - CRITICAL ***
     Your grade MUST be logically consistent with your error analysis:
-    - If you found NO errors and work is present → Grade MUST be 85-100
-    - If you found only MINOR errors → Grade MUST be 75-90
+    - If you found NO errors and work is present → Grade MUST be 90-100
+    - If you found only MINOR errors → Grade MUST be 80-92
     - If you found SIGNIFICANT errors but student shows partial understanding → Grade 65-79
     - If work is blank/no understanding → Grade 55
     
-    NEVER give a low grade (below 85) while simultaneously saying "no errors found" or "work is mathematically correct."
-    NEVER give a high grade (above 85) while listing multiple significant errors.
+    NEVER give a grade below 90 while simultaneously saying "no errors found" or "work is mathematically correct."
+    NEVER give a high grade (above 90) while listing multiple significant errors.
     
     Scale:
-    • 90-100 = Full mastery, no errors or only trivial notation issues
-    • 85-89 = Strong understanding, no mathematical errors but minor presentation issues
-    • 75-84 = Good understanding with some errors
-    • 65-74 = Partial understanding with significant gaps
+    • 95-100 = Full mastery, no errors, complete and well-presented work
+    • 90-94 = Strong understanding, no mathematical errors, work is correct
+    • 80-89 = Good understanding with only minor errors
+    • 65-79 = Partial understanding with significant gaps
     • 55-64 = Minimal or no understanding shown)
 ` + (feedbackVerbosity === 'detailed' ? `
 - Grade Justification: (DETAILED - 150-200 words. MUST directly quote the student's written work using "Student wrote: '[exact quote]'" format. Structure:
@@ -2271,6 +2271,8 @@ interface ParsedResult {
   approachAnalysis: string;
   strengthsAnalysis: string[]; // Detailed list of what student did right
   areasForImprovement: string[]; // Detailed list of what student needs to work on
+  whatStudentDidCorrectly: string; // Direct quote of what student did right
+  whatStudentGotWrong: string; // Direct quote of what student got wrong
   rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
@@ -2295,6 +2297,8 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     approachAnalysis: '',
     strengthsAnalysis: [],
     areasForImprovement: [],
+    whatStudentDidCorrectly: '',
+    whatStudentGotWrong: '',
     rubricScores: [],
     misconceptions: [],
     totalScore: { earned: 0, possible: 0, percentage: 0 },
@@ -2405,6 +2409,26 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
         const isNotNone = !a.match(/^(none|n\/a|no areas?|no improvement|excellent work)$/i);
         return isLongEnough && isNotNone;
       });
+  }
+
+  // Parse What Student Did Correctly
+  const whatCorrectlyMatch = text.match(/What Student Did Correctly[:\s]*([^]*?)(?=What Student Got Wrong|Feedback|Grade Justification|$)/i);
+  if (whatCorrectlyMatch) {
+    const correctlyText = whatCorrectlyMatch[1].trim();
+    // Only keep if it's substantive (not a placeholder)
+    if (correctlyText.length >= 10 && !correctlyText.match(/^(none|n\/a|no correct work)$/i)) {
+      result.whatStudentDidCorrectly = correctlyText;
+    }
+  }
+
+  // Parse What Student Got Wrong
+  const whatWrongMatch = text.match(/What Student Got Wrong[:\s]*([^]*?)(?=Feedback|Grade Justification|$)/i);
+  if (whatWrongMatch) {
+    const wrongText = whatWrongMatch[1].trim();
+    // Only keep if it's substantive (not a placeholder)
+    if (wrongText.length >= 10 && !wrongText.match(/^(none|n\/a|no errors found)$/i)) {
+      result.whatStudentGotWrong = wrongText;
+    }
   }
 
   // Parse Regents Score (0-4)
@@ -2617,15 +2641,16 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   
   console.log(`High grade check - AnswerCorrect: ${result.isAnswerCorrect}, NoRealErrors: ${hasNoRealErrors}, ShouldBeHigh: ${shouldBeHighGrade}`);
   
-  // *** CONSISTENCY CHECK: If "no errors found" + work present, grade must be at least 85 ***
-  // This prevents the contradictory scenario where AI says "no errors" but assigns 70
+  // *** CONSISTENCY CHECK: If "no errors found" + work present, grade must be at least 90 ***
+  // This prevents the contradictory scenario where AI says "no errors" but assigns a low grade.
+  // If there are truly NO errors detected and the student DID work, the grade should reflect that.
   const noErrorsButWorkPresent = result.studentWorkPresent && 
     hasSubstantialWork && 
     hasNoRealErrors &&
     !explicitlyBlank;
   
   if (noErrorsButWorkPresent) {
-    console.log('CONSISTENCY CHECK: No errors detected with work present - enforcing minimum grade of 85');
+    console.log('CONSISTENCY CHECK: No errors detected with work present - enforcing minimum grade of 90');
   }
   
   // *** PERFECT SCORE OVERRIDE: If analysis indicates full mastery, give 100 ***
@@ -2649,8 +2674,9 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     // The AI was given a consistency rule: its grade must match its evidence.
     // Only override for floor enforcement, not to second-guess the AI.
     if (noErrorsButWorkPresent) {
-      // AI said no errors but gave a low grade - override to at least 85
-      result.grade = Math.max(85, Math.min(100, parsedGrade));
+      // AI said no errors but gave a low grade - override to at least 90
+      // If there are truly no errors, the grade should reflect strong mastery
+      result.grade = Math.max(90, Math.min(100, parsedGrade));
     } else if (hasAnyUnderstanding) {
       // Student shows understanding - enforce minimum of 65
       result.grade = Math.max(gradeFloorWithEffort, Math.min(100, parsedGrade));
@@ -2683,10 +2709,11 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     result.grade = 100;
   } else if (shouldBeHighGrade && result.grade < 90) {
     result.grade = 90;
-  } else if (noErrorsButWorkPresent && result.grade < 85) {
-    // CONSISTENCY: Never give below 85 when no errors detected and work is present
-    result.grade = 85;
-    console.log('CONSISTENCY SAFEGUARD: Bumped grade to 85 (no errors + work present)');
+  } else if (noErrorsButWorkPresent && result.grade < 90) {
+    // CONSISTENCY: Never give below 90 when no errors detected and work is present
+    // If AI found zero errors, the student's work is correct - grade must reflect that
+    result.grade = 90;
+    console.log('CONSISTENCY SAFEGUARD: Bumped grade to 90 (no errors + work present)');
   } else if (hasAnyUnderstanding) {
     result.grade = Math.max(gradeFloorWithEffort, result.grade);
   }
@@ -2694,11 +2721,14 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
 
   // INCOMPLETE FINAL ANSWER DEDUCTION: If work is correct but final answer is missing/incomplete
   // Deduct 5-10 points (we use 7 as middle ground)
+  // IMPORTANT: Never push below 90 if no errors were found - the student's work is correct
   if (!result.finalAnswerComplete && result.isAnswerCorrect && result.grade > gradeFloor) {
     const incompleteFinalAnswerDeduction = 7; // Deduct 7 points for incomplete final answer
     const gradeBeforeDeduction = result.grade;
-    result.grade = Math.max(gradeFloor, result.grade - incompleteFinalAnswerDeduction);
-    console.log(`Incomplete final answer deduction: ${gradeBeforeDeduction} -> ${result.grade} (-${incompleteFinalAnswerDeduction} points)`);
+    // If no errors found, don't let deduction push below 90
+    const deductionFloor = noErrorsButWorkPresent ? 90 : gradeFloor;
+    result.grade = Math.max(deductionFloor, result.grade - incompleteFinalAnswerDeduction);
+    console.log(`Incomplete final answer deduction: ${gradeBeforeDeduction} -> ${result.grade} (-${incompleteFinalAnswerDeduction} points, floor: ${deductionFloor})`);
     
     // Add note to justification if there isn't one about incomplete answer
     if (!result.gradeJustification.toLowerCase().includes('incomplete') && 
@@ -2709,8 +2739,10 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     // Even if answer is not marked as correct, if work is coherent but no final answer, still deduct
     const incompleteDeduction = 5;
     const gradeBeforeDeduction = result.grade;
-    result.grade = Math.max(gradeFloor, result.grade - incompleteDeduction);
-    console.log(`Incomplete final answer (work shown): ${gradeBeforeDeduction} -> ${result.grade} (-${incompleteDeduction} points)`);
+    // If no errors found, don't let deduction push below 90
+    const deductionFloor = noErrorsButWorkPresent ? 90 : gradeFloor;
+    result.grade = Math.max(deductionFloor, result.grade - incompleteDeduction);
+    console.log(`Incomplete final answer (work shown): ${gradeBeforeDeduction} -> ${result.grade} (-${incompleteDeduction} points, floor: ${deductionFloor})`);
   }
   
   console.log(`Final grade: ${result.grade} (Understanding: ${hasAnyUnderstanding}, Perfect: ${shouldGetPerfectScore}, FinalAnswerComplete: ${result.finalAnswerComplete})`);
