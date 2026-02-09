@@ -2302,7 +2302,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     rubricScores: [],
     misconceptions: [],
     totalScore: { earned: 0, possible: 0, percentage: 0 },
-    regentsScore: 0,
+    regentsScore: -1, // Use -1 as sentinel to indicate "not yet parsed" (distinct from parsed 0)
     regentsScoreJustification: '',
     grade: gradeFloorWithEffort, // Default to effort floor - most scans have SOME work
     gradeJustification: '',
@@ -2477,9 +2477,11 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
       : 0;
   }
   
-  // FALLBACK: If no valid totalScore parsed but we have a Regents score, convert it
+  // FALLBACK: If no valid totalScore parsed but we have an ACTUALLY PARSED Regents score, convert it
   // This ensures we always have meaningful score data aligned with Regents rubric
-  if (result.totalScore.possible === 0 && result.regentsScore >= 0) {
+  // CRITICAL FIX: Only use this fallback when regentsScore was actually parsed (>= 0),
+  // NOT when it's still the -1 sentinel meaning "never parsed"
+  if (result.totalScore.possible === 0 && regentsScoreParsed && result.regentsScore >= 0) {
     // Use 4-point Regents scale when no teacher rubric is provided
     result.totalScore.earned = result.regentsScore;
     result.totalScore.possible = 4;
@@ -2521,7 +2523,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   const hasCoherentWork = result.studentWorkPresent && result.coherentWorkShown;
   // OCR content only counts if student work is present (printed question text doesn't count)
   const hasOcrContent = result.studentWorkPresent && result.ocrText.trim().length > 10;
-  const hasPositiveRegents = result.regentsScore >= 1;
+  const hasPositiveRegents = regentsScoreParsed && result.regentsScore >= 1;
   const hasPositiveScore = result.totalScore.earned > 0;
   
   // Look for understanding keywords in the analysis - BUT ONLY IF WORK IS PRESENT
@@ -2552,7 +2554,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   
   // REQUIRE substantial OCR content AND high Regents score for 100
   const hasSubstantialWork = result.ocrText.trim().length >= 30 && result.studentWorkPresent;
-  const hasHighRegentsScore = result.regentsScore >= 4;
+  const hasHighRegentsScore = regentsScoreParsed && result.regentsScore >= 4;
   const hasCorrectAnswer = result.isAnswerCorrect === true;
   
   // Only these indicators count as POSITIVE evidence of mastery (not absence of errors)
@@ -2602,7 +2604,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     )
   );
   
-  console.log(`Grade determination - StudentWorkPresent: ${result.studentWorkPresent}, OCR length: ${result.ocrText.trim().length}, Concepts: ${result.conceptsDemonstrated.length}, Coherent: ${hasCoherentWork}, Understanding: ${showsUnderstanding}, Blank: ${explicitlyBlank}, SubstantialWork: ${hasSubstantialWork}, Regents: ${result.regentsScore}, PerfectIndicators: ${shouldGetPerfectScore}`);
+  console.log(`Grade determination - StudentWorkPresent: ${result.studentWorkPresent}, OCR length: ${result.ocrText.trim().length}, Concepts: ${result.conceptsDemonstrated.length}, Coherent: ${hasCoherentWork}, Understanding: ${showsUnderstanding}, Blank: ${explicitlyBlank}, SubstantialWork: ${hasSubstantialWork}, RegentsParsed: ${regentsScoreParsed}, Regents: ${result.regentsScore}, PerfectIndicators: ${shouldGetPerfectScore}`);
   
   // *** CRITICAL: NO STUDENT WORK = GRADE 55, NO EXCEPTIONS ***
   // If student work is not present, there's no understanding to evaluate
@@ -2666,9 +2668,9 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     console.log('Full mastery detected in analysis - assigning grade 100');
   } else if (shouldBeHighGrade) {
     // CRITICAL: Correct answer with no errors should get AT LEAST 90
-    if (result.regentsScore >= 4) {
+    if (regentsScoreParsed && result.regentsScore >= 4) {
       result.grade = 100;
-    } else if (result.regentsScore >= 3) {
+    } else if (regentsScoreParsed && result.regentsScore >= 3) {
       result.grade = 95;
     } else {
       result.grade = 90;
@@ -2692,8 +2694,10 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     } else {
       result.grade = Math.min(100, parsedGrade);
     }
-  } else if (result.regentsScore >= 0) {
-    // Convert Regents score to grade based on concept understanding
+  } else if (regentsScoreParsed && result.regentsScore >= 0) {
+    // Convert ACTUALLY PARSED Regents score to grade based on concept understanding
+    // CRITICAL FIX: Only use this path when regentsScore was actually returned by the AI,
+    // not when it's still the default sentinel value
     const conceptBonus = Math.min(result.conceptsDemonstrated.length * 2, 5);
     
     const regentsToGrade: Record<number, number> = {
@@ -2842,6 +2846,62 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   }
 
   console.log(`Final grade: ${result.grade}`);
+
+  // *** CRITICAL FIX: GRADE ↔ REGENTS SCORE CONSISTENCY ENFORCEMENT ***
+  // If the Regents Score was never parsed from the AI response (still -1 sentinel),
+  // derive it from the final grade to ensure the two are always consistent.
+  // This prevents the bug where grade shows 85% but Regents Score shows 0/4 (ungraded).
+  if (!regentsScoreParsed || result.regentsScore < 0) {
+    // Derive Regents Score from the final grade using the standard conversion
+    const gradeToRegents = (g: number): number => {
+      if (g >= 90) return 4;
+      if (g >= 80) return 3;
+      if (g >= 70) return 2;
+      if (g >= 65) return 1;
+      return 0;
+    };
+    const derivedRegents = gradeToRegents(result.grade);
+    console.log(`Regents Score was not parsed from AI response - deriving from grade ${result.grade} → Regents Score ${derivedRegents}`);
+    result.regentsScore = derivedRegents;
+    if (!result.regentsScoreJustification) {
+      result.regentsScoreJustification = `Regents Score derived from overall grade of ${result.grade}%.`;
+    }
+  } else {
+    // Regents Score was parsed - but ensure it's consistent with the final grade
+    // The grade may have been adjusted by safeguards, so regents should reflect final grade
+    const expectedRegentsFromGrade = (g: number): number => {
+      if (g >= 90) return 4;
+      if (g >= 80) return 3;
+      if (g >= 70) return 2;
+      if (g >= 65) return 1;
+      return 0;
+    };
+    const expectedRegents = expectedRegentsFromGrade(result.grade);
+    
+    // If the regents score is significantly lower than what the grade implies,
+    // adjust it upward to match (the grade is the final authority after all safeguards)
+    if (result.regentsScore < expectedRegents) {
+      console.log(`CONSISTENCY FIX: Regents Score ${result.regentsScore} is inconsistent with grade ${result.grade} (expected ${expectedRegents}) - adjusting Regents Score to ${expectedRegents}`);
+      result.regentsScore = expectedRegents;
+      if (result.regentsScoreJustification) {
+        result.regentsScoreJustification += ` (Adjusted to align with final grade of ${result.grade}%)`;
+      }
+    }
+  }
+
+  // Also ensure totalScore is consistent with the final regentsScore if it was derived from it
+  if (result.totalScore.possible === 4 && result.totalScore.earned !== result.regentsScore) {
+    result.totalScore.earned = result.regentsScore;
+    result.totalScore.percentage = Math.round((result.regentsScore / 4) * 100);
+    console.log(`Updated totalScore to match Regents Score: ${result.regentsScore}/4 (${result.totalScore.percentage}%)`);
+  }
+  // If totalScore was never set (possible still 0), set it from regentsScore now
+  if (result.totalScore.possible === 0 && result.regentsScore >= 0) {
+    result.totalScore.earned = result.regentsScore;
+    result.totalScore.possible = 4;
+    result.totalScore.percentage = Math.round((result.regentsScore / 4) * 100);
+    console.log(`Set totalScore from final Regents Score: ${result.regentsScore}/4 (${result.totalScore.percentage}%)`);
+  }
 
   // Grade justification already parsed above for mastery detection
 
