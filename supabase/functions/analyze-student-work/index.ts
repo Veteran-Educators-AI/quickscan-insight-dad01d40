@@ -2271,6 +2271,8 @@ interface ParsedResult {
   approachAnalysis: string;
   strengthsAnalysis: string[]; // Detailed list of what student did right
   areasForImprovement: string[]; // Detailed list of what student needs to work on
+  whatStudentDidCorrectly: string; // Direct quotes of correct student work
+  whatStudentGotWrong: string; // Direct quotes of incorrect student work
   rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
@@ -2295,6 +2297,8 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     approachAnalysis: '',
     strengthsAnalysis: [],
     areasForImprovement: [],
+    whatStudentDidCorrectly: '',
+    whatStudentGotWrong: '',
     rubricScores: [],
     misconceptions: [],
     totalScore: { earned: 0, possible: 0, percentage: 0 },
@@ -2405,6 +2409,18 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
         const isNotNone = !a.match(/^(none|n\/a|no areas?|no improvement|excellent work)$/i);
         return isLongEnough && isNotNone;
       });
+  }
+
+  // Parse What Student Did Correctly (detailed feedback mode)
+  const whatCorrectMatch = text.match(/What Student Did Correctly[:\s]*([^]*?)(?=What Student Got Wrong|Feedback|Grade Justification|$)/i);
+  if (whatCorrectMatch) {
+    result.whatStudentDidCorrectly = whatCorrectMatch[1].trim();
+  }
+
+  // Parse What Student Got Wrong (detailed feedback mode)
+  const whatWrongMatch = text.match(/What Student Got Wrong[:\s]*([^]*?)(?=Feedback|Grade Justification|$)/i);
+  if (whatWrongMatch) {
+    result.whatStudentGotWrong = whatWrongMatch[1].trim();
   }
 
   // Parse Regents Score (0-4)
