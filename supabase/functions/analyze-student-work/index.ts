@@ -2435,10 +2435,10 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   // Use a more specific regex that avoids matching "Regents Score Justification" 
   // by requiring the match to be "Regents Score:" followed by a digit (not "Justification")
   const regentsScoreMatch = text.match(/Regents Score(?!\s*Justification)[:\s]*(\d)/i);
-  let regentsScoreExplicitlyParsed = false;
+  let regentsScoreParsed = false;
   if (regentsScoreMatch) {
     result.regentsScore = Math.min(4, Math.max(0, parseInt(regentsScoreMatch[1])));
-    regentsScoreExplicitlyParsed = true;
+    regentsScoreParsed = true;
     console.log(`Parsed Regents Score: ${result.regentsScore}`);
   } else {
     console.log('WARNING: Regents Score not found in AI output - defaulting to 0. Will be back-derived from grade if work is present.');
