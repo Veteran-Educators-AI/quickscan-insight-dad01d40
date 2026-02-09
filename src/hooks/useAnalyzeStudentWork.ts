@@ -3,6 +3,75 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { handleApiError, checkResponseForApiError } from '@/lib/apiErrorHandler';
 import { useBlankPageSettings } from '@/hooks/useBlankPageSettings';
+import { compressImage } from '@/lib/imageUtils';
+
+// ── Resilient Edge Function Invocation for Single Analysis ──
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+function isPermanentError(error: any): boolean {
+  if (!error) return false;
+  const msg = (error.message || error.toString() || '').toLowerCase();
+  return (
+    msg.includes('unauthorized') || msg.includes('invalid token') ||
+    msg.includes('401') || msg.includes('402') || msg.includes('403') ||
+    msg.includes('payment') || msg.includes('credit') || msg.includes('quota') ||
+    msg.includes('api key') || msg.includes('image data is required')
+  );
+}
+
+async function compressForEdgeFunction(imageDataUrl: string): Promise<string> {
+  try {
+    if (imageDataUrl.length < 270000) return imageDataUrl;
+    return await compressImage(imageDataUrl, 1600, 0.75);
+  } catch {
+    return imageDataUrl;
+  }
+}
+
+async function invokeAnalyzeWithRetry(
+  body: Record<string, any>,
+  maxRetries = 3
+): Promise<{ data: any; error: any }> {
+  // Compress images in body
+  const processedBody = { ...body };
+  const imageKeys = ['imageBase64', 'answerGuideBase64', 'solutionBase64'];
+  for (const key of imageKeys) {
+    if (processedBody[key] && typeof processedBody[key] === 'string') {
+      processedBody[key] = await compressForEdgeFunction(processedBody[key]);
+    }
+  }
+
+  let lastError: any = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      const delay = 2000 * Math.pow(2, attempt - 1);
+      console.log(`[invokeAnalyzeWithRetry] Retry ${attempt}/${maxRetries} after ${delay}ms`);
+      await sleep(delay);
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-student-work', {
+        body: processedBody,
+      });
+
+      if (error) {
+        lastError = error;
+        if (isPermanentError(error)) return { data: null, error };
+        console.warn(`[invokeAnalyzeWithRetry] Transient error (attempt ${attempt + 1}):`, error.message);
+        continue;
+      }
+
+      return { data, error: null };
+    } catch (err: any) {
+      lastError = err;
+      if (isPermanentError(err)) return { data: null, error: err };
+      console.warn(`[invokeAnalyzeWithRetry] Exception (attempt ${attempt + 1}):`, err.message);
+    }
+  }
+
+  return { data: null, error: lastError || new Error('All retry attempts failed') };
+}
 
 interface RubricStep {
   step_number: number;
@@ -168,25 +237,23 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
       // The edge function also does OCR and returns text, but we pass
       // the setting so the server can skip LLM grading for blank pages.
 
-      const { data, error: fnError } = await supabase.functions.invoke('analyze-student-work', {
-        body: {
-          imageBase64: imageDataUrl,
-          questionId,
-          rubricSteps,
-          studentName,
-          teacherId: user?.id,
-          assessmentMode: assessmentMode || 'ai',
-          promptText,
-          standardCode,
-          topicName,
-          customRubric,
-          // Pass blank page settings so the server can short-circuit
-          blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
-            enabled: true,
-            score: blankPageSettings.blankPageScore,
-            comment: blankPageSettings.blankPageComment,
-          } : undefined,
-        },
+      const { data, error: fnError } = await invokeAnalyzeWithRetry({
+        imageBase64: imageDataUrl,
+        questionId,
+        rubricSteps,
+        studentName,
+        teacherId: user?.id,
+        assessmentMode: assessmentMode || 'ai',
+        promptText,
+        standardCode,
+        topicName,
+        customRubric,
+        // Pass blank page settings so the server can short-circuit
+        blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
+          enabled: true,
+          score: blankPageSettings.blankPageScore,
+          comment: blankPageSettings.blankPageComment,
+        } : undefined,
       });
 
       // Check if cancelled before processing result
@@ -244,25 +311,23 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
     setIsCancelled(false);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('analyze-student-work', {
-        body: {
-          imageBase64: imageDataUrl,
-          answerGuideBase64: answerGuideImage,
-          questionId: options?.questionId,
-          rubricSteps: options?.rubricSteps,
-          studentName: options?.studentName,
-          teacherId: user?.id,
-          assessmentMode: 'teacher-guided',
-          promptText: options?.promptText,
-          standardCode: options?.standardCode,
-          topicName: options?.topicName,
-          customRubric,
-          blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
-            enabled: true,
-            score: blankPageSettings.blankPageScore,
-            comment: blankPageSettings.blankPageComment,
-          } : undefined,
-        },
+      const { data, error: fnError } = await invokeAnalyzeWithRetry({
+        imageBase64: imageDataUrl,
+        answerGuideBase64: answerGuideImage,
+        questionId: options?.questionId,
+        rubricSteps: options?.rubricSteps,
+        studentName: options?.studentName,
+        teacherId: user?.id,
+        assessmentMode: 'teacher-guided',
+        promptText: options?.promptText,
+        standardCode: options?.standardCode,
+        topicName: options?.topicName,
+        customRubric,
+        blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
+          enabled: true,
+          score: blankPageSettings.blankPageScore,
+          comment: blankPageSettings.blankPageComment,
+        } : undefined,
       });
 
       if (isCancelled) {
@@ -319,46 +384,46 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
     setIsCancelled(false);
 
     try {
-      // Run both analyses in parallel
+      // Compress the image once (shared between both analyses)
+      const compressedImage = await compressForEdgeFunction(imageDataUrl);
+      const compressedGuide = answerGuideImage ? await compressForEdgeFunction(answerGuideImage) : undefined;
+
+      // Run both analyses in parallel with retry
       const [aiResponse, teacherGuidedResponse] = await Promise.all([
-        supabase.functions.invoke('analyze-student-work', {
-          body: {
-            imageBase64: imageDataUrl,
-            questionId: options?.questionId,
-            rubricSteps: options?.rubricSteps,
-            studentName: options?.studentName,
-            teacherId: user?.id,
-            assessmentMode: 'ai',
-            promptText: options?.promptText,
-            standardCode: options?.standardCode,
-            topicName: options?.topicName,
-            customRubric,
-            blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
-              enabled: true,
-              score: blankPageSettings.blankPageScore,
-              comment: blankPageSettings.blankPageComment,
-            } : undefined,
-          },
+        invokeAnalyzeWithRetry({
+          imageBase64: compressedImage,
+          questionId: options?.questionId,
+          rubricSteps: options?.rubricSteps,
+          studentName: options?.studentName,
+          teacherId: user?.id,
+          assessmentMode: 'ai',
+          promptText: options?.promptText,
+          standardCode: options?.standardCode,
+          topicName: options?.topicName,
+          customRubric,
+          blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
+            enabled: true,
+            score: blankPageSettings.blankPageScore,
+            comment: blankPageSettings.blankPageComment,
+          } : undefined,
         }),
-        supabase.functions.invoke('analyze-student-work', {
-          body: {
-            imageBase64: imageDataUrl,
-            answerGuideBase64: answerGuideImage,
-            questionId: options?.questionId,
-            rubricSteps: options?.rubricSteps,
-            studentName: options?.studentName,
-            teacherId: user?.id,
-            assessmentMode: 'teacher-guided',
-            promptText: options?.promptText,
-            standardCode: options?.standardCode,
-            topicName: options?.topicName,
-            customRubric,
-            blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
-              enabled: true,
-              score: blankPageSettings.blankPageScore,
-              comment: blankPageSettings.blankPageComment,
-            } : undefined,
-          },
+        invokeAnalyzeWithRetry({
+          imageBase64: compressedImage,
+          answerGuideBase64: compressedGuide,
+          questionId: options?.questionId,
+          rubricSteps: options?.rubricSteps,
+          studentName: options?.studentName,
+          teacherId: user?.id,
+          assessmentMode: 'teacher-guided',
+          promptText: options?.promptText,
+          standardCode: options?.standardCode,
+          topicName: options?.topicName,
+          customRubric,
+          blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
+            enabled: true,
+            score: blankPageSettings.blankPageScore,
+            comment: blankPageSettings.blankPageComment,
+          } : undefined,
         }),
       ]);
 
@@ -400,13 +465,11 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
     setComparisonResult(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('analyze-student-work', {
-        body: {
-          imageBase64: studentImage,
-          solutionBase64: solutionImage,
-          rubricSteps,
-          compareMode: true,
-        },
+      const { data, error: fnError } = await invokeAnalyzeWithRetry({
+        imageBase64: studentImage,
+        solutionBase64: solutionImage,
+        rubricSteps,
+        compareMode: true,
       });
 
       if (fnError) {
