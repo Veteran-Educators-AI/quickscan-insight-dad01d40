@@ -119,22 +119,26 @@ export function BehaviorPointDeductionDialog({
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Failed to send deduction');
 
-      // Also log locally
-      await supabase.from('sister_app_sync_log').insert({
-        teacher_id: user!.id,
-        student_id: selectedStudentId,
-        action: 'behavior_deduction',
-        data: {
-          reason: finalReason,
-          xp_deducted: xpDeduction,
-          coins_deducted: coinDeduction,
-          notes: notes,
-          student_name: `${student.first_name} ${student.last_name}`,
-        },
-        source_app: 'nycologic_ai',
-        processed: true,
-        processed_at: new Date().toISOString(),
-      });
+      // Also log locally (non-fatal if logging fails)
+      try {
+        await supabase.from('sister_app_sync_log').insert({
+          teacher_id: user!.id,
+          student_id: selectedStudentId,
+          action: 'behavior_deduction',
+          data: {
+            reason: finalReason,
+            xp_deducted: xpDeduction,
+            coins_deducted: coinDeduction,
+            notes: notes,
+            student_name: `${student.first_name} ${student.last_name}`,
+          },
+          source_app: 'nycologic_ai',
+          processed: true,
+          processed_at: new Date().toISOString(),
+        });
+      } catch (logErr) {
+        console.error('Non-fatal: Failed to log behavior deduction:', logErr);
+      }
 
       return data;
     },

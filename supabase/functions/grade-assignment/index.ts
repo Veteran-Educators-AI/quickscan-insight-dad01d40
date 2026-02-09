@@ -531,35 +531,20 @@ Deno.serve(async (req) => {
     // Update attempt in database if attempt_id provided
     if (attempt_id) {
       try {
-        // Update with columns that exist in the attempts table
-        // Use both score and total_score for compatibility with different schema versions
+        // Update attempt status to "reviewed" (the enum values are: pending, analyzed, reviewed)
+        // Only update columns that actually exist in the attempts table
         const { error: updateError } = await supabase
           .from("attempts")
           .update({
-            score: correctCount,
-            total_score: correctCount,
-            status: "graded",
-            answers: answers,
-            graded_at: new Date().toISOString(),
-            verified_at: new Date().toISOString(),
+            status: "reviewed",
+            updated_at: new Date().toISOString(),
           })
           .eq("id", attempt_id);
         
         if (updateError) {
-          console.error("Error updating attempt (non-fatal):", updateError);
-          // Try a minimal update if the full one fails
-          const { error: minimalError } = await supabase
-            .from("attempts")
-            .update({
-              total_score: correctCount,
-              status: "graded",
-              graded_at: new Date().toISOString(),
-            })
-            .eq("id", attempt_id);
-          
-          if (minimalError) {
-            console.error("Minimal attempt update also failed:", minimalError);
-          }
+          console.error("Error updating attempt status (non-fatal):", updateError);
+        } else {
+          console.log(`Attempt ${attempt_id} marked as reviewed`);
         }
       } catch (attemptUpdateErr) {
         // Don't let attempt update failure crash the entire grading response

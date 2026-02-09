@@ -8,18 +8,26 @@
 -- ============================================================================
 
 -- ============================================================================
--- 1. FIX: teacher_api_keys - add api_key_hash column alias
+-- 1. FIX: teacher_api_keys - ensure both column names exist for compatibility
 -- ============================================================================
 -- The receive-sister-app-data edge function queries .eq('api_key_hash', ...)
--- but the original schema only defined 'key_hash'. Add the correct column.
+-- but the original migration defined 'key_hash'. The actual database was 
+-- updated to use 'api_key_hash'. Ensure both exist for robustness.
 -- ============================================================================
 ALTER TABLE public.teacher_api_keys
-  ADD COLUMN IF NOT EXISTS api_key_hash TEXT;
+  ADD COLUMN IF NOT EXISTS api_key_hash TEXT,
+  ADD COLUMN IF NOT EXISTS api_key_prefix TEXT,
+  ADD COLUMN IF NOT EXISTS name TEXT;
 
 -- Copy existing key_hash values into api_key_hash if api_key_hash is empty
 UPDATE public.teacher_api_keys
 SET api_key_hash = key_hash
 WHERE api_key_hash IS NULL AND key_hash IS NOT NULL;
+
+-- Copy key_name to name if name is empty
+UPDATE public.teacher_api_keys
+SET name = key_name
+WHERE name IS NULL AND key_name IS NOT NULL;
 
 -- Create index for fast lookups
 CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON public.teacher_api_keys(api_key_hash);
@@ -46,16 +54,24 @@ ALTER TABLE public.sister_app_sync_log
   ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ;
 
 -- ============================================================================
--- 3. FIX: grade_history - restructure from score-change-log to grade record
+-- 3. FIX: grade_history - ensure it has all columns the code expects
 -- ============================================================================
--- The code uses grade_history as a per-student grade record table, but the
--- original schema defined it as a score-change audit log (score_id, previous_score, etc.)
--- Add all the columns the code expects.
+-- The actual database has already been restructured from the original 
+-- score-change audit log to a per-student grade record table.
+-- These columns should already exist (per types.ts) but add IF NOT EXISTS
+-- for fresh setup safety.
 -- ============================================================================
 
--- Make score_id nullable since the new usage doesn't always have one
-ALTER TABLE public.grade_history
-  ALTER COLUMN score_id DROP NOT NULL;
+-- Make score_id nullable since the restructured table doesn't use it
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'grade_history' AND column_name = 'score_id'
+  ) THEN
+    ALTER TABLE public.grade_history ALTER COLUMN score_id DROP NOT NULL;
+  END IF;
+END$$;
 
 -- Add columns that the code inserts/queries
 ALTER TABLE public.grade_history
@@ -113,16 +129,16 @@ CREATE INDEX IF NOT EXISTS idx_misconceptions_topic_name ON public.analysis_misc
 -- Add missing columns
 ALTER TABLE public.attempts
   ADD COLUMN IF NOT EXISTS question_id UUID,
-  ADD COLUMN IF NOT EXISTS answers JSONB,
-  ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS score DECIMAL(5,2);
+  ADD COLUMN IF NOT EXISTS qr_code TEXT,
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
 -- Make assessment_id nullable since some attempts use question_id instead
 ALTER TABLE public.attempts
   ALTER COLUMN assessment_id DROP NOT NULL;
 
--- Add status values to the enum (analyzed, verified)
--- We need to check if these exist first
+-- Ensure the attempt_status enum has the values the code expects
+-- Current values should be: pending, analyzed, reviewed
+-- Add them only if they don't already exist
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -139,9 +155,9 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_enum e
     JOIN pg_type t ON e.enumtypid = t.oid
-    WHERE t.typname = 'attempt_status' AND e.enumlabel = 'verified'
+    WHERE t.typname = 'attempt_status' AND e.enumlabel = 'reviewed'
   ) THEN
-    ALTER TYPE public.attempt_status ADD VALUE 'verified';
+    ALTER TYPE public.attempt_status ADD VALUE 'reviewed';
   END IF;
 END$$;
 
@@ -168,19 +184,15 @@ CREATE INDEX IF NOT EXISTS idx_attempt_images_attempt ON public.attempt_images(a
 -- 7. FIX: scores table - add columns the code references
 -- ============================================================================
 -- Code uses points_earned, notes, is_auto_scored, teacher_override
--- Original schema had score, points_possible, feedback, ai_interpretation
+-- The actual database already has these columns (per types.ts).
+-- Adding IF NOT EXISTS for safety during fresh setup.
 -- ============================================================================
 ALTER TABLE public.scores
   ADD COLUMN IF NOT EXISTS points_earned DECIMAL(5,2),
   ADD COLUMN IF NOT EXISTS notes TEXT,
   ADD COLUMN IF NOT EXISTS is_auto_scored BOOLEAN DEFAULT false,
-  ADD COLUMN IF NOT EXISTS teacher_override BOOLEAN DEFAULT false;
-
--- Make the original NOT NULL columns nullable for new insert patterns
-ALTER TABLE public.scores
-  ALTER COLUMN attempt_id DROP NOT NULL,
-  ALTER COLUMN question_id DROP NOT NULL,
-  ALTER COLUMN student_id DROP NOT NULL;
+  ADD COLUMN IF NOT EXISTS teacher_override BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS rubric_id UUID;
 
 -- ============================================================================
 -- 8. FIX: settings table - restructure from key-value to flat columns
