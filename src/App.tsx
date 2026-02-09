@@ -49,29 +49,59 @@ import { BetaFeedbackButton } from "./components/BetaFeedbackButton";
 
 const queryClient = new QueryClient();
 
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null; errorInfo: React.ErrorInfo | null }> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, errorInfo: null };
   }
 
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
 
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    this.setState({ errorInfo });
+    console.error('[ErrorBoundary] Caught error:', error);
+    console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
+  }
+
   render() {
     if (this.state.hasError) {
+      const isInitError = this.state.error?.message?.includes('before initialization');
       return (
         <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
-          <div className="max-w-md text-center">
+          <div className="max-w-lg text-center">
             <h1 className="text-xl font-bold text-red-600 mb-2">Something went wrong</h1>
             <p className="text-sm text-gray-600 mb-4">{this.state.error?.message}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Reload Page
-            </button>
+            {isInitError && (
+              <p className="text-xs text-gray-500 mb-4">
+                This is typically caused by a temporary loading issue. Reloading the page usually fixes it.
+              </p>
+            )}
+            {this.state.errorInfo?.componentStack && (
+              <details className="text-left mb-4 text-xs text-gray-500">
+                <summary className="cursor-pointer hover:text-gray-700 mb-1">Technical details</summary>
+                <pre className="bg-white/50 rounded p-2 overflow-auto max-h-40 text-[10px]">
+                  {this.state.errorInfo.componentStack}
+                </pre>
+              </details>
+            )}
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false, error: null, errorInfo: null });
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Reload Page
+              </button>
+            </div>
           </div>
         </div>
       );

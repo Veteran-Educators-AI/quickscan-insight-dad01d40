@@ -29,7 +29,9 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Sparkles
+  Sparkles,
+  ThumbsUp,
+  BookOpen
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { BatchItem, AnalysisResult } from '@/hooks/useBatchAnalysis';
@@ -458,6 +460,48 @@ export function GradedPapersGallery({
                             </div>
                           ))}
                         </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Grade Justification */}
+                  {extendedResult.gradeJustification && (
+                    <Card className="border-purple-200 bg-purple-50/50 dark:bg-purple-950/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <BookOpen className="h-4 w-4 text-purple-600" />
+                          <span className="font-medium">Grade Justification</span>
+                        </div>
+                        <p className="text-sm">{extendedResult.gradeJustification}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* What Student Did Correctly */}
+                  {(selectedItem.result as any).whatStudentDidCorrectly && 
+                   !(selectedItem.result as any).whatStudentDidCorrectly.toLowerCase().includes('no correct work') && (
+                    <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <ThumbsUp className="h-4 w-4 text-green-600" />
+                          <span className="font-medium">What Student Did Correctly</span>
+                        </div>
+                        <p className="text-sm">{(selectedItem.result as any).whatStudentDidCorrectly}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* What Student Got Wrong */}
+                  {(selectedItem.result as any).whatStudentGotWrong && 
+                   !(selectedItem.result as any).whatStudentGotWrong.toLowerCase().includes('no errors') &&
+                   !(selectedItem.result as any).whatStudentGotWrong.toLowerCase().includes('work is correct') && (
+                    <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          <span className="font-medium">What Student Got Wrong</span>
+                        </div>
+                        <p className="text-sm">{(selectedItem.result as any).whatStudentGotWrong}</p>
                       </CardContent>
                     </Card>
                   )}

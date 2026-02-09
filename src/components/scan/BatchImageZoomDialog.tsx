@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ZoomIn, ZoomOut, RotateCw, Move, AlertTriangle, MapPin, Check, X, Save, Brain, Loader2, Pencil, PenTool, BookOpen, MessageSquare, ThumbsUp, ThumbsDown, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,63 @@ import { useAnnotations } from '@/hooks/useAnnotations';
 import { AnnotationToolbar } from './AnnotationToolbar';
 import { AnnotationCanvas } from './AnnotationCanvas';
 import { cn } from '@/lib/utils';
+
+// Error boundary to prevent dialog crashes from bringing down the entire app
+class DialogErrorBoundary extends React.Component<
+  { children: React.ReactNode; onClose: () => void },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; onClose: () => void }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[BatchImageZoomDialog] Error caught:', error.message);
+    console.error('[BatchImageZoomDialog] Component stack:', errorInfo.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Dialog open onOpenChange={() => this.props.onClose()}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-red-600 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Error Loading Paper View
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-sm text-muted-foreground mb-3">
+                There was an error loading the paper viewer. This is usually temporary.
+              </p>
+              <p className="text-xs text-muted-foreground mb-4 font-mono bg-muted p-2 rounded">
+                {this.state.error?.message}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => this.setState({ hasError: false, error: null })}
+                >
+                  Try Again
+                </Button>
+                <Button onClick={() => this.props.onClose()}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface AnalysisResultProps {
   gradeJustification?: string;
@@ -52,7 +109,15 @@ interface BatchImageZoomDialogProps {
   analysisResult?: AnalysisResultProps;
 }
 
-export function BatchImageZoomDialog({
+export function BatchImageZoomDialog(props: BatchImageZoomDialogProps) {
+  return (
+    <DialogErrorBoundary onClose={() => props.onOpenChange(false)}>
+      <BatchImageZoomDialogInner {...props} />
+    </DialogErrorBoundary>
+  );
+}
+
+function BatchImageZoomDialogInner({
   open,
   onOpenChange,
   imageUrl,
