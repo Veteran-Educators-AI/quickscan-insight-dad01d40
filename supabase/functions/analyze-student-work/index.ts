@@ -316,7 +316,7 @@ const LITE_MODEL = 'google/gemini-2.5-flash-lite';
 
 type AIModelTier = 'lite' | 'standard';
 
-// Helper function to call Lovable AI Gateway with token logging
+// Helper function to call Lovable AI Gateway with token logging and retry
 async function callLovableAI(
   messages: any[], 
   apiKey: string, 
@@ -338,45 +338,124 @@ async function callLovableAI(
     ? { max_completion_tokens: maxTokens }
     : { max_tokens: maxTokens };
   
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      ...tokenParams,
-    }),
+  const requestBody = JSON.stringify({
+    model,
+    messages,
+    ...tokenParams,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Lovable AI error:', response.status, errorText);
-    
-    if (response.status === 429) {
-      throw { status: 429, message: "Rate limit exceeded. Please try again in a moment." };
-    }
-    if (response.status === 402) {
-      throw { status: 402, message: "AI credits exhausted. Please add funds to continue." };
-    }
-    throw new Error(`AI API error: ${response.status}`);
+  // Log payload size for debugging large request issues
+  const payloadSizeKB = Math.round(requestBody.length / 1024);
+  console.log(`[AI_CALL] Payload size: ${payloadSizeKB}KB for ${functionName}`);
+  if (payloadSizeKB > 5000) {
+    console.warn(`[AI_CALL] WARNING: Very large payload (${payloadSizeKB}KB) - may cause timeouts`);
   }
 
-  const data = await response.json();
-  const latencyMs = Date.now() - startTime;
+  // Retry logic for transient AI API failures (network errors, 500s, 503s)
+  const MAX_AI_RETRIES = 2;
+  let lastError: any = null;
   
-  // Log token usage for cost monitoring
-  const usage = data.usage || {};
-  console.log(`[TOKEN_USAGE] function=${functionName} model=${model} tier=${modelTier} provider=${analysisProvider} prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
-  
-  // Log to database if supabase client is provided
-  if (supabase && userId) {
-    await logAIUsage(supabase, userId, functionName, usage, latencyMs);
+  for (let attempt = 0; attempt <= MAX_AI_RETRIES; attempt++) {
+    if (attempt > 0) {
+      const delay = 3000 * attempt; // 3s, 6s
+      console.log(`[AI_CALL] Retrying AI call (attempt ${attempt + 1}/${MAX_AI_RETRIES + 1}) after ${delay}ms for ${functionName}`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    try {
+      // Use AbortController for timeout (90 seconds for standard tier, 45 for lite)
+      const timeoutMs = modelTier === 'standard' ? 90000 : 45000;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: requestBody,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Lovable AI error (attempt ${attempt + 1}):`, response.status, errorText);
+        
+        // Permanent errors - don't retry
+        if (response.status === 429) {
+          throw { status: 429, message: "Rate limit exceeded. Please try again in a moment." };
+        }
+        if (response.status === 402) {
+          throw { status: 402, message: "AI credits exhausted. Please add funds to continue." };
+        }
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(`AI API authentication error: ${response.status}`);
+        }
+        
+        // Retryable errors (500, 502, 503, 504)
+        if (response.status >= 500) {
+          lastError = new Error(`AI API server error: ${response.status}`);
+          continue; // Retry
+        }
+        
+        throw new Error(`AI API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const latencyMs = Date.now() - startTime;
+      
+      // Log token usage for cost monitoring
+      const usage = data.usage || {};
+      console.log(`[TOKEN_USAGE] function=${functionName} model=${model} tier=${modelTier} provider=${analysisProvider} prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
+      
+      // Log to database if supabase client is provided
+      if (supabase && userId) {
+        await logAIUsage(supabase, userId, functionName, usage, latencyMs);
+      }
+      
+      const content = data.choices?.[0]?.message?.content || '';
+      if (!content && attempt < MAX_AI_RETRIES) {
+        console.warn(`[AI_CALL] Empty response from AI on attempt ${attempt + 1}, retrying...`);
+        lastError = new Error('Empty response from AI');
+        continue;
+      }
+      
+      return content;
+    } catch (err: any) {
+      // Handle timeout/abort
+      if (err.name === 'AbortError') {
+        console.error(`[AI_CALL] Request timed out for ${functionName} (attempt ${attempt + 1})`);
+        lastError = new Error(`AI request timed out after ${modelTier === 'standard' ? 90 : 45}s`);
+        if (attempt < MAX_AI_RETRIES) continue;
+      }
+      
+      // Re-throw permanent errors immediately
+      if (err.status === 429 || err.status === 402) {
+        throw err;
+      }
+      
+      lastError = err;
+      
+      // For network errors, retry
+      if (err.message?.includes('fetch') || err.message?.includes('network') || err.message?.includes('ECONNREFUSED')) {
+        if (attempt < MAX_AI_RETRIES) {
+          console.warn(`[AI_CALL] Network error for ${functionName}, will retry:`, err.message);
+          continue;
+        }
+      }
+      
+      // For other errors on last attempt, throw
+      if (attempt >= MAX_AI_RETRIES) {
+        throw err;
+      }
+    }
   }
   
-  return data.choices?.[0]?.message?.content || '';
+  // All retries exhausted
+  throw lastError || new Error(`AI call failed after ${MAX_AI_RETRIES + 1} attempts`);
 }
 
 // Helper to format image for Lovable AI (OpenAI-compatible format)
@@ -482,7 +561,28 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const { imageBase64, additionalImages, solutionBase64, answerGuideBase64, questionId, rubricSteps, identifyOnly, detectPageType, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric, gradeFloor: customGradeFloor, gradeFloorWithEffort: customGradeFloorWithEffort, useLearnedStyle, blankPageSettings } = await req.json();
+    // Parse request body with size logging
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Invalid request body. The image may be too large. Try reducing image quality or resolution.',
+        retryable: false,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    const { imageBase64, additionalImages, solutionBase64, answerGuideBase64, questionId, rubricSteps, identifyOnly, detectPageType, studentRoster, studentName, teacherId, assessmentMode, promptText, compareMode, standardCode, topicName, customRubric, gradeFloor: customGradeFloor, gradeFloorWithEffort: customGradeFloorWithEffort, useLearnedStyle, blankPageSettings } = requestBody;
+    
+    // Log image sizes for debugging payload issues
+    const imgSizeKB = imageBase64 ? Math.round(imageBase64.length / 1024) : 0;
+    const additionalSizeKB = additionalImages ? Math.round(JSON.stringify(additionalImages).length / 1024) : 0;
+    console.log(`[REQUEST] imageBase64: ${imgSizeKB}KB, additionalImages: ${additionalSizeKB}KB, mode: ${assessmentMode || 'default'}, identifyOnly: ${!!identifyOnly}, detectPageType: ${!!detectPageType}`);
     
     // Ensure teacherId matches authenticated user
     const effectiveTeacherId = teacherId || authenticatedUserId;
@@ -1497,7 +1597,16 @@ Provide your analysis in the following structure:
     console.error('Error in analyze-student-work:', error);
 
     const httpStatus = error?.status === 429 || error?.status === 402 ? error.status : 500;
-    const message = error?.message || (error instanceof Error ? error.message : 'Unknown error occurred');
+    let message = error?.message || (error instanceof Error ? error.message : 'Unknown error occurred');
+    
+    // Provide more descriptive error messages for common failure modes
+    if (message.includes('timed out') || message.includes('AbortError')) {
+      message = 'Analysis timed out. The image may be too large or the AI service is temporarily slow. Please try again.';
+    } else if (message.includes('fetch') || message.includes('network') || message.includes('ECONNREFUSED')) {
+      message = 'Network error connecting to AI service. Please check your connection and try again.';
+    } else if (message.includes('AI API server error')) {
+      message = 'The AI service is temporarily unavailable. Please try again in a moment.';
+    }
 
     return new Response(JSON.stringify({ 
       success: false,
@@ -1505,6 +1614,7 @@ Provide your analysis in the following structure:
       rateLimited: httpStatus === 429,
       creditsExhausted: httpStatus === 402,
       http_status: httpStatus,
+      retryable: httpStatus >= 500 || message.includes('try again'),
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

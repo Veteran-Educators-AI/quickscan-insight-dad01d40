@@ -9,6 +9,196 @@ import { parseStudentQRCode } from '@/components/print/StudentQRCode';
 import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
 import { parseUnifiedStudentQRCode } from '@/components/print/StudentPageQRCode';
 import { toast } from 'sonner';
+import { compressImage } from '@/lib/imageUtils';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RESILIENT EDGE FUNCTION INVOCATION
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Wraps supabase.functions.invoke with:
+// 1. Automatic retry with exponential backoff for transient failures
+// 2. Image compression to reduce payload size
+// 3. Better error classification (retryable vs permanent)
+// 4. Timeout protection
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Errors that should NOT be retried */
+function isPermanentError(error: any): boolean {
+  if (!error) return false;
+  const msg = (error.message || error.toString() || '').toLowerCase();
+  // Auth errors, quota errors, and validation errors are permanent
+  return (
+    msg.includes('unauthorized') ||
+    msg.includes('invalid token') ||
+    msg.includes('401') ||
+    msg.includes('402') ||
+    msg.includes('payment') ||
+    msg.includes('credit') ||
+    msg.includes('quota') ||
+    msg.includes('api key') ||
+    msg.includes('403') ||
+    msg.includes('image data is required')
+  );
+}
+
+/** Check if response data indicates a permanent error */
+function isResponsePermanentError(data: any): boolean {
+  if (!data) return false;
+  return (
+    data.rateLimited === true ||
+    data.creditsExhausted === true ||
+    data.http_status === 401 ||
+    data.http_status === 402 ||
+    data.http_status === 403
+  );
+}
+
+/** Sleep helper */
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Compress an image data URL for sending to edge functions.
+ * Targets a max dimension of 1600px and JPEG quality of 0.75.
+ * This dramatically reduces payload size (typically 60-80% smaller).
+ */
+async function compressForEdgeFunction(imageDataUrl: string): Promise<string> {
+  try {
+    // Skip compression if already small (less than ~200KB base64)
+    if (imageDataUrl.length < 270000) {
+      return imageDataUrl;
+    }
+    const compressed = await compressImage(imageDataUrl, 1600, 0.75);
+    const savings = Math.round((1 - compressed.length / imageDataUrl.length) * 100);
+    if (savings > 5) {
+      console.log(`[compressForEdgeFunction] Compressed image: ${Math.round(imageDataUrl.length / 1024)}KB → ${Math.round(compressed.length / 1024)}KB (${savings}% reduction)`);
+    }
+    return compressed;
+  } catch (err) {
+    console.warn('[compressForEdgeFunction] Compression failed, using original:', err);
+    return imageDataUrl;
+  }
+}
+
+interface InvokeWithRetryOptions {
+  maxRetries?: number;
+  initialDelayMs?: number;
+  compressImages?: boolean;
+  /** Keys in the body that contain base64 image data to compress */
+  imageKeys?: string[];
+  /** Keys in the body that contain arrays of base64 image data to compress */
+  imageArrayKeys?: string[];
+}
+
+/**
+ * Invoke a Supabase Edge Function with automatic retry and image compression.
+ * Retries transient failures (network errors, timeouts, 5xx) with exponential backoff.
+ * Does NOT retry permanent failures (auth, quota, validation).
+ */
+async function invokeWithRetry(
+  functionName: string,
+  body: Record<string, any>,
+  options: InvokeWithRetryOptions = {}
+): Promise<{ data: any; error: any }> {
+  const {
+    maxRetries = 3,
+    initialDelayMs = 2000,
+    compressImages = true,
+    imageKeys = ['imageBase64', 'image1Base64', 'image2Base64', 'answerGuideBase64', 'solutionBase64'],
+    imageArrayKeys = ['additionalImages'],
+  } = options;
+
+  // Step 1: Compress images in the body to reduce payload size
+  let processedBody = { ...body };
+  if (compressImages) {
+    for (const key of imageKeys) {
+      if (processedBody[key] && typeof processedBody[key] === 'string') {
+        processedBody[key] = await compressForEdgeFunction(processedBody[key]);
+      }
+    }
+    for (const arrKey of imageArrayKeys) {
+      if (Array.isArray(processedBody[arrKey])) {
+        processedBody[arrKey] = await Promise.all(
+          processedBody[arrKey].map((img: string) =>
+            typeof img === 'string' ? compressForEdgeFunction(img) : img
+          )
+        );
+      }
+    }
+  }
+
+  // Step 2: Attempt invocation with retries
+  let lastError: any = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = initialDelayMs * Math.pow(2, attempt - 1);
+        console.log(`[invokeWithRetry] Retry ${attempt}/${maxRetries} for ${functionName} after ${delay}ms`);
+        await sleep(delay);
+      }
+
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: processedBody,
+      });
+
+      // If there's an error from Supabase client (FunctionsFetchError, FunctionsHttpError, etc.)
+      if (error) {
+        lastError = error;
+
+        // Don't retry permanent errors
+        if (isPermanentError(error)) {
+          console.error(`[invokeWithRetry] Permanent error on ${functionName}:`, error.message);
+          return { data: null, error };
+        }
+
+        // For retryable errors, continue to next attempt
+        console.warn(`[invokeWithRetry] Transient error on ${functionName} (attempt ${attempt + 1}/${maxRetries + 1}):`, error.message || error);
+        continue;
+      }
+
+      // If the response data itself indicates an error
+      if (data && !data.success && data.error) {
+        // Check if it's a permanent error in the response
+        if (isResponsePermanentError(data)) {
+          console.error(`[invokeWithRetry] Permanent error in response from ${functionName}:`, data.error);
+          return { data, error: null };
+        }
+
+        // Rate limit with retry
+        if (data.rateLimited) {
+          lastError = { message: data.error || 'Rate limited' };
+          console.warn(`[invokeWithRetry] Rate limited on ${functionName}, will retry...`);
+          // Wait longer for rate limits
+          await sleep(initialDelayMs * Math.pow(2, attempt));
+          continue;
+        }
+      }
+
+      // Success!
+      return { data, error: null };
+
+    } catch (err: any) {
+      lastError = err;
+
+      if (isPermanentError(err)) {
+        console.error(`[invokeWithRetry] Permanent exception on ${functionName}:`, err.message);
+        return { data: null, error: err };
+      }
+
+      console.warn(`[invokeWithRetry] Exception on ${functionName} (attempt ${attempt + 1}/${maxRetries + 1}):`, err.message || err);
+    }
+  }
+
+  // All retries exhausted
+  console.error(`[invokeWithRetry] All ${maxRetries + 1} attempts failed for ${functionName}`);
+  return {
+    data: null,
+    error: lastError || new Error(`Failed to invoke ${functionName} after ${maxRetries + 1} attempts`),
+  };
+}
+
+/** Delay between sequential batch items to avoid overwhelming the edge function */
+const BATCH_ITEM_DELAY_MS = 500;
 
 const BATCH_STORAGE_KEY = 'scan-genius-batch-data';
 const BATCH_SUMMARY_KEY = 'scan-genius-batch-summary';
@@ -634,12 +824,10 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         const previousItem = newItems[i - 1];
         
         try {
-          const { data, error } = await supabase.functions.invoke('detect-handwriting-similarity', {
-            body: {
-              image1Base64: previousItem.imageDataUrl,
-              image2Base64: pageDataUrl,
-            },
-          });
+          const { data, error } = await invokeWithRetry('detect-handwriting-similarity', {
+            image1Base64: previousItem.imageDataUrl,
+            image2Base64: pageDataUrl,
+          }, { maxRetries: 2 });
 
           if (!error && data?.success && data?.similarity) {
             const similarity = data.similarity;
@@ -1106,22 +1294,20 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       console.log(`[identifyStudent] Starting identification with ${studentRoster.length} students in roster`);
       console.log(`[identifyStudent] Roster sample:`, studentRoster.slice(0, 3).map(s => `${s.first_name} ${s.last_name}`));
       
-      const { data, error } = await supabase.functions.invoke('analyze-student-work', {
-        body: {
-          imageBase64: item.imageDataUrl,
-          identifyOnly: true,
-          studentRoster: studentRoster.map(s => ({
-            id: s.id,
-            first_name: s.first_name,
-            last_name: s.last_name,
-            student_id: s.student_id,
-          })),
-        },
-      });
+      const { data, error } = await invokeWithRetry('analyze-student-work', {
+        imageBase64: item.imageDataUrl,
+        identifyOnly: true,
+        studentRoster: studentRoster.map(s => ({
+          id: s.id,
+          first_name: s.first_name,
+          last_name: s.last_name,
+          student_id: s.student_id,
+        })),
+      }, { maxRetries: 2 });
 
       if (error) {
         console.error('[identifyStudent] Edge function error:', error);
-        throw new Error(error.message);
+        throw new Error(error.message || 'Edge function request failed');
       }
       
       if (!data?.success) {
@@ -1254,16 +1440,14 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         };
       }
 
-      const { data, error } = await supabase.functions.invoke('analyze-student-work', {
-        body: {
-          imageBase64: item.imageDataUrl,
-          rubricSteps,
-          studentName: item.studentName,
-          teacherId: user?.id,
-          assessmentMode: assessmentMode || 'teacher',
-          promptText,
-        },
-      });
+      const { data, error } = await invokeWithRetry('analyze-student-work', {
+        imageBase64: item.imageDataUrl,
+        rubricSteps,
+        studentName: item.studentName,
+        teacherId: user?.id,
+        assessmentMode: assessmentMode || 'teacher',
+        promptText,
+      }, { maxRetries: 3 });
 
       if (error) {
         const errorMsg = handleApiError(error, 'Analysis');
@@ -1273,7 +1457,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         const errorMsg = handleApiError({ message: data.error }, 'Analysis');
         throw new Error(errorMsg);
       }
-      if (!data?.success || !data?.analysis) throw new Error('Invalid response');
+      if (!data?.success || !data?.analysis) throw new Error('Invalid response from analysis');
 
       // Apply grade curve if configured
       const curvedAnalysis = applyGradeCurve(data.analysis);
@@ -1324,12 +1508,10 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       ));
 
       try {
-        const { data, error } = await supabase.functions.invoke('analyze-student-work', {
-          body: {
-            imageBase64: items[i].imageDataUrl,
-            detectPageType: true,
-          },
-        });
+        const { data, error } = await invokeWithRetry('analyze-student-work', {
+          imageBase64: items[i].imageDataUrl,
+          detectPageType: true,
+        }, { maxRetries: 2 });
 
         if (!error && data?.success && data?.pageType) {
           const isNew = data.pageType.isNewPaper && !data.pageType.isContinuation;
@@ -1447,12 +1629,10 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
       try {
         // Compare handwriting between this page and the previous one
-        const { data, error } = await supabase.functions.invoke('detect-handwriting-similarity', {
-          body: {
-            image1Base64: previousItem.imageDataUrl,
-            image2Base64: currentItem.imageDataUrl,
-          },
-        });
+        const { data, error } = await invokeWithRetry('detect-handwriting-similarity', {
+          image1Base64: previousItem.imageDataUrl,
+          image2Base64: currentItem.imageDataUrl,
+        }, { maxRetries: 2 });
 
         if (!error && data?.success && data?.similarity) {
           const similarity = data.similarity;
@@ -1796,18 +1976,16 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         }
       }
 
-      const { data, error } = await supabase.functions.invoke('analyze-student-work', {
-        body: {
-          imageBase64: item.imageDataUrl,
-          additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
-          rubricSteps,
-          studentName: item.studentName,
-          teacherId: user?.id,
-          assessmentMode: assessmentMode || 'teacher',
-          promptText,
-          useLearnedStyle: useLearnedStyle || false,
-        },
-      });
+      const { data, error } = await invokeWithRetry('analyze-student-work', {
+        imageBase64: item.imageDataUrl,
+        additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
+        rubricSteps,
+        studentName: item.studentName,
+        teacherId: user?.id,
+        assessmentMode: assessmentMode || 'teacher',
+        promptText,
+        useLearnedStyle: useLearnedStyle || false,
+      }, { maxRetries: 3 });
 
       if (error) {
         const errorMsg = handleApiError(error, 'Analysis');
@@ -1817,7 +1995,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         const errorMsg = handleApiError({ message: data.error }, 'Analysis');
         throw new Error(errorMsg);
       }
-      if (!data?.success || !data?.analysis) throw new Error('Invalid response');
+      if (!data?.success || !data?.analysis) throw new Error('Invalid response from analysis');
 
       // Apply grade curve if configured
       const curvedAnalysis = applyGradeCurve(data.analysis);
@@ -1845,6 +2023,8 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
     // Get current items state for the async loop
     const currentItems = [...items];
+    let consecutiveFailures = 0;
+    const MAX_CONSECUTIVE_FAILURES = 5;
 
     for (let i = 0; i < currentItems.length; i++) {
       const item = currentItems[i];
@@ -1858,11 +2038,20 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         continue;
       }
 
+      // Circuit breaker: if too many consecutive failures, stop the batch
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        console.error(`[startBatchAnalysis] ${MAX_CONSECUTIVE_FAILURES} consecutive failures - stopping batch to prevent wasted API calls`);
+        toast.error(`Batch stopped: ${MAX_CONSECUTIVE_FAILURES} consecutive failures. Please check your connection and try again.`);
+        // Mark remaining items as failed
+        setItems(prev => prev.map((it, idx) => 
+          idx >= i && it.status !== 'completed' ? { ...it, status: 'failed', error: 'Batch stopped due to consecutive failures' } : it
+        ));
+        break;
+      }
+
       setCurrentIndex(i);
       
       // Mark current item as analyzing and CLEAR any stale result from prior run
-      // CRITICAL FIX: Without clearing result, old grades persist in UI during analysis,
-      // making it appear work was "graded" when it hasn't been re-evaluated yet
       setItems(prev => prev.map((it, idx) => 
         idx === i ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
       ));
@@ -1876,6 +2065,13 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
       const result = await analyzeItemWithContinuations(item, currentItems, rubricSteps, assessmentMode, promptText, useLearnedStyle);
 
+      // Track consecutive failures for circuit breaker
+      if (result.status === 'failed') {
+        consecutiveFailures++;
+      } else {
+        consecutiveFailures = 0;
+      }
+
       // Update primary item with result
       setItems(prev => prev.map((it, idx) => 
         idx === i ? result : it
@@ -1886,6 +2082,11 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         setItems(prev => prev.map(it => 
           item.continuationPages!.includes(it.id) ? { ...it, status: 'completed', result: result.result } : it
         ));
+      }
+
+      // Small delay between items to avoid overwhelming the edge function
+      if (i < currentItems.length - 1) {
+        await sleep(BATCH_ITEM_DELAY_MS);
       }
     }
 
@@ -2096,17 +2297,15 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
           }
         }
 
-        const { data, error } = await supabase.functions.invoke('analyze-student-work', {
-          body: {
-            imageBase64: item.imageDataUrl,
-            additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
-            answerGuideBase64: answerGuideImage,
-            rubricSteps,
-            studentName: item.studentName,
-            teacherId: user?.id,
-            assessmentMode: 'teacher-guided',
-          },
-        });
+        const { data, error } = await invokeWithRetry('analyze-student-work', {
+          imageBase64: item.imageDataUrl,
+          additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
+          answerGuideBase64: answerGuideImage,
+          rubricSteps,
+          studentName: item.studentName,
+          teacherId: user?.id,
+          assessmentMode: 'teacher-guided',
+        }, { maxRetries: 3 });
 
         if (error) {
           const errorMsg = handleApiError(error, 'Analysis');
@@ -2116,7 +2315,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
           const errorMsg = handleApiError({ message: data.error }, 'Analysis');
           throw new Error(errorMsg);
         }
-        if (!data?.success || !data?.analysis) throw new Error('Invalid response');
+        if (!data?.success || !data?.analysis) throw new Error('Invalid response from analysis');
 
         const curvedAnalysis = applyGradeCurve(data.analysis);
 
