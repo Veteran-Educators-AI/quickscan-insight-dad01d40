@@ -852,8 +852,8 @@ export function BatchImageZoomDialog({
             </div>
           )}
 
-          {/* Sidebar - No errors found panel with analysis details */}
-          {!hasMisconceptions && showAnnotations && !isAnnotating && (
+          {/* Sidebar - No errors found panel with analysis details (only show if analysis was actually run) */}
+          {!hasMisconceptions && showAnnotations && !isAnnotating && grade !== undefined && (
             <div className="w-80 border-l bg-background flex flex-col">
               <div className="p-3 border-b bg-muted/30">
                 {/* Show appropriate header based on grade */}
