@@ -1384,17 +1384,17 @@ Provide your analysis in the following structure:
 - Grade: (55-100 scale. YOUR GRADE MUST MATCH YOUR OWN EVIDENCE.
     *** GRADE CONSISTENCY RULE - CRITICAL ***
     Your grade MUST be logically consistent with your error analysis:
-    - If you found NO errors and work is present → Grade MUST be 85-100
-    - If you found only MINOR errors → Grade MUST be 75-90
+    - If you found NO errors and work is present → Grade MUST be 90-100
+    - If you found only MINOR errors → Grade MUST be 80-90
     - If you found SIGNIFICANT errors but student shows partial understanding → Grade 65-79
     - If work is blank/no understanding → Grade 55
     
-    NEVER give a low grade (below 85) while simultaneously saying "no errors found" or "work is mathematically correct."
-    NEVER give a high grade (above 85) while listing multiple significant errors.
+    NEVER give a low grade (below 90) while simultaneously saying "no errors found" or "work is mathematically correct."
+    NEVER give a high grade (above 90) while listing multiple significant errors.
     
     Scale:
-    • 90-100 = Full mastery, no errors or only trivial notation issues
-    • 85-89 = Strong understanding, no mathematical errors but minor presentation issues
+    • 95-100 = Full mastery, no errors, complete and correct work
+    • 90-94 = Strong understanding, no mathematical errors but minor presentation issues
     • 75-84 = Good understanding with some errors
     • 65-74 = Partial understanding with significant gaps
     • 55-64 = Minimal or no understanding shown)
@@ -2617,15 +2617,16 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   
   console.log(`High grade check - AnswerCorrect: ${result.isAnswerCorrect}, NoRealErrors: ${hasNoRealErrors}, ShouldBeHigh: ${shouldBeHighGrade}`);
   
-  // *** CONSISTENCY CHECK: If "no errors found" + work present, grade must be at least 85 ***
-  // This prevents the contradictory scenario where AI says "no errors" but assigns 70
+  // *** CONSISTENCY CHECK: If "no errors found" + work present, grade must be at least 90 ***
+  // This prevents the contradictory scenario where AI says "no errors" but assigns 70-85
+  // If no errors are found, the minimum grade should reflect that the work is correct
   const noErrorsButWorkPresent = result.studentWorkPresent && 
     hasSubstantialWork && 
     hasNoRealErrors &&
     !explicitlyBlank;
   
   if (noErrorsButWorkPresent) {
-    console.log('CONSISTENCY CHECK: No errors detected with work present - enforcing minimum grade of 85');
+    console.log('CONSISTENCY CHECK: No errors detected with work present - enforcing minimum grade of 90');
   }
   
   // *** PERFECT SCORE OVERRIDE: If analysis indicates full mastery, give 100 ***
@@ -2649,8 +2650,17 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     // The AI was given a consistency rule: its grade must match its evidence.
     // Only override for floor enforcement, not to second-guess the AI.
     if (noErrorsButWorkPresent) {
-      // AI said no errors but gave a low grade - override to at least 85
-      result.grade = Math.max(85, Math.min(100, parsedGrade));
+      // AI said no errors but gave a low grade - override to at least 90
+      // If no errors were found, the work is mathematically correct and deserves 90+
+      result.grade = Math.max(90, Math.min(100, parsedGrade));
+      if (parsedGrade < 90) {
+        console.log(`CONSISTENCY: AI gave ${parsedGrade} but no errors found - raised to ${result.grade}`);
+        // Add consistency note to justification
+        if (!result.gradeJustification.toLowerCase().includes('no error') && 
+            !result.gradeJustification.toLowerCase().includes('mathematically correct')) {
+          result.gradeJustification += ` Grade raised to ${result.grade} because no mathematical errors were detected in the student's work.`;
+        }
+      }
     } else if (hasAnyUnderstanding) {
       // Student shows understanding - enforce minimum of 65
       result.grade = Math.max(gradeFloorWithEffort, Math.min(100, parsedGrade));
@@ -2683,10 +2693,16 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     result.grade = 100;
   } else if (shouldBeHighGrade && result.grade < 90) {
     result.grade = 90;
-  } else if (noErrorsButWorkPresent && result.grade < 85) {
-    // CONSISTENCY: Never give below 85 when no errors detected and work is present
-    result.grade = 85;
-    console.log('CONSISTENCY SAFEGUARD: Bumped grade to 85 (no errors + work present)');
+  } else if (noErrorsButWorkPresent && result.grade < 90) {
+    // CONSISTENCY: Never give below 90 when no errors detected and work is present
+    // If the AI found absolutely no errors, the student's work is mathematically sound
+    const previousGrade = result.grade;
+    result.grade = 90;
+    console.log(`CONSISTENCY SAFEGUARD: Bumped grade from ${previousGrade} to 90 (no errors + work present)`);
+    if (!result.gradeJustification.toLowerCase().includes('no error') && 
+        !result.gradeJustification.toLowerCase().includes('mathematically correct')) {
+      result.gradeJustification += ` Grade raised to 90 because no mathematical errors were detected.`;
+    }
   } else if (hasAnyUnderstanding) {
     result.grade = Math.max(gradeFloorWithEffort, result.grade);
   }

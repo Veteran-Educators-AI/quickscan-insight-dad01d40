@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, Move, AlertTriangle, MapPin, Check, X, Save, Brain, Loader2, Pencil, PenTool } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, Move, AlertTriangle, MapPin, Check, X, Save, Brain, Loader2, Pencil, PenTool, BookOpen, MessageSquare, ThumbsUp, ThumbsDown, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -23,6 +23,19 @@ import { AnnotationToolbar } from './AnnotationToolbar';
 import { AnnotationCanvas } from './AnnotationCanvas';
 import { cn } from '@/lib/utils';
 
+interface AnalysisResultProps {
+  gradeJustification?: string;
+  feedback?: string;
+  approachAnalysis?: string;
+  strengthsAnalysis?: string[];
+  areasForImprovement?: string[];
+  whatStudentDidCorrectly?: string;
+  whatStudentGotWrong?: string;
+  ocrText?: string;
+  problemIdentified?: string;
+  totalScore?: { earned: number; possible: number; percentage: number };
+}
+
 interface BatchImageZoomDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -36,6 +49,7 @@ interface BatchImageZoomDialogProps {
   studentId?: string;
   attemptId?: string;
   topicName?: string;
+  analysisResult?: AnalysisResultProps;
 }
 
 export function BatchImageZoomDialog({
@@ -51,6 +65,7 @@ export function BatchImageZoomDialog({
   studentId,
   attemptId,
   topicName = 'Unknown Topic',
+  analysisResult,
 }: BatchImageZoomDialogProps) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -809,15 +824,20 @@ export function BatchImageZoomDialog({
             </div>
           )}
 
-          {/* Sidebar - No errors found panel */}
+          {/* Sidebar - Analysis details panel (when no specific errors) */}
           {!hasMisconceptions && showAnnotations && !isAnnotating && (
             <div className="w-80 border-l bg-background flex flex-col">
               <div className="p-3 border-b bg-muted/30">
                 {/* Show appropriate header based on grade */}
-                {grade !== undefined && grade >= 85 ? (
+                {grade !== undefined && grade >= 90 ? (
                   <h3 className="text-sm font-medium flex items-center gap-2">
                     <Check className="h-4 w-4 text-green-500" />
                     No Errors Detected
+                  </h3>
+                ) : grade !== undefined && grade >= 85 ? (
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <Info className="h-4 w-4 text-blue-500" />
+                    AI Analysis Complete
                   </h3>
                 ) : (
                   <h3 className="text-sm font-medium flex items-center gap-2">
@@ -831,81 +851,237 @@ export function BatchImageZoomDialog({
               </div>
               
               <ScrollArea className="flex-1">
-                <div className="p-3 space-y-2">
-                  {/* Show different content based on grade - low grade means something was wrong even if no specific errors listed */}
-                  {grade !== undefined && grade < 70 ? (
-                    <div className="p-3 rounded-lg border border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20">
+                <div className="p-3 space-y-3">
+                  {/* Grade justification - ALWAYS show when available */}
+                  {analysisResult?.gradeJustification && (
+                    <div className="p-3 rounded-lg border border-blue-200/50 bg-blue-50/30 dark:border-blue-800/50 dark:bg-blue-950/20">
                       <div className="flex items-start gap-2">
-                        <div className="flex items-center justify-center w-6 h-6 rounded-full shrink-0 bg-amber-100 text-amber-600">
-                          <AlertTriangle className="h-3 w-3" />
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full shrink-0 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 mt-0.5">
+                          <BookOpen className="h-3 w-3" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-400">
-                            The AI did not detect specific errors but the work may be incomplete, missing steps, or have an incorrect final answer. Review the paper manually for issues like incomplete work, missing units, or calculation errors.
+                          <p className="text-[11px] font-medium text-blue-800 dark:text-blue-300 mb-1">Grade Justification</p>
+                          <p className="text-xs leading-relaxed text-blue-700/90 dark:text-blue-400/90">
+                            {analysisResult.gradeJustification}
                           </p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={cn(
-                      "p-3 rounded-lg border transition-all",
-                      noErrorConfirmed && "border-green-400 bg-green-50/50 dark:bg-green-950/20",
-                      !noErrorConfirmed && "border-green-300/50 bg-green-50/50 dark:bg-green-950/20"
-                    )}>
-                      <div className="flex items-start gap-2">
-                        <div className={cn(
-                          "flex items-center justify-center w-6 h-6 rounded-full shrink-0",
-                          noErrorConfirmed ? "bg-green-500 text-white" : "bg-green-100 text-green-600"
-                        )}>
-                          <Check className="h-3 w-3" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs leading-relaxed text-green-700 dark:text-green-400">
-                            No errors found - the student's work appears to be mathematically correct.
-                          </p>
-                        
-                          <div className="flex items-center gap-2 mt-2">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant={noErrorConfirmed ? 'default' : 'outline'}
-                                    size="sm"
-                                    className={cn(
-                                      "h-6 px-2 text-xs gap-1",
-                                      noErrorConfirmed && "bg-green-600 hover:bg-green-700"
-                                    )}
-                                    onClick={() => setNoErrorConfirmed(!noErrorConfirmed)}
-                                  >
-                                    <Check className="h-3 w-3" />
-                                    {noErrorConfirmed ? 'Confirmed' : 'Confirm'}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>AI correctly identified no errors</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 px-2 text-xs gap-1"
-                                    onClick={() => setNoErrorConfirmed(false)}
-                                    disabled={!noErrorConfirmed}
-                                  >
-                                    <X className="h-3 w-3" />
-                                    Dismiss
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>AI missed errors in this work</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
                         </div>
                       </div>
                     </div>
                   )}
+
+                  {/* What student did correctly */}
+                  {analysisResult?.whatStudentDidCorrectly && 
+                   !analysisResult.whatStudentDidCorrectly.toLowerCase().includes('no correct work') && (
+                    <div className="p-3 rounded-lg border border-green-200/50 bg-green-50/30 dark:border-green-800/50 dark:bg-green-950/20">
+                      <div className="flex items-start gap-2">
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full shrink-0 bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 mt-0.5">
+                          <ThumbsUp className="h-3 w-3" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-green-800 dark:text-green-300 mb-1">What Student Did Correctly</p>
+                          <p className="text-xs leading-relaxed text-green-700/90 dark:text-green-400/90">
+                            {analysisResult.whatStudentDidCorrectly}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* What student got wrong */}
+                  {analysisResult?.whatStudentGotWrong && 
+                   !analysisResult.whatStudentGotWrong.toLowerCase().includes('no errors') &&
+                   !analysisResult.whatStudentGotWrong.toLowerCase().includes('work is correct') && (
+                    <div className="p-3 rounded-lg border border-amber-200/50 bg-amber-50/30 dark:border-amber-800/50 dark:bg-amber-950/20">
+                      <div className="flex items-start gap-2">
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full shrink-0 bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 mt-0.5">
+                          <ThumbsDown className="h-3 w-3" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300 mb-1">What Student Got Wrong</p>
+                          <p className="text-xs leading-relaxed text-amber-700/90 dark:text-amber-400/90">
+                            {analysisResult.whatStudentGotWrong}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Strengths */}
+                  {analysisResult?.strengthsAnalysis && analysisResult.strengthsAnalysis.length > 0 && (
+                    <div className="p-3 rounded-lg border border-green-200/50 bg-green-50/30 dark:border-green-800/50 dark:bg-green-950/20">
+                      <div className="flex items-start gap-2">
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full shrink-0 bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 mt-0.5">
+                          <Check className="h-3 w-3" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-green-800 dark:text-green-300 mb-1">Strengths</p>
+                          <ul className="space-y-1">
+                            {analysisResult.strengthsAnalysis.map((s, i) => (
+                              <li key={i} className="text-xs leading-relaxed text-green-700/90 dark:text-green-400/90 flex items-start gap-1">
+                                <span className="text-green-500 mt-0.5">•</span>
+                                <span>{s}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Areas for improvement */}
+                  {analysisResult?.areasForImprovement && analysisResult.areasForImprovement.length > 0 && (
+                    <div className="p-3 rounded-lg border border-amber-200/50 bg-amber-50/30 dark:border-amber-800/50 dark:bg-amber-950/20">
+                      <div className="flex items-start gap-2">
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full shrink-0 bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 mt-0.5">
+                          <AlertTriangle className="h-3 w-3" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300 mb-1">Areas for Improvement</p>
+                          <ul className="space-y-1">
+                            {analysisResult.areasForImprovement.map((a, i) => (
+                              <li key={i} className="text-xs leading-relaxed text-amber-700/90 dark:text-amber-400/90 flex items-start gap-1">
+                                <span className="text-amber-500 mt-0.5">•</span>
+                                <span>{a}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Approach analysis */}
+                  {analysisResult?.approachAnalysis && (
+                    <div className="p-3 rounded-lg border border-muted bg-muted/20">
+                      <div className="flex items-start gap-2">
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full shrink-0 bg-muted text-muted-foreground mt-0.5">
+                          <BookOpen className="h-3 w-3" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-foreground/80 mb-1">Approach Analysis</p>
+                          <p className="text-xs leading-relaxed text-muted-foreground">
+                            {analysisResult.approachAnalysis}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* AI Feedback / suggestions */}
+                  {analysisResult?.feedback && (
+                    <div className="p-3 rounded-lg border border-purple-200/50 bg-purple-50/30 dark:border-purple-800/50 dark:bg-purple-950/20">
+                      <div className="flex items-start gap-2">
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full shrink-0 bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 mt-0.5">
+                          <MessageSquare className="h-3 w-3" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-purple-800 dark:text-purple-300 mb-1">Feedback</p>
+                          <p className="text-xs leading-relaxed text-purple-700/90 dark:text-purple-400/90">
+                            {analysisResult.feedback}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fallback when no analysis details available at all */}
+                  {!analysisResult?.gradeJustification && !analysisResult?.feedback && !analysisResult?.approachAnalysis && (
+                    <>
+                      {/* Low grade warning */}
+                      {grade !== undefined && grade < 70 ? (
+                        <div className="p-3 rounded-lg border border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20">
+                          <div className="flex items-start gap-2">
+                            <div className="flex items-center justify-center w-6 h-6 rounded-full shrink-0 bg-amber-100 text-amber-600">
+                              <AlertTriangle className="h-3 w-3" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+                                The AI did not detect specific errors but the work may be incomplete, missing steps, or have an incorrect final answer. Review the paper manually for issues like incomplete work, missing units, or calculation errors.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : grade !== undefined && grade < 100 && grade >= 85 ? (
+                        <div className="p-3 rounded-lg border border-blue-200/50 bg-blue-50/30 dark:border-blue-800/50 dark:bg-blue-950/20">
+                          <div className="flex items-start gap-2">
+                            <div className="flex items-center justify-center w-6 h-6 rounded-full shrink-0 bg-blue-100 text-blue-600">
+                              <Info className="h-3 w-3" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs leading-relaxed text-blue-700 dark:text-blue-400">
+                                No mathematical errors were detected. The grade of {grade}% may reflect minor presentation issues, missing units, incomplete final answers, or work that could be more clearly shown. This does not necessarily indicate errors.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={cn(
+                          "p-3 rounded-lg border transition-all",
+                          "border-green-300/50 bg-green-50/50 dark:bg-green-950/20"
+                        )}>
+                          <div className="flex items-start gap-2">
+                            <div className="flex items-center justify-center w-6 h-6 rounded-full shrink-0 bg-green-100 text-green-600">
+                              <Check className="h-3 w-3" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs leading-relaxed text-green-700 dark:text-green-400">
+                                No errors found - the student's work appears to be mathematically correct.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Confirm/Dismiss section */}
+                  <div className={cn(
+                    "p-3 rounded-lg border transition-all",
+                    noErrorConfirmed && "border-green-400 bg-green-50/50 dark:bg-green-950/20",
+                    !noErrorConfirmed && "border-muted bg-muted/20"
+                  )}>
+                    <p className="text-[11px] font-medium text-foreground/80 mb-2">
+                      Do you agree with this analysis?
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={noErrorConfirmed ? 'default' : 'outline'}
+                              size="sm"
+                              className={cn(
+                                "h-6 px-2 text-xs gap-1",
+                                noErrorConfirmed && "bg-green-600 hover:bg-green-700"
+                              )}
+                              onClick={() => setNoErrorConfirmed(!noErrorConfirmed)}
+                            >
+                              <Check className="h-3 w-3" />
+                              {noErrorConfirmed ? 'Confirmed' : 'Confirm'}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>AI analysis is correct</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-xs gap-1"
+                              onClick={() => setNoErrorConfirmed(false)}
+                              disabled={!noErrorConfirmed}
+                            >
+                              <X className="h-3 w-3" />
+                              Dismiss
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>AI missed errors in this work</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
                 </div>
               </ScrollArea>
 
