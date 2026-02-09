@@ -38,6 +38,17 @@ export function handleApiError(error: unknown, context?: string): string {
       return message;
     }
     
+    // Model unavailable / bad request (400) — usually a deprecated or invalid model name
+    if (err.status === 400 || err.message?.includes('400') || err.message?.toLowerCase().includes('model') && err.message?.toLowerCase().includes('unavailable')) {
+      const message = 'The AI model returned an error. A fallback model was used or the request needs to be retried.';
+      toast({
+        title: 'AI Model Issue',
+        description: 'The selected AI model may be temporarily unavailable. The system will automatically try a fallback. Please retry your scan.',
+        variant: 'destructive',
+      });
+      return message;
+    }
+    
     // API key invalid (403)
     if (err.status === 403 || err.message?.includes('403') || err.message?.toLowerCase().includes('invalid') || err.message?.toLowerCase().includes('api key')) {
       const message = 'API key is invalid or has insufficient permissions.';

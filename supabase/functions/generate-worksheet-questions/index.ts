@@ -56,7 +56,7 @@ async function callLovableAI(prompt: string, modelOrAdvanced: boolean | string =
   
   console.log(`Using AI model: ${model}`);
 
-  // OpenAI models (gpt-4o, etc.) require max_completion_tokens, Gemini uses max_tokens
+  // OpenAI models (gpt-5.x, etc.) require max_completion_tokens, Gemini uses max_tokens
   const isOpenAIModel = model.startsWith('openai/');
   const tokenParams = isOpenAIModel 
     ? { max_completion_tokens: 12000 }
