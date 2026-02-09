@@ -9,9 +9,50 @@ import { parseStudentQRCode } from '@/components/print/StudentQRCode';
 import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
 import { parseUnifiedStudentQRCode } from '@/components/print/StudentPageQRCode';
 import { toast } from 'sonner';
+import { compressImage } from '@/lib/imageUtils';
 
 const BATCH_STORAGE_KEY = 'scan-genius-batch-data';
 const BATCH_SUMMARY_KEY = 'scan-genius-batch-summary';
+const MAX_EDGE_IMAGE_DATA_URL_LENGTH = 1_600_000; // ~1.2MB binary payload after base64
+const EDGE_INVOKE_RETRY_DELAYS_MS = [600, 1200] as const;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const isRetryableEdgeInvokeError = (message: string): boolean => {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('failed to send a request to the edge function') ||
+    normalized.includes('edge function returned a non-2xx status code') ||
+    normalized.includes('request entity too large') ||
+    normalized.includes('payload too large') ||
+    normalized.includes('network') ||
+    normalized.includes('fetch') ||
+    normalized.includes('timeout') ||
+    normalized.includes('gateway') ||
+    normalized.includes('413') ||
+    normalized.includes('502') ||
+    normalized.includes('503') ||
+    normalized.includes('504')
+  );
+};
+
+const formatScanErrorMessage = (message: string): string => {
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes('failed to send a request to the edge function') ||
+    normalized.includes('edge function returned a non-2xx status code')
+  ) {
+    return 'Could not reach the scanning service after retrying. Please try this page again.';
+  }
+  if (
+    normalized.includes('request entity too large') ||
+    normalized.includes('payload too large') ||
+    normalized.includes('413')
+  ) {
+    return 'This scan is too large to analyze. Re-scan at a lower DPI or enable image preprocessing.';
+  }
+  return message;
+};
 
 interface RubricStep {
   step_number: number;
@@ -169,6 +210,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   const hasLoadedFromStorage = useRef(false);
   const lastSavedItems = useRef<string>('');
   const lastSavedSummary = useRef<string>('');
+  const optimizedImageCache = useRef<Map<string, string>>(new Map());
   
   // Load initial state from localStorage
   const [items, setItems] = useState<BatchItem[]>(() => {
@@ -343,6 +385,109 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     name = name.replace(/\s+/g, ' ').trim();
     return name.toLowerCase() || filename.toLowerCase();
   }, []);
+
+  const optimizeImageForEdgeFunction = useCallback(async (
+    imageDataUrl: string,
+    aggressive = false
+  ): Promise<string> => {
+    if (!imageDataUrl || typeof imageDataUrl !== 'string' || !imageDataUrl.startsWith('data:image/')) {
+      return imageDataUrl;
+    }
+
+    const targetLength = aggressive ? 1_200_000 : MAX_EDGE_IMAGE_DATA_URL_LENGTH;
+    if (!aggressive && imageDataUrl.length <= targetLength) {
+      return imageDataUrl;
+    }
+
+    const cacheKey = `${aggressive ? 'aggressive' : 'normal'}:${imageDataUrl}`;
+    const cached = optimizedImageCache.current.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const compressionProfiles = aggressive
+      ? [
+          { maxWidth: 1200, quality: 0.72 },
+          { maxWidth: 1000, quality: 0.65 },
+          { maxWidth: 850, quality: 0.6 },
+        ]
+      : [
+          { maxWidth: 1400, quality: 0.82 },
+          { maxWidth: 1200, quality: 0.75 },
+        ];
+
+    let optimized = imageDataUrl;
+    try {
+      for (const profile of compressionProfiles) {
+        if (optimized.length <= targetLength) break;
+        optimized = await compressImage(optimized, profile.maxWidth, profile.quality);
+      }
+    } catch (compressionErr) {
+      console.warn('[BatchAnalysis] Image compression failed, using original image payload:', compressionErr);
+      return imageDataUrl;
+    }
+
+    if (optimized.length < imageDataUrl.length) {
+      optimizedImageCache.current.set(cacheKey, optimized);
+    }
+
+    return optimized;
+  }, []);
+
+  const optimizeAnalyzeRequestBody = useCallback(async (
+    body: Record<string, any>,
+    aggressive = false
+  ): Promise<Record<string, any>> => {
+    const optimizedBody = { ...body };
+
+    if (typeof optimizedBody.imageBase64 === 'string') {
+      optimizedBody.imageBase64 = await optimizeImageForEdgeFunction(optimizedBody.imageBase64, aggressive);
+    }
+    if (typeof optimizedBody.answerGuideBase64 === 'string') {
+      optimizedBody.answerGuideBase64 = await optimizeImageForEdgeFunction(optimizedBody.answerGuideBase64, aggressive);
+    }
+    if (typeof optimizedBody.solutionBase64 === 'string') {
+      optimizedBody.solutionBase64 = await optimizeImageForEdgeFunction(optimizedBody.solutionBase64, aggressive);
+    }
+    if (Array.isArray(optimizedBody.additionalImages) && optimizedBody.additionalImages.length > 0) {
+      optimizedBody.additionalImages = await Promise.all(
+        optimizedBody.additionalImages.map((img: string) => optimizeImageForEdgeFunction(img, aggressive))
+      );
+    }
+
+    return optimizedBody;
+  }, [optimizeImageForEdgeFunction]);
+
+  const invokeAnalyzeStudentWork = useCallback(async (
+    body: Record<string, any>
+  ): Promise<{ data: any; error: any }> => {
+    let requestBody = await optimizeAnalyzeRequestBody(body, false);
+
+    for (let attempt = 0; attempt <= EDGE_INVOKE_RETRY_DELAYS_MS.length; attempt++) {
+      const { data, error } = await supabase.functions.invoke('analyze-student-work', {
+        body: requestBody,
+      });
+
+      if (!error) {
+        return { data, error: null };
+      }
+
+      const message = error?.message || '';
+      const shouldRetry = isRetryableEdgeInvokeError(message);
+      if (!shouldRetry || attempt === EDGE_INVOKE_RETRY_DELAYS_MS.length) {
+        return { data, error };
+      }
+
+      // First retry uses more aggressive compression.
+      if (attempt === 0) {
+        requestBody = await optimizeAnalyzeRequestBody(body, true);
+      }
+
+      await sleep(EDGE_INVOKE_RETRY_DELAYS_MS[attempt]);
+    }
+
+    return { data: null, error: { message: 'Unknown edge function invocation error' } };
+  }, [optimizeAnalyzeRequestBody]);
 
   const addImage = useCallback((imageDataUrl: string, studentId?: string, studentName?: string, filename?: string): string => {
     const id = crypto.randomUUID();
@@ -888,6 +1033,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     }
     // Clear duplicate detection cache for fresh batch
     clearDuplicateCache();
+    optimizedImageCache.current.clear();
   }, [clearDuplicateCache]);
 
   // Local QR code scanning function - supports student-only, student+question, and student+page QR codes
@@ -1106,22 +1252,20 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       console.log(`[identifyStudent] Starting identification with ${studentRoster.length} students in roster`);
       console.log(`[identifyStudent] Roster sample:`, studentRoster.slice(0, 3).map(s => `${s.first_name} ${s.last_name}`));
       
-      const { data, error } = await supabase.functions.invoke('analyze-student-work', {
-        body: {
-          imageBase64: item.imageDataUrl,
-          identifyOnly: true,
-          studentRoster: studentRoster.map(s => ({
-            id: s.id,
-            first_name: s.first_name,
-            last_name: s.last_name,
-            student_id: s.student_id,
-          })),
-        },
+      const { data, error } = await invokeAnalyzeStudentWork({
+        imageBase64: item.imageDataUrl,
+        identifyOnly: true,
+        studentRoster: studentRoster.map(s => ({
+          id: s.id,
+          first_name: s.first_name,
+          last_name: s.last_name,
+          student_id: s.student_id,
+        })),
       });
 
       if (error) {
         console.error('[identifyStudent] Edge function error:', error);
-        throw new Error(error.message);
+        throw new Error(formatScanErrorMessage(error.message || 'Student identification failed'));
       }
       
       if (!data?.success) {
@@ -1254,19 +1398,17 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         };
       }
 
-      const { data, error } = await supabase.functions.invoke('analyze-student-work', {
-        body: {
-          imageBase64: item.imageDataUrl,
-          rubricSteps,
-          studentName: item.studentName,
-          teacherId: user?.id,
-          assessmentMode: assessmentMode || 'teacher',
-          promptText,
-        },
+      const { data, error } = await invokeAnalyzeStudentWork({
+        imageBase64: item.imageDataUrl,
+        rubricSteps,
+        studentName: item.studentName,
+        teacherId: user?.id,
+        assessmentMode: assessmentMode || 'teacher',
+        promptText,
       });
 
       if (error) {
-        const errorMsg = handleApiError(error, 'Analysis');
+        const errorMsg = formatScanErrorMessage(handleApiError(error, 'Analysis'));
         throw new Error(errorMsg);
       }
       if (data?.error) {
@@ -1288,7 +1430,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       return {
         ...item,
         status: 'failed',
-        error: err instanceof Error ? err.message : 'Analysis failed',
+        error: err instanceof Error ? formatScanErrorMessage(err.message) : 'Analysis failed',
       };
     }
   };
@@ -1324,11 +1466,9 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       ));
 
       try {
-        const { data, error } = await supabase.functions.invoke('analyze-student-work', {
-          body: {
-            imageBase64: items[i].imageDataUrl,
-            detectPageType: true,
-          },
+        const { data, error } = await invokeAnalyzeStudentWork({
+          imageBase64: items[i].imageDataUrl,
+          detectPageType: true,
         });
 
         if (!error && data?.success && data?.pageType) {
@@ -1392,7 +1532,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     setIsIdentifying(false);
     
     return { newPapers, continuations };
-  }, [items, isProcessing, isIdentifying]);
+  }, [items, isProcessing, isIdentifying, invokeAnalyzeStudentWork]);
 
   // Detect multi-page papers using handwriting similarity between sequential pages
   const detectMultiPageByHandwriting = useCallback(async (): Promise<{ groupsCreated: number; pagesLinked: number }> => {
@@ -1796,21 +1936,19 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         }
       }
 
-      const { data, error } = await supabase.functions.invoke('analyze-student-work', {
-        body: {
-          imageBase64: item.imageDataUrl,
-          additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
-          rubricSteps,
-          studentName: item.studentName,
-          teacherId: user?.id,
-          assessmentMode: assessmentMode || 'teacher',
-          promptText,
-          useLearnedStyle: useLearnedStyle || false,
-        },
+      const { data, error } = await invokeAnalyzeStudentWork({
+        imageBase64: item.imageDataUrl,
+        additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
+        rubricSteps,
+        studentName: item.studentName,
+        teacherId: user?.id,
+        assessmentMode: assessmentMode || 'teacher',
+        promptText,
+        useLearnedStyle: useLearnedStyle || false,
       });
 
       if (error) {
-        const errorMsg = handleApiError(error, 'Analysis');
+        const errorMsg = formatScanErrorMessage(handleApiError(error, 'Analysis'));
         throw new Error(errorMsg);
       }
       if (data?.error) {
@@ -1832,7 +1970,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       return {
         ...item,
         status: 'failed',
-        error: err instanceof Error ? err.message : 'Analysis failed',
+        error: err instanceof Error ? formatScanErrorMessage(err.message) : 'Analysis failed',
       };
     }
   };
@@ -2096,20 +2234,18 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
           }
         }
 
-        const { data, error } = await supabase.functions.invoke('analyze-student-work', {
-          body: {
-            imageBase64: item.imageDataUrl,
-            additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
-            answerGuideBase64: answerGuideImage,
-            rubricSteps,
-            studentName: item.studentName,
-            teacherId: user?.id,
-            assessmentMode: 'teacher-guided',
-          },
+        const { data, error } = await invokeAnalyzeStudentWork({
+          imageBase64: item.imageDataUrl,
+          additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
+          answerGuideBase64: answerGuideImage,
+          rubricSteps,
+          studentName: item.studentName,
+          teacherId: user?.id,
+          assessmentMode: 'teacher-guided',
         });
 
         if (error) {
-          const errorMsg = handleApiError(error, 'Analysis');
+          const errorMsg = formatScanErrorMessage(handleApiError(error, 'Analysis'));
           throw new Error(errorMsg);
         }
         if (data?.error) {
@@ -2131,15 +2267,16 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
           ));
         }
       } catch (err) {
+        const message = err instanceof Error ? formatScanErrorMessage(err.message) : 'Analysis failed';
         setItems(prev => prev.map((it, idx) => 
-          idx === i ? { ...it, status: 'failed', error: err instanceof Error ? err.message : 'Analysis failed' } : it
+          idx === i ? { ...it, status: 'failed', error: message } : it
         ));
       }
     }
 
     setCurrentIndex(-1);
     setIsProcessing(false);
-  }, [items, isProcessing, user?.id]);
+  }, [items, isProcessing, user?.id, applyGradeCurve, invokeAnalyzeStudentWork]);
 
   const generateSummary = useCallback((): BatchSummary => {
     // Only count primary pages (not continuations) to avoid double-counting

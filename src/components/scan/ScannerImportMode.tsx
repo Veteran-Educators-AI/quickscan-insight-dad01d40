@@ -41,7 +41,7 @@ import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { resizeImage, blobToBase64, applyPhotocopyFilter } from "@/lib/imageUtils";
+import { resizeImage, blobToBase64, applyPhotocopyFilter, compressImage } from "@/lib/imageUtils";
 import { pdfToImages, isPdfFile } from "@/lib/pdfUtils";
 import { GoogleDriveImport } from "./GoogleDriveImport";
 import { GoogleDriveAutoSyncConfig } from "./GoogleDriveAutoSyncConfig";
@@ -293,6 +293,13 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
         }
       }
 
+      // Keep payload size reliable for downstream edge-function analysis.
+      try {
+        dataUrl = await compressImage(dataUrl, 1200, 0.8);
+      } catch (err) {
+        console.warn("[ScannerImportMode] Final compression failed, using uncompressed page:", err);
+      }
+
       setProcessProgress(((index + 1) / total) * 100);
 
       return {
@@ -436,6 +443,13 @@ export function ScannerImportMode({ onPagesReady, onClose }: ScannerImportModePr
           rotation = orientationResult.suggestedRotation;
           autoRotated = true;
         }
+      }
+
+      // Keep payload size reliable for downstream edge-function analysis.
+      try {
+        processedDataUrl = await compressImage(processedDataUrl, 1200, 0.8);
+      } catch (err) {
+        console.warn("[ScannerImportMode] Final compression failed for PDF page, using uncompressed page:", err);
       }
 
       setProcessProgress(((index + 1) / total) * 100);
