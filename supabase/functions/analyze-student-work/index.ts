@@ -311,12 +311,58 @@ function getAnalysisModel(provider: AnalysisProvider): string {
   }
 }
 
+// Fallback model chain: if the primary model is unavailable (deprecated,
+// invalid, rate-limited, etc.) we try the next model in the chain before
+// giving up.  This ensures scans keep working even when a provider
+// retires / renames models.
+const FALLBACK_MODELS: Record<string, string[]> = {
+  'openai/gpt-5':            ['openai/gpt-5-mini', 'google/gemini-2.5-flash'],
+  'openai/gpt-5-mini':       ['openai/gpt-5', 'google/gemini-2.5-flash'],
+  'google/gemini-2.5-flash':  ['google/gemini-2.5-flash-lite', 'openai/gpt-5-mini'],
+  'google/gemini-2.5-flash-lite': ['google/gemini-2.5-flash', 'openai/gpt-5-mini'],
+};
+
 // Lite model for simple helper tasks (always Gemini Flash Lite - cheapest)
 const LITE_MODEL = 'google/gemini-2.5-flash-lite';
 
 type AIModelTier = 'lite' | 'standard';
 
-// Helper function to call Lovable AI Gateway with token logging
+// ─── Low-level fetch helper (single attempt, single model) ─────────────────
+async function fetchAICompletion(
+  model: string,
+  messages: any[],
+  maxTokens: number,
+  apiKey: string,
+): Promise<Response> {
+  const isOpenAIModel = model.startsWith('openai/');
+  const tokenParams = isOpenAIModel
+    ? { max_completion_tokens: maxTokens }
+    : { max_tokens: maxTokens };
+
+  return fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ model, messages, ...tokenParams }),
+  });
+}
+
+// Helper: determine whether an HTTP status is worth retrying
+function isRetryableStatus(status: number): boolean {
+  // 408 = timeout, 429 = rate-limit, 500-504 = server errors, 503 = overloaded
+  return status === 408 || status === 429 || (status >= 500 && status <= 504);
+}
+
+// Helper function to call Lovable AI Gateway with token logging,
+// automatic retry (with exponential backoff) and model fallback.
+//
+// Retry strategy:
+//   1. Try the requested model up to 2 times (with 2 s / 4 s backoff).
+//   2. If the error is non-retryable (400 = invalid model, 401, 403, 404)
+//      immediately switch to the next fallback model.
+//   3. After exhausting retries AND fallbacks, throw the last error.
 async function callLovableAI(
   messages: any[], 
   apiKey: string, 
@@ -326,57 +372,98 @@ async function callLovableAI(
   modelTier: AIModelTier = 'lite',
   analysisProvider: AnalysisProvider = 'gemini'
 ) {
-  const model = modelTier === 'standard' ? getAnalysisModel(analysisProvider) : LITE_MODEL;
-  const isOpenAIModel = model.startsWith('openai/');
+  const primaryModel = modelTier === 'standard' ? getAnalysisModel(analysisProvider) : LITE_MODEL;
   const maxTokens = modelTier === 'standard' ? 6000 : 4000;
   const startTime = Date.now();
-  
-  console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier} provider=${analysisProvider}`);
-  
-  // OpenAI models use max_completion_tokens instead of max_tokens
-  const tokenParams = isOpenAIModel 
-    ? { max_completion_tokens: maxTokens }
-    : { max_tokens: maxTokens };
-  
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      ...tokenParams,
-    }),
-  });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Lovable AI error:', response.status, errorText);
-    
-    if (response.status === 429) {
-      throw { status: 429, message: "Rate limit exceeded. Please try again in a moment." };
+  // Build ordered list of models to try: primary + fallbacks
+  const modelsToTry = [primaryModel, ...(FALLBACK_MODELS[primaryModel] || ['google/gemini-2.5-flash'])];
+  // De-duplicate while preserving order
+  const uniqueModels = [...new Set(modelsToTry)];
+
+  const MAX_RETRIES = 2;       // per model
+  const BASE_BACKOFF_MS = 2000; // 2 seconds
+
+  let lastError: any = null;
+
+  for (const model of uniqueModels) {
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier} provider=${analysisProvider} attempt=${attempt + 1}/${MAX_RETRIES}`);
+
+        const response = await fetchAICompletion(model, messages, maxTokens, apiKey);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[AI_ERROR] model=${model} status=${response.status} body=${errorText.slice(0, 300)}`);
+
+          // Non-retryable, non-fallbackable hard errors
+          if (response.status === 402) {
+            throw { status: 402, message: "AI credits exhausted. Please add funds to continue." };
+          }
+
+          // Model-level errors (invalid / not found / deprecated) → skip to next model
+          if (response.status === 400 || response.status === 404) {
+            console.warn(`[AI_FALLBACK] Model "${model}" returned ${response.status} – trying next model in chain`);
+            lastError = new Error(`Model "${model}" unavailable (${response.status}). ${errorText.slice(0, 200)}`);
+            break; // break retry loop, continue to next model
+          }
+
+          // Retryable errors → wait and try again (same model)
+          if (isRetryableStatus(response.status) && attempt < MAX_RETRIES - 1) {
+            const backoff = BASE_BACKOFF_MS * Math.pow(2, attempt);
+            console.log(`[AI_RETRY] Retryable error ${response.status}, waiting ${backoff}ms before retry`);
+            await new Promise(r => setTimeout(r, backoff));
+            lastError = response.status === 429
+              ? { status: 429, message: "Rate limit exceeded. Please try again in a moment." }
+              : new Error(`AI API error: ${response.status}`);
+            continue;
+          }
+
+          // Exhausted retries for this model
+          lastError = response.status === 429
+            ? { status: 429, message: "Rate limit exceeded. Please try again in a moment." }
+            : new Error(`AI API error: ${response.status}`);
+          break; // try next model
+        }
+
+        // ── SUCCESS ──
+        const data = await response.json();
+        const latencyMs = Date.now() - startTime;
+
+        const usage = data.usage || {};
+        console.log(`[TOKEN_USAGE] function=${functionName} model=${model} tier=${modelTier} provider=${analysisProvider} prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
+
+        if (model !== primaryModel) {
+          console.warn(`[AI_FALLBACK_SUCCESS] Used fallback model "${model}" instead of "${primaryModel}"`);
+        }
+
+        if (supabase && userId) {
+          await logAIUsage(supabase, userId, functionName, usage, latencyMs);
+        }
+
+        return data.choices?.[0]?.message?.content || '';
+
+      } catch (err: any) {
+        // If it's one of our structured errors (402, 429) re-throw immediately
+        if (err?.status === 402 || err?.status === 429) {
+          throw err;
+        }
+        lastError = err;
+        console.error(`[AI_CATCH] model=${model} attempt=${attempt + 1}:`, err?.message || err);
+        // Network / unexpected error → try next attempt or model
+        if (attempt < MAX_RETRIES - 1) {
+          const backoff = BASE_BACKOFF_MS * Math.pow(2, attempt);
+          await new Promise(r => setTimeout(r, backoff));
+        }
+      }
     }
-    if (response.status === 402) {
-      throw { status: 402, message: "AI credits exhausted. Please add funds to continue." };
-    }
-    throw new Error(`AI API error: ${response.status}`);
   }
 
-  const data = await response.json();
-  const latencyMs = Date.now() - startTime;
-  
-  // Log token usage for cost monitoring
-  const usage = data.usage || {};
-  console.log(`[TOKEN_USAGE] function=${functionName} model=${model} tier=${modelTier} provider=${analysisProvider} prompt_tokens=${usage.prompt_tokens || 0} completion_tokens=${usage.completion_tokens || 0} total_tokens=${usage.total_tokens || 0} latency_ms=${latencyMs}`);
-  
-  // Log to database if supabase client is provided
-  if (supabase && userId) {
-    await logAIUsage(supabase, userId, functionName, usage, latencyMs);
-  }
-  
-  return data.choices?.[0]?.message?.content || '';
+  // All models and retries exhausted
+  console.error(`[AI_EXHAUSTED] All models failed for ${functionName}. Last error:`, lastError);
+  if (lastError?.status) throw lastError;
+  throw lastError instanceof Error ? lastError : new Error('All AI models failed. Please try again later.');
 }
 
 // Helper to format image for Lovable AI (OpenAI-compatible format)
