@@ -514,10 +514,12 @@ serve(async (req) => {
       const rateLimit = await checkRateLimit(supabase, effectiveTeacherId);
       if (!rateLimit.allowed) {
         return new Response(JSON.stringify({ 
+          success: false,
           error: rateLimit.message,
-          rateLimited: true
+          rateLimited: true,
+          http_status: 429,
         }), {
-          status: 429,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -1493,24 +1495,18 @@ Provide your analysis in the following structure:
 
   } catch (error: any) {
     console.error('Error in analyze-student-work:', error);
-    
-    if (error.status === 429) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 429,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    if (error.status === 402) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 402,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    
+
+    const httpStatus = error?.status === 429 || error?.status === 402 ? error.status : 500;
+    const message = error?.message || (error instanceof Error ? error.message : 'Unknown error occurred');
+
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      success: false,
+      error: message,
+      rateLimited: httpStatus === 429,
+      creditsExhausted: httpStatus === 402,
+      http_status: httpStatus,
     }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
