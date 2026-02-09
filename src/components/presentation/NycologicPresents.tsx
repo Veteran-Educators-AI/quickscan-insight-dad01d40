@@ -17,7 +17,6 @@ import type { SlideImage, PresentationSlide, VisualTheme, NycologicPresentation 
 // IMPORTANT: The canonical definitions live in presentationTypes.ts to avoid
 // a circular dependency with presentationExport.ts.
 export type { SlideImage, PresentationSlide, VisualTheme, NycologicPresentation } from './presentationTypes';
-import type { SlideImage, PresentationSlide, VisualTheme, NycologicPresentation } from './presentationTypes';
 
 interface NycologicPresentsProps {
   presentation: NycologicPresentation;
