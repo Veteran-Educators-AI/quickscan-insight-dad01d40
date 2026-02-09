@@ -1860,15 +1860,17 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
       setCurrentIndex(i);
       
-      // Mark current item as analyzing
+      // Mark current item as analyzing and CLEAR any stale result from prior run
+      // CRITICAL FIX: Without clearing result, old grades persist in UI during analysis,
+      // making it appear work was "graded" when it hasn't been re-evaluated yet
       setItems(prev => prev.map((it, idx) => 
-        idx === i ? { ...it, status: 'analyzing' } : it
+        idx === i ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
       ));
 
-      // Mark any continuation pages as analyzing too
+      // Mark any continuation pages as analyzing too (also clear stale results)
       if (item.continuationPages && item.continuationPages.length > 0) {
         setItems(prev => prev.map(it => 
-          item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing' } : it
+          item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
         ));
       }
 
@@ -1935,15 +1937,15 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
       setCurrentIndex(i);
       
-      // Mark current item as analyzing
+      // Mark current item as analyzing and CLEAR stale results from prior run
       setItems(prev => prev.map((it, idx) => 
-        idx === i ? { ...it, status: 'analyzing' } : it
+        idx === i ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
       ));
 
-      // Mark any continuation pages as analyzing too
+      // Mark any continuation pages as analyzing too (also clear stale results)
       if (item.continuationPages && item.continuationPages.length > 0) {
         setItems(prev => prev.map(it => 
-          item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing' } : it
+          item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
         ));
       }
 
@@ -2070,15 +2072,15 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
       setCurrentIndex(i);
       
-      // Mark current item as analyzing
+      // Mark current item as analyzing and CLEAR stale results from prior run
       setItems(prev => prev.map((it, idx) => 
-        idx === i ? { ...it, status: 'analyzing' } : it
+        idx === i ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
       ));
 
-      // Mark any continuation pages as analyzing too
+      // Mark any continuation pages as analyzing too (also clear stale results)
       if (item.continuationPages && item.continuationPages.length > 0) {
         setItems(prev => prev.map(it => 
-          item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing' } : it
+          item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
         ));
       }
 
@@ -2243,10 +2245,10 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       idx === itemIndex ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
     ));
 
-    // Mark continuation pages as analyzing too
+    // Mark continuation pages as analyzing too (clear stale results)
     if (item.continuationPages && item.continuationPages.length > 0) {
       setItems(prev => prev.map(it => 
-        item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing' } : it
+        item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
       ));
     }
 
