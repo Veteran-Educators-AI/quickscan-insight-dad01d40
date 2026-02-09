@@ -2432,12 +2432,16 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
   }
 
   // Parse Regents Score (0-4)
-  // IMPORTANT: regentsScore starts at -1 (sentinel for "not parsed")
-  // We must distinguish between "AI returned 0" vs "regex never matched"
-  const regentsScoreMatch = text.match(/Regents Score[:\s]*(\d)/i);
-  const regentsScoreParsed = !!regentsScoreMatch; // Track whether we actually parsed a value
+  // Use a more specific regex that avoids matching "Regents Score Justification" 
+  // by requiring the match to be "Regents Score:" followed by a digit (not "Justification")
+  const regentsScoreMatch = text.match(/Regents Score(?!\s*Justification)[:\s]*(\d)/i);
+  let regentsScoreExplicitlyParsed = false;
   if (regentsScoreMatch) {
     result.regentsScore = Math.min(4, Math.max(0, parseInt(regentsScoreMatch[1])));
+    regentsScoreExplicitlyParsed = true;
+    console.log(`Parsed Regents Score: ${result.regentsScore}`);
+  } else {
+    console.log('WARNING: Regents Score not found in AI output - defaulting to 0. Will be back-derived from grade if work is present.');
   }
 
   const regentsJustificationMatch = text.match(/Regents Score Justification[:\s]*([^]*?)(?=Rubric Scores|Misconceptions|$)/i);
@@ -2752,7 +2756,96 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
     console.log(`Incomplete final answer (work shown): ${gradeBeforeDeduction} -> ${result.grade} (-${incompleteDeduction} points, floor: ${deductionFloor})`);
   }
   
-  console.log(`Final grade: ${result.grade} (Understanding: ${hasAnyUnderstanding}, Perfect: ${shouldGetPerfectScore}, FinalAnswerComplete: ${result.finalAnswerComplete})`);
+  console.log(`Final grade (before cross-validation): ${result.grade} (Understanding: ${hasAnyUnderstanding}, Perfect: ${shouldGetPerfectScore}, FinalAnswerComplete: ${result.finalAnswerComplete})`);
+
+  // ===== CROSS-VALIDATION: Grade and Regents Score MUST be consistent =====
+  // The grade (55-100 scale) and Regents score (0-4) must tell the same story.
+  // Without this check, the AI can output "Grade: 85" but "Regents Score: 0",
+  // resulting in a paper showing 85% with 0/4 Regents — the grade appears as
+  // an AI "judgment" not anchored to the actual rubric-based scoring.
+  //
+  // Two scenarios:
+  // A) Regents was NOT explicitly parsed (defaulted to 0): back-derive from grade
+  //    because the AI likely graded correctly but didn't output a parseable Regents line
+  // B) Regents WAS explicitly parsed: trust the rubric-based score as the anchor
+  //    and ensure the grade is consistent with it
+  if (result.studentWorkPresent && !explicitlyBlank) {
+    // What Regents score does the computed grade imply?
+    const gradeImpliedRegents: number =
+      result.grade >= 90 ? 4 :
+      result.grade >= 80 ? 3 :
+      result.grade >= 70 ? 2 :
+      result.grade >= gradeFloorWithEffort ? 1 : 0;
+
+    // What grade range does the Regents score imply?
+    const regentsImpliedGradeMap: Record<number, number> = {
+      4: 95,
+      3: 85,
+      2: 75,
+      1: gradeFloorWithEffort + 2,
+      0: gradeFloor,
+    };
+
+    // Maximum grade allowed by the Regents score
+    const regentsMaxGradeMap: Record<number, number> = {
+      4: 100,
+      3: 94,
+      2: 84,
+      1: 74,
+      0: gradeFloorWithEffort,
+    };
+
+    if (!regentsScoreExplicitlyParsed) {
+      // SCENARIO A: Regents was NOT parsed — back-derive from grade
+      // The AI graded the work (produced a grade) but didn't output a parseable Regents line.
+      // Use the grade to infer an appropriate Regents score.
+      console.log(`CROSS-VALIDATION (Scenario A): Regents not parsed, back-deriving from grade ${result.grade}`);
+      result.regentsScore = gradeImpliedRegents;
+      // Update totalScore to reflect the derived Regents score
+      if (result.totalScore.possible === 4 || result.totalScore.possible === 0) {
+        result.totalScore.earned = gradeImpliedRegents;
+        result.totalScore.possible = 4;
+        result.totalScore.percentage = Math.round((gradeImpliedRegents / 4) * 100);
+      }
+    } else if (noErrorsButWorkPresent && result.regentsScore <= 1 && result.grade >= 80) {
+      // SCENARIO B1: AI CONTRADICTION — "no errors" + work present, but Regents is 0 or 1
+      // The AI said the work is correct (no misconceptions/errors) yet gave a low Regents score.
+      // This is a clear self-contradiction. Trust the "no errors" finding over the low Regents
+      // because "no errors with work present" is positive evidence, while a low Regents may be
+      // due to the AI not knowing how to apply the Regents rubric (e.g., for financial math).
+      console.log(`CROSS-VALIDATION (Scenario B1): AI contradiction - no errors but Regents ${result.regentsScore}. Raising Regents to match grade ${result.grade}.`);
+      result.regentsScore = gradeImpliedRegents;
+      // Update totalScore to reflect the corrected Regents score
+      if (result.totalScore.possible === 4 || result.totalScore.possible === 0) {
+        result.totalScore.earned = gradeImpliedRegents;
+        result.totalScore.possible = 4;
+        result.totalScore.percentage = Math.round((gradeImpliedRegents / 4) * 100);
+      }
+    } else {
+      // SCENARIO B2: Regents WAS explicitly parsed — trust it as the rubric anchor.
+      // The Regents score represents the actual rubric-based assessment.
+      // The grade must be consistent with it — grade cannot float independently.
+
+      // If grade is HIGHER than what Regents allows → cap it
+      // This prevents "85% with 0/4 Regents" — grade can't float above rubric scoring
+      const regentsMaxGrade = regentsMaxGradeMap[result.regentsScore] ?? 100;
+      if (result.grade > regentsMaxGrade) {
+        console.log(`CROSS-VALIDATION (Scenario B2): Grade ${result.grade} exceeds max ${regentsMaxGrade} for Regents ${result.regentsScore}. Capping grade to match rubric.`);
+        result.grade = regentsMaxGrade;
+      }
+
+      // If grade is LOWER than what Regents implies → raise it
+      const regentsMinGrade = regentsImpliedGradeMap[result.regentsScore] ?? gradeFloor;
+      if (result.grade < regentsMinGrade) {
+        console.log(`CROSS-VALIDATION (Scenario B2): Grade ${result.grade} too low for Regents ${result.regentsScore}. Raising to ${regentsMinGrade}.`);
+        result.grade = regentsMinGrade;
+      }
+    }
+
+    console.log(`After cross-validation: Grade=${result.grade}, Regents=${result.regentsScore}, TotalScore=${result.totalScore.earned}/${result.totalScore.possible} (RegentsParsed: ${regentsScoreExplicitlyParsed})`);
+  }
+
+  console.log(`Final grade: ${result.grade}`);
 
   // *** CRITICAL FIX: GRADE ↔ REGENTS SCORE CONSISTENCY ENFORCEMENT ***
   // If the Regents Score was never parsed from the AI response (still -1 sentinel),
