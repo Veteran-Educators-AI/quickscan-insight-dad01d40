@@ -13,8 +13,11 @@ import nyclogicLogo from '@/assets/nyclogic-presents-logo.png';
 import { SlideImageGenerator, GeneratedImageData } from './SlideImageGenerator';
 import type { SlideImage, PresentationSlide, VisualTheme, NycologicPresentation } from './presentationTypes';
 
-// Re-export types for backward compatibility
-export type { SlideImage, PresentationSlide, VisualTheme, NycologicPresentation };
+// Re-export shared types from presentationTypes.ts for backward compatibility.
+// IMPORTANT: The canonical definitions live in presentationTypes.ts to avoid
+// a circular dependency with presentationExport.ts.
+export type { SlideImage, PresentationSlide, VisualTheme, NycologicPresentation } from './presentationTypes';
+import type { SlideImage, PresentationSlide, VisualTheme, NycologicPresentation } from './presentationTypes';
 
 interface NycologicPresentsProps {
   presentation: NycologicPresentation;

@@ -10,7 +10,7 @@ import { Loader2, Sparkles, Play, Save, Plus, Trash2, Check, GripVertical, Image
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
-import { NycologicPresentation, PresentationSlide, VisualTheme } from './NycologicPresents';
+import type { NycologicPresentation, PresentationSlide, VisualTheme } from './presentationTypes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';

@@ -1,3 +1,11 @@
+/**
+ * Shared presentation types.
+ * 
+ * IMPORTANT: These types are extracted into their own file to prevent
+ * circular dependencies between NycologicPresents.tsx and presentationExport.ts.
+ * Do NOT move these back into NycologicPresents.tsx.
+ */
+
 export interface SlideImage {
   url: string;
   prompt: string;
