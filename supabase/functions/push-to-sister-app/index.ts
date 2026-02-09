@@ -305,14 +305,43 @@ serve(async (req) => {
     console.log('Sending payload to sister app:', JSON.stringify(sisterAppPayload));
     
     // Make POST request to the sister app's endpoint with the grade data
-    const response = await fetch(sisterAppEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': sisterAppApiKey,  // Authenticate with the API key
-      },
-      body: JSON.stringify(sisterAppPayload),
-    });
+    // Use a timeout to prevent hanging if the sister app is slow
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    
+    let response: Response;
+    try {
+      response = await fetch(sisterAppEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': sisterAppApiKey,  // Authenticate with the API key
+        },
+        body: JSON.stringify(sisterAppPayload),
+        signal: controller.signal,
+      });
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      const isTimeout = fetchError instanceof DOMException && fetchError.name === 'AbortError';
+      const errorMsg = isTimeout 
+        ? 'Sister app request timed out after 15 seconds'
+        : `Network error connecting to sister app: ${fetchError instanceof Error ? fetchError.message : 'Unknown'}`;
+      
+      console.error(errorMsg);
+      
+      // Return a soft failure - don't use 5xx status so the caller knows it was a network issue
+      // not a bug in our code
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: errorMsg,
+          retriable: true,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     // Read the response
     const responseText = await response.text();
@@ -323,13 +352,16 @@ serve(async (req) => {
     // Check if the request was successful
     if (!response.ok) {
       console.error('Sister app error:', response.status, responseText);
+      
+      // Return 200 with success:false instead of forwarding the error status
+      // This prevents the caller (grade save flow) from thinking the entire operation failed
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Failed to push to sister app',
+          error: 'Sister app returned an error',
           status: response.status,
-          http_status: response.status,
-          details: responseText 
+          details: responseText,
+          retriable: response.status >= 500,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

@@ -301,28 +301,45 @@ Deno.serve(async (req) => {
         // Update mastery levels from topic_performance array
         let masteryUpdated = false;
         if (sessionData.topic_performance && sessionData.topic_performance.length > 0) {
+          // Resolve teacher_id once (not per-topic)
+          let teacherId: string | null = null;
+          if (studentRecord?.class_id) {
+            try {
+              const { data: classInfo } = await supabase
+                .from("classes")
+                .select("teacher_id")
+                .eq("id", studentRecord.class_id)
+                .single();
+              teacherId = classInfo?.teacher_id || null;
+            } catch (err) {
+              console.error("Failed to resolve teacher_id:", err);
+            }
+          }
+
           for (const topic of sessionData.topic_performance) {
-            // Record grade history for each topic
-            const { error: gradeError } = await supabase
-              .from("grade_history")
-              .insert({
-                student_id: studentRecord?.id || studentId,
-                teacher_id: studentRecord?.class_id ? 
-                  (await supabase.from("classes").select("teacher_id").eq("id", studentRecord.class_id).single()).data?.teacher_id 
-                  : null,
-                topic_name: topic.topic,
-                grade: topic.masteryPercentage,
-                nys_standard: topic.standardCode,
-                raw_score_earned: topic.questionsCorrect,
-                raw_score_possible: topic.questionsAttempted,
-                grade_justification: `Scholar app practice: ${topic.questionsCorrect}/${topic.questionsAttempted} correct`,
-              });
-            
-            if (!gradeError) {
-              masteryUpdated = true;
-              console.log(`Updated mastery for topic ${topic.topic}: ${topic.masteryPercentage}%`);
-            } else {
-              console.error(`Failed to update mastery for ${topic.topic}:`, gradeError);
+            try {
+              // Record grade history for each topic
+              const { error: gradeError } = await supabase
+                .from("grade_history")
+                .insert({
+                  student_id: studentRecord?.id || studentId,
+                  teacher_id: teacherId,
+                  topic_name: topic.topic,
+                  grade: topic.masteryPercentage,
+                  nys_standard: topic.standardCode,
+                  raw_score_earned: topic.questionsCorrect,
+                  raw_score_possible: topic.questionsAttempted,
+                  grade_justification: `Scholar app practice: ${topic.questionsCorrect}/${topic.questionsAttempted} correct`,
+                });
+              
+              if (!gradeError) {
+                masteryUpdated = true;
+                console.log(`Updated mastery for topic ${topic.topic}: ${topic.masteryPercentage}%`);
+              } else {
+                console.error(`Failed to update mastery for ${topic.topic}:`, gradeError);
+              }
+            } catch (topicErr) {
+              console.error(`Error processing topic ${topic.topic}:`, topicErr);
             }
           }
         }
@@ -353,28 +370,29 @@ Deno.serve(async (req) => {
             );
             
             // Store recommendation as a diagnostic result or note
-            await supabase
-              .from("diagnostic_results")
-              .insert({
-                student_id: studentRecord?.id || studentId,
-                teacher_id: studentRecord?.class_id ? 
-                  (await supabase.from("classes").select("teacher_id").eq("id", studentRecord.class_id).single()).data?.teacher_id 
-                  : null,
-                topic_name: sessionData.subject || "General Practice",
-                recommended_level: weakTopics[0]?.mastery < 50 ? "A" : weakTopics[0]?.mastery < 70 ? "B" : "C",
-                notes: JSON.stringify({
-                  source: "scholar-app",
-                  session_date: sessionData.completed_at,
-                  overall_percentage: sessionData.percentage,
-                  focus_areas: focusAreas,
-                  strong_topics: strongTopics,
-                  max_streak: sessionData.max_streak,
-                  timed_mode: sessionData.timed_mode,
-                }),
-              });
-            
-            planUpdated = true;
-            console.log(`Study plan updated with ${weakTopics.length} focus areas`);
+            try {
+              await supabase
+                .from("diagnostic_results")
+                .insert({
+                  student_id: studentRecord?.id || studentId,
+                  strengths: strongTopics,
+                  weaknesses: weakTopics.map((w: { topic: string }) => w.topic),
+                  recommendations: {
+                    source: "scholar-app",
+                    session_date: sessionData.completed_at,
+                    overall_percentage: sessionData.percentage,
+                    focus_areas: focusAreas,
+                    strong_topics: strongTopics,
+                    max_streak: sessionData.max_streak,
+                    timed_mode: sessionData.timed_mode,
+                  },
+                });
+              
+              planUpdated = true;
+              console.log(`Study plan updated with ${weakTopics.length} focus areas`);
+            } catch (diagErr) {
+              console.error("Failed to save diagnostic result (non-fatal):", diagErr);
+            }
           }
         }
         
@@ -650,9 +668,8 @@ Deno.serve(async (req) => {
               id,
               student_id,
               status,
-              score,
-              submitted_at,
-              verified_at
+              created_at,
+              updated_at
             )
           `)
           .eq("external_ref", data.external_ref)
@@ -690,23 +707,27 @@ Deno.serve(async (req) => {
           .from("students")
           .select("id, first_name, last_name, class_id")
           .eq("id", payload.student_id)
-          .single();
+          .maybeSingle();
         
-        // Log the incoming grade data
-        const { error: logError } = await supabase
-          .from("inbound_scholar_data")
-          .insert({
-            source_app: "nycologic-ai",
-            event_type: "grade_completed",
-            student_id: studentRecord?.id || null,
-            student_name: gradeData.student_name,
-            class_id: gradeData.class_id,
-            payload: gradeData,
-            status: "pending",
-          });
-        
-        if (logError) {
-          console.error("Failed to log grade data:", logError);
+        // Log the incoming grade data (non-fatal if table doesn't exist)
+        try {
+          const { error: logError } = await supabase
+            .from("inbound_scholar_data")
+            .insert({
+              source_app: "nycologic-ai",
+              event_type: "grade_completed",
+              student_id: studentRecord?.id || null,
+              student_name: gradeData.student_name,
+              class_id: gradeData.class_id,
+              payload: gradeData,
+              status: "pending",
+            });
+          
+          if (logError) {
+            console.error("Failed to log grade data (non-fatal):", logError);
+          }
+        } catch (logErr) {
+          console.error("Non-fatal: inbound_scholar_data insert failed:", logErr);
         }
         
         return new Response(
@@ -726,21 +747,25 @@ Deno.serve(async (req) => {
         const studentData = payload.data;
         console.log(`Processing student creation: ${studentData.student_name}`);
         
-        // Log the incoming student data for review
-        const { error: logError } = await supabase
-          .from("inbound_scholar_data")
-          .insert({
-            source_app: "nycologic-ai",
-            event_type: "student_created",
-            student_id: payload.student_id,
-            student_name: studentData.student_name || `${studentData.first_name} ${studentData.last_name}`,
-            class_id: studentData.class_id,
-            payload: studentData,
-            status: "pending",
-          });
-        
-        if (logError) {
-          console.error("Failed to log student creation:", logError);
+        // Log the incoming student data for review (non-fatal)
+        try {
+          const { error: logError } = await supabase
+            .from("inbound_scholar_data")
+            .insert({
+              source_app: "nycologic-ai",
+              event_type: "student_created",
+              student_id: payload.student_id,
+              student_name: studentData.student_name || `${studentData.first_name} ${studentData.last_name}`,
+              class_id: studentData.class_id,
+              payload: studentData,
+              status: "pending",
+            });
+          
+          if (logError) {
+            console.error("Failed to log student creation (non-fatal):", logError);
+          }
+        } catch (logErr) {
+          console.error("Non-fatal: inbound_scholar_data insert failed:", logErr);
         }
         
         return new Response(
@@ -758,21 +783,25 @@ Deno.serve(async (req) => {
         const behaviorData = payload.data;
         console.log(`Processing behavior deduction for student ${payload.student_id}`);
         
-        // Log the behavior data
-        const { error: logError } = await supabase
-          .from("inbound_scholar_data")
-          .insert({
-            source_app: "nycologic-ai",
-            event_type: "behavior_deduction",
-            student_id: payload.student_id,
-            student_name: behaviorData.student_name,
-            class_id: behaviorData.class_id,
-            payload: behaviorData,
-            status: "pending",
-          });
-        
-        if (logError) {
-          console.error("Failed to log behavior deduction:", logError);
+        // Log the behavior data (non-fatal)
+        try {
+          const { error: logError } = await supabase
+            .from("inbound_scholar_data")
+            .insert({
+              source_app: "nycologic-ai",
+              event_type: "behavior_deduction",
+              student_id: payload.student_id,
+              student_name: behaviorData.student_name,
+              class_id: behaviorData.class_id,
+              payload: behaviorData,
+              status: "pending",
+            });
+          
+          if (logError) {
+            console.error("Failed to log behavior deduction (non-fatal):", logError);
+          }
+        } catch (logErr) {
+          console.error("Non-fatal: inbound_scholar_data insert failed:", logErr);
         }
         
         return new Response(

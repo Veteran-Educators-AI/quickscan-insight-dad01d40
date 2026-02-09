@@ -274,8 +274,43 @@ serve(async (req) => {
     // -------------------------------------------------------------------------
     const body: IncomingData = await req.json();
 
-    const internalApiKey = Deno.env.get('SISTER_APP_API_KEY');
-    const isInternalKey = internalApiKey && apiKey === internalApiKey;
+    // -------------------------------------------------------------------------
+    // STEP 4: LOOK UP THE API KEY IN THE DATABASE
+    // -------------------------------------------------------------------------
+    // Search the teacher_api_keys table for a matching hash.
+    // If found, we get the teacher_id to know whose account this key belongs to.
+    // -------------------------------------------------------------------------
+    // Try api_key_hash first (new column name), fall back to key_hash (original column name)
+    let keyRecord: any = null;
+    let keyError: any = null;
+
+    const { data: keyData1, error: keyErr1 } = await supabaseAdmin
+      .from('teacher_api_keys')
+      .select('id, teacher_id, is_active')
+      .eq('api_key_hash', apiKeyHash)
+      .maybeSingle();
+
+    if (keyData1) {
+      keyRecord = keyData1;
+    } else {
+      // Fallback: try original column name 'key_hash'
+      const { data: keyData2, error: keyErr2 } = await supabaseAdmin
+        .from('teacher_api_keys')
+        .select('id, teacher_id, is_active')
+        .eq('key_hash', apiKeyHash)
+        .maybeSingle();
+      keyRecord = keyData2;
+      keyError = keyErr2;
+    }
+
+    // If no matching key found, reject the request
+    if (keyError || !keyRecord) {
+      console.error('API key not found:', keyError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid API key' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     let teacherIdFromKey: string | null = null;
 
@@ -425,41 +460,32 @@ serve(async (req) => {
 
       for (const participant of participantResults) {
         participantsProcessed++;
-
-        const resolvedStudent = resolveStudentId(
-          participant.student_id,
-          null,
-          existingStudentIds,
-          emptyEmailMap
-        );
-
-        if (!resolvedStudent.resolvedId) {
-          participantsMissing++;
+        
+        // Log each participant's results (non-fatal if logging fails)
+        try {
+          await supabaseAdmin.from('sister_app_sync_log').insert({
+            teacher_id: keyRecord.teacher_id,
+            student_id: participant.student_id,
+            action: 'live_session_participation',
+            data: {
+              activity_name: body.data?.activity_name,
+              topic_name: body.data?.topic_name,
+              student_name: participant.student_name,
+              total_questions_answered: participant.total_questions_answered,
+              correct_answers: participant.correct_answers,
+              accuracy: participant.accuracy,
+              credit_awarded: participant.credit_awarded,
+              participated: participant.participated,
+              answers: participant.answers,
+              session_code: body.data?.session_code,
+            },
+            source_app: 'scholar_app',
+            processed: true,
+            processed_at: new Date().toISOString(),
+          });
+        } catch (logErr) {
+          console.error('Non-fatal: Failed to log participant sync:', logErr);
         }
-
-        // Log each participant's results
-        await supabaseAdmin.from('sister_app_sync_log').insert({
-          teacher_id: teacherId,
-          student_id: resolvedStudent.resolvedId,
-          action: 'live_session_participation',
-          data: {
-            activity_name: body.data?.activity_name,
-            topic_name: body.data?.topic_name,
-            student_name: participant.student_name,
-            total_questions_answered: participant.total_questions_answered,
-            correct_answers: participant.correct_answers,
-            accuracy: participant.accuracy,
-            credit_awarded: participant.credit_awarded,
-            participated: participant.participated,
-            answers: participant.answers,
-            session_code: body.data?.session_code,
-            external_student_id: resolvedStudent.externalStudentId,
-            student_resolution: resolvedStudent.resolution,
-          },
-          source_app: 'scholar_app',
-          processed: true,
-          processed_at: new Date().toISOString(),
-        });
 
         // If participated, create a grade entry for tracking
         if (participant.participated && participant.total_questions_answered > 0) {
@@ -486,31 +512,33 @@ serve(async (req) => {
         }
       }
 
-      // Log the session summary
-      const { data: summaryLog } = await supabaseAdmin
-        .from('sister_app_sync_log')
-        .insert({
-          teacher_id: teacherId,
-          action: 'live_session_completed',
-          data: {
-            activity_name: body.data?.activity_name,
-            topic_name: body.data?.topic_name,
-            session_code: body.data?.session_code,
-            total_participants: body.data?.total_participants,
-            active_participants: body.data?.active_participants,
-            participants_processed: participantsProcessed,
-            participants_missing: participantsMissing,
-            grades_created: gradesCreated,
-            grades_skipped_missing_student: gradesSkippedMissingStudent,
-          },
-          source_app: 'scholar_app',
-          processed: true,
-          processed_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+      // Log the session summary (non-fatal)
+      try {
+        const { data: summaryLog } = await supabaseAdmin
+          .from('sister_app_sync_log')
+          .insert({
+            teacher_id: keyRecord.teacher_id,
+            action: 'live_session_completed',
+            data: {
+              activity_name: body.data?.activity_name,
+              topic_name: body.data?.topic_name,
+              session_code: body.data?.session_code,
+              total_participants: body.data?.total_participants,
+              active_participants: body.data?.active_participants,
+              participants_processed: participantsProcessed,
+              grades_created: gradesCreated,
+            },
+            source_app: 'scholar_app',
+            processed: true,
+            processed_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
 
-      logEntry = summaryLog;
+        logEntry = summaryLog;
+      } catch (logErr) {
+        console.error('Non-fatal: Failed to log live session summary:', logErr);
+      }
       processedResult = {
         live_session_processed: true,
         participants_synced: participantsProcessed,
@@ -669,36 +697,36 @@ serve(async (req) => {
         }
 
         // ===================================================================
-        // LOG COMPREHENSIVE STUDENT PROFILE WITH ALL DATA
+        // LOG COMPREHENSIVE STUDENT PROFILE WITH ALL DATA (non-fatal)
         // ===================================================================
-        await supabaseAdmin.from('sister_app_sync_log').insert({
-          teacher_id: teacherId,
-          student_id: resolvedStudent.resolvedId,
-          action: 'batch_sync_student',
-          data: {
-            student_name: profile.student_name,
-            student_email: profile.student_email,
-            overall_average: profile.overall_average,
-            grades_count: profile.grades?.length || 0,
-            grades_processed: profileGradesProcessed,
-            grades_saved: profileGradesSaved,
-            misconceptions_count: profile.misconceptions?.length || 0,
-            misconceptions_processed: profileMisconceptionsProcessed,
-            misconceptions_saved: profileMisconceptionsSaved,
-            weak_topics: profile.weak_topics,
-            recommended_remediation: profile.recommended_remediation,
-            xp_potential: profile.xp_potential,
-            coin_potential: profile.coin_potential,
-            external_student_id: resolvedStudent.externalStudentId,
-            student_resolution: resolvedStudent.resolution,
-            // Include sample data for debugging
-            sample_grades: profile.grades?.slice(0, 3) || [],
-            sample_misconceptions: profile.misconceptions?.slice(0, 3) || [],
-          },
-          source_app: 'nycologic_ai',
-          processed: true,
-          processed_at: new Date().toISOString(),
-        });
+        try {
+          await supabaseAdmin.from('sister_app_sync_log').insert({
+            teacher_id: keyRecord.teacher_id,
+            student_id: profile.student_id,
+            action: 'batch_sync_student',
+            data: {
+              student_name: profile.student_name,
+              student_email: profile.student_email,
+              overall_average: profile.overall_average,
+              grades_count: profile.grades?.length || 0,
+              grades_saved: gradesSaved,
+              misconceptions_count: profile.misconceptions?.length || 0,
+              misconceptions_saved: misconceptionsSaved,
+              weak_topics: profile.weak_topics,
+              recommended_remediation: profile.recommended_remediation,
+              xp_potential: profile.xp_potential,
+              coin_potential: profile.coin_potential,
+              // Include sample data for debugging
+              sample_grades: profile.grades?.slice(0, 3) || [],
+              sample_misconceptions: profile.misconceptions?.slice(0, 3) || [],
+            },
+            source_app: 'nycologic_ai',
+            processed: true,
+            processed_at: new Date().toISOString(),
+          });
+        } catch (logErr) {
+          console.error('Non-fatal: Failed to log student profile sync:', logErr);
+        }
 
         if (profile.recommended_remediation && profile.recommended_remediation.length > 0) {
           remediationsCreated++;
@@ -707,34 +735,34 @@ serve(async (req) => {
 
       console.log(`Batch sync complete: ${gradesSaved}/${gradesProcessed} grades saved, ${misconceptionsSaved}/${misconceptionsProcessed} misconceptions saved`);
 
-      // Log the batch sync summary with actual save counts
-      const { data: summaryLog } = await supabaseAdmin
-        .from('sister_app_sync_log')
-        .insert({
-          teacher_id: teacherId,
-          action: 'batch_sync',
-          data: {
-            summary: body.summary,
-            teacher_name: body.teacher_name,
-            sync_timestamp: body.sync_timestamp,
-            profiles_processed: profiles.length,
-            students_missing: studentsMissing,
-            students_resolved_by_email: studentsResolvedByEmail,
-            grades_processed: gradesProcessed,
-            grades_saved: gradesSaved,
-            grades_skipped_missing_student: gradesSkippedMissingStudent,
-            misconceptions_processed: misconceptionsProcessed,
-            misconceptions_saved: misconceptionsSaved,
-            misconceptions_skipped_missing_student: misconceptionsSkippedMissingStudent,
-          },
-          source_app: 'nycologic_ai',
-          processed: true,
-          processed_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+      // Log the batch sync summary with actual save counts (non-fatal)
+      try {
+        const { data: summaryLog } = await supabaseAdmin
+          .from('sister_app_sync_log')
+          .insert({
+            teacher_id: keyRecord.teacher_id,
+            action: 'batch_sync',
+            data: {
+              summary: body.summary,
+              teacher_name: body.teacher_name,
+              sync_timestamp: body.sync_timestamp,
+              profiles_processed: profiles.length,
+              grades_processed: gradesProcessed,
+              grades_saved: gradesSaved,
+              misconceptions_processed: misconceptionsProcessed,
+              misconceptions_saved: misconceptionsSaved,
+            },
+            source_app: 'nycologic_ai',
+            processed: true,
+            processed_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
 
-      logEntry = summaryLog;
+        logEntry = summaryLog;
+      } catch (logErr) {
+        console.error('Non-fatal: Failed to log batch sync summary:', logErr);
+      }
 
       processedResult = {
         batch_processed: true,
@@ -778,33 +806,35 @@ serve(async (req) => {
         emailMap
       );
       
-      // Log the roster sync event
-      const { data: rosterLog } = await supabaseAdmin
-        .from('sister_app_sync_log')
-        .insert({
-          teacher_id: teacherId,
-          student_id: resolvedStudent.resolvedId,
-          action: body.action,
-          data: {
+      // Log the roster sync event (non-fatal)
+      try {
+        const { data: rosterLog } = await supabaseAdmin
+          .from('sister_app_sync_log')
+          .insert({
+            teacher_id: keyRecord.teacher_id,
             student_id: studentId,
-            first_name: studentData.first_name,
-            last_name: studentData.last_name,
-            student_name: studentData.student_name,
-            email: studentData.email,
-            class_id: studentData.class_id,
-            class_name: studentData.class_name,
-            source_action: body.action,
-            external_student_id: resolvedStudent.externalStudentId,
-            student_resolution: resolvedStudent.resolution,
-          },
-          source_app: 'scholar_app',
-          processed: true,
-          processed_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+            action: body.action,
+            data: {
+              student_id: studentId,
+              first_name: studentData.first_name,
+              last_name: studentData.last_name,
+              student_name: studentData.student_name,
+              email: studentData.email,
+              class_id: studentData.class_id,
+              class_name: studentData.class_name,
+              source_action: body.action,
+            },
+            source_app: 'scholar_app',
+            processed: true,
+            processed_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
 
-      logEntry = rosterLog;
+        logEntry = rosterLog;
+      } catch (logErr) {
+        console.error('Non-fatal: Failed to log roster sync:', logErr);
+      }
       processedResult = {
         roster_sync_received: true,
         student_id: resolvedStudent.resolvedId || studentId,
@@ -853,11 +883,11 @@ serve(async (req) => {
         .single();
 
       if (logError) {
-        console.error('Error logging sync data:', logError);
-        return new Response(
-          JSON.stringify({ success: false, error: 'Failed to log sync data' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // Log the error but don't fail the request - the sync log is secondary
+        // to actually processing the incoming data. Previous versions would
+        // return 500 here, causing the sister app to think the sync failed.
+        console.error('Error logging sync data (non-fatal):', logError);
+        console.error('Will continue processing the request despite log failure');
       }
 
       logEntry = singleLogEntry;
@@ -908,14 +938,16 @@ serve(async (req) => {
           break;
       }
 
-      // Mark single event as processed
-      await supabaseAdmin
-        .from('sister_app_sync_log')
-        .update({ 
-          processed: true, 
-          processed_at: new Date().toISOString() 
-        })
-        .eq('id', logEntry.id);
+      // Mark single event as processed (only if log entry was created)
+      if (logEntry?.id) {
+        await supabaseAdmin
+          .from('sister_app_sync_log')
+          .update({ 
+            processed: true, 
+            processed_at: new Date().toISOString() 
+          })
+          .eq('id', logEntry.id);
+      }
     }
 
     // -------------------------------------------------------------------------
@@ -928,21 +960,6 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         log_id: logEntry?.id,
-        processed: processedResult 
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-    // -------------------------------------------------------------------------
-    // STEP 11: RETURN SUCCESS RESPONSE
-    // -------------------------------------------------------------------------
-    // Let the sister app know the request was successful.
-    // Include the log ID so they can reference it if needed.
-    // -------------------------------------------------------------------------
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        log_id: logEntry.id,
         processed: processedResult 
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

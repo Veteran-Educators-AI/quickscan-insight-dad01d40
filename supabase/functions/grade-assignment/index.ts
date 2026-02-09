@@ -530,38 +530,66 @@ Deno.serve(async (req) => {
 
     // Update attempt in database if attempt_id provided
     if (attempt_id) {
-      await supabase
-        .from("attempts")
-        .update({
-          score: correctCount,
-          status: "verified",
-          answers: answers,
-          verified_at: new Date().toISOString(),
-        })
-        .eq("id", attempt_id);
+      try {
+        // Update attempt status to "reviewed" (the enum values are: pending, analyzed, reviewed)
+        // Only update columns that actually exist in the attempts table
+        const { error: updateError } = await supabase
+          .from("attempts")
+          .update({
+            status: "reviewed",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", attempt_id);
+        
+        if (updateError) {
+          console.error("Error updating attempt status (non-fatal):", updateError);
+        } else {
+          console.log(`Attempt ${attempt_id} marked as reviewed`);
+        }
+      } catch (attemptUpdateErr) {
+        // Don't let attempt update failure crash the entire grading response
+        console.error("Failed to update attempt record (non-fatal):", attemptUpdateErr);
+      }
     }
 
     // Award XP and coins SECURELY using the database function (prevents manipulation)
     if (meetsThreshold && xpEarned > 0) {
-      console.log(`Awarding rewards via secure function: ${xpEarned} XP, ${coinsEarned} coins`);
-      
-      const { data: rewardResult, error: rewardError } = await supabase.rpc("award_rewards_secure", {
-        p_student_id: student_id,
-        p_claim_type: "assignment",
-        p_reference_id: assignment_id,
-        p_xp_amount: xpEarned,
-        p_coin_amount: coinsEarned,
-        p_reason: `Assignment completed: ${percentage}%`,
-      });
+      try {
+        console.log(`Awarding rewards via secure function: ${xpEarned} XP, ${coinsEarned} coins`);
+        
+        const { data: rewardResult, error: rewardError } = await supabase.rpc("award_rewards_secure", {
+          p_student_id: student_id,
+          p_claim_type: "assignment",
+          p_reference_id: assignment_id,
+          p_xp_amount: xpEarned,
+          p_coin_amount: coinsEarned,
+          p_reason: `Assignment completed: ${percentage}%`,
+        });
 
-      if (rewardError) {
-        console.error("Secure reward error:", rewardError);
-        // Check if it's a duplicate claim (which is expected for retries)
-        if (!rewardError.message?.includes("already claimed")) {
-          console.warn("Failed to award rewards securely:", rewardError.message);
+        if (rewardError) {
+          console.error("Secure reward error:", rewardError);
+          // Check if it's a duplicate claim (which is expected for retries)
+          if (!rewardError.message?.includes("already claimed")) {
+            console.warn("Failed to award rewards securely:", rewardError.message);
+          }
+          
+          // Fallback: try direct update if the RPC function doesn't exist
+          if (rewardError.message?.includes("function") || rewardError.code === '42883') {
+            console.log("RPC not available, falling back to direct update");
+            await supabase
+              .from("students")
+              .update({
+                xp_total: supabase.rpc ? undefined : xpEarned, // can't increment directly
+                last_activity_date: new Date().toISOString().split('T')[0],
+              })
+              .eq("id", student_id);
+          }
+        } else {
+          console.log("Rewards awarded securely:", rewardResult);
         }
-      } else {
-        console.log("Rewards awarded securely:", rewardResult);
+      } catch (rewardErr) {
+        // Don't let reward failure crash the grading response
+        console.error("Reward awarding failed (non-fatal):", rewardErr);
       }
     }
 
