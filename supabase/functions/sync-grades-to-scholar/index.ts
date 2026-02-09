@@ -467,14 +467,32 @@ serve(async (req) => {
         
         if (!response.ok) {
           console.error('Batch sync failed:', response.status, responseText);
+
+          try {
+            await supabase.from('sister_app_sync_log').insert({
+              teacher_id: user.id,
+              action: 'batch_sync',
+              data: {
+                ...batchPayload.summary,
+                class_id,
+                status: 'failed',
+                http_status: response.status,
+                error: responseText.slice(0, 500),
+              },
+            });
+          } catch (logError) {
+            console.error('Failed to log batch sync failure:', logError);
+          }
+
           return new Response(
             JSON.stringify({ 
               success: false, 
               error: 'Batch sync failed',
               details: responseText,
-              status: response.status 
+              status: response.status,
+              http_status: response.status,
             }),
-            { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
@@ -513,12 +531,29 @@ serve(async (req) => {
         );
       } catch (fetchError) {
         console.error('Network error:', fetchError);
+
+        try {
+          await supabase.from('sister_app_sync_log').insert({
+            teacher_id: user.id,
+            action: 'batch_sync',
+            data: {
+              ...batchPayload.summary,
+              class_id,
+              status: 'network_error',
+              error: fetchError instanceof Error ? fetchError.message : 'Connection failed',
+            },
+          });
+        } catch (logError) {
+          console.error('Failed to log batch sync network error:', logError);
+        }
+
         return new Response(
           JSON.stringify({ 
             success: false, 
             error: `Network error: ${fetchError instanceof Error ? fetchError.message : 'Connection failed'}`,
+            http_status: 503,
           }),
-          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
@@ -685,6 +720,7 @@ serve(async (req) => {
         misconceptions_synced: totalMisconceptions,
         weak_topics_synced: totalWeakTopics,
         errors: syncResults.errors.length > 0 ? syncResults.errors : undefined,
+        http_status: allSucceeded ? 200 : partialSuccess ? 207 : 500,
         message: allSucceeded 
           ? `Successfully synced ${syncResults.successful} students to Scholar`
           : partialSuccess
@@ -692,7 +728,7 @@ serve(async (req) => {
             : `Failed to sync all ${syncResults.failed} students`,
       }),
       { 
-        status: allSucceeded ? 200 : partialSuccess ? 207 : 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
@@ -700,8 +736,8 @@ serve(async (req) => {
     console.error('Error in sync-grades-to-scholar:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ success: false, error: message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: message, http_status: 500 }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

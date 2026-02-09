@@ -195,13 +195,24 @@ export function useSaveAnalysisResults() {
       if (imageError) throw imageError;
 
       // 3. Create score records for each rubric item
-      const scoreInserts = params.result.rubricScores.map((rubricScore, index) => ({
+      const scoreInserts = params.result.rubricScores.map((rubricScore) => ({
         attempt_id: attempt.id,
         points_earned: rubricScore.score,
         notes: rubricScore.feedback,
         is_auto_scored: true,
         teacher_override: false,
       }));
+
+      if (scoreInserts.length > 0) {
+        const { error: rubricScoreError } = await supabase
+          .from('scores')
+          .insert(scoreInserts);
+
+        if (rubricScoreError) {
+          console.error('Error saving rubric scores:', rubricScoreError);
+          // Don't throw - rubric item scores are supplemental
+        }
+      }
 
       // Insert a summary score with total
       const { error: scoreError } = await supabase
@@ -229,13 +240,44 @@ export function useSaveAnalysisResults() {
       // Ensure grade is never below 55
       const finalGrade = Math.max(55, Math.min(100, grade));
       
-      if (params.topicName) {
+      let resolvedTopicName = params.topicName;
+      let resolvedTopicId = params.topicId;
+
+      if (!resolvedTopicName || !resolvedTopicId) {
+        const { data: questionTopic, error: questionTopicError } = await supabase
+          .from('question_topics')
+          .select('topic_id, topics(name)')
+          .eq('question_id', params.questionId)
+          .maybeSingle();
+
+        if (questionTopicError) {
+          console.error('Error fetching question topic:', questionTopicError);
+        }
+
+        const topicNameFromQuestion = (questionTopic as any)?.topics?.name;
+        if (!resolvedTopicId && questionTopic?.topic_id) {
+          resolvedTopicId = questionTopic.topic_id;
+        }
+        if (!resolvedTopicName && topicNameFromQuestion) {
+          resolvedTopicName = topicNameFromQuestion;
+        }
+      }
+
+      if (!resolvedTopicName && params.result.problemIdentified) {
+        resolvedTopicName = params.result.problemIdentified.trim();
+      }
+
+      if (!resolvedTopicName) {
+        resolvedTopicName = 'General Assessment';
+      }
+
+      if (resolvedTopicName) {
         const { data: gradeHistoryData, error: gradeHistoryError } = await supabase
           .from('grade_history')
           .insert({
             student_id: params.studentId,
-            topic_id: params.topicId || null,
-            topic_name: params.topicName,
+            topic_id: resolvedTopicId || null,
+            topic_name: resolvedTopicName,
             grade: finalGrade,
             grade_justification: params.result.gradeJustification || null,
             raw_score_earned: params.result.totalScore.earned,
@@ -293,7 +335,7 @@ export function useSaveAnalysisResults() {
               teacher_id: user.id,
               attempt_id: attempt.id,
               grade_history_id: gradeHistoryData.id,
-              topic_name: params.topicName!,
+              topic_name: resolvedTopicName,
               misconception_text: misconception,
               suggested_remedies: suggestedRemedies,
               severity,
@@ -314,8 +356,8 @@ export function useSaveAnalysisResults() {
         }
 
         // Check for performance drop and send alert if significant
-        if (params.topicName && params.studentName) {
-          const previousGrade = await getPreviousGrade(params.studentId, params.topicName);
+        if (resolvedTopicName && params.studentName) {
+          const previousGrade = await getPreviousGrade(params.studentId, resolvedTopicName);
           if (previousGrade !== null && previousGrade > finalGrade) {
             // Get student's parent email for potential parent notification
             const { data: studentData } = await supabase
@@ -341,7 +383,7 @@ export function useSaveAnalysisResults() {
               studentName: params.studentName,
               previousGrade,
               currentGrade: finalGrade,
-              topicName: params.topicName,
+              topicName: resolvedTopicName,
               nysStandard: params.result.nysStandard,
               parentEmail: studentData?.parent_email || undefined,
               weakTopics,
@@ -394,7 +436,7 @@ export function useSaveAnalysisResults() {
                 studentName: params.studentName || 'Unknown Student',
                 regentsScore: params.result.regentsScore,
                 grade: finalGrade,
-                topicName: params.topicName,
+                topicName: resolvedTopicName,
                 nysStandard: params.result.nysStandard,
                 teacherEmail: teacherProfile.email,
                 teacherName: teacherProfile.full_name || 'Teacher',
@@ -435,8 +477,8 @@ export function useSaveAnalysisResults() {
             className: params.className,
             data: {
               attemptId: attempt.id,
-              topicName: params.topicName,
-              topicId: params.topicId,
+              topicName: resolvedTopicName,
+              topicId: resolvedTopicId,
               totalScore: params.result.totalScore,
               grade: finalGrade,
               gradeJustification: params.result.gradeJustification,
@@ -483,8 +525,8 @@ export function useSaveAnalysisResults() {
           }
           
           // Add topic-based recommendations if grade is low
-          if (finalGrade < 70 && params.topicName) {
-            remediationRecommendations.push(`Review ${params.topicName} fundamentals`);
+          if (finalGrade < 70 && resolvedTopicName) {
+            remediationRecommendations.push(`Review ${resolvedTopicName} fundamentals`);
             if (params.result.nysStandard) {
               remediationRecommendations.push(`Practice ${params.result.nysStandard} concepts`);
             }
@@ -501,15 +543,15 @@ export function useSaveAnalysisResults() {
           const sisterAppResult = await pushToSisterApp({
             class_id: params.classId || '',
             source: 'scan_genius',  // Proper source identifier
-            title: `Grade: ${params.topicName || 'Assessment'}`,
+            title: `Grade: ${resolvedTopicName || 'Assessment'}`,
             description: `${params.studentName || 'Student'} scored ${finalGrade}% - ${params.result.feedback}`,
-            standard_code: params.result.nysStandard || params.topicName || undefined,
+            standard_code: params.result.nysStandard || resolvedTopicName || undefined,
             xp_reward: Math.round(finalGrade * xpMultiplier),
             coin_reward: Math.round(finalGrade * coinMultiplier),
             student_id: params.studentId,
             student_name: params.studentName,
             grade: finalGrade,
-            topic_name: params.topicName,
+            topic_name: resolvedTopicName,
             // Include remediation data for Scholar app
             remediation_recommendations: remediationRecommendations,
             difficulty_level: difficultyLevel,
@@ -520,7 +562,7 @@ export function useSaveAnalysisResults() {
             action: 'grade_update',
             student_id: params.studentId,
             student_name: params.studentName || 'Unknown',
-            topic_name: params.topicName,
+            topic_name: resolvedTopicName,
             grade: finalGrade,
             regents_score: params.result.regentsScore ?? null,
             nys_standard: params.result.nysStandard ?? null,
@@ -554,7 +596,7 @@ export function useSaveAnalysisResults() {
             console.log('Grade synced to Scholar AI:', {
               student: params.studentName,
               grade: finalGrade,
-              topic: params.topicName,
+              topic: resolvedTopicName,
             });
           } else {
             setSyncStatus(prev => ({ 

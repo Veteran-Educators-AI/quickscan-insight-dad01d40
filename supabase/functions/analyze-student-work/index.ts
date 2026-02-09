@@ -287,29 +287,13 @@ async function logAIUsage(
 // TIER SYSTEM:
 // - LITE: Fast/cheap for simple tasks (OCR, blank detection, identification)
 // - STANDARD: Default for main grading analysis with detailed feedback
-// - PREMIUM: Best quality for handwriting OCR + deep educational analysis (GPT-4o)
+// - PREMIUM: Best quality for handwriting OCR + deep educational analysis
 //
 // ANALYSIS PROVIDER (teacher-selectable via Settings):
-// - 'gemini'  → standard tier uses Gemini 2.5 Flash       (~$0.15/1M tokens)
-// - 'gpt4o'   → standard tier uses GPT-4o                 (~$2.50/1M input, $10/1M output)
-// - 'gpt4o-mini' → standard tier uses GPT-4o Mini         (~$0.15/1M input, $0.60/1M output)
+// - 'gemini'  → standard tier uses Gemini 2.5 Flash (default, fast, affordable)
+// - 'gpt4o'   → standard tier uses GPT-5 (best quality, higher cost)
+// - 'gpt4o-mini' → standard tier uses GPT-5 Mini (good balance)
 //
-// GPT-4o ADVANTAGES for student work analysis:
-// - Superior handwriting recognition (especially messy/young student writing)
-// - Better at structured educational feedback
-// - More accurate OCR of mathematical notation and diagrams
-// - Higher cost but significantly better analysis quality
-//
-// GPT-4o Mini is a great middle ground:
-// - Much better handwriting OCR than Gemini Flash Lite
-// - Comparable to Gemini Flash for analysis quality
-// - Similar cost to Gemini Flash
-//
-// COST COMPARISON per scan (approximate):
-// - Gemini Flash Lite (helper calls only): ~$0.001
-// - Gemini Flash (main analysis):          ~$0.01-0.02
-// - GPT-4o Mini (main analysis):           ~$0.01-0.03
-// - GPT-4o (main analysis):                ~$0.05-0.15
 // ═══════════════════════════════════════════════════════════════════════════════
 
 type AnalysisProvider = 'gemini' | 'gpt4o' | 'gpt4o-mini';
@@ -318,9 +302,9 @@ type AnalysisProvider = 'gemini' | 'gpt4o' | 'gpt4o-mini';
 function getAnalysisModel(provider: AnalysisProvider): string {
   switch (provider) {
     case 'gpt4o':
-      return 'openai/gpt-4o';           // Best quality: superior handwriting OCR + analysis
+      return 'openai/gpt-5';            // Best quality: superior handwriting OCR + analysis
     case 'gpt4o-mini':
-      return 'openai/gpt-4o-mini';      // Good balance: better OCR than Gemini, similar cost
+      return 'openai/gpt-5-mini';       // Good balance: better OCR than Gemini, similar cost
     case 'gemini':
     default:
       return 'google/gemini-2.5-flash';  // Default: good quality, fast, affordable
@@ -530,10 +514,12 @@ serve(async (req) => {
       const rateLimit = await checkRateLimit(supabase, effectiveTeacherId);
       if (!rateLimit.allowed) {
         return new Response(JSON.stringify({ 
+          success: false,
           error: rateLimit.message,
-          rateLimited: true
+          rateLimited: true,
+          http_status: 429,
         }), {
-          status: 429,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -1444,8 +1430,8 @@ Provide your analysis in the following structure:
     // compared to the lite model used for simpler tasks like OCR/blank detection.
     // The teacher's analysisProvider setting controls which model is used:
     // - 'gemini' → Gemini 2.5 Flash (default, fast, affordable)
-    // - 'gpt4o'  → GPT-4o (best handwriting OCR + analysis quality, higher cost)
-    // - 'gpt4o-mini' → GPT-4o Mini (better OCR than Gemini, similar cost)
+    // - 'gpt4o'  → GPT-5 (best handwriting OCR + analysis quality, higher cost)
+    // - 'gpt4o-mini' → GPT-5 Mini (better OCR than Gemini, similar cost)
     const analysisText = await callLovableAI(
       messages, 
       LOVABLE_API_KEY, 
@@ -1509,24 +1495,18 @@ Provide your analysis in the following structure:
 
   } catch (error: any) {
     console.error('Error in analyze-student-work:', error);
-    
-    if (error.status === 429) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 429,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    if (error.status === 402) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 402,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    
+
+    const httpStatus = error?.status === 429 || error?.status === 402 ? error.status : 500;
+    const message = error?.message || (error instanceof Error ? error.message : 'Unknown error occurred');
+
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      success: false,
+      error: message,
+      rateLimited: httpStatus === 429,
+      creditsExhausted: httpStatus === 402,
+      http_status: httpStatus,
     }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

@@ -67,6 +67,11 @@ export function usePushToSisterApp() {
         return { success: false, error: response.error.message };
       }
 
+      if (response.data?.success === false) {
+        console.error('Push to sister app failed:', response.data);
+        return { success: false, error: response.data.error || 'Sister app rejected the request' };
+      }
+
       console.log('Push to sister app result:', response.data);
       return { success: true, data: response.data };
     } catch (error) {
