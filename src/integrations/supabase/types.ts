@@ -2135,13 +2135,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "sister_app_sync_log_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "sister_app_sync_log_teacher_id_fkey"
             columns: ["teacher_id"]
             isOneToOne: false
