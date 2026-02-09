@@ -51,14 +51,28 @@ Guidelines:
       }
     ];
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Use Lovable AI gateway (OpenRouter-compatible) so we aren't locked to a
+    // single provider/model.  gpt-4o-mini was deprecated – use gpt-5-mini via
+    // the gateway which handles routing for us.
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const useGateway = !!lovableApiKey;
+
+    const apiUrl = useGateway
+      ? 'https://ai.gateway.lovable.dev/v1/chat/completions'
+      : 'https://api.openai.com/v1/chat/completions';
+    const authToken = useGateway ? lovableApiKey : openAIApiKey;
+    // If going through the gateway use the OpenRouter model id; otherwise use
+    // a current OpenAI model directly.
+    const model = useGateway ? 'openai/gpt-5-mini' : 'gpt-4.1-mini';
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model,
         messages: messages,
         max_tokens: 500,
         temperature: 0.7,
