@@ -598,7 +598,7 @@ serve(async (req) => {
         .from('sister_app_sync_log')
         .insert({
           teacher_id: keyRecord.teacher_id,
-          student_id: body.student_id,
+          student_id: body.student_id || null,
           action: body.action,
           data: body.data || {},
           source_app: 'sister_app',
