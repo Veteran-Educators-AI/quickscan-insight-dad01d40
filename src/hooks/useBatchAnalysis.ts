@@ -54,6 +54,16 @@ const formatScanErrorMessage = (message: string): string => {
   return message;
 };
 
+const getEdgeInvokeErrorMessage = (error: unknown): string => {
+  if (error && typeof error === 'object' && 'message' in error) {
+    const maybeMessage = (error as { message?: unknown }).message;
+    if (typeof maybeMessage === 'string') {
+      return maybeMessage;
+    }
+  }
+  return '';
+};
+
 interface RubricStep {
   step_number: number;
   description: string;
@@ -435,9 +445,9 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   }, []);
 
   const optimizeAnalyzeRequestBody = useCallback(async (
-    body: Record<string, any>,
+    body: Record<string, unknown>,
     aggressive = false
-  ): Promise<Record<string, any>> => {
+  ): Promise<Record<string, unknown>> => {
     const optimizedBody = { ...body };
 
     if (typeof optimizedBody.imageBase64 === 'string') {
@@ -451,7 +461,9 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     }
     if (Array.isArray(optimizedBody.additionalImages) && optimizedBody.additionalImages.length > 0) {
       optimizedBody.additionalImages = await Promise.all(
-        optimizedBody.additionalImages.map((img: string) => optimizeImageForEdgeFunction(img, aggressive))
+        optimizedBody.additionalImages.map((img) =>
+          typeof img === 'string' ? optimizeImageForEdgeFunction(img, aggressive) : Promise.resolve(img)
+        )
       );
     }
 
@@ -459,8 +471,8 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
   }, [optimizeImageForEdgeFunction]);
 
   const invokeAnalyzeStudentWork = useCallback(async (
-    body: Record<string, any>
-  ): Promise<{ data: any; error: any }> => {
+    body: Record<string, unknown>
+  ): Promise<{ data: unknown; error: unknown | null }> => {
     let requestBody = await optimizeAnalyzeRequestBody(body, false);
 
     for (let attempt = 0; attempt <= EDGE_INVOKE_RETRY_DELAYS_MS.length; attempt++) {
@@ -472,7 +484,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         return { data, error: null };
       }
 
-      const message = error?.message || '';
+      const message = getEdgeInvokeErrorMessage(error);
       const shouldRetry = isRetryableEdgeInvokeError(message);
       if (!shouldRetry || attempt === EDGE_INVOKE_RETRY_DELAYS_MS.length) {
         return { data, error };
@@ -1265,7 +1277,8 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
       if (error) {
         console.error('[identifyStudent] Edge function error:', error);
-        throw new Error(formatScanErrorMessage(error.message || 'Student identification failed'));
+        const errorMessage = getEdgeInvokeErrorMessage(error);
+        throw new Error(formatScanErrorMessage(errorMessage || 'Student identification failed'));
       }
       
       if (!data?.success) {
