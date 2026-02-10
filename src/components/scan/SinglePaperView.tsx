@@ -122,11 +122,22 @@ export function SinglePaperView({
   const [rotation, setRotation] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showOverridePanel, setShowOverridePanel] = useState(false);
-  const [overrideGrade, setOverrideGrade] = useState(result.grade || result.totalScore?.percentage || 0);
+
+  // Safely default all result fields that may be missing from edge function
+  const totalScore = result?.totalScore ?? { earned: 0, possible: 1, percentage: 0 };
+  const misconceptions = result?.misconceptions ?? [];
+  const rubricScores = result?.rubricScores ?? [];
+  const approachAnalysis = result?.approachAnalysis ?? '';
+  const strengthsAnalysis = result?.strengthsAnalysis ?? [];
+  const areasForImprovement = result?.areasForImprovement ?? [];
+  const feedbackText = result?.feedback ?? '';
+  const gradeJustificationText = result?.gradeJustification ?? '';
+
+  const currentGrade = result?.grade ?? totalScore.percentage ?? 0;
+
+  const [overrideGrade, setOverrideGrade] = useState(currentGrade);
   const [justification, setJustification] = useState('');
   const [selectedCriteria, setSelectedCriteria] = useState<string[]>([]);
-
-  const currentGrade = result.grade || result.totalScore?.percentage || 0;
 
   const getGradeColor = (grade: number) => {
     if (grade >= 80) return 'text-green-600 dark:text-green-400';
@@ -294,10 +305,10 @@ export function SinglePaperView({
                         <p className="text-sm text-muted-foreground">AI Grade</p>
                         <p className="text-xl font-semibold">{Math.round(currentGrade)}%</p>
                       </div>
-                      {result.regentsScore !== undefined && (
+                      {result?.regentsScore !== undefined && (
                         <div>
                           <p className="text-sm text-muted-foreground">Regents Score</p>
-                          <p className="text-xl font-semibold">{result.regentsScore}/6</p>
+                          <p className="text-xl font-semibold">{result?.regentsScore}/6</p>
                         </div>
                       )}
                       {overrideGrade !== currentGrade && (
@@ -408,13 +419,13 @@ export function SinglePaperView({
                 </Card>
 
                 {/* Rubric Breakdown */}
-                {result.rubricScores && result.rubricScores.length > 0 && (
+                {rubricScores.length > 0 && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-lg">Rubric Breakdown</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      {result.rubricScores.map((score, idx) => (
+                      {rubricScores.map((score, idx) => (
                         <div key={idx} className="flex items-start justify-between p-2 rounded bg-muted/30">
                           <div className="flex-1">
                             <p className="text-sm font-medium">{score.criterion}</p>
@@ -430,7 +441,7 @@ export function SinglePaperView({
                 )}
 
                 {/* Misconceptions */}
-                {result.misconceptions && result.misconceptions.length > 0 && (
+                {misconceptions.length > 0 && (
                   <Card className="border-orange-200 dark:border-orange-800">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-lg flex items-center gap-2 text-orange-600 dark:text-orange-400">
@@ -440,7 +451,7 @@ export function SinglePaperView({
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-1">
-                        {result.misconceptions.map((m, idx) => (
+                        {misconceptions.map((m, idx) => (
                           <li key={idx} className="text-sm flex items-start gap-2">
                             <span className="text-orange-500">•</span>
                             {m}
@@ -452,7 +463,7 @@ export function SinglePaperView({
                 )}
 
                 {/* Feedback */}
-                {result.feedback && (
+                {feedbackText && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-lg flex items-center gap-2">
@@ -461,20 +472,20 @@ export function SinglePaperView({
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm">{result.feedback}</p>
+                      <p className="text-sm">{feedbackText}</p>
                     </CardContent>
                   </Card>
                 )}
 
                 {/* Extracted Text */}
-                {result.extractedText && (
+                {result?.extractedText && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-lg">Extracted Text</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <pre className="text-xs whitespace-pre-wrap bg-muted/30 p-2 rounded max-h-32 overflow-auto">
-                        {result.extractedText}
+                        {result?.extractedText}
                       </pre>
                     </CardContent>
                   </Card>
