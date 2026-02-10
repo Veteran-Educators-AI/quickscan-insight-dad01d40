@@ -270,9 +270,10 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
         } : undefined,
       };
 
-      if (ocrText && ocrText.length > 10) {
+      const ocrUsable = ocrText && ocrText.length > 10 && !ocrText.includes('[OCR FAILED');
+      if (ocrUsable) {
         requestPayload.preExtractedOCR = ocrText;
-        requestPayload.imageBase64 = 'PLACEHOLDER';
+        requestPayload.imageBase64 = imageDataUrl; // Always send real image as fallback
       } else {
         requestPayload.imageBase64 = imageDataUrl;
       }
