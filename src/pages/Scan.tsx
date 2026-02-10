@@ -67,7 +67,16 @@ export default function Scan() {
   const nativeInputRef = useRef<HTMLInputElement>(null);
   const batchInputRef = useRef<HTMLInputElement>(null);
   
-  const [scanMode, setScanMode] = useState<ScanMode>('single');
+  const [scanMode, setScanMode] = useState<ScanMode>(() => {
+    // Restore scan mode from localStorage if available
+    try {
+      const savedMode = localStorage.getItem('scan-genius-scan-mode');
+      if (savedMode && ['single', 'batch', 'saved', 'scanner'].includes(savedMode)) {
+        return savedMode as ScanMode;
+      }
+    } catch {}
+    return 'single';
+  });
   const [scanState, setScanState] = useState<ScanState>('idle');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [finalImage, setFinalImage] = useState<string | null>(null);
@@ -208,16 +217,41 @@ export default function Scan() {
     { step_number: 4, description: 'Arrives at correct answer', points: 1 },
   ];
 
-  // ── Restore single scan session from localStorage on mount ──
+  // ── Persist scanMode and batch classId to localStorage ──
+  useEffect(() => {
+    localStorage.setItem('scan-genius-scan-mode', scanMode);
+  }, [scanMode]);
+
+  useEffect(() => {
+    if (selectedClassId) {
+      localStorage.setItem('scan-genius-batch-class-id', selectedClassId);
+    } else {
+      localStorage.removeItem('scan-genius-batch-class-id');
+    }
+  }, [selectedClassId]);
+
+  // ── Restore scan session on mount ──
   const sessionRestoredRef = useRef(false);
   useEffect(() => {
     if (sessionRestoredRef.current) return;
     sessionRestoredRef.current = true;
     
+    // If batch items were restored, ensure we're in batch mode and restore class
+    if (batch.isRestoredFromStorage && batch.items.length > 0) {
+      setScanMode('batch');
+      try {
+        const savedClassId = localStorage.getItem('scan-genius-batch-class-id');
+        if (savedClassId) setSelectedClassId(savedClassId);
+      } catch {}
+      console.log(`[ScanSession] Auto-switched to batch mode with ${batch.items.length} restored items`);
+      return; // batch takes priority over single session
+    }
+    
+    // Try single scan session restore
     const session = loadSession();
     if (!session) return;
     
-    // Restore state
+    setScanMode('single');
     setScanState(session.scanState as ScanState);
     setFinalImage(session.finalImage);
     setSingleScanClassId(session.singleScanClassId);
@@ -229,7 +263,6 @@ export default function Scan() {
     setMultiQuestionResults(session.multiQuestionResults || {});
     setCurrentQuestionIndex(session.currentQuestionIndex || 0);
     
-    // Restore analysis results into the hook
     if (session.result) setResult(session.result);
     if (session.teacherGuidedResult) setTeacherGuidedResult(session.teacherGuidedResult);
     if (session.rawAnalysis) setRawAnalysis(session.rawAnalysis);
@@ -237,7 +270,7 @@ export default function Scan() {
     toast.info('Previous scan session restored. Click "Start Over" to clear.', {
       duration: 4000,
     });
-  }, [loadSession, setResult, setTeacherGuidedResult, setRawAnalysis]);
+  }, [loadSession, setResult, setTeacherGuidedResult, setRawAnalysis, batch.isRestoredFromStorage, batch.items.length]);
 
   // ── Auto-save single scan session when meaningful state changes ──
   useEffect(() => {
@@ -260,6 +293,7 @@ export default function Scan() {
       currentQuestionIndex,
     });
   }, [scanState, finalImage, singleScanClassId, singleScanStudentId, selectedQuestionIds, gradingMode, resultsSaved, result, teacherGuidedResult, rawAnalysis, answerGuideImage, multiQuestionResults, currentQuestionIndex, saveSession]);
+
 
   const handleCameraCapture = useCallback(async (imageDataUrl: string) => {
     // Compress image on capture to prevent memory issues on mobile
@@ -1238,6 +1272,7 @@ export default function Scan() {
     clearIdentification();
     resetSyncStatus();
     clearSession();
+    localStorage.removeItem('scan-genius-batch-class-id');
   };
 
   // Handle analyzing a saved scan with multiple questions
