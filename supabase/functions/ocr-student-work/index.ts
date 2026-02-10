@@ -73,6 +73,7 @@ serve(async (req) => {
 
   try {
     const GOOGLE_VISION_API_KEY = Deno.env.get('GOOGLE_VISION_API_KEY');
+    console.log('[OCR] API key present:', !!GOOGLE_VISION_API_KEY, 'length:', GOOGLE_VISION_API_KEY?.length);
     if (!GOOGLE_VISION_API_KEY) {
       throw new Error('GOOGLE_VISION_API_KEY not configured');
     }
