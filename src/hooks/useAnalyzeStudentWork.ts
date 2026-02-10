@@ -270,7 +270,7 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
         } : undefined,
       };
 
-      const ocrUsable = ocrText && ocrText.length > 10 && !ocrText.includes('[OCR FAILED');
+      const ocrUsable = ocrText && ocrText.length > 30 && !ocrText.includes('[OCR FAILED');
       if (ocrUsable) {
         requestPayload.preExtractedOCR = ocrText;
         requestPayload.imageBase64 = imageDataUrl; // Always send real image as fallback
