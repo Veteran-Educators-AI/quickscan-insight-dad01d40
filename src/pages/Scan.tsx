@@ -3051,26 +3051,32 @@ export default function Scan() {
         open={showSaveToDriveDialog}
         onOpenChange={setShowSaveToDriveDialog}
         files={batch.items
-          .filter(item => item.status === 'completed' || item.status === 'pending')
+          .filter(item => (item.status === 'completed' || item.status === 'pending') && item.imageDataUrl && item.imageDataUrl.length > 100)
           .map((item, index) => {
-            // Convert base64 to blob
-            const base64Data = item.imageDataUrl.split(',')[1];
-            const byteString = atob(base64Data);
-            const ab = new ArrayBuffer(byteString.length);
-            const ia = new Uint8Array(ab);
-            for (let i = 0; i < byteString.length; i++) {
-              ia[i] = byteString.charCodeAt(i);
+            try {
+              // Convert base64 to blob
+              const base64Data = item.imageDataUrl.split(',')[1] || '';
+              if (!base64Data) return null;
+              const byteString = atob(base64Data);
+              const ab = new ArrayBuffer(byteString.length);
+              const ia = new Uint8Array(ab);
+              for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+              }
+              const blob = new Blob([ab], { type: 'image/jpeg' });
+            
+              // Generate meaningful filename
+              const studentName = item.studentName?.replace(/\s+/g, '_') || 'Unknown';
+              const date = new Date().toISOString().split('T')[0];
+              const topicName = item.result?.problemIdentified?.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30) || 'Scan';
+              const fileName = `${studentName}_${topicName}_${date}_${index + 1}.jpg`;
+              
+              return { blob, name: fileName };
+            } catch (e) {
+              console.warn('Failed to convert image for Drive save:', e);
+              return null;
             }
-            const blob = new Blob([ab], { type: 'image/jpeg' });
-            
-            // Generate meaningful filename
-            const studentName = item.studentName?.replace(/\s+/g, '_') || 'Unknown';
-            const date = new Date().toISOString().split('T')[0];
-            const topicName = item.result?.problemIdentified?.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30) || 'Scan';
-            const fileName = `${studentName}_${topicName}_${date}_${index + 1}.jpg`;
-            
-            return { blob, name: fileName };
-          })}
+          }).filter(Boolean) as { blob: Blob; name: string }[]}
         onSaveComplete={(count, folderName) => {
           setDriveSaved(true);
         }}
