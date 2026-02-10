@@ -661,9 +661,9 @@ serve(async (req) => {
 
     // ── BLANK PAGE EARLY EXIT — no separate AI call needed ──
 
-    // ── TEXT-ONLY GRADING (when OCR was done externally via Google Vision) ──
+    // ── OCR-ASSISTED GRADING (OCR text + student image for visual context) ──
     if (preExtractedOCR && typeof preExtractedOCR === 'string' && preExtractedOCR.length > 0) {
-      console.log(`[TEXT_ONLY] Grading from pre-extracted OCR (${preExtractedOCR.length} chars)`);
+      console.log(`[OCR_ASSISTED] Grading from pre-extracted OCR (${preExtractedOCR.length} chars) + image`);
 
       const { system: sysPrompt, user: usrPrompt } = buildGradingPrompt({
         rubricSteps, standardCode, topicName, customRubric, promptText,
@@ -672,37 +672,40 @@ serve(async (req) => {
         feedbackVerbosity, gradeFloor, gradeFloorWithEffort,
       });
 
-      // Replace the user prompt to include extracted text instead of image
-      const textOnlyPrompt = `${usrPrompt}\n\n--- STUDENT'S EXTRACTED WORK (from OCR) ---\n${preExtractedOCR}\n--- END OF STUDENT WORK ---`;
+      // Include OCR text in the prompt so AI doesn't need to re-read handwriting
+      const ocrAugmentedPrompt = `${usrPrompt}\n\n--- STUDENT'S EXTRACTED WORK (from OCR) ---\n${preExtractedOCR}\n--- END OF STUDENT WORK ---\nThe student's image is also attached for visual context (diagrams, graphs, formatting). Use the OCR text as the primary source for reading handwriting.`;
+
+      // Always include the student image alongside OCR text for visual context
+      const userContent: any[] = [
+        { type: 'text', text: ocrAugmentedPrompt },
+      ];
+
+      // Include the real student image if available (for diagrams/graphs)
+      if (imageBase64 && typeof imageBase64 === 'string' && imageBase64.length > 50) {
+        userContent.push(formatImageForAI(imageBase64));
+      }
+
+      // If there's an answer guide image, include it too
+      if (answerGuideBase64) {
+        userContent.push({ type: 'text', text: '[TEACHER ANSWER GUIDE:]' });
+        userContent.push(formatImageForAI(answerGuideBase64));
+      }
 
       const messages: any[] = [
         { role: 'system', content: sysPrompt },
-        { role: 'user', content: textOnlyPrompt },
+        { role: 'user', content: userContent },
       ];
 
-      // If there's an answer guide image, still include it (teacher reference)
-      if (answerGuideBase64) {
-        messages[1] = {
-          role: 'user',
-          content: [
-            { type: 'text', text: textOnlyPrompt },
-            { type: 'text', text: '[TEACHER ANSWER GUIDE:]' },
-            formatImageForAI(answerGuideBase64),
-          ],
-        };
-      }
-
-      // Use Gemini 2.5 Pro for text-only grading (no image = can use stronger model)
-      const isOpenAI = false;
-      const textModel = 'google/gemini-2.5-pro';
+      // Use Gemini 2.5 Flash for OCR-assisted grading (image + text = multimodal)
+      const textModel = 'google/gemini-2.5-flash';
       const startTime = Date.now();
-      console.log(`[TEXT_ONLY] Grading with model=${textModel}`);
+      console.log(`[OCR_ASSISTED] Grading with model=${textModel}`);
 
       const tokenParams = { max_tokens: 4000 };
       const requestBody2 = JSON.stringify({ model: textModel, messages, ...tokenParams });
 
       const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 90000); // 90s for pro model
+      const tid = setTimeout(() => controller.abort(), 65000); // 65s timeout
 
       const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
@@ -713,7 +716,7 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error(`[TEXT_ONLY] AI error: ${response.status}`, errText);
+        console.error(`[OCR_ASSISTED] AI error: ${response.status}`, errText);
         if (response.status === 429) throw { status: 429, message: "Rate limit exceeded." };
         if (response.status === 402) throw { status: 402, message: "AI credits exhausted." };
         throw new Error(`AI API error: ${response.status}`);
@@ -722,8 +725,8 @@ serve(async (req) => {
       const aiData = await response.json();
       const latencyMs = Date.now() - startTime;
       const usage = aiData.usage || {};
-      console.log(`[TEXT_ONLY] Done: prompt=${usage.prompt_tokens || 0} completion=${usage.completion_tokens || 0} latency=${latencyMs}ms`);
-      if (supabase && effectiveTeacherId) await logAIUsage(supabase, effectiveTeacherId, 'analyze-student-work-text', usage, latencyMs);
+      console.log(`[OCR_ASSISTED] Done: prompt=${usage.prompt_tokens || 0} completion=${usage.completion_tokens || 0} latency=${latencyMs}ms`);
+      if (supabase && effectiveTeacherId) await logAIUsage(supabase, effectiveTeacherId, 'analyze-student-work-ocr', usage, latencyMs);
 
       const analysisText = aiData.choices?.[0]?.message?.content || '';
 
@@ -747,7 +750,7 @@ serve(async (req) => {
         analysis: result,
         rawAnalysis: analysisText,
         blankPageDetected: !result.studentWorkPresent,
-        ocrSource: 'google-vision',
+        ocrSource: 'google-vision-assisted',
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
