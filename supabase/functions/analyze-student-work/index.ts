@@ -2885,7 +2885,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
       0: gradeFloorWithEffort,
     };
 
-    if (!regentsScoreExplicitlyParsed) {
+    if (!regentsScoreParsed) {
       // SCENARIO A: Regents was NOT parsed — back-derive from grade
       // The AI graded the work (produced a grade) but didn't output a parseable Regents line.
       // Use the grade to infer an appropriate Regents score.
@@ -2932,7 +2932,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor: numb
       }
     }
 
-    console.log(`After cross-validation: Grade=${result.grade}, Regents=${result.regentsScore}, TotalScore=${result.totalScore.earned}/${result.totalScore.possible} (RegentsParsed: ${regentsScoreExplicitlyParsed})`);
+    console.log(`After cross-validation: Grade=${result.grade}, Regents=${result.regentsScore}, TotalScore=${result.totalScore.earned}/${result.totalScore.possible} (RegentsParsed: ${regentsScoreParsed})`);
   }
 
   console.log(`Final grade: ${result.grade}`);
