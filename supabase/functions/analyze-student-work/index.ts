@@ -692,11 +692,40 @@ serve(async (req) => {
         };
       }
 
-      const analysisText = await callLovableAI(
-        messages,
-        LOVABLE_API_KEY, 'analyze-student-work-text', supabase, effectiveTeacherId,
-        'standard', analysisProvider
-      );
+      // Use Gemini 2.5 Pro for text-only grading (no image = can use stronger model)
+      const isOpenAI = false;
+      const textModel = 'google/gemini-2.5-pro';
+      const startTime = Date.now();
+      console.log(`[TEXT_ONLY] Grading with model=${textModel}`);
+
+      const tokenParams = { max_tokens: 4000 };
+      const requestBody2 = JSON.stringify({ model: textModel, messages, ...tokenParams });
+
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 90000); // 90s for pro model
+
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+        body: requestBody2, signal: controller.signal,
+      });
+      clearTimeout(tid);
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[TEXT_ONLY] AI error: ${response.status}`, errText);
+        if (response.status === 429) throw { status: 429, message: "Rate limit exceeded." };
+        if (response.status === 402) throw { status: 402, message: "AI credits exhausted." };
+        throw new Error(`AI API error: ${response.status}`);
+      }
+
+      const aiData = await response.json();
+      const latencyMs = Date.now() - startTime;
+      const usage = aiData.usage || {};
+      console.log(`[TEXT_ONLY] Done: prompt=${usage.prompt_tokens || 0} completion=${usage.completion_tokens || 0} latency=${latencyMs}ms`);
+      if (supabase && effectiveTeacherId) await logAIUsage(supabase, effectiveTeacherId, 'analyze-student-work-text', usage, latencyMs);
+
+      const analysisText = aiData.choices?.[0]?.message?.content || '';
 
       if (!analysisText) throw new Error('No analysis returned from AI');
 
