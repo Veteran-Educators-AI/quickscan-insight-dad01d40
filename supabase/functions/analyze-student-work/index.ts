@@ -75,7 +75,7 @@ async function callLovableAI(
       console.log(`[AI_CALL] Retry ${attempt + 1}/${MAX_RETRIES + 1} for ${functionName}`);
     }
     try {
-      const timeoutMs = modelTier === 'standard' ? 90000 : 45000;
+      const timeoutMs = modelTier === 'standard' ? 60000 : 45000;
       const controller = new AbortController();
       const tid = setTimeout(() => controller.abort(), timeoutMs);
 
