@@ -123,3 +123,6 @@ verify_jwt = false
 
 [functions.deepseek-reasoning]
 verify_jwt = false
+
+[functions.ocr-student-work]
+verify_jwt = false
