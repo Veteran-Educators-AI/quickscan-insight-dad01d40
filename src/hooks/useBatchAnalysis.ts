@@ -1303,9 +1303,13 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
   const identifyStudent = async (item: BatchItem, studentRoster: Student[]): Promise<BatchItem> => {
     try {
+      // Guard: skip items with no image data
+      if (!item.imageDataUrl || item.imageDataUrl.length < 100) {
+        console.warn(`[identifyStudent] Skipping item ${item.id}: no image data`);
+        return { ...item, status: 'pending' };
+      }
       console.log(`[identifyStudent] Starting identification with ${studentRoster.length} students in roster`);
       console.log(`[identifyStudent] Roster sample:`, studentRoster.slice(0, 3).map(s => `${s.first_name} ${s.last_name}`));
-      
       const { data, error } = await invokeWithRetry('analyze-student-work', {
         imageBase64: item.imageDataUrl,
         identifyOnly: true,
@@ -1404,6 +1408,15 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
   const analyzeItem = async (item: BatchItem, rubricSteps?: RubricStep[], assessmentMode?: 'teacher' | 'ai', promptText?: string): Promise<BatchItem> => {
     try {
+      // Guard: skip items with no image data (e.g. restored from localStorage with stripped images)
+      if (!item.imageDataUrl || item.imageDataUrl.length < 100) {
+        console.warn(`[analyzeItem] Skipping item ${item.id}: no image data`);
+        return {
+          ...item,
+          status: 'failed',
+          error: 'Image data missing — please re-upload this paper',
+        };
+      }
       // Check for duplicate work before spending AI credits
       if (item.studentId && item.questionId) {
         const duplicateCheck = await checkForDuplicate(
@@ -1986,6 +1999,15 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     useLearnedStyle?: boolean
   ): Promise<BatchItem> => {
     try {
+      // Guard: skip items with no image data (e.g. restored from localStorage with stripped images)
+      if (!item.imageDataUrl || item.imageDataUrl.length < 100) {
+        console.warn(`[analyzeItemWithContinuations] Skipping item ${item.id}: no image data (restored session?)`);
+        return {
+          ...item,
+          status: 'failed',
+          error: 'Image data missing — please re-upload this paper',
+        };
+      }
       // Get all continuation page images
       const additionalImages: string[] = [];
       if (item.continuationPages && item.continuationPages.length > 0) {
@@ -2371,6 +2393,13 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
       await Promise.all(batch.map(async ({ item, index: i }) => {
         try {
+          // Guard: skip items with no image data
+          if (!item.imageDataUrl || item.imageDataUrl.length < 100) {
+            setItems(prev => prev.map((it, idx) => 
+              idx === i ? { ...it, status: 'failed', error: 'Image data missing — please re-upload this paper' } : it
+            ));
+            return;
+          }
           const additionalImages: string[] = [];
           if (item.continuationPages && item.continuationPages.length > 0) {
             for (const contId of item.continuationPages) {
