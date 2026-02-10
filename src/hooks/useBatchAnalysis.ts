@@ -59,16 +59,16 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Compress an image data URL for sending to edge functions.
- * Targets a max dimension of 1600px and JPEG quality of 0.75.
- * This dramatically reduces payload size (typically 60-80% smaller).
+ * Targets a max dimension of 1200px and JPEG quality of 0.6.
+ * Aggressive compression for faster uploads and lower latency.
  */
 async function compressForEdgeFunction(imageDataUrl: string): Promise<string> {
   try {
-    // Skip compression if already small (less than ~200KB base64)
-    if (imageDataUrl.length < 270000) {
+    // Skip compression if already small (less than ~110KB base64)
+    if (imageDataUrl.length < 150000) {
       return imageDataUrl;
     }
-    const compressed = await compressImage(imageDataUrl, 1600, 0.75);
+    const compressed = await compressImage(imageDataUrl, 1200, 0.6);
     const savings = Math.round((1 - compressed.length / imageDataUrl.length) * 100);
     if (savings > 5) {
       console.log(`[compressForEdgeFunction] Compressed image: ${Math.round(imageDataUrl.length / 1024)}KB → ${Math.round(compressed.length / 1024)}KB (${savings}% reduction)`);
@@ -137,9 +137,15 @@ async function invokeWithRetry(
         await sleep(delay);
       }
 
-      const { data, error } = await supabase.functions.invoke(functionName, {
+      const invokePromise = supabase.functions.invoke(functionName, {
         body: processedBody,
       });
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out after 65 seconds')), 65000)
+      );
+
+      const { data, error } = await Promise.race([invokePromise, timeoutPromise]) as { data: any; error: any };
 
       // If there's an error from Supabase client (FunctionsFetchError, FunctionsHttpError, etc.)
       if (error) {
