@@ -14,9 +14,9 @@ type AnalysisProvider = 'gemini' | 'gpt4o' | 'gpt4o-mini';
 function getAnalysisModel(provider: AnalysisProvider): string {
   switch (provider) {
     case 'gpt4o':
-      return 'openai/gpt-4o';              // ← FIXED (was 'openai/gpt-5')
+      return 'openai/gpt-5';
     case 'gpt4o-mini':
-      return 'openai/gpt-4o-mini';          // ← FIXED (was 'openai/gpt-5-mini')
+      return 'openai/gpt-5-mini';
     case 'gemini':
     default:
       return 'google/gemini-2.5-flash';
