@@ -270,12 +270,13 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
         } : undefined,
       };
 
-      const ocrUsable = ocrText && ocrText.length > 30 && !ocrText.includes('[OCR FAILED');
-      if (ocrUsable) {
+      // Always send the image so AI can see diagrams/graphs
+      requestPayload.imageBase64 = imageDataUrl;
+
+      // If OCR returned any text, send it alongside the image
+      const hasOcrText = ocrText && ocrText.trim().length > 0 && !ocrText.includes('[OCR FAILED');
+      if (hasOcrText) {
         requestPayload.preExtractedOCR = ocrText;
-        requestPayload.imageBase64 = imageDataUrl; // Always send real image as fallback
-      } else {
-        requestPayload.imageBase64 = imageDataUrl;
       }
 
       const { data, error: fnError } = await invokeAnalyzeWithRetry(requestPayload);
