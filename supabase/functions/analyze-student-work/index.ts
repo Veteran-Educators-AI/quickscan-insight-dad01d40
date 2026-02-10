@@ -19,7 +19,7 @@ function getAnalysisModel(provider: AnalysisProvider): string {
       return 'openai/gpt-5-mini';
     case 'gemini':
     default:
-      return 'google/gemini-2.5-flash';
+      return 'google/gemini-2.5-pro';
   }
 }
 

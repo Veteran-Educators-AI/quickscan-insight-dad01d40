@@ -276,30 +276,30 @@ export function AIDetectionSettings() {
             <SelectContent>
               <SelectItem value="gemini">
                 <div className="flex flex-col items-start">
-                  <span className="font-medium">Gemini 2.5 Flash</span>
-                  <span className="text-xs text-muted-foreground">Fast &amp; affordable — good for most work (~$0.01/scan)</span>
+                  <span className="font-medium">Gemini 2.5 Pro</span>
+                  <span className="text-xs text-muted-foreground">Best quality — OCR + Pro grading pipeline (default)</span>
                 </div>
               </SelectItem>
               <SelectItem value="gpt4o-mini">
                 <div className="flex flex-col items-start">
                   <span className="font-medium">GPT-5 Mini</span>
-                  <span className="text-xs text-muted-foreground">Better handwriting reading, similar cost (~$0.02/scan)</span>
+                  <span className="text-xs text-muted-foreground">OpenAI fallback — used when image-only grading is needed</span>
                 </div>
               </SelectItem>
               <SelectItem value="gpt4o">
                 <div className="flex flex-col items-start">
                   <span className="font-medium">GPT-5</span>
-                  <span className="text-xs text-muted-foreground">Best handwriting &amp; analysis quality (~$0.08/scan)</span>
+                  <span className="text-xs text-muted-foreground">Premium OpenAI — best for difficult handwriting (~$0.08/scan)</span>
                 </div>
               </SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
             {settings.analysis_provider === 'gpt4o' 
-              ? 'GPT-5 provides the best handwriting recognition and most detailed educational analysis. Recommended for difficult-to-read student work.'
+              ? 'GPT-5 is used for image-based grading when OCR cannot extract text. Text grading always uses Gemini 2.5 Pro.'
               : settings.analysis_provider === 'gpt4o-mini'
-              ? 'GPT-5 Mini offers improved handwriting reading over Gemini at a similar cost. Good balance of quality and affordability.'
-              : 'Gemini Flash is fast and affordable. Works well for clearly written student work.'}
+              ? 'GPT-5 Mini is used for image-based grading when OCR cannot extract text. Text grading always uses Gemini 2.5 Pro.'
+              : 'Gemini 2.5 Pro grades all scans. Google Vision OCR extracts text first for faster, more accurate results.'}
           </p>
         </div>
 
