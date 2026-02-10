@@ -46,6 +46,8 @@ interface AnalysisResult {
   approachAnalysis: string;
   strengthsAnalysis?: string[];
   areasForImprovement?: string[];
+  whatStudentDidCorrectly?: string;
+  whatStudentGotWrong?: string;
   rubricScores: RubricScore[];
   misconceptions: string[];
   totalScore: { earned: number; possible: number; percentage: number };
@@ -199,16 +201,28 @@ export function StudentWorkDetailDialog({
     return 'None';
   };
 
+  // Safely default all result fields that may be missing from edge function
+  const totalScore = result?.totalScore ?? { earned: 0, possible: 1, percentage: 0 };
+  const misconceptions = result?.misconceptions ?? [];
+  const rubricScores = result?.rubricScores ?? [];
+  const ocrText = result?.ocrText ?? '';
+  const approachAnalysis = result?.approachAnalysis ?? '';
+  const strengthsAnalysis = result?.strengthsAnalysis ?? [];
+  const areasForImprovement = result?.areasForImprovement ?? [];
+  const whatStudentDidCorrectly = result?.whatStudentDidCorrectly ?? '';
+  const whatStudentGotWrong = result?.whatStudentGotWrong ?? '';
+  const feedbackText = result?.feedback ?? '';
+
   // Calculate grade using teacher's grade floor settings
-  const hasAnyPoints = result.totalScore.earned > 0;
-  const hasAnyWork = result.ocrText?.trim().length > 10 || hasAnyPoints;
+  const hasAnyPoints = totalScore.earned > 0;
+  const hasAnyWork = ocrText.trim().length > 10 || hasAnyPoints;
   const minGrade = hasAnyWork ? gradeFloorWithEffort : gradeFloor;
   const calculatedGrade = calculateGrade(
-    result.totalScore.percentage, 
+    totalScore.percentage, 
     hasAnyWork, 
-    result.regentsScore
+    result?.regentsScore
   );
-  const grade = result.grade ? Math.max(minGrade, result.grade) : calculatedGrade;
+  const grade = result?.grade ? Math.max(minGrade, result.grade) : calculatedGrade;
 
   return (
     <>
@@ -387,7 +401,7 @@ export function StudentWorkDetailDialog({
                 )}
 
                 {/* Detailed Analysis: What Student Did Right */}
-                {result.strengthsAnalysis && result.strengthsAnalysis.length > 0 && (
+                {strengthsAnalysis.length > 0 && (
                   <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -396,7 +410,7 @@ export function StudentWorkDetailDialog({
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      {result.strengthsAnalysis.map((strength, i) => (
+                      {strengthsAnalysis.map((strength, i) => (
                         <div key={i} className="flex items-start gap-2">
                           <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mt-0.5 shrink-0" />
                           <p className="text-xs">{strength}</p>
@@ -407,7 +421,7 @@ export function StudentWorkDetailDialog({
                 )}
 
                 {/* Detailed Analysis: Areas for Improvement */}
-                {result.areasForImprovement && result.areasForImprovement.length > 0 && (
+                {areasForImprovement.length > 0 && (
                   <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -416,7 +430,7 @@ export function StudentWorkDetailDialog({
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      {result.areasForImprovement.map((area, i) => (
+                      {areasForImprovement.map((area, i) => (
                         <div key={i} className="flex items-start gap-2">
                           <AlertTriangle className="h-3.5 w-3.5 text-orange-500 mt-0.5 shrink-0" />
                           <p className="text-xs">{area}</p>
@@ -427,7 +441,7 @@ export function StudentWorkDetailDialog({
                 )}
 
                 {/* Approach Analysis - Now shown prominently */}
-                {result.approachAnalysis && result.approachAnalysis !== 'No student work to analyze' && (
+                {approachAnalysis && approachAnalysis !== 'No student work to analyze' && (
                   <Card className="border-purple-200 bg-purple-50/50 dark:bg-purple-950/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -436,19 +450,19 @@ export function StudentWorkDetailDialog({
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-xs">{result.approachAnalysis}</p>
+                      <p className="text-xs">{approachAnalysis}</p>
                     </CardContent>
                   </Card>
                 )}
 
                 {/* Rubric Breakdown */}
-                {result.rubricScores.length > 0 && (
+                {rubricScores.length > 0 && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm">Rubric Breakdown</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      {result.rubricScores.map((score, i) => (
+                      {rubricScores.map((score, i) => (
                         <div key={i} className="flex items-start gap-2 text-sm">
                           {score.score >= score.maxScore ? (
                             <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
@@ -475,9 +489,9 @@ export function StudentWorkDetailDialog({
                 )}
 
                 {/* Misconceptions - Side-by-side comparison with image highlighting */}
-                {result.misconceptions.length > 0 && (
+                {misconceptions.length > 0 && (
                   <MisconceptionComparison 
-                    misconceptions={result.misconceptions}
+                    misconceptions={misconceptions}
                     highlightedError={highlightedError}
                     onErrorHover={setHighlightedError}
                     onErrorClick={(id) => setHighlightedError(id === highlightedError ? null : id)}
@@ -485,7 +499,7 @@ export function StudentWorkDetailDialog({
                 )}
 
                 {/* Feedback */}
-                {result.feedback && (
+                {feedbackText && (
                   <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -494,14 +508,14 @@ export function StudentWorkDetailDialog({
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm">{result.feedback}</p>
+                      <p className="text-sm">{feedbackText}</p>
                     </CardContent>
                   </Card>
                 )}
 
                 {/* Justifications */}
                 <Accordion type="single" collapsible className="w-full">
-                  {result.regentsScoreJustification && (
+                  {result?.regentsScoreJustification && (
                     <AccordionItem value="regents">
                       <AccordionTrigger className="text-sm">Regents Score Rationale</AccordionTrigger>
                       <AccordionContent>
@@ -510,7 +524,7 @@ export function StudentWorkDetailDialog({
                     </AccordionItem>
                   )}
 
-                  {result.gradeJustification && (
+                  {result?.gradeJustification && (
                     <AccordionItem value="grade">
                       <AccordionTrigger className="text-sm">Grade Justification</AccordionTrigger>
                       <AccordionContent>
@@ -522,16 +536,16 @@ export function StudentWorkDetailDialog({
                   <AccordionItem value="problem">
                     <AccordionTrigger className="text-sm">Problem Identified</AccordionTrigger>
                     <AccordionContent>
-                      <p className="text-sm text-muted-foreground">{result.problemIdentified || 'Not identified'}</p>
+                      <p className="text-sm text-muted-foreground">{result?.problemIdentified || 'Not identified'}</p>
                     </AccordionContent>
                   </AccordionItem>
 
                   {/* Approach Analysis moved to prominent card above - only in accordion if card didn't render */}
-                  {(!result.approachAnalysis || result.approachAnalysis === 'No student work to analyze') && (
+                  {(!approachAnalysis || approachAnalysis === 'No student work to analyze') && (
                     <AccordionItem value="approach">
                       <AccordionTrigger className="text-sm">Approach Analysis</AccordionTrigger>
                       <AccordionContent>
-                        <p className="text-sm text-muted-foreground">{result.approachAnalysis || 'No analysis available'}</p>
+                        <p className="text-sm text-muted-foreground">{approachAnalysis || 'No analysis available'}</p>
                       </AccordionContent>
                     </AccordionItem>
                   )}
@@ -540,7 +554,7 @@ export function StudentWorkDetailDialog({
                     <AccordionTrigger className="text-sm">Extracted Text (OCR)</AccordionTrigger>
                     <AccordionContent>
                       <div className="bg-muted rounded-md p-3 text-xs font-mono whitespace-pre-wrap max-h-32 overflow-y-auto">
-                        {result.ocrText || 'No text extracted'}
+                        {ocrText || 'No text extracted'}
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -550,10 +564,10 @@ export function StudentWorkDetailDialog({
                 <div className="mt-4 pt-4 border-t">
                   <AIAnalysisCritiqueDialog
                     aiGrade={grade}
-                    aiJustification={result.gradeJustification}
-                    aiMisconceptions={result.misconceptions}
-                    aiFeedback={result.feedback}
-                    topicName={result.problemIdentified || 'Unknown Topic'}
+                    aiJustification={result?.gradeJustification}
+                    aiMisconceptions={misconceptions}
+                    aiFeedback={feedbackText}
+                    topicName={result?.problemIdentified || 'Unknown Topic'}
                   />
                 </div>
               </div>

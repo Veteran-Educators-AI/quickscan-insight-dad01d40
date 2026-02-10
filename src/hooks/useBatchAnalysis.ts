@@ -201,7 +201,7 @@ async function invokeWithRetry(
 const BATCH_ITEM_DELAY_MS = 200;
 
 /** Number of papers to analyze concurrently in batch mode */
-const BATCH_CONCURRENCY = 3;
+const BATCH_CONCURRENCY = 4;
 
 const BATCH_STORAGE_KEY = 'scan-genius-batch-data';
 const BATCH_SUMMARY_KEY = 'scan-genius-batch-summary';
@@ -1360,23 +1360,33 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
     setIsIdentifying(true);
 
-    for (let i = 0; i < items.length; i++) {
-      // Skip already assigned items
-      if (items[i].studentId) continue;
+    // Identify items that need identification
+    const unassigned = items
+      .map((item, idx) => ({ item, idx }))
+      .filter(({ item }) => !item.studentId);
 
-      setCurrentIndex(i);
-      
-      // Mark as identifying
-      setItems(prev => prev.map((item, idx) => 
-        idx === i ? { ...item, status: 'identifying' } : item
-      ));
+    // Mark all as identifying
+    setItems(prev => prev.map((item, idx) => 
+      unassigned.some(u => u.idx === idx) ? { ...item, status: 'identifying' } : item
+    ));
 
-      const result = await identifyStudent(items[i], studentRoster);
+    // Process in parallel batches of BATCH_CONCURRENCY
+    for (let batchStart = 0; batchStart < unassigned.length; batchStart += BATCH_CONCURRENCY) {
+      const batch = unassigned.slice(batchStart, batchStart + BATCH_CONCURRENCY);
+      setCurrentIndex(batch[0].idx);
 
-      // Update item with identification result
-      setItems(prev => prev.map((item, idx) => 
-        idx === i ? result : item
-      ));
+      const results = await Promise.all(
+        batch.map(({ item }) => identifyStudent(item, studentRoster))
+      );
+
+      // Update all items in this batch
+      setItems(prev => {
+        const updated = [...prev];
+        batch.forEach(({ idx }, i) => {
+          updated[idx] = results[i];
+        });
+        return updated;
+      });
     }
 
     setCurrentIndex(-1);
@@ -1450,7 +1460,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         teacherId: user?.id,
         assessmentMode: assessmentMode || 'teacher',
         promptText,
-      }, { maxRetries: 3 });
+      }, { maxRetries: 2 });
 
       if (error) {
         const errorMsg = handleApiError(error, 'Analysis');
@@ -1988,7 +1998,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         assessmentMode: assessmentMode || 'teacher',
         promptText,
         useLearnedStyle: useLearnedStyle || false,
-      }, { maxRetries: 3 });
+      }, { maxRetries: 2 });
 
       if (error) {
         const errorMsg = handleApiError(error, 'Analysis');
