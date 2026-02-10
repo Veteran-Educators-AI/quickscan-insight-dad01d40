@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, Suspense } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,9 +30,14 @@ import {
   BookOpen
 } from 'lucide-react';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
-import { MisconceptionComparison, extractErrorRegions } from './MisconceptionComparison';
 import { ImageErrorOverlay } from './ImageErrorOverlay';
-import { AIAnalysisCritiqueDialog } from './AIAnalysisCritiqueDialog';
+
+// Lazy-load to prevent TDZ errors in production bundles
+const MisconceptionComparison = React.lazy(() => import('./MisconceptionComparison').then(m => ({ default: m.MisconceptionComparison })));
+const AIAnalysisCritiqueDialog = React.lazy(() => import('./AIAnalysisCritiqueDialog').then(m => ({ default: m.AIAnalysisCritiqueDialog })));
+
+// We still need extractErrorRegions at module level - import it separately
+import { extractErrorRegions } from './MisconceptionComparison';
 interface RubricScore {
   criterion: string;
   score: number;

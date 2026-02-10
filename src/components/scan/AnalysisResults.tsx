@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { CheckCircle2, XCircle, AlertTriangle, Lightbulb, Save, UserPlus, Loader2, FileX, ThumbsUp, Target, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,17 +12,22 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { AIWorkDetector } from './AIWorkDetector';
-import { GradeOverrideDialog } from './GradeOverrideDialog';
-import { MisconceptionComparison } from './MisconceptionComparison';
-import { RemediationActions } from './RemediationActions';
-import { RecommendedNextSteps } from './RecommendedNextSteps';
-import { TeacherVerificationPanel } from './TeacherVerificationPanel';
-import { TrainingConfidenceIndicator } from './TrainingConfidenceIndicator';
-import { AIAnalysisCritiqueDialog } from './AIAnalysisCritiqueDialog';
-import { OCRCorrectionPanel } from './OCRCorrectionPanel';
-import { TeacherInterpretationPanel } from './TeacherInterpretationPanel';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
+
+// Lazy-load all sub-components to prevent TDZ / circular-init crashes
+// when the Scan chunk initializes in production builds.
+const AIWorkDetector = React.lazy(() => import('./AIWorkDetector').then(m => ({ default: m.AIWorkDetector })));
+const GradeOverrideDialog = React.lazy(() => import('./GradeOverrideDialog').then(m => ({ default: m.GradeOverrideDialog })));
+const MisconceptionComparison = React.lazy(() => import('./MisconceptionComparison').then(m => ({ default: m.MisconceptionComparison })));
+const RemediationActions = React.lazy(() => import('./RemediationActions').then(m => ({ default: m.RemediationActions })));
+const RecommendedNextSteps = React.lazy(() => import('./RecommendedNextSteps').then(m => ({ default: m.RecommendedNextSteps })));
+const TeacherVerificationPanel = React.lazy(() => import('./TeacherVerificationPanel').then(m => ({ default: m.TeacherVerificationPanel })));
+const TrainingConfidenceIndicator = React.lazy(() => import('./TrainingConfidenceIndicator').then(m => ({ default: m.TrainingConfidenceIndicator })));
+const AIAnalysisCritiqueDialog = React.lazy(() => import('./AIAnalysisCritiqueDialog').then(m => ({ default: m.AIAnalysisCritiqueDialog })));
+const OCRCorrectionPanel = React.lazy(() => import('./OCRCorrectionPanel').then(m => ({ default: m.OCRCorrectionPanel })));
+const TeacherInterpretationPanel = React.lazy(() => import('./TeacherInterpretationPanel').then(m => ({ default: m.TeacherInterpretationPanel })));
+
+const LazyFallback = null; // Render nothing while loading sub-components
 
 interface RubricScore {
   criterion: string;
@@ -183,6 +188,7 @@ export function AnalysisResults({
   const gradeBadge = getGradeBadge(grade);
 
   return (
+    <Suspense fallback={LazyFallback}>
     <div className="space-y-4">
       {/* Logo Header */}
       <div className="flex justify-center py-2">
@@ -601,5 +607,6 @@ export function AnalysisResults({
         )}
       </Accordion>
     </div>
+    </Suspense>
   );
 }
