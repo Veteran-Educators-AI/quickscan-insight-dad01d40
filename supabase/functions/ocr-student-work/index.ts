@@ -72,9 +72,9 @@ serve(async (req) => {
   }
 
   try {
-    const GOOGLE_VISION_API_KEY = Deno.env.get('GOOGLE_VISION_SERVICE_ACCOUNT');
+    const GOOGLE_VISION_API_KEY = Deno.env.get('GOOGLE_VISION_API_KEY');
     if (!GOOGLE_VISION_API_KEY) {
-      throw new Error('GOOGLE_VISION_SERVICE_ACCOUNT not configured');
+      throw new Error('GOOGLE_VISION_API_KEY not configured');
     }
 
     const { imageBase64, additionalImages } = await req.json();
