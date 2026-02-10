@@ -101,8 +101,8 @@ async function invokeWithRetry(
   options: InvokeWithRetryOptions = {}
 ): Promise<{ data: any; error: any }> {
   const {
-    maxRetries = 3,
-    initialDelayMs = 2000,
+    maxRetries = 2,
+    initialDelayMs = 1500,
     compressImages = true,
     imageKeys = ['imageBase64', 'image1Base64', 'image2Base64', 'answerGuideBase64', 'solutionBase64'],
     imageArrayKeys = ['additionalImages'],
@@ -198,7 +198,10 @@ async function invokeWithRetry(
 }
 
 /** Delay between sequential batch items to avoid overwhelming the edge function */
-const BATCH_ITEM_DELAY_MS = 500;
+const BATCH_ITEM_DELAY_MS = 200;
+
+/** Number of papers to analyze concurrently in batch mode */
+const BATCH_CONCURRENCY = 3;
 
 const BATCH_STORAGE_KEY = 'scan-genius-batch-data';
 const BATCH_SUMMARY_KEY = 'scan-genius-batch-summary';
@@ -2023,69 +2026,88 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
     // Get current items state for the async loop
     const currentItems = [...items];
-    let consecutiveFailures = 0;
-    const MAX_CONSECUTIVE_FAILURES = 5;
+    let totalFailures = 0;
+    const MAX_TOTAL_FAILURES = 8;
 
+    // Separate items into analyzable (primary papers) and continuations
+    const analyzableItems: { item: BatchItem; index: number }[] = [];
     for (let i = 0; i < currentItems.length; i++) {
       const item = currentItems[i];
-      
-      // Skip continuation pages - they'll be analyzed with their primary paper
       if (item.pageType === 'continuation' && item.continuationOf) {
-        // Mark as completed (will use primary's result)
+        // Mark continuation pages as completed immediately
         setItems(prev => prev.map((it, idx) => 
           idx === i ? { ...it, status: 'completed' } : it
         ));
-        continue;
+      } else {
+        analyzableItems.push({ item, index: i });
       }
+    }
 
-      // Circuit breaker: if too many consecutive failures, stop the batch
-      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-        console.error(`[startBatchAnalysis] ${MAX_CONSECUTIVE_FAILURES} consecutive failures - stopping batch to prevent wasted API calls`);
-        toast.error(`Batch stopped: ${MAX_CONSECUTIVE_FAILURES} consecutive failures. Please check your connection and try again.`);
-        // Mark remaining items as failed
+    // Process papers in parallel batches of BATCH_CONCURRENCY
+    for (let batchStart = 0; batchStart < analyzableItems.length; batchStart += BATCH_CONCURRENCY) {
+      // Circuit breaker
+      if (totalFailures >= MAX_TOTAL_FAILURES) {
+        console.error(`[startBatchAnalysis] ${MAX_TOTAL_FAILURES} total failures - stopping batch`);
+        toast.error(`Batch stopped: too many failures. Please check your connection and try again.`);
+        const remainingIndices = new Set(analyzableItems.slice(batchStart).map(a => a.index));
         setItems(prev => prev.map((it, idx) => 
-          idx >= i && it.status !== 'completed' ? { ...it, status: 'failed', error: 'Batch stopped due to consecutive failures' } : it
+          remainingIndices.has(idx) && it.status !== 'completed' ? { ...it, status: 'failed', error: 'Batch stopped due to failures' } : it
         ));
         break;
       }
 
-      setCurrentIndex(i);
-      
-      // Mark current item as analyzing and CLEAR any stale result from prior run
-      setItems(prev => prev.map((it, idx) => 
-        idx === i ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
-      ));
+      const batch = analyzableItems.slice(batchStart, batchStart + BATCH_CONCURRENCY);
+      setCurrentIndex(batch[0].index);
 
-      // Mark any continuation pages as analyzing too (also clear stale results)
-      if (item.continuationPages && item.continuationPages.length > 0) {
-        setItems(prev => prev.map(it => 
-          item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
+      // Mark all items in this batch as analyzing
+      const batchIndices = new Set(batch.map(b => b.index));
+      const batchContIds = new Set<string>();
+      batch.forEach(({ item }) => {
+        if (item.continuationPages) {
+          item.continuationPages.forEach(id => batchContIds.add(id));
+        }
+      });
+      setItems(prev => prev.map((it, idx) => {
+        if (batchIndices.has(idx)) {
+          return { ...it, status: 'analyzing', result: undefined, error: undefined };
+        }
+        if (batchContIds.has(it.id)) {
+          return { ...it, status: 'analyzing', result: undefined, error: undefined };
+        }
+        return it;
+      }));
+
+      // Run batch in parallel
+      const results = await Promise.all(
+        batch.map(({ item }) => 
+          analyzeItemWithContinuations(item, currentItems, rubricSteps, assessmentMode, promptText, useLearnedStyle)
+        )
+      );
+
+      // Apply results
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
+        const { item, index } = batch[j];
+
+        if (result.status === 'failed') {
+          totalFailures++;
+        }
+
+        // Update primary item
+        setItems(prev => prev.map((it, idx) => 
+          idx === index ? result : it
         ));
+
+        // Update continuation pages with same result
+        if (item.continuationPages && item.continuationPages.length > 0) {
+          setItems(prev => prev.map(it => 
+            item.continuationPages!.includes(it.id) ? { ...it, status: 'completed', result: result.result } : it
+          ));
+        }
       }
 
-      const result = await analyzeItemWithContinuations(item, currentItems, rubricSteps, assessmentMode, promptText, useLearnedStyle);
-
-      // Track consecutive failures for circuit breaker
-      if (result.status === 'failed') {
-        consecutiveFailures++;
-      } else {
-        consecutiveFailures = 0;
-      }
-
-      // Update primary item with result
-      setItems(prev => prev.map((it, idx) => 
-        idx === i ? result : it
-      ));
-
-      // Update continuation pages with the same result (they share the grade)
-      if (item.continuationPages && item.continuationPages.length > 0) {
-        setItems(prev => prev.map(it => 
-          item.continuationPages!.includes(it.id) ? { ...it, status: 'completed', result: result.result } : it
-        ));
-      }
-
-      // Small delay between items to avoid overwhelming the edge function
-      if (i < currentItems.length - 1) {
+      // Small delay between batches (not between individual items)
+      if (batchStart + BATCH_CONCURRENCY < analyzableItems.length) {
         await sleep(BATCH_ITEM_DELAY_MS);
       }
     }

@@ -31,6 +31,8 @@ export function useRemediationCompletions() {
       if (!user) return { count: 0, completions: [] };
 
       // Fetch unprocessed completions from sister app
+      // Note: sister_app_sync_log has no FK to students table,
+      // so we cannot use a Supabase join. Student names come from the data JSONB field.
       const { data: completions, error, count } = await supabase
         .from('sister_app_sync_log')
         .select(`
@@ -38,11 +40,7 @@ export function useRemediationCompletions() {
           student_id,
           action,
           data,
-          created_at,
-          students (
-            first_name,
-            last_name
-          )
+          created_at
         `, { count: 'exact' })
         .eq('teacher_id', user.id)
         .eq('processed', false)
@@ -61,9 +59,10 @@ export function useRemediationCompletions() {
         action: c.action,
         data: c.data as RemediationCompletion['data'],
         created_at: c.created_at,
-        student: c.students ? {
-          first_name: c.students.first_name,
-          last_name: c.students.last_name,
+        // Student name comes from the data JSONB field (no FK join available)
+        student: c.data?.student_name ? {
+          first_name: c.data.student_name.split(' ')[0] || '',
+          last_name: c.data.student_name.split(' ').slice(1).join(' ') || '',
         } : undefined,
       }));
 
