@@ -546,10 +546,11 @@ serve(async (req) => {
       standardCode, topicName, customRubric,
       gradeFloor: customGradeFloor, gradeFloorWithEffort: customGradeFloorWithEffort,
       useLearnedStyle, blankPageSettings,
+      preExtractedOCR,
     } = requestBody;
 
     const effectiveTeacherId = teacherId || authenticatedUserId;
-    if (!imageBase64) throw new Error('Image data is required');
+    if (!imageBase64 && !preExtractedOCR) throw new Error('Image data or OCR text is required');
 
     // ── Page type detection ──
     if (detectPageType) {
@@ -659,9 +660,67 @@ serve(async (req) => {
     }
 
     // ── BLANK PAGE EARLY EXIT — no separate AI call needed ──
-    // If blankPageSettings enabled AND we can detect blank from a quick AI check,
-    // do it as part of the main call (the AI prompt already checks for blank pages).
-    // We removed the redundant separate OCR call that was doubling token usage.
+
+    // ── TEXT-ONLY GRADING (when OCR was done externally via Google Vision) ──
+    if (preExtractedOCR && typeof preExtractedOCR === 'string' && preExtractedOCR.length > 0) {
+      console.log(`[TEXT_ONLY] Grading from pre-extracted OCR (${preExtractedOCR.length} chars)`);
+
+      const { system: sysPrompt, user: usrPrompt } = buildGradingPrompt({
+        rubricSteps, standardCode, topicName, customRubric, promptText,
+        answerGuideBase64: answerGuideBase64 ? 'yes' : undefined,
+        gradingStyleContext, teacherAnswerSampleContext, verificationContext,
+        feedbackVerbosity, gradeFloor, gradeFloorWithEffort,
+      });
+
+      // Replace the user prompt to include extracted text instead of image
+      const textOnlyPrompt = `${usrPrompt}\n\n--- STUDENT'S EXTRACTED WORK (from OCR) ---\n${preExtractedOCR}\n--- END OF STUDENT WORK ---`;
+
+      const messages: any[] = [
+        { role: 'system', content: sysPrompt },
+        { role: 'user', content: textOnlyPrompt },
+      ];
+
+      // If there's an answer guide image, still include it (teacher reference)
+      if (answerGuideBase64) {
+        messages[1] = {
+          role: 'user',
+          content: [
+            { type: 'text', text: textOnlyPrompt },
+            { type: 'text', text: '[TEACHER ANSWER GUIDE:]' },
+            formatImageForAI(answerGuideBase64),
+          ],
+        };
+      }
+
+      const analysisText = await callLovableAI(
+        messages,
+        LOVABLE_API_KEY, 'analyze-student-work-text', supabase, effectiveTeacherId,
+        'standard', analysisProvider
+      );
+
+      if (!analysisText) throw new Error('No analysis returned from AI');
+
+      const result = parseAnalysisResult(analysisText, rubricSteps, gradeFloor, gradeFloorWithEffort);
+
+      // Override OCR text with the pre-extracted version (more reliable)
+      result.ocrText = preExtractedOCR;
+
+      // Handle blank page
+      if (!result.studentWorkPresent && blankPageSettings?.enabled) {
+        const blankScore = blankPageSettings.score ?? gradeFloor;
+        result.grade = blankScore;
+        result.gradeJustification = blankPageSettings.comment ?? 'No work shown; score assigned per no-response policy.';
+        result.feedback = 'No student work detected. Re-scan with better lighting if incorrect.';
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        analysis: result,
+        rawAnalysis: analysisText,
+        blankPageDetected: !result.studentWorkPresent,
+        ocrSource: 'google-vision',
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     // ── Build prompt ──
     const { system: systemPrompt, user: userPromptText } = buildGradingPrompt({

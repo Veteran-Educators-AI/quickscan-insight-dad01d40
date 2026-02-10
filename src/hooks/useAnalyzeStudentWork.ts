@@ -236,12 +236,24 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
     setIsCancelled(false);
 
     try {
-      // --- Blank page pre-check (client-side, Phase 1: text-based) ---
-      // The edge function also does OCR and returns text, but we pass
-      // the setting so the server can skip LLM grading for blank pages.
+      // STEP 1: Extract text via Google Cloud Vision API (fast, ~1-2s)
+      let ocrText: string | null = null;
+      try {
+        const { data: ocrData, error: ocrError } = await supabase.functions.invoke('ocr-student-work', {
+          body: { imageBase64: imageDataUrl },
+        });
+        if (!ocrError && ocrData?.success && ocrData?.ocrText) {
+          ocrText = ocrData.ocrText;
+          console.log(`[OCR] Single scan: extracted ${ocrText!.length} chars in ${ocrData.latencyMs}ms`);
+        } else {
+          console.warn('[OCR] Single scan failed, falling back to image-based:', ocrError?.message || ocrData?.error);
+        }
+      } catch (ocrErr: any) {
+        console.warn('[OCR] Single scan exception, falling back:', ocrErr.message);
+      }
 
-      const { data, error: fnError } = await invokeAnalyzeWithRetry({
-        imageBase64: imageDataUrl,
+      // STEP 2: Build request — use OCR text if available, else image
+      const requestPayload: any = {
         questionId,
         rubricSteps,
         studentName,
@@ -251,13 +263,21 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
         standardCode,
         topicName,
         customRubric,
-        // Pass blank page settings so the server can short-circuit
         blankPageSettings: blankPageSettings.autoScoreBlankPages ? {
           enabled: true,
           score: blankPageSettings.blankPageScore,
           comment: blankPageSettings.blankPageComment,
         } : undefined,
-      });
+      };
+
+      if (ocrText && ocrText.length > 10) {
+        requestPayload.preExtractedOCR = ocrText;
+        requestPayload.imageBase64 = 'PLACEHOLDER';
+      } else {
+        requestPayload.imageBase64 = imageDataUrl;
+      }
+
+      const { data, error: fnError } = await invokeAnalyzeWithRetry(requestPayload);
 
       // Check if cancelled before processing result
       if (isCancelled) {

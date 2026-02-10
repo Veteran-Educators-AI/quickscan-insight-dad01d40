@@ -1994,16 +1994,52 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         }
       }
 
-      const { data, error } = await invokeWithRetry('analyze-student-work', {
-        imageBase64: item.imageDataUrl,
-        additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
+      // STEP 1: Extract text via Google Cloud Vision API (fast, ~1-2s)
+      let ocrText: string | null = null;
+      try {
+        const ocrBody: any = { imageBase64: item.imageDataUrl };
+        if (additionalImages.length > 0) {
+          ocrBody.additionalImages = additionalImages;
+        }
+        const { data: ocrData, error: ocrError } = await supabase.functions.invoke('ocr-student-work', {
+          body: ocrBody,
+        });
+        if (!ocrError && ocrData?.success && ocrData?.ocrText) {
+          ocrText = ocrData.ocrText;
+          console.log(`[OCR] Extracted ${ocrText!.length} chars in ${ocrData.latencyMs}ms`);
+        } else {
+          console.warn('[OCR] Failed, falling back to image-based grading:', ocrError?.message || ocrData?.error);
+        }
+      } catch (ocrErr: any) {
+        console.warn('[OCR] Exception, falling back:', ocrErr.message);
+      }
+
+      // STEP 2: Grade using extracted text (no image = much faster) or fall back to image
+      const requestBody: any = {
         rubricSteps,
         studentName: item.studentName,
         teacherId: user?.id,
         assessmentMode: assessmentMode || 'teacher',
         promptText,
         useLearnedStyle: useLearnedStyle || false,
-      }, { maxRetries: 2 });
+      };
+
+      if (ocrText && ocrText.length > 10) {
+        // OCR succeeded — send text only, no image
+        requestBody.preExtractedOCR = ocrText;
+        requestBody.imageBase64 = 'PLACEHOLDER'; // Required field but won't be used
+      } else {
+        // OCR failed or empty — fall back to sending image
+        requestBody.imageBase64 = item.imageDataUrl;
+        if (additionalImages.length > 0) {
+          requestBody.additionalImages = additionalImages;
+        }
+      }
+
+      const { data, error } = await invokeWithRetry('analyze-student-work', requestBody, {
+        maxRetries: 1,
+        compressImages: !ocrText || ocrText.length <= 10,
+      });
 
       if (error) {
         const errorMsg = handleApiError(error, 'Analysis');
