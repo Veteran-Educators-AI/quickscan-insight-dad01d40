@@ -408,25 +408,28 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     return null;
   });
 
-  // Persist items to localStorage when they change - use JSON comparison to avoid unnecessary writes
+  // Persist items to localStorage when they change - strip imageDataUrl to avoid QuotaExceededError
   useEffect(() => {
     try {
-      const serialized = items.length > 0 ? JSON.stringify(items) : '';
-      
-      // Only write if the data actually changed
-      if (serialized !== lastSavedItems.current) {
-        if (items.length > 0) {
-          console.log(`[BatchAnalysis] Persisting ${items.length} items to localStorage`);
+      if (items.length > 0) {
+        // Strip base64 image data before persisting - it's too large for localStorage (~5MB limit)
+        const itemsForStorage = items.map(item => ({
+          ...item,
+          imageDataUrl: '', // Don't persist images - they're too large
+        }));
+        const serialized = JSON.stringify(itemsForStorage);
+        if (serialized !== lastSavedItems.current) {
+          console.log(`[BatchAnalysis] Persisting ${items.length} items to localStorage (images stripped)`);
           localStorage.setItem(BATCH_STORAGE_KEY, serialized);
           lastSavedItems.current = serialized;
-        } else if (lastSavedItems.current !== '') {
-          // Only clear if we previously had data (prevents clearing on initial empty load)
-          console.log('[BatchAnalysis] Clearing items from localStorage');
-          localStorage.removeItem(BATCH_STORAGE_KEY);
-          localStorage.removeItem(BATCH_SUMMARY_KEY);
-          lastSavedItems.current = '';
-          lastSavedSummary.current = '';
         }
+      } else if (lastSavedItems.current !== '') {
+        // Only clear if we previously had data (prevents clearing on initial empty load)
+        console.log('[BatchAnalysis] Clearing items from localStorage');
+        localStorage.removeItem(BATCH_STORAGE_KEY);
+        localStorage.removeItem(BATCH_SUMMARY_KEY);
+        lastSavedItems.current = '';
+        lastSavedSummary.current = '';
       }
     } catch (e) {
       console.error('[BatchAnalysis] Failed to persist batch data:', e);
