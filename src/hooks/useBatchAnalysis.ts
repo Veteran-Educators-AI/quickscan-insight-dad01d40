@@ -2035,8 +2035,8 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
     // Get current items state for the async loop
     const currentItems = [...items];
-    let totalFailures = 0;
-    const MAX_TOTAL_FAILURES = 8;
+    let consecutiveFailures = 0;
+    const MAX_CONSECUTIVE_FAILURES = 4;
 
     // Separate items into analyzable (primary papers) and continuations
     const analyzableItems: { item: BatchItem; index: number }[] = [];
@@ -2054,10 +2054,10 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
     // Process papers in parallel batches of BATCH_CONCURRENCY
     for (let batchStart = 0; batchStart < analyzableItems.length; batchStart += BATCH_CONCURRENCY) {
-      // Circuit breaker
-      if (totalFailures >= MAX_TOTAL_FAILURES) {
-        console.error(`[startBatchAnalysis] ${MAX_TOTAL_FAILURES} total failures - stopping batch`);
-        toast.error(`Batch stopped: too many failures. Please check your connection and try again.`);
+      // Circuit breaker — stop only on consecutive failures (not scattered ones)
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        console.error(`[startBatchAnalysis] ${MAX_CONSECUTIVE_FAILURES} consecutive failures - stopping batch`);
+        toast.error(`Batch stopped: ${MAX_CONSECUTIVE_FAILURES} consecutive failures. Please check your connection and try again.`);
         const remainingIndices = new Set(analyzableItems.slice(batchStart).map(a => a.index));
         setItems(prev => prev.map((it, idx) => 
           remainingIndices.has(idx) && it.status !== 'completed' ? { ...it, status: 'failed', error: 'Batch stopped due to failures' } : it
@@ -2099,7 +2099,9 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         const { item, index } = batch[j];
 
         if (result.status === 'failed') {
-          totalFailures++;
+          consecutiveFailures++;
+        } else {
+          consecutiveFailures = 0;
         }
 
         // Update primary item
