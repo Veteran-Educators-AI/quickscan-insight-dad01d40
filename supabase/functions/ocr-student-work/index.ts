@@ -22,6 +22,8 @@ async function extractTextFromImage(imageBase64: string, apiKey: string): Promis
     raw = raw.split(',')[1] || raw;
   }
 
+  console.log('[OCR] Image size:', raw.length, 'chars');
+
   const response = await fetch(
     `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
     {
@@ -44,6 +46,7 @@ async function extractTextFromImage(imageBase64: string, apiKey: string): Promis
   if (!response.ok) {
     const errText = await response.text();
     console.error(`Vision API error: ${response.status}`, errText);
+    console.log('[OCR] Full error response:', errText);
     throw new Error(`Vision API error: ${response.status}`);
   }
 
