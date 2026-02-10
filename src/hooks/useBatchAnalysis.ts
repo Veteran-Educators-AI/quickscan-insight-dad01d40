@@ -2027,7 +2027,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         useLearnedStyle: useLearnedStyle || false,
       };
 
-      const ocrUsable = ocrText && ocrText.length > 10 && !ocrText.includes('[OCR FAILED');
+      const ocrUsable = ocrText && ocrText.length > 30 && !ocrText.includes('[OCR FAILED');
       if (ocrUsable) {
         // OCR succeeded — send text + image as fallback
         requestBody.preExtractedOCR = ocrText;

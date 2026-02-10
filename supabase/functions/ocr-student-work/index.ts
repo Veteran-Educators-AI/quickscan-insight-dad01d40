@@ -31,9 +31,11 @@ async function extractTextFromImage(imageBase64: string, apiKey: string): Promis
         requests: [{
           image: { content: raw },
           features: [
-            { type: 'TEXT_DETECTION' },
-            { type: 'DOCUMENT_TEXT_DETECTION' },
+            { type: 'DOCUMENT_TEXT_DETECTION', model: 'builtin/latest' },
           ],
+          imageContext: {
+            languageHints: ['en'],
+          },
         }],
       }),
     }
