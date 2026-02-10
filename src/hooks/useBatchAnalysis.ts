@@ -101,7 +101,7 @@ async function invokeWithRetry(
   options: InvokeWithRetryOptions = {}
 ): Promise<{ data: any; error: any }> {
   const {
-    maxRetries = 2,
+    maxRetries = 1,
     initialDelayMs = 1500,
     compressImages = true,
     imageKeys = ['imageBase64', 'image1Base64', 'image2Base64', 'answerGuideBase64', 'solutionBase64'],
@@ -1501,8 +1501,9 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     let continuations = 0;
     let lastNewPaperId: string | null = null;
 
+    // Separate already-marked items from those needing detection
+    const needsDetection: { item: BatchItem; index: number }[] = [];
     for (let i = 0; i < items.length; i++) {
-      // Skip items already marked
       if (items[i].pageType) {
         if (items[i].pageType === 'new') {
           lastNewPaperId = items[i].id;
@@ -1510,76 +1511,74 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         } else {
           continuations++;
         }
-        continue;
+      } else {
+        needsDetection.push({ item: items[i], index: i });
       }
+    }
 
-      setCurrentIndex(i);
-      
-      // Mark as identifying
+    // Process in parallel batches of BATCH_CONCURRENCY
+    for (let batchStart = 0; batchStart < needsDetection.length; batchStart += BATCH_CONCURRENCY) {
+      const batch = needsDetection.slice(batchStart, batchStart + BATCH_CONCURRENCY);
+      setCurrentIndex(batch[0].index);
+
+      // Mark batch as identifying
       setItems(prev => prev.map((item, idx) => 
-        idx === i ? { ...item, status: 'identifying' } : item
+        batch.some(b => b.index === idx) ? { ...item, status: 'identifying' } : item
       ));
 
-      try {
-        const { data, error } = await invokeWithRetry('analyze-student-work', {
-          imageBase64: items[i].imageDataUrl,
-          detectPageType: true,
-        }, { maxRetries: 2 });
+      const results = await Promise.all(batch.map(async ({ item, index: i }) => {
+        try {
+          const { data, error } = await invokeWithRetry('analyze-student-work', {
+            imageBase64: item.imageDataUrl,
+            detectPageType: true,
+          }, { maxRetries: 1 });
 
-        if (!error && data?.success && data?.pageType) {
+          return { i, item, data, error, exception: null };
+        } catch (err) {
+          return { i, item, data: null, error: null, exception: err };
+        }
+      }));
+
+      // Process results sequentially to maintain lastNewPaperId ordering
+      for (const { i, item, data, error, exception } of results) {
+        if (!exception && !error && data?.success && data?.pageType) {
           const isNew = data.pageType.isNewPaper && !data.pageType.isContinuation;
           
           if (isNew) {
             newPapers++;
-            lastNewPaperId = items[i].id;
-            setItems(prev => prev.map((item, idx) => 
-              idx === i ? { 
-                ...item, 
-                status: 'pending',
-                pageType: 'new',
-                continuationOf: undefined,
-              } : item
+            lastNewPaperId = item.id;
+            setItems(prev => prev.map((it, idx) => 
+              idx === i ? { ...it, status: 'pending', pageType: 'new', continuationOf: undefined } : it
             ));
           } else {
             continuations++;
-            // Link to the most recent "new" paper
             setItems(prev => {
-              const updated: BatchItem[] = prev.map((item, idx) => {
+              const updated: BatchItem[] = prev.map((it, idx) => {
                 if (idx === i) {
-                  return { 
-                    ...item, 
-                    status: 'pending' as const,
-                    pageType: 'continuation' as const,
-                    continuationOf: lastNewPaperId || undefined,
-                  };
+                  return { ...it, status: 'pending' as const, pageType: 'continuation' as const, continuationOf: lastNewPaperId || undefined };
                 }
-                // Add this as a continuation page to the primary paper
-                if (lastNewPaperId && item.id === lastNewPaperId) {
-                  return {
-                    ...item,
-                    continuationPages: [...(item.continuationPages || []), items[i].id],
-                  };
+                if (lastNewPaperId && it.id === lastNewPaperId) {
+                  return { ...it, continuationPages: [...(it.continuationPages || []), item.id] };
                 }
-                return item;
+                return it;
               });
               return updated;
             });
           }
         } else {
           // Default to new paper if detection fails
+          console.error('Page type detection failed:', exception || error);
           newPapers++;
-          lastNewPaperId = items[i].id;
-          setItems(prev => prev.map((item, idx) => 
-            idx === i ? { ...item, status: 'pending', pageType: 'new' } : item
+          lastNewPaperId = item.id;
+          setItems(prev => prev.map((it, idx) => 
+            idx === i ? { ...it, status: 'pending', pageType: 'new' } : it
           ));
         }
-      } catch (err) {
-        console.error('Page type detection failed:', err);
-        setItems(prev => prev.map((item, idx) => 
-          idx === i ? { ...item, status: 'pending', pageType: 'new' } : item
-        ));
-        newPapers++;
-        lastNewPaperId = items[i].id;
+      }
+
+      // Small delay between batches
+      if (batchStart + BATCH_CONCURRENCY < needsDetection.length) {
+        await sleep(BATCH_ITEM_DELAY_MS);
       }
     }
 
@@ -2157,76 +2156,80 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
     const currentItems = [...items];
 
+    // Build list of analyzable items (skip continuations)
+    const analyzableItems: { item: BatchItem; index: number }[] = [];
     for (let i = 0; i < currentItems.length; i++) {
       const item = currentItems[i];
-      
-      // Skip continuation pages
       if (item.pageType === 'continuation' && item.continuationOf) {
         setItems(prev => prev.map((it, idx) => 
           idx === i ? { ...it, status: 'completed' } : it
         ));
-        continue;
+      } else {
+        analyzableItems.push({ item, index: i });
       }
+    }
 
-      setCurrentIndex(i);
-      
-      // Mark current item as analyzing and CLEAR stale results from prior run
-      setItems(prev => prev.map((it, idx) => 
-        idx === i ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
-      ));
+    // Process papers in parallel batches of BATCH_CONCURRENCY
+    for (let batchStart = 0; batchStart < analyzableItems.length; batchStart += BATCH_CONCURRENCY) {
+      const batch = analyzableItems.slice(batchStart, batchStart + BATCH_CONCURRENCY);
+      setCurrentIndex(batch[0].index);
 
-      // Mark any continuation pages as analyzing too (also clear stale results)
-      if (item.continuationPages && item.continuationPages.length > 0) {
-        setItems(prev => prev.map(it => 
-          item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
-        ));
-      }
-
-      // Run multiple analyses
-      const analysisResults: AnalysisResult[] = [];
-      for (let run = 0; run < analysisCount; run++) {
-        const result = await analyzeItemWithContinuations(item, currentItems, rubricSteps, assessmentMode, promptText);
-        if (result.result) {
-          analysisResults.push(result.result);
+      // Mark batch as analyzing and clear stale results
+      setItems(prev => prev.map((it, idx) => {
+        const inBatch = batch.some(b => b.index === idx);
+        const isContinuation = batch.some(b => b.item.continuationPages?.includes(it.id));
+        if (inBatch || isContinuation) {
+          return { ...it, status: 'analyzing', result: undefined, error: undefined };
         }
-      }
+        return it;
+      }));
 
-      if (analysisResults.length === 0) {
-        // All analyses failed
+      await Promise.all(batch.map(async ({ item, index: i }) => {
+        // Run multiple analyses sequentially per paper
+        const analysisResults: AnalysisResult[] = [];
+        for (let run = 0; run < analysisCount; run++) {
+          const result = await analyzeItemWithContinuations(item, currentItems, rubricSteps, assessmentMode, promptText);
+          if (result.result) {
+            analysisResults.push(result.result);
+          }
+        }
+
+        if (analysisResults.length === 0) {
+          setItems(prev => prev.map((it, idx) => 
+            idx === i ? { ...it, status: 'failed', error: 'All analysis attempts failed' } : it
+          ));
+          return;
+        }
+
+        const grades = analysisResults.map(r => r.grade ?? r.totalScore.percentage);
+        const averageGrade = Math.round(grades.reduce((a, b) => a + b, 0) / grades.length);
+        const confidenceScore = calculateConfidence(grades);
+
+        const combinedResult: AnalysisResult = {
+          ...analysisResults[0],
+          grade: averageGrade,
+          gradeJustification: `Average of ${analysisCount} analyses (${grades.join('%, ')}%). ${analysisResults[0].gradeJustification || ''}`,
+          multiAnalysisGrades: grades,
+          multiAnalysisResults: analysisResults,
+          confidenceScore,
+        };
+
+        const curvedResult = applyGradeCurve(combinedResult);
+
         setItems(prev => prev.map((it, idx) => 
-          idx === i ? { ...it, status: 'failed', error: 'All analysis attempts failed' } : it
+          idx === i ? { ...it, status: 'completed', result: curvedResult } : it
         ));
-        continue;
-      }
 
-      // Calculate final grade by averaging
-      const grades = analysisResults.map(r => r.grade ?? r.totalScore.percentage);
-      const averageGrade = Math.round(grades.reduce((a, b) => a + b, 0) / grades.length);
-      const confidenceScore = calculateConfidence(grades);
+        if (item.continuationPages && item.continuationPages.length > 0) {
+          setItems(prev => prev.map(it => 
+            item.continuationPages!.includes(it.id) ? { ...it, status: 'completed', result: curvedResult } : it
+          ));
+        }
+      }));
 
-      // Combine the results - use first result as base but with averaged grade
-      const combinedResult: AnalysisResult = {
-        ...analysisResults[0],
-        grade: averageGrade,
-        gradeJustification: `Average of ${analysisCount} analyses (${grades.join('%, ')}%). ${analysisResults[0].gradeJustification || ''}`,
-        multiAnalysisGrades: grades,
-        multiAnalysisResults: analysisResults, // Store full breakdown of each run
-        confidenceScore,
-      };
-
-      // Apply grade curve if configured
-      const curvedResult = applyGradeCurve(combinedResult);
-
-      // Update primary item with combined result
-      setItems(prev => prev.map((it, idx) => 
-        idx === i ? { ...it, status: 'completed', result: curvedResult } : it
-      ));
-
-      // Update continuation pages with the same result
-      if (item.continuationPages && item.continuationPages.length > 0) {
-        setItems(prev => prev.map(it => 
-          item.continuationPages!.includes(it.id) ? { ...it, status: 'completed', result: curvedResult } : it
-        ));
+      // Small delay between batches
+      if (batchStart + BATCH_CONCURRENCY < analyzableItems.length) {
+        await sleep(BATCH_ITEM_DELAY_MS);
       }
     }
 
@@ -2292,79 +2295,87 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
     const currentItems = [...items];
 
+    // Build list of analyzable items (skip continuations)
+    const analyzableItems: { item: BatchItem; index: number }[] = [];
     for (let i = 0; i < currentItems.length; i++) {
       const item = currentItems[i];
-      
-      // Skip continuation pages - they'll be analyzed with their primary paper
       if (item.pageType === 'continuation' && item.continuationOf) {
         setItems(prev => prev.map((it, idx) => 
           idx === i ? { ...it, status: 'completed' } : it
         ));
-        continue;
+      } else {
+        analyzableItems.push({ item, index: i });
       }
+    }
 
-      setCurrentIndex(i);
-      
-      // Mark current item as analyzing and CLEAR stale results from prior run
-      setItems(prev => prev.map((it, idx) => 
-        idx === i ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
-      ));
+    // Process papers in parallel batches of BATCH_CONCURRENCY
+    for (let batchStart = 0; batchStart < analyzableItems.length; batchStart += BATCH_CONCURRENCY) {
+      const batch = analyzableItems.slice(batchStart, batchStart + BATCH_CONCURRENCY);
+      setCurrentIndex(batch[0].index);
 
-      // Mark any continuation pages as analyzing too (also clear stale results)
-      if (item.continuationPages && item.continuationPages.length > 0) {
-        setItems(prev => prev.map(it => 
-          item.continuationPages!.includes(it.id) ? { ...it, status: 'analyzing', result: undefined, error: undefined } : it
-        ));
-      }
+      // Mark batch as analyzing and clear stale results
+      setItems(prev => prev.map((it, idx) => {
+        const inBatch = batch.some(b => b.index === idx);
+        const isContinuation = batch.some(b => b.item.continuationPages?.includes(it.id));
+        if (inBatch || isContinuation) {
+          return { ...it, status: 'analyzing', result: undefined, error: undefined };
+        }
+        return it;
+      }));
 
-      try {
-        // Get all continuation page images
-        const additionalImages: string[] = [];
-        if (item.continuationPages && item.continuationPages.length > 0) {
-          for (const contId of item.continuationPages) {
-            const contItem = currentItems.find(it => it.id === contId);
-            if (contItem) {
-              additionalImages.push(contItem.imageDataUrl);
+      await Promise.all(batch.map(async ({ item, index: i }) => {
+        try {
+          const additionalImages: string[] = [];
+          if (item.continuationPages && item.continuationPages.length > 0) {
+            for (const contId of item.continuationPages) {
+              const contItem = currentItems.find(it => it.id === contId);
+              if (contItem) {
+                additionalImages.push(contItem.imageDataUrl);
+              }
             }
           }
-        }
 
-        const { data, error } = await invokeWithRetry('analyze-student-work', {
-          imageBase64: item.imageDataUrl,
-          additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
-          answerGuideBase64: answerGuideImage,
-          rubricSteps,
-          studentName: item.studentName,
-          teacherId: user?.id,
-          assessmentMode: 'teacher-guided',
-        }, { maxRetries: 3 });
+          const { data, error } = await invokeWithRetry('analyze-student-work', {
+            imageBase64: item.imageDataUrl,
+            additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
+            answerGuideBase64: answerGuideImage,
+            rubricSteps,
+            studentName: item.studentName,
+            teacherId: user?.id,
+            assessmentMode: 'teacher-guided',
+          }, { maxRetries: 1 });
 
-        if (error) {
-          const errorMsg = handleApiError(error, 'Analysis');
-          throw new Error(errorMsg);
-        }
-        if (data?.error) {
-          const errorMsg = handleApiError({ message: data.error }, 'Analysis');
-          throw new Error(errorMsg);
-        }
-        if (!data?.success || !data?.analysis) throw new Error('Invalid response from analysis');
+          if (error) {
+            const errorMsg = handleApiError(error, 'Analysis');
+            throw new Error(errorMsg);
+          }
+          if (data?.error) {
+            const errorMsg = handleApiError({ message: data.error }, 'Analysis');
+            throw new Error(errorMsg);
+          }
+          if (!data?.success || !data?.analysis) throw new Error('Invalid response from analysis');
 
-        const curvedAnalysis = applyGradeCurve(data.analysis);
+          const curvedAnalysis = applyGradeCurve(data.analysis);
 
-        setItems(prev => prev.map((it, idx) => 
-          idx === i ? { ...it, status: 'completed', result: curvedAnalysis, rawAnalysis: data.rawAnalysis } : it
-        ));
+          setItems(prev => prev.map((it, idx) => 
+            idx === i ? { ...it, status: 'completed', result: curvedAnalysis, rawAnalysis: data.rawAnalysis } : it
+          ));
 
-        // Update continuation pages with the same result
-        if (item.continuationPages && item.continuationPages.length > 0) {
-          setItems(prev => prev.map(it => 
-            item.continuationPages!.includes(it.id) ? { ...it, status: 'completed', result: curvedAnalysis } : it
+          if (item.continuationPages && item.continuationPages.length > 0) {
+            setItems(prev => prev.map(it => 
+              item.continuationPages!.includes(it.id) ? { ...it, status: 'completed', result: curvedAnalysis } : it
+            ));
+          }
+        } catch (err) {
+          setItems(prev => prev.map((it, idx) => 
+            idx === i ? { ...it, status: 'failed', error: err instanceof Error ? err.message : 'Analysis failed' } : it
           ));
         }
-      } catch (err) {
-        setItems(prev => prev.map((it, idx) => 
-          idx === i ? { ...it, status: 'failed', error: err instanceof Error ? err.message : 'Analysis failed' } : it
-        ));
+      }));
+
+      // Small delay between batches
+      if (batchStart + BATCH_CONCURRENCY < analyzableItems.length) {
+        await sleep(BATCH_ITEM_DELAY_MS);
       }
     }
 

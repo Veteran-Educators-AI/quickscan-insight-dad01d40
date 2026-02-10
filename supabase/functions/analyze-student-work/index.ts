@@ -66,7 +66,7 @@ async function callLovableAI(
   const tokenParams = isOpenAI ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens };
   const requestBody = JSON.stringify({ model, messages, ...tokenParams });
 
-  const MAX_RETRIES = 2;
+  const MAX_RETRIES = 1;
   let lastError: any = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
