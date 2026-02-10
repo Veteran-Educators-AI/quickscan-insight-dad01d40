@@ -50,6 +50,7 @@ import { preprocessImage, preprocessBatch, defaultSettings, PreprocessingSetting
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
+import { useScanSessionPersistence } from '@/hooks/useScanSessionPersistence';
 
 type ScanState = 'idle' | 'camera' | 'preview' | 'choose-method' | 'upload-solution' | 'analyzed' | 'manual-scoring' | 'analyze-saved' | 'comparison';
 type ScanMode = 'single' | 'batch' | 'saved' | 'scanner';
@@ -112,7 +113,8 @@ export default function Scan() {
   const [showStudentPicker, setShowStudentPicker] = useState(false);
   const { students: singleScanStudents } = useClassStudents(singleScanClassId);
 
-  const { analyze, analyzeWithTeacherGuide, runBothAnalyses, compareWithSolution, cancelAnalysis, isAnalyzing, isComparing, error, result, teacherGuidedResult, rawAnalysis, comparisonResult } = useAnalyzeStudentWork();
+  const { analyze, analyzeWithTeacherGuide, runBothAnalyses, compareWithSolution, cancelAnalysis, isAnalyzing, isComparing, error, result, setResult, teacherGuidedResult, setTeacherGuidedResult, rawAnalysis, setRawAnalysis, comparisonResult } = useAnalyzeStudentWork();
+  const { saveSession, loadSession, clearSession } = useScanSessionPersistence();
   const batch = useBatchAnalysis();
   const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans();
   const { saveResults, saveMultiQuestionResults, isSaving, syncStatus, resetSyncStatus } = useSaveAnalysisResults();
@@ -205,6 +207,59 @@ export default function Scan() {
     { step_number: 3, description: 'Shows clear work and reasoning', points: 2 },
     { step_number: 4, description: 'Arrives at correct answer', points: 1 },
   ];
+
+  // ── Restore single scan session from localStorage on mount ──
+  const sessionRestoredRef = useRef(false);
+  useEffect(() => {
+    if (sessionRestoredRef.current) return;
+    sessionRestoredRef.current = true;
+    
+    const session = loadSession();
+    if (!session) return;
+    
+    // Restore state
+    setScanState(session.scanState as ScanState);
+    setFinalImage(session.finalImage);
+    setSingleScanClassId(session.singleScanClassId);
+    setSingleScanStudentId(session.singleScanStudentId);
+    setSelectedQuestionIds(session.selectedQuestionIds || []);
+    setGradingMode(session.gradingMode as GradingMode);
+    setResultsSaved(session.resultsSaved || false);
+    setAnswerGuideImage(session.answerGuideImage);
+    setMultiQuestionResults(session.multiQuestionResults || {});
+    setCurrentQuestionIndex(session.currentQuestionIndex || 0);
+    
+    // Restore analysis results into the hook
+    if (session.result) setResult(session.result);
+    if (session.teacherGuidedResult) setTeacherGuidedResult(session.teacherGuidedResult);
+    if (session.rawAnalysis) setRawAnalysis(session.rawAnalysis);
+    
+    toast.info('Previous scan session restored. Click "Start Over" to clear.', {
+      duration: 4000,
+    });
+  }, [loadSession, setResult, setTeacherGuidedResult, setRawAnalysis]);
+
+  // ── Auto-save single scan session when meaningful state changes ──
+  useEffect(() => {
+    if (!['choose-method', 'analyzed', 'comparison', 'manual-scoring', 'upload-solution'].includes(scanState)) {
+      return;
+    }
+    saveSession({
+      scanState,
+      finalImage,
+      singleScanClassId,
+      singleScanStudentId,
+      selectedQuestionIds,
+      gradingMode,
+      resultsSaved,
+      result,
+      teacherGuidedResult,
+      rawAnalysis,
+      answerGuideImage,
+      multiQuestionResults,
+      currentQuestionIndex,
+    });
+  }, [scanState, finalImage, singleScanClassId, singleScanStudentId, selectedQuestionIds, gradingMode, resultsSaved, result, teacherGuidedResult, rawAnalysis, answerGuideImage, multiQuestionResults, currentQuestionIndex, saveSession]);
 
   const handleCameraCapture = useCallback(async (imageDataUrl: string) => {
     // Compress image on capture to prevent memory issues on mobile
@@ -1182,6 +1237,7 @@ export default function Scan() {
     clearQRResult();
     clearIdentification();
     resetSyncStatus();
+    clearSession();
   };
 
   // Handle analyzing a saved scan with multiple questions

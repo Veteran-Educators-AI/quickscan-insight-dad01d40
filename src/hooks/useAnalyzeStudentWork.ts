@@ -179,9 +179,12 @@ interface UseAnalyzeStudentWorkReturn {
   isComparing: boolean;
   error: string | null;
   result: AnalysisResult | null;
+  setResult: React.Dispatch<React.SetStateAction<AnalysisResult | null>>;
   teacherGuidedResult: AnalysisResult | null;
+  setTeacherGuidedResult: React.Dispatch<React.SetStateAction<AnalysisResult | null>>;
   comparisonResult: ComparisonResult | null;
   rawAnalysis: string | null;
+  setRawAnalysis: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
@@ -507,8 +510,11 @@ export function useAnalyzeStudentWork(): UseAnalyzeStudentWorkReturn {
     isComparing, 
     error, 
     result, 
+    setResult,
     teacherGuidedResult,
+    setTeacherGuidedResult,
     comparisonResult, 
-    rawAnalysis 
+    rawAnalysis,
+    setRawAnalysis,
   };
 }
