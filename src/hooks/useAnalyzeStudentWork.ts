@@ -31,7 +31,7 @@ async function compressForEdgeFunction(imageDataUrl: string): Promise<string> {
 
 async function invokeAnalyzeWithRetry(
   body: Record<string, any>,
-  maxRetries = 3
+  maxRetries = 1
 ): Promise<{ data: any; error: any }> {
   // Compress images in body
   const processedBody = { ...body };
