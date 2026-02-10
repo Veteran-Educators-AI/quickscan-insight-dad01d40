@@ -282,13 +282,13 @@ export function AIDetectionSettings() {
               </SelectItem>
               <SelectItem value="gpt4o-mini">
                 <div className="flex flex-col items-start">
-                  <span className="font-medium">GPT-4o Mini</span>
-                  <span className="text-xs text-muted-foreground">Better handwriting reading (~$0.02/scan)</span>
+                  <span className="font-medium">GPT-5 Mini</span>
+                  <span className="text-xs text-muted-foreground">Better handwriting reading, similar cost (~$0.02/scan)</span>
                 </div>
               </SelectItem>
               <SelectItem value="gpt4o">
                 <div className="flex flex-col items-start">
-                  <span className="font-medium">GPT-4o</span>
+                  <span className="font-medium">GPT-5</span>
                   <span className="text-xs text-muted-foreground">Best handwriting &amp; analysis quality (~$0.08/scan)</span>
                 </div>
               </SelectItem>
@@ -296,9 +296,9 @@ export function AIDetectionSettings() {
           </Select>
           <p className="text-xs text-muted-foreground">
             {settings.analysis_provider === 'gpt4o' 
-              ? 'GPT-4o provides the best handwriting recognition and most detailed educational analysis. Recommended for difficult-to-read student work.'
+              ? 'GPT-5 provides the best handwriting recognition and most detailed educational analysis. Recommended for difficult-to-read student work.'
               : settings.analysis_provider === 'gpt4o-mini'
-              ? 'GPT-4o Mini offers improved handwriting reading over Gemini at a similar cost. Good balance of quality and affordability.'
+              ? 'GPT-5 Mini offers improved handwriting reading over Gemini at a similar cost. Good balance of quality and affordability.'
               : 'Gemini Flash is fast and affordable. Works well for clearly written student work.'}
           </p>
         </div>
