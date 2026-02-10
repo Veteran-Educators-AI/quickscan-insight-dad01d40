@@ -198,12 +198,13 @@ export function GradedPapersGallery({
   const calculateItemGrade = (item: BatchItem) => {
     if (!item.result) return 0;
     const result = item.result as ExtendedAnalysisResult;
-    const hasAnyPoints = item.result.totalScore.earned > 0;
-    const hasAnyWork = item.result.ocrText?.trim().length > 10 || hasAnyPoints;
+    const totalScore = result?.totalScore ?? { earned: 0, possible: 1, percentage: 0 };
+    const hasAnyPoints = totalScore.earned > 0;
+    const hasAnyWork = (result?.ocrText?.trim().length ?? 0) > 10 || hasAnyPoints;
     return calculateGrade(
-      item.result.totalScore.percentage, 
+      totalScore.percentage, 
       hasAnyWork, 
-      result.regentsScore
+      result?.regentsScore
     );
   };
 
@@ -287,8 +288,8 @@ export function GradedPapersGallery({
                         className="w-full h-full object-cover"
                       />
                       {/* Score overlay */}
-                      <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-white text-sm font-bold ${getScoreColor(item.result!.totalScore.percentage)}`}>
-                        {item.result!.totalScore.percentage}%
+                      <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-white text-sm font-bold ${getScoreColor(item.result?.totalScore?.percentage ?? 0)}`}>
+                        {item.result?.totalScore?.percentage ?? 0}%
                       </div>
                       {/* Notes indicator */}
                       {hasNotes && (
@@ -378,7 +379,7 @@ export function GradedPapersGallery({
                               {getLetterGrade(calculateItemGrade(selectedItem))}
                             </Badge>
                             <span className="text-lg text-muted-foreground">
-                              ({selectedItem.result.totalScore.percentage}%)
+                              ({selectedItem.result?.totalScore?.percentage ?? 0}%)
                             </span>
                           </div>
                           <div className="mt-2">
@@ -432,12 +433,12 @@ export function GradedPapersGallery({
                   </Card>
 
                   {/* Rubric Breakdown */}
-                  {selectedItem.result.rubricScores.length > 0 && (
+                  {(selectedItem.result?.rubricScores?.length ?? 0) > 0 && (
                     <Card>
                       <CardContent className="p-4">
                         <p className="font-medium mb-3">Rubric Breakdown</p>
                         <div className="space-y-2">
-                          {selectedItem.result.rubricScores.map((score, i) => (
+                          {(selectedItem.result?.rubricScores ?? []).map((score, i) => (
                             <div key={i} className="flex items-start gap-2 text-sm">
                               {score.score >= score.maxScore ? (
                                 <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
@@ -463,8 +464,8 @@ export function GradedPapersGallery({
                   )}
 
                   {/* Misconceptions - Side-by-side comparison */}
-                  {selectedItem.result.misconceptions.length > 0 && (
-                    <MisconceptionComparison misconceptions={selectedItem.result.misconceptions} />
+                  {(selectedItem.result?.misconceptions?.length ?? 0) > 0 && (
+                    <MisconceptionComparison misconceptions={selectedItem.result?.misconceptions ?? []} />
                   )}
 
                   {/* Feedback */}

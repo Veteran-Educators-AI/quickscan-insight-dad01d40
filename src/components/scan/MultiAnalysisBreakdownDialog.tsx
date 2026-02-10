@@ -29,8 +29,8 @@ export function MultiAnalysisBreakdownDialog({
   }
 
   const { multiAnalysisResults, multiAnalysisGrades, confidenceScore, grade, selectedRunIndex } = result;
-  const grades = multiAnalysisGrades || multiAnalysisResults.map(r => r.grade ?? r.totalScore.percentage);
-  const averageGrade = Math.round(grades.reduce((a, b) => a + b, 0) / grades.length);
+  const grades = multiAnalysisGrades || multiAnalysisResults.map(r => r.grade ?? r.totalScore?.percentage ?? 0);
+  const averageGrade = grades.length > 0 ? Math.round(grades.reduce((a, b) => a + b, 0) / grades.length) : 0;
   const isUsingAverage = selectedRunIndex === undefined;
   const maxGrade = Math.max(...grades);
   const minGrade = Math.min(...grades);
