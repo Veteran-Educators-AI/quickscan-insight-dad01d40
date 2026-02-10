@@ -144,29 +144,41 @@ export function AnalysisResults({
     onGradeOverride?.(newGrade, newJustification);
   };
 
+  // Safely default all result fields that may be missing from edge function
+  const totalScore = result?.totalScore ?? { earned: 0, possible: 1, percentage: 0 };
+  const misconceptions = result?.misconceptions ?? [];
+  const rubricScores = result?.rubricScores ?? [];
+  const ocrText = result?.ocrText ?? '';
+  const approachAnalysis = result?.approachAnalysis ?? '';
+  const strengthsAnalysis = result?.strengthsAnalysis ?? [];
+  const areasForImprovement = result?.areasForImprovement ?? [];
+  const whatStudentDidCorrectly = result?.whatStudentDidCorrectly ?? '';
+  const whatStudentGotWrong = result?.whatStudentGotWrong ?? '';
+  const feedback = result?.feedback ?? '';
+
   // Calculate grade using teacher's grade floor settings
   // VERY lenient check - if there's ANY content, consider it "work"
-  const hasAnyPoints = result.totalScore.earned > 0;
-  const hasOcrContent = result.ocrText?.trim().length > 5;
-  const hasRegentsScore = (result.regentsScore ?? 0) >= 1;
+  const hasAnyPoints = totalScore.earned > 0;
+  const hasOcrContent = ocrText.trim().length > 5;
+  const hasRegentsScore = (result?.regentsScore ?? 0) >= 1;
   const hasAnyWork = hasAnyPoints || hasOcrContent || hasRegentsScore;
   
   // Use teacher-configured grade floors - enforce strictly
   const minGrade = hasAnyWork ? gradeFloorWithEffort : gradeFloor;
   const calculatedGrade = calculateGrade(
-    result.totalScore.percentage, 
+    totalScore.percentage, 
     hasAnyWork, 
-    result.regentsScore
+    result?.regentsScore
   );
   
   // Get AI grade, ensuring it respects the floor
-  const aiGrade = result.grade ?? calculatedGrade;
+  const aiGrade = result?.grade ?? calculatedGrade;
   const flooredAiGrade = Math.max(minGrade, aiGrade);
   
   // Final grade: use override if present, otherwise use floored AI grade
   // CRITICAL: Never show 0 - always apply minimum floor
   const grade = overriddenGrade?.grade ?? Math.max(minGrade, flooredAiGrade);
-  const gradeJustification = overriddenGrade?.justification ?? result.gradeJustification;
+  const gradeJustification = overriddenGrade?.justification ?? result?.gradeJustification;
   const isOverridden = overriddenGrade !== null;
   const gradeBadge = getGradeBadge(grade);
 
@@ -279,8 +291,8 @@ export function AnalysisResults({
               <AIAnalysisCritiqueDialog
                 aiGrade={grade}
                 aiJustification={gradeJustification}
-                aiMisconceptions={result.misconceptions}
-                aiFeedback={result.feedback}
+                aiMisconceptions={misconceptions}
+                aiFeedback={feedback}
                 topicName={topicName || 'Unknown Topic'}
                 studentId={studentId || undefined}
                 attemptId={attemptId || undefined}
@@ -307,13 +319,13 @@ export function AnalysisResults({
           </CardHeader>
           <CardContent>
             <p className="text-sm whitespace-pre-wrap">
-              {result.whatStudentDidCorrectly || result.approachAnalysis || 'No analysis available'}
+              {whatStudentDidCorrectly || approachAnalysis || 'No analysis available'}
             </p>
           </CardContent>
         </Card>
       )}
 
-      {!result.noResponse && (result.whatStudentGotWrong || (result.misconceptions && result.misconceptions.length > 0)) && (
+      {!result?.noResponse && (whatStudentGotWrong || misconceptions.length > 0) && (
         <Card className="border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
@@ -322,12 +334,12 @@ export function AnalysisResults({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {result.whatStudentGotWrong && (
-              <p className="text-sm whitespace-pre-wrap">{result.whatStudentGotWrong}</p>
+            {whatStudentGotWrong && (
+              <p className="text-sm whitespace-pre-wrap">{whatStudentGotWrong}</p>
             )}
-            {!result.whatStudentGotWrong && result.misconceptions.length > 0 && (
+            {!whatStudentGotWrong && misconceptions.length > 0 && (
               <ul className="text-sm space-y-1 list-disc list-inside">
-                {result.misconceptions.map((m, i) => (
+                {misconceptions.map((m, i) => (
                   <li key={i}>{m}</li>
                 ))}
               </ul>
@@ -373,7 +385,7 @@ export function AnalysisResults({
       )}
 
       {/* Detailed Analysis: What Student Did Right */}
-      {result.strengthsAnalysis && result.strengthsAnalysis.length > 0 && (
+      {strengthsAnalysis.length > 0 && (
         <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
@@ -382,7 +394,7 @@ export function AnalysisResults({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {result.strengthsAnalysis.map((strength, i) => (
+            {strengthsAnalysis.map((strength, i) => (
               <div key={i} className="flex items-start gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                 <p className="text-sm">{strength}</p>
@@ -393,7 +405,7 @@ export function AnalysisResults({
       )}
 
       {/* Detailed Analysis: Areas for Improvement */}
-      {result.areasForImprovement && result.areasForImprovement.length > 0 && (
+      {areasForImprovement.length > 0 && (
         <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
@@ -402,7 +414,7 @@ export function AnalysisResults({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {result.areasForImprovement.map((area, i) => (
+            {areasForImprovement.map((area, i) => (
               <div key={i} className="flex items-start gap-2">
                 <AlertTriangle className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
                 <p className="text-sm">{area}</p>
@@ -413,7 +425,7 @@ export function AnalysisResults({
       )}
 
       {/* Approach Analysis - Now visible by default (not hidden in accordion) */}
-      {result.approachAnalysis && result.approachAnalysis !== 'No student work to analyze' && (
+      {approachAnalysis && approachAnalysis !== 'No student work to analyze' && (
         <Card className="border-purple-200 bg-purple-50/50 dark:bg-purple-950/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
@@ -422,7 +434,7 @@ export function AnalysisResults({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm">{result.approachAnalysis}</p>
+            <p className="text-sm">{approachAnalysis}</p>
           </CardContent>
         </Card>
       )}
@@ -440,9 +452,9 @@ export function AnalysisResults({
       )}
 
       {/* OCR Correction Panel - Allow teachers to fix misread numbers/text */}
-      {result.ocrText && (
+      {ocrText && (
         <OCRCorrectionPanel
-          ocrText={result.ocrText}
+          ocrText={ocrText}
           attemptId={attemptId || undefined}
           studentId={studentId || undefined}
           onOCRCorrected={(corrections) => {
@@ -454,19 +466,19 @@ export function AnalysisResults({
       {/* Teacher Interpretation Panel - Teach AI recognition patterns */}
       <TeacherInterpretationPanel
         topicName={topicName || undefined}
-        ocrText={result.ocrText}
+        ocrText={ocrText}
         onInterpretationSaved={() => {
           console.log('Interpretation saved for AI training');
         }}
       />
 
-      {result.rubricScores.length > 0 && (
+      {rubricScores.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Rubric Breakdown</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {result.rubricScores.map((score, i) => (
+            {rubricScores.map((score, i) => (
               <div key={i} className="flex items-start gap-3">
                 {score.score >= score.maxScore ? (
                   <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
@@ -493,19 +505,19 @@ export function AnalysisResults({
       )}
 
       {/* Misconceptions - Side-by-side comparison view */}
-      {result.misconceptions.length > 0 && (
-        <MisconceptionComparison misconceptions={result.misconceptions} />
+      {misconceptions.length > 0 && (
+        <MisconceptionComparison misconceptions={misconceptions} />
       )}
 
       {/* Remediation Actions - Generate practice questions based on misconceptions */}
-      {result.misconceptions.length > 0 && (
+      {misconceptions.length > 0 && (
         <RemediationActions
-          misconceptions={result.misconceptions}
-          problemContext={result.problemIdentified}
+          misconceptions={misconceptions}
+          problemContext={result?.problemIdentified}
           studentName={studentName || undefined}
           studentId={studentId || undefined}
           classId={classId || undefined}
-          topicName={topicName || result.problemIdentified || undefined}
+          topicName={topicName || result?.problemIdentified || undefined}
           onPushToStudentApp={onPushRemediationToApp}
           onGenerateWorksheet={onGenerateRemediationWorksheet}
         />
@@ -513,19 +525,19 @@ export function AnalysisResults({
 
       {/* Recommended Next Steps - Worksheets & Topics for Sister App */}
       <RecommendedNextSteps
-        misconceptions={result.misconceptions}
-        problemContext={result.problemIdentified}
-        nysStandard={result.nysStandard}
-        topicName={topicName || result.problemIdentified}
+        misconceptions={misconceptions}
+        problemContext={result?.problemIdentified}
+        nysStandard={result?.nysStandard}
+        topicName={topicName || result?.problemIdentified}
         studentId={studentId || undefined}
         studentName={studentName || undefined}
         classId={classId || undefined}
         grade={grade}
-        regentsScore={result.regentsScore}
+        regentsScore={result?.regentsScore}
       />
 
       {/* Feedback */}
-      {result.feedback && (
+      {feedback && (
         <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
@@ -534,18 +546,18 @@ export function AnalysisResults({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm">{result.feedback}</p>
+            <p className="text-sm">{feedback}</p>
           </CardContent>
         </Card>
       )}
 
       {/* AI Work Detection */}
-      {result.ocrText && result.ocrText.length > 20 && (
+      {ocrText && ocrText.length > 20 && (
         <AIWorkDetector 
-          text={result.ocrText} 
+          text={ocrText} 
           studentName={studentName || undefined}
           studentId={studentId || undefined}
-          questionContext={result.problemIdentified}
+          questionContext={result?.problemIdentified}
         />
       )}
 
@@ -555,7 +567,7 @@ export function AnalysisResults({
           <AccordionTrigger className="text-sm">Extracted Text (OCR)</AccordionTrigger>
           <AccordionContent>
             <div className="bg-muted rounded-md p-3 text-sm font-mono whitespace-pre-wrap">
-              {result.ocrText || 'No text extracted'}
+              {ocrText || 'No text extracted'}
             </div>
           </AccordionContent>
         </AccordionItem>
@@ -563,16 +575,16 @@ export function AnalysisResults({
         <AccordionItem value="problem">
           <AccordionTrigger className="text-sm">Problem Identified</AccordionTrigger>
           <AccordionContent>
-            <p className="text-sm">{result.problemIdentified || 'Not identified'}</p>
+            <p className="text-sm">{result?.problemIdentified || 'Not identified'}</p>
           </AccordionContent>
         </AccordionItem>
 
         {/* Approach Analysis moved to prominent card above - only show in accordion if card didn't render */}
-        {(!result.approachAnalysis || result.approachAnalysis === 'No student work to analyze') && (
+        {(!approachAnalysis || approachAnalysis === 'No student work to analyze') && (
           <AccordionItem value="approach">
             <AccordionTrigger className="text-sm">Approach Analysis</AccordionTrigger>
             <AccordionContent>
-              <p className="text-sm">{result.approachAnalysis || 'No analysis available'}</p>
+              <p className="text-sm">{approachAnalysis || 'No analysis available'}</p>
             </AccordionContent>
           </AccordionItem>
         )}
