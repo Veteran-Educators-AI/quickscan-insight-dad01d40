@@ -2024,10 +2024,11 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         useLearnedStyle: useLearnedStyle || false,
       };
 
-      if (ocrText && ocrText.length > 10) {
-        // OCR succeeded — send text only, no image
+      const ocrUsable = ocrText && ocrText.length > 10 && !ocrText.includes('[OCR FAILED');
+      if (ocrUsable) {
+        // OCR succeeded — send text + image as fallback
         requestBody.preExtractedOCR = ocrText;
-        requestBody.imageBase64 = 'PLACEHOLDER'; // Required field but won't be used
+        requestBody.imageBase64 = item.imageDataUrl; // Always include real image
       } else {
         // OCR failed or empty — fall back to sending image
         requestBody.imageBase64 = item.imageDataUrl;
@@ -2038,7 +2039,6 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
       const { data, error } = await invokeWithRetry('analyze-student-work', requestBody, {
         maxRetries: 1,
-        compressImages: !ocrText || ocrText.length <= 10,
       });
 
       if (error) {
