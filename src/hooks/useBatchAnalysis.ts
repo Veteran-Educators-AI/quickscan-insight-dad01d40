@@ -198,10 +198,10 @@ async function invokeWithRetry(
 }
 
 /** Delay between sequential batch items to avoid overwhelming the edge function */
-const BATCH_ITEM_DELAY_MS = 200;
+const BATCH_ITEM_DELAY_MS = 1500;
 
 /** Number of papers to analyze concurrently in batch mode */
-const BATCH_CONCURRENCY = 4;
+const BATCH_CONCURRENCY = 2;
 
 const BATCH_STORAGE_KEY = 'scan-genius-batch-data';
 const BATCH_SUMMARY_KEY = 'scan-genius-batch-summary';
@@ -2036,7 +2036,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     // Get current items state for the async loop
     const currentItems = [...items];
     let consecutiveFailures = 0;
-    const MAX_CONSECUTIVE_FAILURES = 4;
+    const MAX_CONSECUTIVE_FAILURES = 15;
 
     // Separate items into analyzable (primary papers) and continuations
     const analyzableItems: { item: BatchItem; index: number }[] = [];
