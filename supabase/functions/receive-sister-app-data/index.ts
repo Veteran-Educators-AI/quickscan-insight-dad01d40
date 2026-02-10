@@ -280,38 +280,9 @@ serve(async (req) => {
     // Search the teacher_api_keys table for a matching hash.
     // If found, we get the teacher_id to know whose account this key belongs to.
     // -------------------------------------------------------------------------
-    // Try api_key_hash first (new column name), fall back to key_hash (original column name)
-    let keyRecord: any = null;
-    let keyError: any = null;
-
-    const { data: keyData1, error: keyErr1 } = await supabaseAdmin
-      .from('teacher_api_keys')
-      .select('id, teacher_id, is_active')
-      .eq('api_key_hash', apiKeyHash)
-      .maybeSingle();
-
-    if (keyData1) {
-      keyRecord = keyData1;
-    } else {
-      // Fallback: try original column name 'key_hash'
-      const { data: keyData2, error: keyErr2 } = await supabaseAdmin
-        .from('teacher_api_keys')
-        .select('id, teacher_id, is_active')
-        .eq('key_hash', apiKeyHash)
-        .maybeSingle();
-      keyRecord = keyData2;
-      keyError = keyErr2;
-    }
-
-    // If no matching key found, reject the request
-    if (keyError || !keyRecord) {
-      console.error('API key not found:', keyError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Invalid API key' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
+    // Check if this is an internal system-to-system call
+    const isInternalKey = apiKey === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
     let teacherIdFromKey: string | null = null;
 
     if (isInternalKey) {
@@ -464,7 +435,7 @@ serve(async (req) => {
         // Log each participant's results (non-fatal if logging fails)
         try {
           await supabaseAdmin.from('sister_app_sync_log').insert({
-            teacher_id: keyRecord.teacher_id,
+            teacher_id: teacherId,
             student_id: participant.student_id,
             action: 'live_session_participation',
             data: {
@@ -489,7 +460,14 @@ serve(async (req) => {
 
         // If participated, create a grade entry for tracking
         if (participant.participated && participant.total_questions_answered > 0) {
-          if (!resolvedStudent.resolvedId) {
+          // Resolve each participant's student ID
+          const participantResolved = resolveStudentId(
+            participant.student_id,
+            undefined,
+            existingStudentIds,
+            emptyEmailMap
+          );
+          if (!participantResolved.resolvedId) {
             gradesSkippedMissingStudent++;
             continue;
           }
@@ -497,7 +475,7 @@ serve(async (req) => {
           const { error: gradeError } = await supabaseAdmin
             .from('grade_history')
             .insert({
-              student_id: resolvedStudent.resolvedId,
+              student_id: participantResolved.resolvedId,
               teacher_id: teacherId,
               topic_name: body.data?.topic_name || 'Live Session',
               grade: participant.accuracy,
@@ -517,7 +495,7 @@ serve(async (req) => {
         const { data: summaryLog } = await supabaseAdmin
           .from('sister_app_sync_log')
           .insert({
-            teacher_id: keyRecord.teacher_id,
+            teacher_id: teacherId,
             action: 'live_session_completed',
             data: {
               activity_name: body.data?.activity_name,
@@ -701,7 +679,7 @@ serve(async (req) => {
         // ===================================================================
         try {
           await supabaseAdmin.from('sister_app_sync_log').insert({
-            teacher_id: keyRecord.teacher_id,
+            teacher_id: teacherId,
             student_id: profile.student_id,
             action: 'batch_sync_student',
             data: {
@@ -740,7 +718,7 @@ serve(async (req) => {
         const { data: summaryLog } = await supabaseAdmin
           .from('sister_app_sync_log')
           .insert({
-            teacher_id: keyRecord.teacher_id,
+            teacher_id: teacherId,
             action: 'batch_sync',
             data: {
               summary: body.summary,
@@ -788,15 +766,15 @@ serve(async (req) => {
       // ---------------------------------------------------------------------
       console.log('Processing roster sync from Scholar:', body.action, body.data || body.student_id);
       
-      const studentData = body.data || {};
-      const studentId = body.student_id || studentData.student_id;
+      const studentData: any = body.data || {};
+      const studentId: string | undefined = body.student_id || studentData.student_id;
       const existingStudentIds = await fetchExistingStudentIds(
         supabaseAdmin,
-        studentId ? [studentId] : []
+        studentId ? [studentId] : [] as string[]
       );
       const emailMap = await fetchStudentIdsByEmail(
         supabaseAdmin,
-        studentData.email ? [studentData.email] : [],
+        studentData.email ? [studentData.email as string] : [] as string[],
         teacherId
       );
       const resolvedStudent = resolveStudentId(
@@ -811,7 +789,7 @@ serve(async (req) => {
         const { data: rosterLog } = await supabaseAdmin
           .from('sister_app_sync_log')
           .insert({
-            teacher_id: keyRecord.teacher_id,
+            teacher_id: teacherId,
             student_id: studentId,
             action: body.action,
             data: {

@@ -579,7 +579,7 @@ Deno.serve(async (req) => {
             await supabase
               .from("students")
               .update({
-                xp_total: supabase.rpc ? undefined : xpEarned, // can't increment directly
+                // xp_total can't be incremented directly via update, skip it here
                 last_activity_date: new Date().toISOString().split('T')[0],
               })
               .eq("id", student_id);
