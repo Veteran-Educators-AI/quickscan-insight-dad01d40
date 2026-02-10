@@ -2027,18 +2027,17 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         useLearnedStyle: useLearnedStyle || false,
       };
 
-      const ocrUsable = ocrText && ocrText.length > 30 && !ocrText.includes('[OCR FAILED');
-      if (ocrUsable) {
-        // OCR succeeded — send text + image as fallback
+      // Always send exactly ONE image (first page) so AI can see diagrams/graphs
+      requestBody.imageBase64 = item.imageDataUrl;
+
+      // If OCR returned any text at all, send it — the AI gets both text AND image
+      const hasOcrText = ocrText && ocrText.trim().length > 0 && !ocrText.includes('[OCR FAILED');
+      if (hasOcrText) {
         requestBody.preExtractedOCR = ocrText;
-        requestBody.imageBase64 = item.imageDataUrl; // Always include real image
-      } else {
-        // OCR failed or empty — fall back to sending image
-        requestBody.imageBase64 = item.imageDataUrl;
-        if (additionalImages.length > 0) {
-          requestBody.additionalImages = additionalImages;
-        }
+        // Do NOT send additionalImages — OCR text already covers all pages
       }
+      // If OCR completely failed, still only send the first page image (not continuation images)
+      // to avoid payload bloat and timeouts
 
       const { data, error } = await invokeWithRetry('analyze-student-work', requestBody, {
         maxRetries: 1,
