@@ -132,10 +132,13 @@ export function BatchImageZoomDialog({
     const totalErrors = misconceptions.length;
     if (totalErrors === 0) return grade;
     
+    // Compute dismissed count locally to avoid TDZ reference to later-declared const
+    const dismissed = Object.values(decisions).filter(d => d === 'dismissed').length;
+    
     // Each dismissed error adds points back (errors were incorrectly identified)
     // Estimate ~5-10 points per dismissed error, capped at effort floor to max
     const pointsPerError = Math.min(10, (100 - grade) / Math.max(1, totalErrors));
-    const adjustedGrade = Math.min(100, grade + (dismissedCount * pointsPerError));
+    const adjustedGrade = Math.min(100, grade + (dismissed * pointsPerError));
     return Math.round(adjustedGrade);
   };
   
