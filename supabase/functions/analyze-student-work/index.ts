@@ -560,12 +560,7 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
 
-    // ── Rate limit ──
-    if (supabase && effectiveTeacherId) {
-      const rl = await checkRateLimit(supabase, effectiveTeacherId);
-      if (!rl.allowed)
-        return new Response(JSON.stringify({ success: false, error: rl.message, rateLimited: true, http_status: 429 }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+    // ── Rate limit removed — using direct OpenAI API which has its own limits ──
 
     // ── Identify only ──
     if (identifyOnly) {
