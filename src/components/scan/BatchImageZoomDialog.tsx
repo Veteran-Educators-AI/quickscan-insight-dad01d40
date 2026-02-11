@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { ZoomIn, ZoomOut, RotateCw, Move, AlertTriangle, MapPin, Check, X, Save, Brain, Loader2, Pencil, PenTool, CheckCircle2, Lightbulb, BookOpen, Target, ThumbsUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,13 +15,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ImageErrorOverlay, ErrorRegion } from './ImageErrorOverlay';
+import type { ErrorRegion } from './ImageErrorOverlay';
 import { extractErrorRegions } from './extractErrorRegions';
 import { useMisconceptionFeedback, MisconceptionDecision } from '@/hooks/useMisconceptionFeedback';
 import { useAnnotations } from '@/hooks/useAnnotations';
-import { AnnotationToolbar } from './AnnotationToolbar';
-import { AnnotationCanvas } from './AnnotationCanvas';
 import { cn } from '@/lib/utils';
+
+// Lazy-load heavy components to break TDZ circular dependency chains
+const ImageErrorOverlay = React.lazy(() => import('./ImageErrorOverlay').then(m => ({ default: m.ImageErrorOverlay })));
+const AnnotationToolbar = React.lazy(() => import('./AnnotationToolbar').then(m => ({ default: m.AnnotationToolbar })));
+const AnnotationCanvas = React.lazy(() => import('./AnnotationCanvas').then(m => ({ default: m.AnnotationCanvas })));
 
 interface BatchImageZoomDialogProps {
   open: boolean;
@@ -453,16 +456,18 @@ export function BatchImageZoomDialog({
         {/* Annotation toolbar - shown when annotating */}
         {isAnnotating && (
           <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50">
-            <AnnotationToolbar
-              activeTool={activeTool}
-              activeColor={activeColor}
-              onToolChange={setActiveTool}
-              onColorChange={setActiveColor}
-              onUndo={undoAnnotation}
-              onClearAll={clearAllAnnotations}
-              canUndo={canUndo}
-              annotationCount={annotations.length}
-            />
+            <Suspense fallback={<Loader2 className="h-4 w-4 animate-spin" />}>
+              <AnnotationToolbar
+                activeTool={activeTool}
+                activeColor={activeColor}
+                onToolChange={setActiveTool}
+                onColorChange={setActiveColor}
+                onUndo={undoAnnotation}
+                onClearAll={clearAllAnnotations}
+                canUndo={canUndo}
+                annotationCount={annotations.length}
+              />
+            </Suspense>
           </div>
         )}
 
@@ -508,46 +513,52 @@ export function BatchImageZoomDialog({
                 
                 {/* Error region overlay */}
                 {showAnnotations && hasAnnotatableErrors && !isAnnotating && (
-                  <ImageErrorOverlay
-                    errorRegions={errorRegions}
-                    highlightedError={highlightedError}
-                    onErrorHover={setHighlightedError}
-                    onErrorClick={(id) => setHighlightedError(id === highlightedError ? null : id)}
-                    onRegionUpdate={handleRegionUpdate}
-                    zoom={zoom}
-                    rotation={rotation}
-                    isEditing={isEditingRegions}
-                  />
+                  <Suspense fallback={null}>
+                    <ImageErrorOverlay
+                      errorRegions={errorRegions}
+                      highlightedError={highlightedError}
+                      onErrorHover={setHighlightedError}
+                      onErrorClick={(id) => setHighlightedError(id === highlightedError ? null : id)}
+                      onRegionUpdate={handleRegionUpdate}
+                      zoom={zoom}
+                      rotation={rotation}
+                      isEditing={isEditingRegions}
+                    />
+                  </Suspense>
                 )}
 
                 {/* Teacher annotation canvas */}
                 {isAnnotating && (
-                  <AnnotationCanvas
-                    annotations={annotations}
-                    activeTool={activeTool}
-                    activeColor={activeColor}
-                    onAnnotationAdd={addAnnotation}
-                    onAnnotationUpdate={updateAnnotation}
-                    onAnnotationDelete={deleteAnnotation}
-                    selectedId={selectedAnnotationId}
-                    onSelect={setSelectedAnnotationId}
-                    disabled={false}
-                  />
+                  <Suspense fallback={null}>
+                    <AnnotationCanvas
+                      annotations={annotations}
+                      activeTool={activeTool}
+                      activeColor={activeColor}
+                      onAnnotationAdd={addAnnotation}
+                      onAnnotationUpdate={updateAnnotation}
+                      onAnnotationDelete={deleteAnnotation}
+                      selectedId={selectedAnnotationId}
+                      onSelect={setSelectedAnnotationId}
+                      disabled={false}
+                    />
+                  </Suspense>
                 )}
 
                 {/* Show annotations even when not in annotation mode */}
                 {!isAnnotating && annotations.length > 0 && (
-                  <AnnotationCanvas
-                    annotations={annotations}
-                    activeTool="select"
-                    activeColor={activeColor}
-                    onAnnotationAdd={addAnnotation}
-                    onAnnotationUpdate={updateAnnotation}
-                    onAnnotationDelete={deleteAnnotation}
-                    selectedId={null}
-                    onSelect={() => {}}
-                    disabled={true}
-                  />
+                  <Suspense fallback={null}>
+                    <AnnotationCanvas
+                      annotations={annotations}
+                      activeTool="select"
+                      activeColor={activeColor}
+                      onAnnotationAdd={addAnnotation}
+                      onAnnotationUpdate={updateAnnotation}
+                      onAnnotationDelete={deleteAnnotation}
+                      selectedId={null}
+                      onSelect={() => {}}
+                      disabled={true}
+                    />
+                  </Suspense>
                 )}
               </div>
             </div>
