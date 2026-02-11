@@ -12,8 +12,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
-
 // Lazy-load all sub-components to prevent TDZ / circular-init crashes
 // when the Scan chunk initializes in production builds.
 import { MisconceptionComparison, AIAnalysisCritiqueDialog } from './lazy';
@@ -25,6 +23,10 @@ const TeacherVerificationPanel = React.lazy(() => import('./TeacherVerificationP
 const TrainingConfidenceIndicator = React.lazy(() => import('./TrainingConfidenceIndicator').then(m => ({ default: m.TrainingConfidenceIndicator })));
 const OCRCorrectionPanel = React.lazy(() => import('./OCRCorrectionPanel').then(m => ({ default: m.OCRCorrectionPanel })));
 const TeacherInterpretationPanel = React.lazy(() => import('./TeacherInterpretationPanel').then(m => ({ default: m.TeacherInterpretationPanel })));
+
+// Import useGradeFloorSettings AFTER lazy declarations to avoid TDZ issues
+// with the production chunk initialization order.
+import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 
 const LazyFallback = null; // Render nothing while loading sub-components
 

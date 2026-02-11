@@ -1415,7 +1415,10 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         }
       } catch { /* OCR failed, continue to AI */ }
 
-      const alphaOnly = (singleOcrText || '').replace(/[^a-zA-Z0-9]/g, '');
+      // Strip common header/boilerplate words before checking for student work
+      const headerStripped = (singleOcrText || '')
+        .replace(/name|date|period|class|form|level|page|student|teacher|grade|score|warm.?up|practice|questions?|answer|work.?area|instructions?|show.?work|explain|directions?|side\s*[ab]/gi, '');
+      const alphaOnly = headerStripped.replace(/[^a-zA-Z0-9]/g, '');
       if (alphaOnly.length < 30) {
         console.log(`[analyzeItem] Blank page detected (${alphaOnly.length} alphanumeric chars). Skipping AI call.`);
         return {
@@ -1943,7 +1946,10 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       // second page with a filled first page passes through fine.
       {
         const textToCheck = ocrText || '';
-        const alphanumericOnly = textToCheck.replace(/[^a-zA-Z0-9]/g, '');
+        // Strip common header/boilerplate words so pages with only "Name:", "Date:" etc. are correctly blank
+        const headerStripped = textToCheck
+          .replace(/name|date|period|class|form|level|page|student|teacher|grade|score|warm.?up|practice|questions?|answer|work.?area|instructions?|show.?work|explain|directions?|side\s*[ab]/gi, '');
+        const alphanumericOnly = headerStripped.replace(/[^a-zA-Z0-9]/g, '');
         if (alphanumericOnly.length < 30) {
           console.log(`[BlankPageDetection] Blank page detected (${alphanumericOnly.length} alphanumeric chars). Skipping AI call entirely.`);
           return {
