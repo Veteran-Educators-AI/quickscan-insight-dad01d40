@@ -93,6 +93,7 @@ async function callLovableAI(
     temperature,
     top_p,
     seed,
+    response_format: { type: 'json_object' },
   });
 
   const MAX_RETRIES = 1;
@@ -537,11 +538,11 @@ Respond with a SINGLE JSON object. No markdown, no code fences, no text outside 
   "nys_standard": "CODE - Description",
   "is_correct": true,
   "regents_score": 3,
-  "regents_justification": "(why this Regents score)",
+  "regents_justification": "(why this Regents score — must align with grade anchor)",
   "strengths": ["(specific thing done right, quoting student work)"],
   "areas_for_improvement": ["(specific error with why wrong and how to fix, quoting student work)"],
   "misconceptions": ["(verified errors only — quote exact student writing. Empty array if none)"],
-  "grade": 85,
+  "grade": 88,
   "grade_justification": "(cite student's actual writing using 'Student wrote: ...' format)",
   "feedback": "(constructive: what was done well, what to practice, next steps)",
   "confidence": "high"${rubricSection ? ',\n  "rubric_scores": [{"criterion": "...", "score": 0, "max_score": 0, "feedback": "..."}]' : ''}
@@ -680,6 +681,14 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55,
     areasForImprovement = Array.isArray(parsed.areas_for_improvement) ? parsed.areas_for_improvement.filter((s: string) => s && s.length >= 10) : [];
     misconceptions = Array.isArray(parsed.misconceptions) ? parsed.misconceptions.filter((m: string) => m && m.length >= 5 && !/no error|no misconception|none|N\/A/i.test(m)) : [];
     rawGrade = parseInt(parsed.grade) || gradeFloorWithEffort;
+
+    // ─── HARD ANCHOR SNAP: force grade to nearest valid anchor at parse time ───
+    const VALID_ANCHORS_PARSE = [97, 93, 88, 83, 75, gradeFloorWithEffort, gradeFloor];
+    rawGrade = VALID_ANCHORS_PARSE.reduce((prev, curr) =>
+      Math.abs(curr - rawGrade) < Math.abs(prev - rawGrade) ? curr : prev
+    );
+    console.log(`[PARSE_ANCHOR] Parsed grade ${parsed.grade} → snapped to anchor ${rawGrade}`);
+
     gradeJustification = parsed.grade_justification || parsed.regents_justification || '';
     feedback = parsed.feedback || '';
     confidence = parsed.confidence || 'medium';
@@ -732,7 +741,13 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55,
     misconceptions = misconceptions.filter(m => !/no error|no misconception|none/i.test(m));
 
     const gradeMatch = text.match(/\bGrade[:\s]*(\d+)/i);
-    rawGrade = gradeMatch ? parseInt(gradeMatch[1]) : (regentsScore >= 0 ? ({ 4: 95, 3: 85, 2: 75, 1: gradeFloorWithEffort, 0: gradeFloor } as Record<number, number>)[regentsScore] ?? gradeFloorWithEffort : gradeFloorWithEffort);
+    rawGrade = gradeMatch ? parseInt(gradeMatch[1]) : (regentsScore >= 0 ? ({ 4: 97, 3: 88, 2: 75, 1: gradeFloorWithEffort, 0: gradeFloor } as Record<number, number>)[regentsScore] ?? gradeFloorWithEffort : gradeFloorWithEffort);
+
+    // ─── HARD ANCHOR SNAP for regex path too ───
+    const VALID_ANCHORS_REGEX = [97, 93, 88, 83, 75, gradeFloorWithEffort, gradeFloor];
+    rawGrade = VALID_ANCHORS_REGEX.reduce((prev, curr) =>
+      Math.abs(curr - rawGrade) < Math.abs(prev - rawGrade) ? curr : prev
+    );
     gradeJustification = extract('Grade Justification', 'Feedback');
     feedback = extract('Feedback', 'Rubric Scores|$');
     confidence = 'medium';
@@ -941,7 +956,8 @@ serve(async (req: Request) => {
           const examples = corrections.slice(0, 3).map((c: any) =>
             `AI:${c.ai_grade}→Teacher:${c.corrected_grade}${c.correction_reason ? ` (${c.correction_reason})` : ''}`
           ).join('; ');
-          gradingStyleContext = `\nTeacher grading style (${corrections.length} corrections): avg adjustment ${avgDiff > 0 ? '+' : ''}${avgDiff.toFixed(1)}. Examples: ${examples}. ${avgDiff > 3 ? 'Be more generous.' : avgDiff < -3 ? 'Be stricter.' : ''}`;
+          // NOTE: Style context informs feedback tone only — NOT grade values (anchors are fixed)
+          gradingStyleContext = `\nTeacher feedback style (${corrections.length} corrections): avg adjustment ${avgDiff > 0 ? '+' : ''}${avgDiff.toFixed(1)}. Examples: ${examples}. Adjust your FEEDBACK TONE accordingly, but do NOT change grade anchor values — always use exact anchors from the decision tree.`;
         }
       } catch (e) { console.error('Corrections fetch error:', e); }
     }
@@ -1074,39 +1090,110 @@ serve(async (req: Request) => {
     console.log(`Grading with provider=${analysisProvider}, model=${getAnalysisModel(analysisProvider)}`);
     const messages = [{ role: 'system', content: systemPrompt }, { role: 'user', content: imageContent }];
 
-    // CONSENSUS GRADING: Call AI 3 times with different seeds, take median grade
-    const CONSENSUS_ROUNDS = 3;
-    const CONSENSUS_SEEDS = [42, 123, 256];
-    const consensusResults: { grade: number; result: any; analysisText: string }[] = [];
+    // CONSENSUS GRADING: Call AI with multiple seeds, enforce ≤2pt spread
+    const INITIAL_SEEDS = [42, 123, 256];
+    const EXTRA_SEEDS = [789, 1024];  // Used if initial spread > 2
+    const MAX_SPREAD = 2;             // HARD BOUNDARY
+    let consensusResults: { grade: number; isCorrect: boolean; result: any; analysisText: string }[] = [];
 
-    for (let round = 0; round < CONSENSUS_ROUNDS; round++) {
-      console.log(`[CONSENSUS] Round ${round + 1}/${CONSENSUS_ROUNDS} seed=${CONSENSUS_SEEDS[round]}`);
+    // Phase 1: Initial 3 calls
+    for (const seed of INITIAL_SEEDS) {
+      console.log(`[CONSENSUS] seed=${seed}`);
       const roundText = await callLovableAI(
         messages as any,
         OPENAI_API_KEY, 'analyze-student-work', supabase, effectiveTeacherId,
         'standard', analysisProvider,
-        { temperature: 0, seed: CONSENSUS_SEEDS[round] }
+        { temperature: 0, seed }
       );
       if (!roundText) continue;
       const roundResult = parseAnalysisResult(roundText, rubricSteps, gradeFloor, gradeFloorWithEffort);
-      consensusResults.push({ grade: roundResult.grade, result: roundResult, analysisText: roundText });
+      consensusResults.push({ grade: roundResult.grade, isCorrect: roundResult.isAnswerCorrect, result: roundResult, analysisText: roundText });
     }
 
     if (consensusResults.length === 0) throw new Error('No analysis returned from AI');
 
-    // Sort by grade and pick the median
-    consensusResults.sort((a, b) => a.grade - b.grade);
-    const medianIdx = Math.floor(consensusResults.length / 2);
-    const chosen = consensusResults[medianIdx];
+    // Phase 2: Check spread — if >2, run extra calls to build stronger consensus
+    let grades = consensusResults.map(r => r.grade);
+    let spread = Math.max(...grades) - Math.min(...grades);
+    console.log(`[CONSENSUS] Phase 1: grades=[${grades.join(',')}] spread=${spread}`);
+
+    if (spread > MAX_SPREAD && consensusResults.length < 5) {
+      console.log(`[CONSENSUS] Spread ${spread} > ${MAX_SPREAD}, running ${EXTRA_SEEDS.length} extra rounds`);
+      for (const seed of EXTRA_SEEDS) {
+        const roundText = await callLovableAI(
+          messages as any,
+          OPENAI_API_KEY, 'analyze-student-work', supabase, effectiveTeacherId,
+          'standard', analysisProvider,
+          { temperature: 0, seed }
+        );
+        if (!roundText) continue;
+        const roundResult = parseAnalysisResult(roundText, rubricSteps, gradeFloor, gradeFloorWithEffort);
+        consensusResults.push({ grade: roundResult.grade, isCorrect: roundResult.isAnswerCorrect, result: roundResult, analysisText: roundText });
+      }
+      grades = consensusResults.map(r => r.grade);
+      spread = Math.max(...grades) - Math.min(...grades);
+      console.log(`[CONSENSUS] Phase 2: grades=[${grades.join(',')}] spread=${spread}`);
+    }
+
+    // Phase 3: Pick final grade — use MODE (most frequent), then median
+    const gradeFreq: Record<number, number> = {};
+    for (const g of grades) gradeFreq[g] = (gradeFreq[g] || 0) + 1;
+    const maxFreq = Math.max(...Object.values(gradeFreq));
+    const modeGrades = Object.entries(gradeFreq)
+      .filter(([, f]) => f === maxFreq)
+      .map(([g]) => parseInt(g));
+
+    // If there's a clear mode, use it; otherwise use median
+    let finalGrade: number;
+    if (modeGrades.length === 1) {
+      finalGrade = modeGrades[0];
+      console.log(`[CONSENSUS] Using mode: ${finalGrade} (appeared ${maxFreq}x)`);
+    } else {
+      // Multiple modes — use median of all results
+      grades.sort((a, b) => a - b);
+      finalGrade = grades[Math.floor(grades.length / 2)];
+      console.log(`[CONSENSUS] No clear mode, using median: ${finalGrade}`);
+    }
+
+    // Phase 4: Cross-validate is_correct — majority vote
+    const correctVotes = consensusResults.filter(r => r.isCorrect).length;
+    const majorityCorrect = correctVotes > consensusResults.length / 2;
+    console.log(`[CONSENSUS] is_correct votes: ${correctVotes}/${consensusResults.length} → majority=${majorityCorrect}`);
+
+    // Pick the result that matches the final grade (or closest match)
+    const chosen = consensusResults.find(r => r.grade === finalGrade)
+      || consensusResults.reduce((prev, curr) =>
+        Math.abs(curr.grade - finalGrade) < Math.abs(prev.grade - finalGrade) ? curr : prev
+      );
     const analysisText = chosen.analysisText;
     const result = chosen.result;
 
-    // Log consensus spread
-    const grades = consensusResults.map(r => r.grade);
-    const spread = Math.max(...grades) - Math.min(...grades);
-    console.log(`[CONSENSUS] grades=[${grades.join(',')}] median=${chosen.grade} spread=${spread}`);
+    // Override is_correct with majority vote if it disagrees
+    if (result.isAnswerCorrect !== majorityCorrect) {
+      console.log(`[CONSENSUS] Overriding is_correct: ${result.isAnswerCorrect} → ${majorityCorrect}`);
+      result.isAnswerCorrect = majorityCorrect;
+      // If majority says correct but grade is low, boost to minimum
+      if (majorityCorrect && finalGrade < 88) {
+        console.log(`[CONSENSUS] Majority says correct, boosting grade ${finalGrade} → 88`);
+        finalGrade = 88;
+      }
+    }
+
+    // Phase 5: HARD FINAL ANCHOR ASSERTION — no non-anchor grade leaves this pipeline
+    const FINAL_ANCHORS = [97, 93, 88, 83, 75, gradeFloorWithEffort, gradeFloor];
+    if (!FINAL_ANCHORS.includes(finalGrade)) {
+      const snapped = FINAL_ANCHORS.reduce((p, c) => Math.abs(c - finalGrade) < Math.abs(p - finalGrade) ? c : p);
+      console.log(`[GRADE_ASSERT] VIOLATION: ${finalGrade} is not a valid anchor! Snapping to ${snapped}`);
+      finalGrade = snapped;
+    }
+
+    // Apply final grade to result
+    result.grade = finalGrade;
     result.consensusGrades = grades;
     result.consensusSpread = spread;
+    result.consensusMethod = modeGrades.length === 1 ? 'mode' : 'median';
+    result.consensusRounds = consensusResults.length;
+    console.log(`[CONSENSUS] FINAL grade=${finalGrade} spread=${spread} rounds=${consensusResults.length}`);
 
 
 
