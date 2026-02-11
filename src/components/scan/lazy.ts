@@ -4,6 +4,7 @@ import React from 'react';
 // Every cross-component import should go through this file
 // to eliminate circular dependency TDZ crashes in production builds.
 
+export const AnalysisResults = React.lazy(() => import('./AnalysisResults').then(m => ({ default: m.AnalysisResults })));
 export const BatchImageZoomDialog = React.lazy(() => import('./BatchImageZoomDialog'));
 export const StudentWorkDetailDialog = React.lazy(() => import('./StudentWorkDetailDialog'));
 export const GradedPapersGallery = React.lazy(() => import('./GradedPapersGallery'));

@@ -18,7 +18,8 @@ import { ImagePreview } from '@/components/scan/ImagePreview';
 import React, { Suspense } from 'react';
 import { ScanResultsErrorBoundary } from '@/components/scan/ScanResultsErrorBoundary';
 
-const AnalysisResults = React.lazy(() => import('@/components/scan/AnalysisResults').then(m => ({ default: m.AnalysisResults })));
+// AnalysisResults imported from centralized lazy barrel to prevent TDZ crashes
+import { AnalysisResults } from '@/components/scan/lazy';
 const BatchQueue = React.lazy(() => import('@/components/scan/BatchQueue').then(m => ({ default: m.BatchQueue })));
 const BatchReport = React.lazy(() => import('@/components/scan/BatchReport').then(m => ({ default: m.BatchReport })));
 const GradingComparisonView = React.lazy(() => import('@/components/scan/GradingComparisonView').then(m => ({ default: m.GradingComparisonView })));
