@@ -10,6 +10,7 @@ import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
 import { parseUnifiedStudentQRCode } from '@/components/print/StudentPageQRCode';
 import { toast } from 'sonner';
 import { compressImage } from '@/lib/imageUtils';
+import { detectBlankPage } from '@/lib/blankPageDetection';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RESILIENT EDGE FUNCTION INVOCATION
@@ -250,6 +251,7 @@ export interface AnalysisResult {
   overriddenGrade?: number;
   overrideJustification?: string;
   selectedRunIndex?: number; // Index of manually selected run (instead of average)
+  studentWorkPresent?: boolean; // False when blank page detected
 }
 
 export interface Student {
@@ -1840,6 +1842,42 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         }
       } catch (ocrErr: any) {
         console.warn('[OCR] Exception, falling back:', ocrErr.message);
+      }
+
+      // STEP 1.5: Blank page detection — skip expensive AI grading for empty pages
+      // Only check combined OCR text (continuation pages included), so a blank
+      // second page with a filled first page is fine.
+      if (ocrText !== null) {
+        const blankCheck = detectBlankPage(ocrText, 30);
+        if (blankCheck.isBlank) {
+          console.log(`[BlankPageDetection] Page detected as blank (${blankCheck.normalizedLength} chars). Skipping AI grading.`);
+          const gradeFloor = 55; // default; will be overridden by BlankPageSettings in the UI layer
+          return {
+            ...item,
+            status: 'completed' as const,
+            result: {
+              ocrText: ocrText || '',
+              problemIdentified: 'Blank or nearly blank page',
+              approachAnalysis: 'No student work detected',
+              strengthsAnalysis: [],
+              areasForImprovement: ['No work submitted'],
+              whatStudentDidCorrectly: '',
+              whatStudentGotWrong: 'No work was submitted for this page',
+              rubricScores: (rubricSteps || []).map(step => ({
+                criterion: step.description,
+                score: 0,
+                maxScore: step.points,
+                feedback: 'No work shown',
+              })),
+              misconceptions: [],
+              totalScore: { earned: 0, possible: rubricSteps?.reduce((s, r) => s + r.points, 0) || 6, percentage: 0 },
+              grade: gradeFloor,
+              gradeJustification: 'No student work detected on this page.',
+              feedback: 'This page appears to be blank. Please submit your work.',
+              studentWorkPresent: false,
+            } as AnalysisResult,
+          };
+        }
       }
 
       // STEP 2: Grade using extracted text (no image = much faster) or fall back to image
