@@ -249,3 +249,5 @@ export function HandwritingComparisonDialog({
     </Dialog>
   );
 }
+
+export default HandwritingComparisonDialog;

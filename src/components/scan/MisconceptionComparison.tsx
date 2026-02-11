@@ -289,3 +289,5 @@ export function MisconceptionComparison({
     </Card>
   );
 }
+
+export default MisconceptionComparison;

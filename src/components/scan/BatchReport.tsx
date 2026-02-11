@@ -1,13 +1,13 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback, Suspense } from 'react';
 import { Download, Users, TrendingUp, AlertTriangle, BarChart3, Eye, GitCompare, LayoutGrid, Send, Loader2, Save, CheckCircle, BookOpen, Link, Unlink, FileStack, Upload, FileText, Cloud, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { BatchItem, BatchSummary } from '@/hooks/useBatchAnalysis';
-import { StudentWorkDetailDialog } from './StudentWorkDetailDialog';
+import { StudentWorkDetailDialog } from './lazy';
 import { StudentComparisonView } from './StudentComparisonView';
-import { GradedPapersGallery } from './GradedPapersGallery';
+import { GradedPapersGallery } from './lazy';
 import { DifferentiationGroupView } from './DifferentiationGroupView';
 import { MissingSubmissionsAlert } from './MissingSubmissionsAlert';
 import { PushToClassroomDialog } from './PushToClassroomDialog';
@@ -876,35 +876,39 @@ export function BatchReport({ items, summary, classId, questionId, className, as
 
       {/* Student Work Detail Dialog */}
       {selectedStudent && selectedStudent.result && (
-        <StudentWorkDetailDialog
-          open={!!selectedStudent}
-          onOpenChange={(open) => !open && setSelectedStudent(null)}
-          studentName={getItemStudentDisplayName(selectedStudent)}
-          imageUrl={selectedStudent.imageDataUrl}
-          result={selectedStudent.result}
-          isReanalyzing={isReanalyzing}
-          onReanalyze={onReanalyzeItem ? async () => {
-            setIsReanalyzing(true);
-            try {
-              const result = await onReanalyzeItem(selectedStudent.id);
-              if (result?.result) {
-                // Update the selected student with new result
-                setSelectedStudent(result);
+        <Suspense fallback={null}>
+          <StudentWorkDetailDialog
+            open={!!selectedStudent}
+            onOpenChange={(open) => !open && setSelectedStudent(null)}
+            studentName={getItemStudentDisplayName(selectedStudent)}
+            imageUrl={selectedStudent.imageDataUrl}
+            result={selectedStudent.result}
+            isReanalyzing={isReanalyzing}
+            onReanalyze={onReanalyzeItem ? async () => {
+              setIsReanalyzing(true);
+              try {
+                const result = await onReanalyzeItem(selectedStudent.id);
+                if (result?.result) {
+                  // Update the selected student with new result
+                  setSelectedStudent(result);
+                }
+              } finally {
+                setIsReanalyzing(false);
               }
-            } finally {
-              setIsReanalyzing(false);
-            }
-          } : undefined}
-        />
+            } : undefined}
+          />
+        </Suspense>
       )}
 
       {/* Graded Papers Gallery */}
-      <GradedPapersGallery
-        open={showGallery}
-        onOpenChange={setShowGallery}
-        items={items}
-        onUpdateNotes={onUpdateNotes}
-      />
+      <Suspense fallback={null}>
+        <GradedPapersGallery
+          open={showGallery}
+          onOpenChange={setShowGallery}
+          items={items}
+          onUpdateNotes={onUpdateNotes}
+        />
+      </Suspense>
 
       {/* Student Comparison View */}
       {showComparison && comparisonStudents.length >= 2 && (

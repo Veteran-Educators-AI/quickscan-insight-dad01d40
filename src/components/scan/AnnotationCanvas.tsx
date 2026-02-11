@@ -500,3 +500,5 @@ export function AnnotationCanvas({
     </div>
   );
 }
+
+export default AnnotationCanvas;

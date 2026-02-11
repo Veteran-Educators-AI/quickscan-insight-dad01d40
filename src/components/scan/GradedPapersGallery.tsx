@@ -35,7 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { BatchItem, AnalysisResult } from '@/hooks/useBatchAnalysis';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 import { useMultipleGradeTrends, TrendDirection } from '@/hooks/useGradeTrend';
-const MisconceptionComparison = React.lazy(() => import('./MisconceptionComparison').then(m => ({ default: m.MisconceptionComparison })));
+import { MisconceptionComparison } from './lazy';
 
 // Extended result type that may include additional fields
 interface ExtendedAnalysisResult extends AnalysisResult {
@@ -520,3 +520,5 @@ export function GradedPapersGallery({
     </Dialog>
   );
 }
+
+export default GradedPapersGallery;

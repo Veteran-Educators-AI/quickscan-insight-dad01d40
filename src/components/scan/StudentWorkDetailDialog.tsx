@@ -32,9 +32,8 @@ import {
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 import { ImageErrorOverlay } from './ImageErrorOverlay';
 
-// Lazy-load to prevent TDZ errors in production bundles
-const MisconceptionComparison = React.lazy(() => import('./MisconceptionComparison').then(m => ({ default: m.MisconceptionComparison })));
-const AIAnalysisCritiqueDialog = React.lazy(() => import('./AIAnalysisCritiqueDialog').then(m => ({ default: m.AIAnalysisCritiqueDialog })));
+// Import from centralized lazy barrel to prevent TDZ errors
+import { MisconceptionComparison, AIAnalysisCritiqueDialog } from './lazy';
 
 // Import from standalone utility to avoid TDZ circular dependency
 import { extractErrorRegions } from './extractErrorRegions';
@@ -616,3 +615,5 @@ export function StudentWorkDetailDialog({
     </>
   );
 }
+
+export default StudentWorkDetailDialog;
