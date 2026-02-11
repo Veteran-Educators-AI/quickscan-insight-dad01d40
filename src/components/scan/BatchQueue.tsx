@@ -1087,6 +1087,7 @@ export function BatchQueue({
       <ScanResultsErrorBoundary
         grade={items[zoomPreviewIndex].result?.grade}
         studentName={getItemDisplayName(items[zoomPreviewIndex])}
+        result={items[zoomPreviewIndex].result ?? null}
         onRetry={() => setZoomPreviewIndex(null)}
       >
         <Suspense fallback={null}>
