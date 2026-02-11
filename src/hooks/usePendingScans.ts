@@ -19,7 +19,13 @@ interface PendingScan {
   } | null;
 }
 
-export function usePendingScans() {
+interface UsePendingScansOptions {
+  /** If true (default), fetch pending scans on mount; if false, only fetch when refresh() is called. */
+  autoFetch?: boolean;
+}
+
+export function usePendingScans(options: UsePendingScansOptions = {}) {
+  const { autoFetch = true } = options;
   const { user } = useAuth();
   const [pendingScans, setPendingScans] = useState<PendingScan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,8 +73,10 @@ export function usePendingScans() {
   }, [user]);
 
   useEffect(() => {
-    fetchPendingScans();
-  }, [fetchPendingScans]);
+    if (autoFetch) {
+      fetchPendingScans();
+    }
+  }, [fetchPendingScans, autoFetch]);
 
   const updateScanStatus = async (scanId: string, status: 'pending' | 'analyzed') => {
     try {

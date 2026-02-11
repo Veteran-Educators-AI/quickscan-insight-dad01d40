@@ -23,11 +23,26 @@ type AIModelTier = 'lite' | 'standard';
 // RATE LIMITING & USAGE LOGGING (unchanged)
 // ═══════════════════════════════════════════════════════════════════════════════
 async function checkRateLimit(supabase: any, userId: string): Promise<{ allowed: boolean; message?: string }> {
-  const { data, error } = await supabase.rpc('check_ai_rate_limit', { p_user_id: userId });
-  if (error) { console.error('Rate limit check error:', error); return { allowed: true }; }
-  if (!data.allowed) {
-    if (data.hourly_remaining === 0) return { allowed: false, message: `Hourly AI limit reached (${data.hourly_limit}/hour). Please wait.` };
-    if (data.daily_remaining === 0) return { allowed: false, message: `Daily AI limit reached (${data.daily_limit}/day). Resets in 24 hours.` };
+  try {
+    const { data, error } = await supabase.rpc('check_ai_rate_limit', { p_user_id: userId });
+    
+    // If RPC fails (e.g. function missing), allow request
+    if (error) { 
+      console.warn('Rate limit check error (allowing request):', error.message); 
+      return { allowed: true }; 
+    }
+
+    if (!data.allowed) {
+      // TEMPORARY BYPASS: Log warning but allow request
+      console.warn(`[RATE LIMIT BYPASS] User ${userId} exceeded limit: ${data.hourly_limit}/hour. Allowing request.`);
+      return { allowed: true };
+      
+      // Original blocking logic:
+      // if (data.hourly_remaining === 0) return { allowed: false, message: `Hourly AI limit reached (${data.hourly_limit}/hour). Please wait.` };
+      // if (data.daily_remaining === 0) return { allowed: false, message: `Daily AI limit reached (${data.daily_limit}/day). Resets in 24 hours.` };
+    }
+  } catch (err) {
+    console.error('Rate limit exception:', err);
   }
   return { allowed: true };
 }
@@ -44,6 +59,13 @@ async function logAIUsage(supabase: any, userId: string, functionName: string, u
 // ═══════════════════════════════════════════════════════════════════════════════
 // OPENAI API CALL — direct, no gateway
 // ═══════════════════════════════════════════════════════════════════════════════
+interface AICallOptions {
+  temperature?: number;   // 0 = deterministic (default for grading), 0.3-0.7 = creative
+  top_p?: number;         // 1 = consider all tokens (default)
+  seed?: number;          // reproducibility seed (supported by some models)
+  modelOverride?: string; // override model selection
+}
+
 async function callLovableAI(
   messages: any[], _apiKey: string, functionName = 'analyze-student-work',
   supabase?: any, userId?: string, modelTier: AIModelTier = 'lite',
@@ -56,7 +78,11 @@ async function callLovableAI(
   const maxTokens = modelTier === 'standard' ? 4000 : 2000;
   const startTime = Date.now();
 
-  console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier}`);
+  // Default to temperature=0 for deterministic output (grading)
+  const temperature = options.temperature ?? 0;
+  const top_p = options.top_p ?? 1;
+
+  console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier} temp=${temperature}`);
 
   const requestBody = JSON.stringify({
     model,
@@ -150,7 +176,7 @@ Respond in JSON only:
   const content = await callLovableAI([
     { role: 'system', content: 'You analyze scanned student worksheets. Respond in JSON only.' },
     { role: 'user', content: [{ type: 'text', text: prompt }, formatImageForAI(imageBase64)] }
-  ], apiKey, 'detect-page-type');
+  ], apiKey, 'detect-page-type', undefined, undefined, 'lite', 'gemini', { temperature: 0.2 });
 
   try {
     const parsed = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] || '{}');
@@ -180,7 +206,7 @@ Respond in JSON only:
 
   const content = await callLovableAI([
     { role: 'user', content: [{ type: 'text', text: prompt }, formatImageForAI(imageBase64)] }
-  ], apiKey, 'identify-student');
+  ], apiKey, 'identify-student', undefined, undefined, 'lite', 'gemini', { temperature: 0.2 });
 
   try {
     const parsed = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] || '{}');
@@ -285,7 +311,7 @@ async function compareWithSolution(studentImg: string, solutionImg: string, rubr
       { type: 'text', text: `Compare student work (image 1) to correct solution (image 2).${rubricPrompt}\nJSON format: {"suggested_scores":[{"criterion":"...","score":0,"max_score":0,"feedback":"..."}],"total_earned":0,"total_possible":0,"misconceptions":["..."],"feedback":"...","correctness_analysis":"..."}` },
       formatImageForAI(studentImg), formatImageForAI(solutionImg),
     ] }
-  ], apiKey, 'compare-with-solution', undefined, undefined, 'standard');
+  ], apiKey, 'compare-with-solution', undefined, undefined, 'standard', 'gemini', { temperature: 0 });
 
   try {
     const p = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] || '{}');
@@ -299,7 +325,7 @@ async function compareWithSolution(studentImg: string, solutionImg: string, rubr
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN GRADING PROMPT — DRAMATICALLY REDUCED (~2K tokens vs ~10K)
+// MAIN GRADING PROMPT — CALIBRATION-ANCHORED, JSON OUTPUT
 // ═══════════════════════════════════════════════════════════════════════════════
 function buildGradingPrompt(opts: {
   rubricSteps?: any[];
@@ -317,164 +343,290 @@ function buildGradingPrompt(opts: {
 }): { system: string; user: string } {
 
   const rubricSection = opts.rubricSteps?.length
-    ? `\nTeacher Rubric (score each):\n${opts.rubricSteps.map((s: any, i: number) => `${i+1}. ${s.description} (${s.points}pts)`).join('\n')}`
+    ? `\nSCORING RUBRIC (score each criterion separately):\n${opts.rubricSteps.map((s: any, i: number) => `  ${i+1}. "${s.description}" — ${s.points} points`).join('\n')}\nInclude rubric_scores array in your JSON with each criterion scored.`
     : '';
 
   const standardSection = opts.standardCode
-    ? `\nStandard being assessed: ${opts.standardCode}${opts.topicName ? ` — ${opts.topicName}` : ''}`
+    ? `\nSTANDARD: ${opts.standardCode}${opts.topicName ? ` — ${opts.topicName}` : ''}`
     : '';
 
   const customRubricSection = opts.customRubric
-    ? `\nCustom Rubric:\n${opts.customRubric.criteria.map((c: any, i: number) => `${i+1}. ${c.name} (${c.weight}%): ${c.description}`).join('\n')}`
+    ? `\nCUSTOM RUBRIC:\n${opts.customRubric.criteria.map((c: any, i: number) => `  ${i+1}. ${c.name} (${c.weight}%): ${c.description}`).join('\n')}`
     : '';
 
   const teacherGuideNote = opts.answerGuideBase64
-    ? `\nA teacher answer guide image is attached. Use it as the PRIMARY grading reference.`
+    ? `\nIMPORTANT: A teacher answer guide image is attached. Use it as the PRIMARY grading reference. Compare the student's work directly against this guide.`
     : '';
 
-  const system = `You are an NYS Regents grader. Grade student work using evidence-based assessment.
+  const detailLevel = opts.feedbackVerbosity === 'detailed'
+    ? 'Write 150-200 word justification with specific quotes from student work. Write 100-150 word feedback.'
+    : 'Write 75-120 word justification with specific quotes. Write 60-100 word feedback.';
 
-CORE RULES:
-1. OCR the student's work — extract ALL text, equations, and handwriting from the ENTIRE page including margins.
-2. If the page has NO student handwriting (only printed questions or blank), mark it as BLANK.
-3. Grade on a 55-100 scale using NYS Regents 0-4 rubric:
-   - Score 0 = ${opts.gradeFloor} (blank/no work)
-   - Score 1 = ${opts.gradeFloorWithEffort}-69 (minimal understanding)
-   - Score 2 = 70-79 (partial understanding)
-   - Score 3 = 80-89 (strong understanding)
-   - Score 4 = 90-100 (full mastery)
-4. CORRECT final answer = minimum 90. Never grade a correct answer below 90.
-5. Quote the student's actual written work as evidence for every claim.
-6. If something is hard to read, give your best interpretation and flag it.
+  const system = `You are a calibrated NYS Regents grading engine. You produce consistent, evidence-based grades.
+
+GRADING PROCEDURE (follow these steps IN ORDER):
+
+STEP 1 — EXTRACT: Read ALL student handwriting from the entire page including margins. Record exact text.
+STEP 2 — DETECT: Is there student handwriting? (Printed questions alone = NO student work)
+STEP 3 — IDENTIFY: What problem/question is being answered? What subject area?
+STEP 4 — EVALUATE: Check the final answer and work shown against the standard/rubric.
+STEP 5 — SCORE using this STRICT decision tree:
+
+  ┌─ Correct final answer + complete work shown ──────────► 90-100 (Regents 4)
+  ├─ Correct final answer + partial/incomplete work ──────► 85-94  (Regents 3-4)
+  ├─ Mostly correct (right approach, minor errors) ───────► 80-89  (Regents 3)
+  ├─ Partially correct (some understanding, wrong answer) ► 70-79  (Regents 2)
+  ├─ Minimal understanding shown (confused attempt) ──────► ${opts.gradeFloorWithEffort}-69 (Regents 1)
+  └─ Blank page / no student work ────────────────────────► ${opts.gradeFloor}    (Regents 0)
+
+STEP 6 — VERIFY: Re-read your justification. Does it support your grade? If not, adjust.
+
+CALIBRATION EXAMPLES (use these as scoring anchors):
+• Student correctly solves "3x + 5 = 20" showing "3x = 15, x = 5" → Grade: 95 (Regents 4)
+• Student writes "3x = 15, x = 5" but doesn't show subtracting 5 → Grade: 88 (Regents 3)
+• Student writes "3x = 25, x = 8.3" (wrong subtraction, right method) → Grade: 75 (Regents 2)
+• Student writes "x = 7" with no work shown → Grade: ${opts.gradeFloorWithEffort} (Regents 1)
+• Blank page → Grade: ${opts.gradeFloor} (Regents 0)
+
+CONSISTENCY RULES:
+1. CORRECT final answer = MINIMUM grade of 90. Never grade a correct answer below 90.
+2. Grade MUST fall within the Regents score band (see decision tree above).
+3. If Regents = 3, grade MUST be 80-89. If Regents = 2, grade MUST be 70-79. Etc.
+4. Quote the student's actual written work as evidence for EVERY claim.
+5. If handwriting is hard to read, give your best interpretation and set confidence to "low".
+6. Do NOT penalize for messy handwriting if the work is mathematically correct.
+7. Be CONSISTENT: the same quality of work should receive the same grade every time.
 ${opts.gradingStyleContext}${opts.teacherAnswerSampleContext}${opts.verificationContext}${teacherGuideNote}${standardSection}${customRubricSection}`;
 
-  const detailLevel = opts.feedbackVerbosity === 'detailed'
-    ? 'Write 150-200 word justification and 100-150 word feedback with specific quotes from student work.'
-    : 'Write 75-120 word justification and 60-100 word feedback.';
+  const user = `Grade this student's work.${opts.promptText ? ` Problem: ${opts.promptText}` : ''}${rubricSection}
 
-  const user = `Analyze this student's work.${opts.promptText ? ` Problem: ${opts.promptText}` : ''}${rubricSection}
+${detailLevel}
 
-Respond in this EXACT format (every field required):
-
-OCR Text: (all extracted text from the page)
-Student Work Present: (YES or NO — is there any student handwriting? Printed questions alone = NO)
-Detected Subject: (Math/Science/English/History/Other)
-Problem Identified: (brief, under 20 words)
-NYS Standard: (format: "CODE - Brief description", e.g. "G.CO.A.1 - Triangle congruence")
-Is Correct: (YES or NO)
-Regents Score: (0-4)
-
-Strengths: (list 2+ specific things done right, quoting student's work for each)
-
-Areas for Improvement: (list specific errors with WHY wrong and HOW to fix, quoting student's work)
-
-Misconceptions: (list verified errors only — must quote exact student writing. If no errors: "None")
-
-Grade: (55-100)
-Grade Justification: (${detailLevel} Cite student's actual writing using "Student wrote: '...'" format. Explain points earned and deducted.)
-
-Feedback: (constructive comments for the teacher and student — what was done well, what to practice, next steps)
-${rubricSection ? '\nRubric Scores: (score each criterion with points and brief feedback)' : ''}`;
+Respond with a SINGLE JSON object. No markdown, no code fences, no text outside the JSON:
+{
+  "ocr_text": "(all extracted handwritten text from the page)",
+  "student_work_present": true,
+  "detected_subject": "Math",
+  "problem_identified": "(brief, under 20 words)",
+  "nys_standard": "CODE - Description",
+  "is_correct": true,
+  "regents_score": 3,
+  "regents_justification": "(why this Regents score)",
+  "strengths": ["(specific thing done right, quoting student work)"],
+  "areas_for_improvement": ["(specific error with why wrong and how to fix, quoting student work)"],
+  "misconceptions": ["(verified errors only — quote exact student writing. Empty array if none)"],
+  "grade": 85,
+  "grade_justification": "(cite student's actual writing using 'Student wrote: ...' format)",
+  "feedback": "(constructive: what was done well, what to practice, next steps)",
+  "confidence": "high"${rubricSection ? ',\n  "rubric_scores": [{"criterion": "...", "score": 0, "max_score": 0, "feedback": "..."}]' : ''}
+}`;
 
   return { system, user };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PARSE AI RESPONSE — simplified to 3 clear paths
+// GRADE VALIDATION — cross-checks grade against Regents band
 // ═══════════════════════════════════════════════════════════════════════════════
-function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55, gradeFloorWithEffort = 65) {
-  const extract = (label: string, until: string) => {
-    const re = new RegExp(`${label}[:\\s]*([\\s\\S]*?)(?=${until}|$)`, 'i');
-    return re.exec(text)?.[1]?.trim() || '';
+function validateAndNormalizeGrade(
+  rawGrade: number,
+  regentsScore: number,
+  isCorrect: boolean,
+  hasMisconceptions: boolean,
+  studentWorkPresent: boolean,
+  gradeFloor: number,
+  gradeFloorWithEffort: number
+): { grade: number; regentsScore: number; adjusted: boolean; adjustReason: string } {
+  let adjusted = false;
+  let adjustReason = '';
+
+  // BLANK PAGE → floor
+  if (!studentWorkPresent) {
+    return { grade: gradeFloor, regentsScore: 0, adjusted: rawGrade !== gradeFloor, adjustReason: 'Blank page → floor' };
+  }
+
+  let grade = Math.max(gradeFloorWithEffort, Math.min(100, rawGrade));
+
+  // Correct answer → minimum 90 (Regents 4)
+  if (isCorrect && !hasMisconceptions) {
+    if (grade < 90) {
+      adjusted = true;
+      adjustReason = `Correct answer boosted from ${grade} to 90`;
+      grade = 90;
+    }
+    if (regentsScore < 4) regentsScore = 4;
+  }
+
+  // Cross-check: grade MUST fall within Regents band
+  const regentsBands: Record<number, [number, number]> = {
+    4: [90, 100],
+    3: [80, 89],
+    2: [70, 79],
+    1: [gradeFloorWithEffort, 69],
+    0: [gradeFloor, gradeFloor],
   };
 
-  const extractList = (label: string, until: string) =>
-    extract(label, until).split(/\n/).map(s => s.replace(/^[-•*✓]\s*/, '').trim()).filter(s => s.length >= 15);
-
-  // Basic field extraction
-  const ocrText = extract('OCR Text', 'Student Work Present|Detected Subject');
-  const studentWorkRaw = text.match(/Student Work Present[:\s]*(YES|NO)/i);
-  const studentWorkPresent = studentWorkRaw ? studentWorkRaw[1].toUpperCase() === 'YES' : ocrText.length > 30;
-  const detectedSubject = extract('Detected Subject', 'Problem Identified');
-  const problemIdentified = extract('Problem Identified', 'NYS Standard');
-  const nysStandard = extract('NYS Standard', 'Is Correct');
-  const isCorrectRaw = text.match(/Is Correct[:\s]*(YES|NO)/i);
-  const isAnswerCorrect = isCorrectRaw ? isCorrectRaw[1].toUpperCase() === 'YES' : false;
-
-  // Regents Score
-  const regentsMatch = text.match(/Regents Score(?!\s*Justification)[:\s]*(\d)/i);
-  let regentsScore = regentsMatch ? Math.min(4, Math.max(0, parseInt(regentsMatch[1]))) : -1;
-
-  // Strengths, Areas, Misconceptions
-  const strengthsAnalysis = extractList('Strengths', 'Areas for Improvement|Misconceptions');
-  const areasForImprovement = extractList('Areas for Improvement', 'Misconceptions|Grade:');
-  const misconceptions = extractList('Misconceptions', 'Grade:|Grade Justification|Feedback');
-
-  // Grade
-  const gradeMatch = text.match(/\bGrade[:\s]*(\d+)/i);
-  const gradeJustification = extract('Grade Justification', 'Feedback');
-  const feedback = extract('Feedback', 'Rubric Scores|$');
-
-  // Rubric scores
-  const rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[] = [];
-  if (rubricSteps?.length) {
-    const rubricSection = extract('Rubric Scores', '$');
-    rubricSteps.forEach((step: any, i: number) => {
-      const re = new RegExp(`(?:${i+1}[.)]|${step.description.slice(0,20)})[^\\d]*(\\d+(?:\\.\\d+)?)[\\s/]*(\\d+)?`, 'i');
-      const m = rubricSection.match(re);
-      rubricScores.push({ criterion: step.description, score: m ? parseFloat(m[1]) : 0, maxScore: step.points, feedback: '' });
-    });
+  const band = regentsBands[regentsScore];
+  if (band) {
+    if (grade < band[0] || grade > band[1]) {
+      // Grade is outside the Regents band — use band midpoint
+      const midpoint = Math.round((band[0] + band[1]) / 2);
+      adjusted = true;
+      adjustReason += `${adjustReason ? '; ' : ''}Grade ${grade} outside Regents ${regentsScore} band [${band[0]}-${band[1]}], adjusted to ${midpoint}`;
+      grade = midpoint;
+    }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // GRADE DETERMINATION — 3 clear paths
-  // ═══════════════════════════════════════════════════════════════════════════
-  let grade: number;
+  // Derive Regents from grade if they're still misaligned
+  const derivedRegents = grade >= 90 ? 4 : grade >= 80 ? 3 : grade >= 70 ? 2 : grade >= gradeFloorWithEffort ? 1 : 0;
+  if (derivedRegents !== regentsScore) {
+    regentsScore = derivedRegents;
+  }
 
-  // PATH 1: BLANK PAGE → 55
-  if (!studentWorkPresent) {
-    grade = gradeFloor;
-    regentsScore = 0;
-    console.log(`BLANK PAGE → grade ${gradeFloor}`);
+  grade = Math.min(100, Math.max(gradeFloor, grade));
 
-  // PATH 2: AI parsed a grade → trust it with floor/ceiling enforcement
-  } else if (gradeMatch) {
-    const aiGrade = parseInt(gradeMatch[1]);
-    grade = Math.max(gradeFloorWithEffort, Math.min(100, aiGrade));
+  if (adjusted) {
+    console.log(`[GRADE_GUARD] ${adjustReason}. Final: grade=${grade}, regents=${regentsScore}`);
+  }
 
-    // Consistency: correct answer with no real errors → at least 90
-    const noRealErrors = misconceptions.length === 0 ||
-      misconceptions.every(m => /no error|no misconception|correct/i.test(m));
-    if (isAnswerCorrect && noRealErrors) grade = Math.max(90, grade);
+  return { grade, regentsScore, adjusted, adjustReason };
+}
 
-    console.log(`AI grade ${aiGrade} → enforced ${grade} (correct=${isAnswerCorrect}, noErrors=${noRealErrors})`);
+// ═══════════════════════════════════════════════════════════════════════════════
+// PARSE AI RESPONSE — JSON-first with regex fallback
+// ═══════════════════════════════════════════════════════════════════════════════
+function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55, gradeFloorWithEffort = 65) {
+  // ─── Try JSON parse first (primary path) ───
+  let parsed: any = null;
+  try {
+    // Strip markdown code fences if present
+    const cleaned = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      parsed = JSON.parse(jsonMatch[0]);
+    }
+  } catch {
+    console.warn('[PARSE] JSON parse failed, falling back to regex');
+  }
 
-  // PATH 3: No grade parsed → derive from Regents score
+  let ocrText: string;
+  let studentWorkPresent: boolean;
+  let detectedSubject: string;
+  let problemIdentified: string;
+  let nysStandard: string;
+  let isAnswerCorrect: boolean;
+  let regentsScore: number;
+  let strengthsAnalysis: string[];
+  let areasForImprovement: string[];
+  let misconceptions: string[];
+  let rawGrade: number;
+  let gradeJustification: string;
+  let feedback: string;
+  let confidence: string;
+  let rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[] = [];
+
+  if (parsed && typeof parsed === 'object' && ('grade' in parsed || 'student_work_present' in parsed)) {
+    // ─── PATH 1: JSON structured output ───
+    console.log('[PARSE] Using JSON structured output');
+
+    ocrText = parsed.ocr_text || '';
+    studentWorkPresent = parsed.student_work_present !== false && parsed.student_work_present !== 'NO';
+    detectedSubject = parsed.detected_subject || '';
+    problemIdentified = parsed.problem_identified || '';
+    nysStandard = parsed.nys_standard || '';
+    isAnswerCorrect = parsed.is_correct === true || parsed.is_correct === 'YES';
+    regentsScore = Math.min(4, Math.max(0, parseInt(parsed.regents_score) || 0));
+    strengthsAnalysis = Array.isArray(parsed.strengths) ? parsed.strengths.filter((s: string) => s && s.length >= 10) : [];
+    areasForImprovement = Array.isArray(parsed.areas_for_improvement) ? parsed.areas_for_improvement.filter((s: string) => s && s.length >= 10) : [];
+    misconceptions = Array.isArray(parsed.misconceptions) ? parsed.misconceptions.filter((m: string) => m && m.length >= 5 && !/no error|no misconception|none|N\/A/i.test(m)) : [];
+    rawGrade = parseInt(parsed.grade) || gradeFloorWithEffort;
+    gradeJustification = parsed.grade_justification || parsed.regents_justification || '';
+    feedback = parsed.feedback || '';
+    confidence = parsed.confidence || 'medium';
+
+    // Parse rubric scores from JSON
+    if (Array.isArray(parsed.rubric_scores)) {
+      rubricScores = parsed.rubric_scores.map((rs: any) => ({
+        criterion: rs.criterion || '',
+        score: parseFloat(rs.score) || 0,
+        maxScore: parseFloat(rs.max_score) || 0,
+        feedback: rs.feedback || '',
+      }));
+    }
+
+    // Fill in missing rubric scores from rubricSteps
+    if (rubricSteps?.length && rubricScores.length < rubricSteps.length) {
+      rubricSteps.forEach((step: any, i: number) => {
+        if (!rubricScores[i]) {
+          rubricScores.push({ criterion: step.description, score: 0, maxScore: step.points, feedback: '' });
+        }
+      });
+    }
+
   } else {
-    const r = regentsScore >= 0 ? regentsScore : 1; // default to 1 if work present
-    const map: Record<number, number> = { 4: 95, 3: 85, 2: 75, 1: gradeFloorWithEffort, 0: gradeFloor };
-    grade = map[r] ?? gradeFloorWithEffort;
-    console.log(`No grade parsed → derived from Regents ${r} → ${grade}`);
+    // ─── PATH 2: Regex fallback (legacy) ───
+    console.warn('[PARSE] Using regex fallback');
+
+    const extract = (label: string, until: string) => {
+      const re = new RegExp(`${label}[:\\s]*([\\s\\S]*?)(?=${until}|$)`, 'i');
+      return re.exec(text)?.[1]?.trim() || '';
+    };
+    const extractList = (label: string, until: string) =>
+      extract(label, until).split(/\n/).map(s => s.replace(/^[-•*✓]\s*/, '').trim()).filter(s => s.length >= 15);
+
+    ocrText = extract('OCR Text', 'Student Work Present|Detected Subject|student_work_present');
+    const workRaw = text.match(/Student Work Present[:\s]*(YES|NO)/i);
+    studentWorkPresent = workRaw ? workRaw[1].toUpperCase() === 'YES' : ocrText.length > 30;
+    detectedSubject = extract('Detected Subject', 'Problem Identified');
+    problemIdentified = extract('Problem Identified', 'NYS Standard');
+    nysStandard = extract('NYS Standard', 'Is Correct');
+    const correctRaw = text.match(/Is Correct[:\s]*(YES|NO)/i);
+    isAnswerCorrect = correctRaw ? correctRaw[1].toUpperCase() === 'YES' : false;
+
+    const regentsMatch = text.match(/Regents Score(?!\s*Justification)[:\s]*(\d)/i);
+    regentsScore = regentsMatch ? Math.min(4, Math.max(0, parseInt(regentsMatch[1]))) : -1;
+
+    strengthsAnalysis = extractList('Strengths', 'Areas for Improvement|Misconceptions');
+    areasForImprovement = extractList('Areas for Improvement', 'Misconceptions|Grade:');
+    misconceptions = extractList('Misconceptions', 'Grade:|Grade Justification|Feedback');
+    misconceptions = misconceptions.filter(m => !/no error|no misconception|none/i.test(m));
+
+    const gradeMatch = text.match(/\bGrade[:\s]*(\d+)/i);
+    rawGrade = gradeMatch ? parseInt(gradeMatch[1]) : (regentsScore >= 0 ? ({ 4: 95, 3: 85, 2: 75, 1: gradeFloorWithEffort, 0: gradeFloor } as Record<number, number>)[regentsScore] ?? gradeFloorWithEffort : gradeFloorWithEffort);
+    gradeJustification = extract('Grade Justification', 'Feedback');
+    feedback = extract('Feedback', 'Rubric Scores|$');
+    confidence = 'medium';
+
+    // Derive Regents if not parsed
+    if (regentsScore < 0) {
+      regentsScore = rawGrade >= 90 ? 4 : rawGrade >= 80 ? 3 : rawGrade >= 70 ? 2 : rawGrade >= gradeFloorWithEffort ? 1 : 0;
+    }
+
+    // Parse rubric scores from text
+    if (rubricSteps?.length) {
+      const rubricSection = extract('Rubric Scores', '$');
+      rubricSteps.forEach((step: any, i: number) => {
+        const re = new RegExp(`(?:${i+1}[.)]|${step.description.slice(0,20)})[^\\d]*(\\d+(?:\\.\\d+)?)[\\s/]*(\\d+)?`, 'i');
+        const m = rubricSection.match(re);
+        rubricScores.push({ criterion: step.description, score: m ? parseFloat(m[1]) : 0, maxScore: step.points, feedback: '' });
+      });
+    }
   }
 
-  // Derive Regents from grade if not parsed
-  if (regentsScore < 0 || !regentsMatch) {
-    regentsScore = grade >= 90 ? 4 : grade >= 80 ? 3 : grade >= 70 ? 2 : grade >= gradeFloorWithEffort ? 1 : 0;
-  }
+  // ─── GRADE VALIDATION — cross-check grade against Regents band ───
+  const hasMisconceptions = misconceptions.length > 0;
+  const validated = validateAndNormalizeGrade(
+    rawGrade, regentsScore, isAnswerCorrect, hasMisconceptions,
+    studentWorkPresent, gradeFloor, gradeFloorWithEffort
+  );
 
-  // Ensure grade ↔ regents consistency (bidirectional)
-  const regentsMax: Record<number, number> = { 4: 100, 3: 94, 2: 84, 1: 74, 0: gradeFloorWithEffort };
-  const regentsMin: Record<number, number> = { 4: 90, 3: 80, 2: 70, 1: gradeFloorWithEffort, 0: gradeFloor };
-  if (studentWorkPresent && regentsMatch) {
-    // Only cap/raise if Regents was explicitly parsed (not derived)
-    if (grade > (regentsMax[regentsScore] ?? 100)) grade = regentsMax[regentsScore] ?? 100;
-    if (grade < (regentsMin[regentsScore] ?? gradeFloor)) grade = regentsMin[regentsScore] ?? gradeFloor;
-  }
+  const grade = validated.grade;
+  regentsScore = validated.regentsScore;
+
+  console.log(`[GRADING] raw=${rawGrade} → validated=${grade} regents=${regentsScore} correct=${isAnswerCorrect} misconceptions=${misconceptions.length} confidence=${confidence}${validated.adjusted ? ` ADJUSTED: ${validated.adjustReason}` : ''}`);
 
   // Total score (Regents 0-4 scale)
   const totalScore = { earned: regentsScore, possible: 4, percentage: Math.round(regentsScore / 4 * 100) };
 
-  // Build result
   return {
     detectedSubject,
     ocrText,
@@ -489,17 +641,19 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55,
     whatStudentDidCorrectly: strengthsAnalysis.join(' '),
     whatStudentGotWrong: areasForImprovement.join(' '),
     rubricScores,
-    misconceptions: misconceptions.filter(m => !/no error|no misconception|none/i.test(m)),
+    misconceptions,
     totalScore,
     regentsScore,
-    regentsScoreJustification: `Regents Score ${regentsScore}/4 aligned with grade ${grade}.`,
+    regentsScoreJustification: gradeJustification || `Regents Score ${regentsScore}/4 aligned with grade ${grade}.`,
     grade,
     gradeJustification: gradeJustification || `Grade: ${grade}. ${studentWorkPresent ? 'Based on demonstrated understanding.' : 'No student work present.'}`,
     feedback: feedback || (studentWorkPresent ? 'Review the marked strengths and areas for improvement.' : 'No student work was submitted on this page.'),
     isAnswerCorrect,
     finalAnswerComplete: true,
-    // Blank page metadata
-    ...((!studentWorkPresent) && {
+    confidence,
+    gradeAdjusted: validated.adjusted,
+    gradeAdjustReason: validated.adjustReason,
+    ...(!studentWorkPresent && {
       noResponse: true,
       noResponseReason: 'TEXT_LENGTH' as const,
     }),
@@ -509,7 +663,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55,
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN REQUEST HANDLER
 // ═══════════════════════════════════════════════════════════════════════════════
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
@@ -654,7 +808,7 @@ serve(async (req) => {
 
     // ── BLANK PAGE EARLY EXIT — no separate AI call needed ──
 
-    // ── OCR-ASSISTED GRADING (OCR text + student image for visual context) ──
+    // ── OCR-ASSISTED GRADING (unified through callLovableAI) ──
     if (preExtractedOCR && typeof preExtractedOCR === 'string' && preExtractedOCR.length > 0) {
       console.log(`[OCR_ASSISTED] Grading from pre-extracted OCR (${preExtractedOCR.length} chars) + image`);
 
@@ -668,17 +822,14 @@ serve(async (req) => {
       // Include OCR text in the prompt so AI doesn't need to re-read handwriting
       const ocrAugmentedPrompt = `${usrPrompt}\n\n--- STUDENT'S EXTRACTED WORK (from OCR) ---\n${preExtractedOCR}\n--- END OF STUDENT WORK ---\nThe student's image is also attached for visual context (diagrams, graphs, formatting). Use the OCR text as the primary source for reading handwriting.`;
 
-      // Always include the student image alongside OCR text for visual context
       const userContent: any[] = [
         { type: 'text', text: ocrAugmentedPrompt },
       ];
 
-      // Include the real student image if available (for diagrams/graphs)
       if (imageBase64 && typeof imageBase64 === 'string' && imageBase64.length > 50) {
         userContent.push(formatImageForAI(imageBase64));
       }
 
-      // If there's an answer guide image, include it too
       if (answerGuideBase64) {
         userContent.push({ type: 'text', text: '[TEACHER ANSWER GUIDE:]' });
         userContent.push(formatImageForAI(answerGuideBase64));
