@@ -246,6 +246,90 @@ Sent when a teacher updates student information (name, email).
 
 ---
 
+### 6. Work Submitted (Student → Teacher)
+
+Sent when a student completes assigned work on the Scholar App and presses "Push to Teacher." This is an **inbound** event received by the `nycologic-webhook` or `receive-sister-app-data` edge functions.
+
+**Automatic behavior:**
+- Score is saved to `grade_history`
+- Full submission is logged to `sister_app_sync_log` (action: `work_submitted`)
+- A **push notification** is sent to the teacher: *"Jane Doe submitted Linear Equations Practice (78%)"*
+- The submission appears as a pending item on the teacher's dashboard
+
+```json
+{
+  "action": "work_submitted",
+  "student_id": "uuid-of-student",
+  "data": {
+    "student_name": "Jane Doe",
+    "class_id": "uuid-of-class",
+    "assignment_title": "Linear Equations Practice",
+    "topic_name": "Linear Equations",
+    "standard_code": "A.REI.3",
+    "score": 78,
+    "questions_attempted": 5,
+    "questions_correct": 4,
+    "time_spent_minutes": 12,
+    "answers": [
+      {
+        "questionNumber": 1,
+        "studentAnswer": "x = 3",
+        "isCorrect": true
+      },
+      {
+        "questionNumber": 2,
+        "studentAnswer": "x = -2",
+        "isCorrect": false,
+        "correctAnswer": "x = 2"
+      }
+    ],
+    "completed_at": "2026-02-11T14:30:00Z",
+    "source_assignment_id": "uuid-of-original-pushed-assignment"
+  }
+}
+```
+
+#### Work Submitted Data Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `student_name` | string | No | Display name of the student |
+| `class_id` | string | No | UUID of the class (used to resolve teacher) |
+| `assignment_title` | string | No | Title of the completed assignment |
+| `topic_name` | string | No | Math topic covered |
+| `standard_code` | string | No | NYS standard code (e.g., "A.REI.3") |
+| `score` | number | No | Percentage score (0-100) |
+| `questions_attempted` | number | No | Total questions attempted |
+| `questions_correct` | number | No | Number answered correctly |
+| `time_spent_minutes` | number | No | Time spent on the assignment |
+| `answers` | array | No | Per-question answer details (see below) |
+| `completed_at` | string | No | ISO timestamp of completion |
+| `source_assignment_id` | string | No | Reference to the original assignment pushed from Nyclogic AI |
+
+#### Answer Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `questionNumber` | number | Sequential question number |
+| `studentAnswer` | string | The student's submitted answer |
+| `isCorrect` | boolean | Whether the answer was correct |
+| `correctAnswer` | string \| undefined | The correct answer (included when `isCorrect` is false) |
+
+#### Response
+
+```json
+{
+  "success": true,
+  "status": "work_received",
+  "student_found": true,
+  "grade_saved": true,
+  "topic": "Linear Equations",
+  "score": 78
+}
+```
+
+---
+
 ## Question Object Schema
 
 | Field | Type | Description |
@@ -417,3 +501,4 @@ curl -X POST https://your-scholar-app.com/api/receive-from-scangenius \
 | 2025-01-25 | Added `questions` array to grade_completed payload |
 | 2025-01-25 | Added difficulty levels: scaffolded, practice, challenge |
 | 2025-01-25 | Added targetMisconception field for remediation tracking |
+| 2026-02-11 | Added `work_submitted` inbound event for student-to-teacher submissions with auto push notification |
