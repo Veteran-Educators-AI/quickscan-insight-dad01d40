@@ -8,6 +8,12 @@ interface QRScanSettings {
   gradeCurvePercent: number;
 }
 
+// Simple in-memory cache so multiple components using this hook
+// don't all hit Supabase separately on initial load.
+let cachedSettings: QRScanSettings | null = null;
+let cachedUserId: string | null = null;
+let inFlightPromise: Promise<QRScanSettings | null> | null = null;
+
 export function useQRScanSettings() {
   const { user } = useAuth();
   const [settings, setSettings] = useState<QRScanSettings>({
@@ -18,23 +24,44 @@ export function useQRScanSettings() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchSettings = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
 
     try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('auto_qr_scan_enabled, auto_handwriting_grouping_enabled, grade_curve_percent')
-        .eq('teacher_id', user.id)
-        .maybeSingle();
+      // Use cached settings if we already fetched them for this user
+      if (cachedSettings && cachedUserId === user.id) {
+        setSettings(cachedSettings);
+        setIsLoading(false);
+        return;
+      }
 
-      if (error) throw error;
+      // Share in‑flight request across all hook instances
+      if (!inFlightPromise || cachedUserId !== user.id) {
+        cachedUserId = user.id;
+        inFlightPromise = (async () => {
+          const { data, error } = await supabase
+            .from('settings')
+            .select('auto_qr_scan_enabled, auto_handwriting_grouping_enabled, grade_curve_percent')
+            .eq('teacher_id', user.id)
+            .maybeSingle();
 
-      if (data) {
-        setSettings({
-          autoQRScanEnabled: data.auto_qr_scan_enabled ?? true,
-          autoHandwritingGroupingEnabled: data.auto_handwriting_grouping_enabled ?? false,
-          gradeCurvePercent: data.grade_curve_percent ?? 0,
-        });
+          if (error) throw error;
+
+          const next: QRScanSettings = {
+            autoQRScanEnabled: data?.auto_qr_scan_enabled ?? true,
+            autoHandwritingGroupingEnabled: data?.auto_handwriting_grouping_enabled ?? false,
+            gradeCurvePercent: data?.grade_curve_percent ?? 0,
+          };
+          cachedSettings = next;
+          return next;
+        })();
+      }
+
+      const next = await inFlightPromise;
+      if (next) {
+        setSettings(next);
       }
     } catch (err) {
       console.error('Error fetching QR scan settings:', err);
@@ -65,7 +92,15 @@ export function useQRScanSettings() {
 
       if (error) throw error;
 
-      setSettings(prev => ({ ...prev, ...newSettings }));
+      setSettings(prev => {
+        const merged = { ...prev, ...newSettings };
+        // Keep cache in sync for this user
+        if (user?.id) {
+          cachedUserId = user.id;
+          cachedSettings = merged;
+        }
+        return merged;
+      });
       return true;
     } catch (err) {
       console.error('Error updating QR scan settings:', err);

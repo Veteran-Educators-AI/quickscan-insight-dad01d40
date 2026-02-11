@@ -128,7 +128,10 @@ export default function Scan() {
   const { analyze, analyzeWithTeacherGuide, runBothAnalyses, compareWithSolution, cancelAnalysis, isAnalyzing, isComparing, error, result, setResult, teacherGuidedResult, setTeacherGuidedResult, rawAnalysis, setRawAnalysis, comparisonResult } = useAnalyzeStudentWork();
   const { saveSession, loadSession, clearSession } = useScanSessionPersistence();
   const batch = useBatchAnalysis();
-  const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans();
+  // Only auto-fetch pending scans when the Saved tab is active to avoid extra traffic
+  const { pendingScans, refresh: refreshPendingScans, updateScanStatus } = usePendingScans({
+    autoFetch: scanMode === 'saved',
+  });
   const { saveResults, saveMultiQuestionResults, isSaving, syncStatus, resetSyncStatus } = useSaveAnalysisResults();
   const { scanImageForQR, isScanning: isQRScanning, scanResult: qrScanResult, clearResult: clearQRResult } = useQRCodeScanner();
   const { settings: qrScanSettings } = useQRScanSettings();

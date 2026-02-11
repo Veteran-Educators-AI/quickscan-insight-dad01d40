@@ -66,7 +66,7 @@ async function extractTextFromImage(imageBase64: string, apiKey: string): Promis
   return fullText.trim();
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -102,18 +102,26 @@ serve(async (req) => {
           })
           .catch(err => {
             console.error(`[OCR] Page ${i + 1} failed:`, err.message);
-            return `[OCR FAILED FOR PAGE ${i + 1}]`;
+            return null;
           })
       )
     );
 
+    // Filter out failed pages
+    const validPages = results.filter(p => p !== null) as string[];
+
+    // If all pages failed (or no text found), extract process failed
+    if (validPages.length === 0) {
+      throw new Error('OCR failed to extract text from image(s)');
+    }
+
     // Combine pages with markers
     let combinedText: string;
     if (results.length === 1) {
-      combinedText = results[0];
+      combinedText = validPages[0];
     } else {
       combinedText = results
-        .map((text, i) => `--- PAGE ${i + 1} ---\n${text}`)
+        .map((text, i) => (text !== null) ? `--- PAGE ${i + 1} ---\n${text}` : `--- PAGE ${i + 1} (OCR FAILED) ---`)
         .join('\n\n');
     }
 
@@ -124,7 +132,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         ocrText: combinedText,
-        pages: results,
+        pages: results, // Keep nulls here if needed for debugging, or cleaner: results.map(r => r || "")
         pageCount: results.length,
         latencyMs,
       }),

@@ -1197,7 +1197,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
           last_name: s.last_name,
           student_id: s.student_id,
         })),
-      }, { maxRetries: 2 });
+      }, { maxRetries: 0 });
 
       if (error) {
         console.error('[identifyStudent] Edge function error:', error);
@@ -1360,7 +1360,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         teacherId: user?.id,
         assessmentMode: assessmentMode || 'teacher',
         promptText,
-      }, { maxRetries: 2 });
+      }, { maxRetries: 0 });
 
       if (error) {
         const errorMsg = handleApiError(error, 'Analysis');
@@ -1431,7 +1431,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
           const { data, error } = await invokeWithRetry('analyze-student-work', {
             imageBase64: item.imageDataUrl,
             detectPageType: true,
-          }, { maxRetries: 1 });
+          }, { maxRetries: 0 });
 
           return { i, item, data, error, exception: null };
         } catch (err) {
@@ -1903,7 +1903,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       // to avoid payload bloat and timeouts
 
       const { data, error } = await invokeWithRetry('analyze-student-work', requestBody, {
-        maxRetries: 1,
+        maxRetries: 0,
       });
 
       if (error) {
@@ -2269,7 +2269,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
             studentName: item.studentName,
             teacherId: user?.id,
             assessmentMode: 'teacher-guided',
-          }, { maxRetries: 1 });
+          }, { maxRetries: 0 });
 
           if (error) {
             const errorMsg = handleApiError(error, 'Analysis');
