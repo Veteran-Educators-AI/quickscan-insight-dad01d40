@@ -10,7 +10,7 @@ import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
 import { parseUnifiedStudentQRCode } from '@/components/print/StudentPageQRCode';
 import { toast } from 'sonner';
 import { compressImage } from '@/lib/imageUtils';
-import { detectBlankPage } from '@/lib/blankPageDetection';
+// Blank page detection is done inline via alphanumeric character count (<30 chars = blank)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RESILIENT EDGE FUNCTION INVOCATION
@@ -204,11 +204,11 @@ async function invokeWithRetry(
   };
 }
 
-/** Delay between sequential batch items to avoid overwhelming the edge function */
-const BATCH_ITEM_DELAY_MS = 1500;
+/** Delay between sequential batch items to avoid hitting the 50/hour rate limit */
+const BATCH_ITEM_DELAY_MS = 3000;
 
-/** Number of papers to analyze concurrently in batch mode */
-const BATCH_CONCURRENCY = 2;
+/** Number of papers to analyze concurrently in batch mode (sequential to preserve rate limit) */
+const BATCH_CONCURRENCY = 1;
 
 const BATCH_STORAGE_KEY = 'scan-genius-batch-data';
 const BATCH_SUMMARY_KEY = 'scan-genius-batch-summary';
@@ -1353,6 +1353,48 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         };
       }
 
+      // Blank page guard for single-item analysis (non-continuation path)
+      // Run a quick OCR to check for blank pages before calling the grading AI
+      let singleOcrText: string | null = null;
+      try {
+        const { data: ocrData, error: ocrError } = await supabase.functions.invoke('ocr-student-work', {
+          body: { imageBase64: item.imageDataUrl },
+        });
+        if (!ocrError && ocrData?.success && ocrData?.ocrText) {
+          singleOcrText = ocrData.ocrText;
+        }
+      } catch { /* OCR failed, continue to AI */ }
+
+      const alphaOnly = (singleOcrText || '').replace(/[^a-zA-Z0-9]/g, '');
+      if (alphaOnly.length < 30) {
+        console.log(`[analyzeItem] Blank page detected (${alphaOnly.length} alphanumeric chars). Skipping AI call.`);
+        return {
+          ...item,
+          status: 'completed' as const,
+          result: {
+            ocrText: singleOcrText || '',
+            problemIdentified: 'Blank or nearly blank page',
+            approachAnalysis: 'No student work detected',
+            strengthsAnalysis: [],
+            areasForImprovement: ['No work submitted'],
+            whatStudentDidCorrectly: '',
+            whatStudentGotWrong: 'No work was submitted for this page',
+            rubricScores: (rubricSteps || []).map(step => ({
+              criterion: step.description || (step as any).step_number?.toString() || 'Step',
+              score: 0,
+              maxScore: step.points,
+              feedback: 'No work shown',
+            })),
+            misconceptions: [],
+            totalScore: { earned: 0, possible: rubricSteps?.reduce((s, r) => s + r.points, 0) || 6, percentage: 0 },
+            grade: 45,
+            gradeJustification: 'No student work detected on this page.',
+            feedback: 'No student work detected.',
+            studentWorkPresent: false,
+          } as AnalysisResult,
+        };
+      }
+
       const { data, error } = await invokeWithRetry('analyze-student-work', {
         imageBase64: item.imageDataUrl,
         rubricSteps,
@@ -1360,6 +1402,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         teacherId: user?.id,
         assessmentMode: assessmentMode || 'teacher',
         promptText,
+        preExtractedOCR: singleOcrText || undefined,
       }, { maxRetries: 2 });
 
       if (error) {
@@ -1844,19 +1887,20 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         console.warn('[OCR] Exception, falling back:', ocrErr.message);
       }
 
-      // STEP 1.5: Blank page detection — skip expensive AI grading for empty pages
-      // Only check combined OCR text (continuation pages included), so a blank
-      // second page with a filled first page is fine.
-      if (ocrText !== null) {
-        const blankCheck = detectBlankPage(ocrText, 30);
-        if (blankCheck.isBlank) {
-          console.log(`[BlankPageDetection] Page detected as blank (${blankCheck.normalizedLength} chars). Skipping AI grading.`);
-          const gradeFloor = 55; // default; will be overridden by BlankPageSettings in the UI layer
+      // STEP 1.5: Blank page detection — skip AI grading entirely for empty pages.
+      // Strip all non-alphanumeric chars and check if fewer than 30 remain.
+      // For linked/continuation pages, OCR text is already combined so a blank
+      // second page with a filled first page passes through fine.
+      {
+        const textToCheck = ocrText || '';
+        const alphanumericOnly = textToCheck.replace(/[^a-zA-Z0-9]/g, '');
+        if (alphanumericOnly.length < 30) {
+          console.log(`[BlankPageDetection] Blank page detected (${alphanumericOnly.length} alphanumeric chars). Skipping AI call entirely.`);
           return {
             ...item,
             status: 'completed' as const,
             result: {
-              ocrText: ocrText || '',
+              ocrText: textToCheck,
               problemIdentified: 'Blank or nearly blank page',
               approachAnalysis: 'No student work detected',
               strengthsAnalysis: [],
@@ -1871,9 +1915,9 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
               })),
               misconceptions: [],
               totalScore: { earned: 0, possible: rubricSteps?.reduce((s, r) => s + r.points, 0) || 6, percentage: 0 },
-              grade: gradeFloor,
+              grade: 45,
               gradeJustification: 'No student work detected on this page.',
-              feedback: 'This page appears to be blank. Please submit your work.',
+              feedback: 'No student work detected.',
               studentWorkPresent: false,
             } as AnalysisResult,
           };
