@@ -69,21 +69,30 @@ interface AICallOptions {
 async function callLovableAI(
   messages: any[], _apiKey: string, functionName = 'analyze-student-work',
   supabase?: any, userId?: string, modelTier: AIModelTier = 'lite',
-  analysisProvider: AnalysisProvider = 'gpt4o'
+  analysisProvider: AnalysisProvider = 'gpt4o',
+  options: AICallOptions = {}
 ) {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) throw new Error('OPENAI_API_KEY is not configured');
 
-  const model = modelTier === 'standard' ? getAnalysisModel(analysisProvider) : LITE_MODEL;
+  const model = options.modelOverride || (modelTier === 'standard' ? getAnalysisModel(analysisProvider) : LITE_MODEL);
   const maxTokens = modelTier === 'standard' ? 4000 : 2000;
   const startTime = Date.now();
 
-  console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier}`);
+  // DETERMINISTIC DEFAULTS: temperature=0, seed=42 for grading consistency
+  const temperature = options.temperature ?? 0;
+  const top_p = options.top_p ?? 1;
+  const seed = options.seed ?? 42;
+
+  console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier} temp=${temperature} seed=${seed}`);
 
   const requestBody = JSON.stringify({
     model,
     messages,
     max_completion_tokens: maxTokens,
+    temperature,
+    top_p,
+    seed,
   });
 
   const MAX_RETRIES = 1;
@@ -366,32 +375,38 @@ STEP 1 — EXTRACT: Read ALL student handwriting from the entire page including 
 STEP 2 — DETECT: Is there student handwriting? (Printed questions alone = NO student work)
 STEP 3 — IDENTIFY: What problem/question is being answered? What subject area?
 STEP 4 — EVALUATE: Check the final answer and work shown against the standard/rubric.
-STEP 5 — SCORE using this STRICT decision tree:
+STEP 5 — SCORE using this STRICT decision tree (use the EXACT grade values shown):
 
-  ┌─ Correct final answer + complete work shown ──────────► 90-100 (Regents 4)
-  ├─ Correct final answer + partial/incomplete work ──────► 85-94  (Regents 3-4)
-  ├─ Mostly correct (right approach, minor errors) ───────► 80-89  (Regents 3)
-  ├─ Partially correct (some understanding, wrong answer) ► 70-79  (Regents 2)
-  ├─ Minimal understanding shown (confused attempt) ──────► ${opts.gradeFloorWithEffort}-69 (Regents 1)
-  └─ Blank page / no student work ────────────────────────► ${opts.gradeFloor}    (Regents 0)
+  ┌─ PERFECT: Correct final answer + complete work shown ──► 97 (Regents 4)
+  ├─ EXCELLENT: Correct answer + minor work omission ──────► 93 (Regents 4)
+  ├─ GOOD: Correct answer + significant work gaps ─────────► 88 (Regents 3)
+  ├─ ADEQUATE: Right approach, minor computational error ──► 83 (Regents 3)
+  ├─ DEVELOPING: Some understanding, wrong final answer ───► 75 (Regents 2)
+  ├─ MINIMAL: Confused attempt, little understanding ──────► ${opts.gradeFloorWithEffort} (Regents 1)
+  └─ NO RESPONSE: Blank page / no student work ────────────► ${opts.gradeFloor} (Regents 0)
+
+IMPORTANT: You MUST output one of these EXACT grade values: 97, 93, 88, 83, 75, ${opts.gradeFloorWithEffort}, or ${opts.gradeFloor}.
+Do NOT interpolate or choose values between these anchors. Pick the anchor that best matches.
 
 STEP 6 — VERIFY: Re-read your justification. Does it support your grade? If not, adjust.
 
 CALIBRATION EXAMPLES (use these as scoring anchors):
-• Student correctly solves "3x + 5 = 20" showing "3x = 15, x = 5" → Grade: 95 (Regents 4)
-• Student writes "3x = 15, x = 5" but doesn't show subtracting 5 → Grade: 88 (Regents 3)
-• Student writes "3x = 25, x = 8.3" (wrong subtraction, right method) → Grade: 75 (Regents 2)
-• Student writes "x = 7" with no work shown → Grade: ${opts.gradeFloorWithEffort} (Regents 1)
-• Blank page → Grade: ${opts.gradeFloor} (Regents 0)
+• Student correctly solves "3x + 5 = 20" showing all steps "3x+5=20, 3x=15, x=5" → Grade: 97 (PERFECT)
+• Student writes "3x = 15, x = 5" but skips showing subtraction of 5 → Grade: 93 (EXCELLENT)
+• Student writes "x = 5" correct answer but shows no algebra work → Grade: 88 (GOOD)
+• Student writes "3x = 25, x = 8.3" (wrong subtraction but right method) → Grade: 83 (ADEQUATE)
+• Student writes "x = 25" wrong answer with confused attempt → Grade: 75 (DEVELOPING)
+• Student writes "x = 7" with no work, wrong answer, no understanding → Grade: ${opts.gradeFloorWithEffort} (MINIMAL)
+• Blank page → Grade: ${opts.gradeFloor} (NO RESPONSE)
 
-CONSISTENCY RULES:
-1. CORRECT final answer = MINIMUM grade of 90. Never grade a correct answer below 90.
-2. Grade MUST fall within the Regents score band (see decision tree above).
-3. If Regents = 3, grade MUST be 80-89. If Regents = 2, grade MUST be 70-79. Etc.
-4. Quote the student's actual written work as evidence for EVERY claim.
-5. If handwriting is hard to read, give your best interpretation and set confidence to "low".
-6. Do NOT penalize for messy handwriting if the work is mathematically correct.
-7. Be CONSISTENT: the same quality of work should receive the same grade every time.
+CONSISTENCY RULES (MANDATORY):
+1. CORRECT final answer = MINIMUM grade of 88. Never grade a correct answer below 88.
+2. You MUST use one of the exact anchor values: 97, 93, 88, 83, 75, ${opts.gradeFloorWithEffort}, ${opts.gradeFloor}.
+3. Quote the student's actual written work as evidence for EVERY claim.
+4. If handwriting is hard to read, give your best interpretation and set confidence to "low".
+5. Do NOT penalize for messy handwriting if the work is mathematically correct.
+6. Be CONSISTENT: the same quality of work MUST receive the same grade every time.
+7. When in doubt between two adjacent anchors, choose the HIGHER one.
 ${opts.gradingStyleContext}${opts.teacherAnswerSampleContext}${opts.verificationContext}${teacherGuideNote}${standardSection}${customRubricSection}`;
 
   const user = `Grade this student's work.${opts.promptText ? ` Problem: ${opts.promptText}` : ''}${rubricSection}
@@ -442,33 +457,48 @@ function validateAndNormalizeGrade(
 
   let grade = Math.max(gradeFloorWithEffort, Math.min(100, rawGrade));
 
-  // Correct answer → minimum 90 (Regents 4)
+  // Correct answer → minimum 88 (anchored at GOOD tier)
   if (isCorrect && !hasMisconceptions) {
-    if (grade < 90) {
+    if (grade < 88) {
       adjusted = true;
-      adjustReason = `Correct answer boosted from ${grade} to 90`;
-      grade = 90;
+      adjustReason = `Correct answer boosted from ${grade} to 88`;
+      grade = 88;
     }
-    if (regentsScore < 4) regentsScore = 4;
+    if (regentsScore < 3) regentsScore = 3;
   }
 
-  // Cross-check: grade MUST fall within Regents band
+  // Cross-check: snap grade to nearest valid anchor value
+  const GRADE_ANCHORS = [97, 93, 88, 83, 75, gradeFloorWithEffort, gradeFloor];
   const regentsBands: Record<number, [number, number]> = {
-    4: [90, 100],
-    3: [80, 89],
-    2: [70, 79],
-    1: [gradeFloorWithEffort, 69],
+    4: [91, 100],   // anchors: 93, 97
+    3: [81, 90],    // anchors: 83, 88
+    2: [70, 80],    // anchor: 75
+    1: [gradeFloorWithEffort, 69],  // anchor: gradeFloorWithEffort
     0: [gradeFloor, gradeFloor],
   };
 
+  // Snap grade to nearest anchor value for consistency
+  const nearestAnchor = GRADE_ANCHORS.reduce((prev, curr) =>
+    Math.abs(curr - grade) < Math.abs(prev - grade) ? curr : prev
+  );
+  if (nearestAnchor !== grade) {
+    adjusted = true;
+    adjustReason += `${adjustReason ? '; ' : ''}Snapped grade ${grade} to nearest anchor ${nearestAnchor}`;
+    grade = nearestAnchor;
+  }
+
+  // Verify grade falls within Regents band
   const band = regentsBands[regentsScore];
   if (band) {
     if (grade < band[0] || grade > band[1]) {
-      // Grade is outside the Regents band — use band midpoint
-      const midpoint = Math.round((band[0] + band[1]) / 2);
+      // Grade outside band — find the nearest anchor WITHIN the band
+      const validAnchors = GRADE_ANCHORS.filter(a => a >= band[0] && a <= band[1]);
+      const bestAnchor = validAnchors.length > 0
+        ? validAnchors.reduce((prev, curr) => Math.abs(curr - grade) < Math.abs(prev - grade) ? curr : prev)
+        : Math.round((band[0] + band[1]) / 2);
       adjusted = true;
-      adjustReason += `${adjustReason ? '; ' : ''}Grade ${grade} outside Regents ${regentsScore} band [${band[0]}-${band[1]}], adjusted to ${midpoint}`;
-      grade = midpoint;
+      adjustReason += `${adjustReason ? '; ' : ''}Grade ${grade} outside Regents ${regentsScore} band [${band[0]}-${band[1]}], snapped to anchor ${bestAnchor}`;
+      grade = bestAnchor;
     }
   }
 
@@ -802,6 +832,11 @@ serve(async (req: Request) => {
       } catch (e) { console.error('Verification fetch error:', e); }
     }
 
+    // ── Context fingerprint for debugging prompt drift ──
+    const contextHash = [gradingStyleContext, teacherAnswerSampleContext, verificationContext]
+      .map(s => s.length).join('-');
+    console.log(`[CONTEXT_FINGERPRINT] hash=${contextHash} style_len=${gradingStyleContext.length} samples_len=${teacherAnswerSampleContext.length} verif_len=${verificationContext.length}`);
+
     // ── BLANK PAGE EARLY EXIT — no separate AI call needed ──
 
     // ── OCR-ASSISTED GRADING (unified through callLovableAI) ──
@@ -831,44 +866,13 @@ serve(async (req: Request) => {
         userContent.push(formatImageForAI(answerGuideBase64));
       }
 
-      const messages: any[] = [
-        { role: 'system', content: sysPrompt },
-        { role: 'user', content: userContent },
-      ];
-
-      // Use gpt-4o for OCR-assisted grading (image + text = multimodal)
-      const textModel = 'gpt-4o';
-      const startTime = Date.now();
-      console.log(`[OCR_ASSISTED] Grading with model=${textModel}`);
-
-      const tokenParams = { max_completion_tokens: 4000 };
-      const requestBody2 = JSON.stringify({ model: textModel, messages, ...tokenParams });
-
-      const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 65000); // 65s timeout
-
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-        body: requestBody2, signal: controller.signal,
-      });
-      clearTimeout(tid);
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error(`[OCR_ASSISTED] AI error: ${response.status}`, errText);
-        if (response.status === 429) throw { status: 429, message: "Rate limit exceeded." };
-        if (response.status === 402) throw { status: 402, message: "AI credits exhausted." };
-        throw new Error(`AI API error: ${response.status}`);
-      }
-
-      const aiData = await response.json();
-      const latencyMs = Date.now() - startTime;
-      const usage = aiData.usage || {};
-      console.log(`[OCR_ASSISTED] Done: prompt=${usage.prompt_tokens || 0} completion=${usage.completion_tokens || 0} latency=${latencyMs}ms`);
-      if (supabase && effectiveTeacherId) await logAIUsage(supabase, effectiveTeacherId, 'analyze-student-work-ocr', usage, latencyMs);
-
-      const analysisText = aiData.choices?.[0]?.message?.content || '';
+      // Use callLovableAI for unified temp=0, seed=42, retry logic, and logging
+      const analysisText = await callLovableAI(
+        [{ role: 'system', content: sysPrompt }, { role: 'user', content: userContent }],
+        OPENAI_API_KEY, 'analyze-student-work-ocr', supabase, effectiveTeacherId,
+        'standard', analysisProvider,
+        { temperature: 0, seed: 42 }
+      );
 
       if (!analysisText) throw new Error('No analysis returned from AI');
 
@@ -916,18 +920,45 @@ serve(async (req: Request) => {
       for (const img of additionalImages) imageContent.push(formatImageForAI(img));
     }
 
-    // ── Call AI ──
+    // ── Call AI with consensus grading for maximum consistency ──
     console.log(`Grading with provider=${analysisProvider}, model=${getAnalysisModel(analysisProvider)}`);
-    const analysisText = await callLovableAI(
-      [{ role: 'system', content: systemPrompt }, { role: 'user', content: imageContent }],
-      OPENAI_API_KEY, 'analyze-student-work', supabase, effectiveTeacherId,
-      'standard', analysisProvider
-    );
+    const messages = [{ role: 'system', content: systemPrompt }, { role: 'user', content: imageContent }];
 
-    if (!analysisText) throw new Error('No analysis returned from AI');
+    // CONSENSUS GRADING: Call AI 3 times with different seeds, take median grade
+    const CONSENSUS_ROUNDS = 3;
+    const CONSENSUS_SEEDS = [42, 123, 256];
+    const consensusResults: { grade: number; result: any; analysisText: string }[] = [];
 
-    // ── Parse result ──
-    const result = parseAnalysisResult(analysisText, rubricSteps, gradeFloor, gradeFloorWithEffort);
+    for (let round = 0; round < CONSENSUS_ROUNDS; round++) {
+      console.log(`[CONSENSUS] Round ${round + 1}/${CONSENSUS_ROUNDS} seed=${CONSENSUS_SEEDS[round]}`);
+      const roundText = await callLovableAI(
+        messages as any,
+        OPENAI_API_KEY, 'analyze-student-work', supabase, effectiveTeacherId,
+        'standard', analysisProvider,
+        { temperature: 0, seed: CONSENSUS_SEEDS[round] }
+      );
+      if (!roundText) continue;
+      const roundResult = parseAnalysisResult(roundText, rubricSteps, gradeFloor, gradeFloorWithEffort);
+      consensusResults.push({ grade: roundResult.grade, result: roundResult, analysisText: roundText });
+    }
+
+    if (consensusResults.length === 0) throw new Error('No analysis returned from AI');
+
+    // Sort by grade and pick the median
+    consensusResults.sort((a, b) => a.grade - b.grade);
+    const medianIdx = Math.floor(consensusResults.length / 2);
+    const chosen = consensusResults[medianIdx];
+    const analysisText = chosen.analysisText;
+    const result = chosen.result;
+
+    // Log consensus spread
+    const grades = consensusResults.map(r => r.grade);
+    const spread = Math.max(...grades) - Math.min(...grades);
+    console.log(`[CONSENSUS] grades=[${grades.join(',')}] median=${chosen.grade} spread=${spread}`);
+    result.consensusGrades = grades;
+    result.consensusSpread = spread;
+
+
 
     // ── Handle blank page from grading result ──
     if (!result.studentWorkPresent && blankPageSettings?.enabled) {
