@@ -35,7 +35,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { BatchItem, AnalysisResult } from '@/hooks/useBatchAnalysis';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 import { useMultipleGradeTrends, TrendDirection } from '@/hooks/useGradeTrend';
-import { MisconceptionComparison } from './lazy';
+// Lazy-load directly (NOT from ./lazy barrel — this file IS in the barrel, so importing from it is circular)
+const MisconceptionComparison = React.lazy(() => import('./MisconceptionComparison'));
 
 // Extended result type that may include additional fields
 interface ExtendedAnalysisResult extends AnalysisResult {
