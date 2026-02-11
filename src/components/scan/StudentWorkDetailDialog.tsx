@@ -32,8 +32,9 @@ import {
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 import { ImageErrorOverlay } from './ImageErrorOverlay';
 
-// Import from centralized lazy barrel to prevent TDZ errors
-import { MisconceptionComparison, AIAnalysisCritiqueDialog } from './lazy';
+// Lazy-load directly (NOT from ./lazy barrel — this file IS in the barrel, so importing from it is circular)
+const MisconceptionComparison = React.lazy(() => import('./MisconceptionComparison'));
+const AIAnalysisCritiqueDialog = React.lazy(() => import('./AIAnalysisCritiqueDialog'));
 
 // Import from standalone utility to avoid TDZ circular dependency
 import { extractErrorRegions } from './extractErrorRegions';

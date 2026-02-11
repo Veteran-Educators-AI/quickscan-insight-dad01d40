@@ -12,11 +12,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
-
-// Lazy-load all sub-components to prevent TDZ / circular-init crashes
-// when the Scan chunk initializes in production builds.
-import { MisconceptionComparison, AIAnalysisCritiqueDialog } from './lazy';
+// Lazy-load ALL sub-components directly (NOT from ./lazy barrel) to prevent
+// TDZ / circular-init crashes ("Cannot access 'Z' before initialization")
+// in production builds where Vite may bundle barrel re-exports eagerly.
+const MisconceptionComparison = React.lazy(() => import('./MisconceptionComparison'));
+const AIAnalysisCritiqueDialog = React.lazy(() => import('./AIAnalysisCritiqueDialog'));
 const AIWorkDetector = React.lazy(() => import('./AIWorkDetector').then(m => ({ default: m.AIWorkDetector })));
 const GradeOverrideDialog = React.lazy(() => import('./GradeOverrideDialog').then(m => ({ default: m.GradeOverrideDialog })));
 const RemediationActions = React.lazy(() => import('./RemediationActions').then(m => ({ default: m.RemediationActions })));
@@ -25,6 +25,10 @@ const TeacherVerificationPanel = React.lazy(() => import('./TeacherVerificationP
 const TrainingConfidenceIndicator = React.lazy(() => import('./TrainingConfidenceIndicator').then(m => ({ default: m.TrainingConfidenceIndicator })));
 const OCRCorrectionPanel = React.lazy(() => import('./OCRCorrectionPanel').then(m => ({ default: m.OCRCorrectionPanel })));
 const TeacherInterpretationPanel = React.lazy(() => import('./TeacherInterpretationPanel').then(m => ({ default: m.TeacherInterpretationPanel })));
+
+// Import useGradeFloorSettings AFTER lazy declarations to avoid TDZ issues
+// with the production chunk initialization order.
+import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 
 const LazyFallback = null; // Render nothing while loading sub-components
 

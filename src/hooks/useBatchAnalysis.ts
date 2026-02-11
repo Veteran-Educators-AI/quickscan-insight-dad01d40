@@ -10,6 +10,7 @@ import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
 import { parseUnifiedStudentQRCode } from '@/components/print/StudentPageQRCode';
 import { toast } from 'sonner';
 import { compressImage } from '@/lib/imageUtils';
+import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 // Blank page detection is done inline via alphanumeric character count (<30 chars = blank)
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -369,6 +370,7 @@ interface UseBatchAnalysisReturn {
 export function useBatchAnalysis(): UseBatchAnalysisReturn {
   const { user } = useAuth();
   const { settings: qrScanSettings } = useQRScanSettings();
+  const { gradeFloor: teacherGradeFloor } = useGradeFloorSettings();
   const { checkForDuplicate, quickDuplicateCheck, clearDuplicateCache } = useDuplicateWorkDetection();
   const hasLoadedFromStorage = useRef(false);
   const lastSavedItems = useRef<string>('');
@@ -1415,7 +1417,10 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         }
       } catch { /* OCR failed, continue to AI */ }
 
-      const alphaOnly = (singleOcrText || '').replace(/[^a-zA-Z0-9]/g, '');
+      // Strip common header/boilerplate words before checking for student work
+      const headerStripped = (singleOcrText || '')
+        .replace(/name|date|period|class|form|level|page|student|teacher|grade|score|warm.?up|practice|questions?|answer|work.?area|instructions?|show.?work|explain|directions?|side\s*[ab]/gi, '');
+      const alphaOnly = headerStripped.replace(/[^a-zA-Z0-9]/g, '');
       if (alphaOnly.length < 30) {
         console.log(`[analyzeItem] Blank page detected (${alphaOnly.length} alphanumeric chars). Skipping AI call.`);
         return {
@@ -1437,7 +1442,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
             })),
             misconceptions: [],
             totalScore: { earned: 0, possible: rubricSteps?.reduce((s, r) => s + r.points, 0) || 6, percentage: 0 },
-            grade: 45,
+            grade: teacherGradeFloor,
             gradeJustification: 'No student work detected on this page.',
             feedback: 'No student work detected.',
             studentWorkPresent: false,
@@ -1943,7 +1948,10 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       // second page with a filled first page passes through fine.
       {
         const textToCheck = ocrText || '';
-        const alphanumericOnly = textToCheck.replace(/[^a-zA-Z0-9]/g, '');
+        // Strip common header/boilerplate words so pages with only "Name:", "Date:" etc. are correctly blank
+        const headerStripped = textToCheck
+          .replace(/name|date|period|class|form|level|page|student|teacher|grade|score|warm.?up|practice|questions?|answer|work.?area|instructions?|show.?work|explain|directions?|side\s*[ab]/gi, '');
+        const alphanumericOnly = headerStripped.replace(/[^a-zA-Z0-9]/g, '');
         if (alphanumericOnly.length < 30) {
           console.log(`[BlankPageDetection] Blank page detected (${alphanumericOnly.length} alphanumeric chars). Skipping AI call entirely.`);
           return {
@@ -1965,7 +1973,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
               })),
               misconceptions: [],
               totalScore: { earned: 0, possible: rubricSteps?.reduce((s, r) => s + r.points, 0) || 6, percentage: 0 },
-              grade: 45,
+              grade: teacherGradeFloor,
               gradeJustification: 'No student work detected on this page.',
               feedback: 'No student work detected.',
               studentWorkPresent: false,
