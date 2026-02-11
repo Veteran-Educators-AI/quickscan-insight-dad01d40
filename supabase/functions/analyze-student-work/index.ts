@@ -199,69 +199,184 @@ Respond in JSON only:
 // ═══════════════════════════════════════════════════════════════════════════════
 // STUDENT IDENTIFICATION (kept, trimmed prompt)
 // ═══════════════════════════════════════════════════════════════════════════════
-async function identifyStudent(imageBase64: string, studentRoster: any[] | null, apiKey: string) {
-  const rosterInfo = studentRoster?.length
-    ? `\nRoster:\n${studentRoster.map(s => `- ${s.first_name} ${s.last_name}${s.student_id ? ` (ID: ${s.student_id})` : ''} [uuid: ${s.id}]`).join('\n')}`
-    : '';
-
-  const prompt = `Extract student identity from this image. Look for: QR codes (JSON with "s" field = student UUID), printed names in headers, handwritten names, student IDs.${rosterInfo}
-
-Respond in JSON only:
-{"qr_code_detected":false,"qr_code_content":null,"handwritten_name":null,"printed_name":null,"student_id_found":null,"matched_student_id":null,"matched_student_name":null,"confidence":"none"}`;
-
-  const content = await callLovableAI([
-    { role: 'user', content: [{ type: 'text', text: prompt }, formatImageForAI(imageBase64)] }
-  ], apiKey, 'identify-student', undefined, undefined, 'lite', 'gemini');
-
-  try {
-    const parsed = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] || '{}');
-    let matchedId = parsed.matched_student_id;
-    let matchedName = parsed.matched_student_name;
-    let matchedQuestionId: string | null = null;
-    let parsedQRCode = null;
-
-    // Parse QR code if found
-    if (parsed.qr_code_content) {
-      try {
-        const qr = JSON.parse(parsed.qr_code_content);
-        if (qr.s) {
-          parsedQRCode = { studentId: qr.s, questionId: qr.q, version: qr.v || 0, pageNumber: qr.p, totalPages: qr.t };
-          if (qr.q) matchedQuestionId = qr.q;
-          const student = studentRoster?.find(s => s.id === qr.s);
-          if (student) { matchedId = qr.s; matchedName = `${student.first_name} ${student.last_name}`; }
-        }
-      } catch { /* QR parse failed, continue */ }
-    }
-
-    // Verify AI-reported match exists in roster
-    if (matchedId && studentRoster?.length) {
-      if (!studentRoster.find(s => s.id === matchedId)) { matchedId = null; matchedName = null; }
-    }
-
-    // Fuzzy name matching fallback
-    if (!matchedId && studentRoster?.length) {
-      const nameToTry = parsed.printed_name || parsed.handwritten_name;
-      if (nameToTry) {
-        const match = fuzzyMatchStudent(nameToTry, studentRoster);
-        if (match) { matchedId = match.id; matchedName = `${match.first_name} ${match.last_name}`; }
-      }
-    }
-
-    return {
-      qrCodeDetected: parsed.qr_code_detected || false,
-      qrCodeContent: parsed.qr_code_content || null,
-      parsedQRCode, handwrittenName: parsed.handwritten_name || parsed.printed_name || null,
-      matchedStudentId: matchedId || null, matchedStudentName: matchedName || null,
-      matchedQuestionId, confidence: matchedId ? (parsedQRCode ? 'high' : 'medium') : 'none',
-      rawExtraction: content,
-    };
-  } catch {
+async function identifyStudentViaOCR(imageBase64: string, studentRoster: any[] | null) {
+  const GOOGLE_VISION_API_KEY = Deno.env.get('GOOGLE_VISION_API_KEY');
+  if (!GOOGLE_VISION_API_KEY) {
+    console.error('[IDENTIFY] GOOGLE_VISION_API_KEY not configured, cannot identify student');
     return {
       qrCodeDetected: false, qrCodeContent: null, parsedQRCode: null,
       handwrittenName: null, matchedStudentId: null, matchedStudentName: null,
-      matchedQuestionId: null, confidence: 'none' as const, rawExtraction: content,
+      matchedQuestionId: null, confidence: 'none' as const, rawExtraction: null,
     };
   }
+
+  // Strip data URL prefix for Vision API
+  let raw = imageBase64;
+  if (raw.startsWith('data:')) {
+    raw = raw.split(',')[1] || raw;
+  }
+
+  console.log('[IDENTIFY] Calling Google Vision OCR for student identification...');
+  const startTime = Date.now();
+
+  let ocrText = '';
+  try {
+    const response = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{
+            image: { content: raw },
+            features: [{ type: 'DOCUMENT_TEXT_DETECTION', model: 'builtin/latest' }],
+            imageContext: { languageHints: ['en'] },
+          }],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[IDENTIFY] Vision API error: ${response.status}`, errText);
+      throw new Error(`Vision API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const annotations = data.responses?.[0];
+    if (annotations?.error) {
+      throw new Error(annotations.error.message || 'Vision API annotation error');
+    }
+
+    ocrText = annotations?.fullTextAnnotation?.text
+      || annotations?.textAnnotations?.[0]?.description
+      || '';
+  } catch (err: any) {
+    console.error('[IDENTIFY] Vision OCR failed:', err.message);
+    return {
+      qrCodeDetected: false, qrCodeContent: null, parsedQRCode: null,
+      handwrittenName: null, matchedStudentId: null, matchedStudentName: null,
+      matchedQuestionId: null, confidence: 'none' as const, rawExtraction: null,
+    };
+  }
+
+  const latencyMs = Date.now() - startTime;
+  console.log(`[IDENTIFY] OCR complete in ${latencyMs}ms, extracted ${ocrText.length} chars`);
+
+  let qrCodeDetected = false;
+  let qrCodeContent: string | null = null;
+  let parsedQRCode: any = null;
+  let matchedStudentId: string | null = null;
+  let matchedStudentName: string | null = null;
+  let matchedQuestionId: string | null = null;
+
+  // 1. Search OCR text for QR code JSON patterns
+  const qrPatterns = [
+    /\{[^{}]*"v"\s*:\s*\d+[^{}]*"s"\s*:\s*"[^"]+"/g,
+    /\{[^{}]*"s"\s*:\s*"[^"]+[^{}]*"v"\s*:\s*\d+/g,
+  ];
+  for (const pattern of qrPatterns) {
+    const matches = ocrText.match(pattern);
+    if (matches) {
+      for (const m of matches) {
+        try {
+          // Try to complete the JSON if truncated
+          let jsonStr = m;
+          if (!jsonStr.endsWith('}')) {
+            const closingIdx = ocrText.indexOf('}', ocrText.indexOf(m) + m.length);
+            if (closingIdx !== -1) {
+              jsonStr = ocrText.substring(ocrText.indexOf(m), closingIdx + 1);
+            }
+          }
+          const qr = JSON.parse(jsonStr);
+          if (qr.s) {
+            qrCodeDetected = true;
+            qrCodeContent = jsonStr;
+            parsedQRCode = { studentId: qr.s, questionId: qr.q, version: qr.v || 0, pageNumber: qr.p, totalPages: qr.t };
+            if (qr.q) matchedQuestionId = qr.q;
+            // Verify against roster
+            const student = studentRoster?.find(s => s.id === qr.s);
+            if (student) {
+              matchedStudentId = qr.s;
+              matchedStudentName = `${student.first_name} ${student.last_name}`;
+              console.log(`[IDENTIFY] QR code matched student: ${matchedStudentName}`);
+            } else {
+              console.log(`[IDENTIFY] QR code found but student ID ${qr.s} not in roster`);
+              // Clear invalid QR match to allow name fallback
+              parsedQRCode = null;
+              qrCodeDetected = false;
+              qrCodeContent = null;
+            }
+            break;
+          }
+        } catch { /* continue */ }
+      }
+      if (matchedStudentId) break;
+    }
+  }
+
+  // 2. Name extraction from OCR text — use first few lines
+  let handwrittenName: string | null = null;
+  if (!matchedStudentId && studentRoster?.length) {
+    const lines = ocrText.split('\n').slice(0, 10); // Focus on top of page
+    // Clean boilerplate from each line
+    const cleanedLines: string[] = [];
+    for (const line of lines) {
+      let cleaned = line.trim();
+      if (!cleaned || cleaned.length < 2 || cleaned.length > 60) continue;
+      // Skip obvious non-name lines
+      if (/^\d+[\.\)]\s/.test(cleaned)) continue; // question numbers
+      if (/^(directions?|instructions?|show\s+your\s+work|answer|page|side)/i.test(cleaned)) continue;
+      // Extract name from "Name: ..." pattern
+      const nameMatch = cleaned.match(/^(?:name|student|by|written by|from)\s*[:.\-]\s*(.+)/i);
+      if (nameMatch) {
+        cleaned = nameMatch[1].trim();
+      }
+      // Remove trailing date/period info
+      cleaned = cleaned.replace(/\s*(period|class|date|pd|hr)[\s\d:./]*$/i, '').trim();
+      if (cleaned.length >= 2) {
+        cleanedLines.push(cleaned);
+      }
+    }
+
+    // Try fuzzy matching each candidate line against roster
+    for (const candidate of cleanedLines) {
+      const match = fuzzyMatchStudent(candidate, studentRoster);
+      if (match) {
+        matchedStudentId = match.id;
+        matchedStudentName = `${match.first_name} ${match.last_name}`;
+        handwrittenName = candidate;
+        console.log(`[IDENTIFY] Name matched: "${candidate}" → ${matchedStudentName}`);
+        break;
+      }
+    }
+
+    // If no match, store first plausible name candidate
+    if (!handwrittenName && cleanedLines.length > 0) {
+      // Pick the line most likely to be a name (2-4 words, alphabetic)
+      for (const line of cleanedLines) {
+        const words = line.split(/\s+/).filter(w => /^[a-zA-Z'-]+$/.test(w));
+        if (words.length >= 1 && words.length <= 4) {
+          handwrittenName = line;
+          break;
+        }
+      }
+    }
+  }
+
+  const confidence = matchedStudentId
+    ? (parsedQRCode ? 'high' : 'medium')
+    : (handwrittenName ? 'low' : 'none');
+
+  console.log(`[IDENTIFY] Result: confidence=${confidence}, matched=${matchedStudentName || 'none'}, handwritten=${handwrittenName || 'none'}`);
+
+  return {
+    qrCodeDetected, qrCodeContent, parsedQRCode,
+    handwrittenName,
+    matchedStudentId, matchedStudentName,
+    matchedQuestionId, confidence: confidence as 'high' | 'medium' | 'low' | 'none',
+    rawExtraction: ocrText.substring(0, 500), // Truncate for response size
+  };
 }
 
 function fuzzyMatchStudent(name: string, roster: any[]): any | null {
@@ -742,10 +857,45 @@ serve(async (req: Request) => {
 
     // ── Rate limit removed — using direct OpenAI API which has its own limits ──
 
-    // ── Identify only ──
-    if (identifyOnly) {
-      const identification = await identifyStudent(imageBase64, studentRoster, OPENAI_API_KEY);
+    // ── Identify only (single) ──
+    if (identifyOnly && !requestBody.batchIdentify) {
+      const identification = await identifyStudentViaOCR(imageBase64, studentRoster);
       return new Response(JSON.stringify({ success: true, identification }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ── Batch identify (multiple images, parallel OCR) ──
+    if (requestBody.batchIdentify && Array.isArray(requestBody.images)) {
+      const images: { id: string; imageBase64: string }[] = requestBody.images;
+      console.log(`[BATCH_IDENTIFY] Processing ${images.length} images in parallel`);
+      const startTime = Date.now();
+
+      const results = await Promise.all(
+        images.map(async (img) => {
+          try {
+            const identification = await identifyStudentViaOCR(img.imageBase64, studentRoster);
+            return { id: img.id, success: true, identification };
+          } catch (err: any) {
+            console.error(`[BATCH_IDENTIFY] Failed for ${img.id}:`, err.message);
+            return {
+              id: img.id, success: false,
+              identification: {
+                qrCodeDetected: false, qrCodeContent: null, parsedQRCode: null,
+                handwrittenName: null, matchedStudentId: null, matchedStudentName: null,
+                matchedQuestionId: null, confidence: 'none' as const, rawExtraction: null,
+              },
+            };
+          }
+        })
+      );
+
+      const latencyMs = Date.now() - startTime;
+      const matched = results.filter(r => r.identification.matchedStudentId).length;
+      console.log(`[BATCH_IDENTIFY] Complete: ${matched}/${images.length} matched in ${latencyMs}ms`);
+
+      return new Response(
+        JSON.stringify({ success: true, results, latencyMs }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // ── Compare mode ──

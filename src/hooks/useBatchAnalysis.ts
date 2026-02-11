@@ -210,6 +210,9 @@ const BATCH_ITEM_DELAY_MS = 3000;
 /** Number of papers to analyze concurrently in batch mode (sequential to preserve rate limit) */
 const BATCH_CONCURRENCY = 1;
 
+/** Number of papers to identify concurrently via OCR (no rate limit concerns) */
+const IDENTIFY_CONCURRENCY = 5;
+
 const BATCH_STORAGE_KEY = 'scan-genius-batch-data';
 const BATCH_SUMMARY_KEY = 'scan-genius-batch-summary';
 
@@ -1251,33 +1254,80 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
 
     setIsIdentifying(true);
 
-    // Identify items that need identification
+    // Identify items that need identification (no QR match yet)
     const unassigned = items
       .map((item, idx) => ({ item, idx }))
-      .filter(({ item }) => !item.studentId);
+      .filter(({ item }) => !item.studentId && item.imageDataUrl && item.imageDataUrl.length > 100);
 
     // Mark all as identifying
     setItems(prev => prev.map((item, idx) => 
       unassigned.some(u => u.idx === idx) ? { ...item, status: 'identifying' } : item
     ));
 
-    // Process in parallel batches of BATCH_CONCURRENCY
-    for (let batchStart = 0; batchStart < unassigned.length; batchStart += BATCH_CONCURRENCY) {
-      const batch = unassigned.slice(batchStart, batchStart + BATCH_CONCURRENCY);
+    // Process in parallel batches using batch OCR endpoint
+    for (let batchStart = 0; batchStart < unassigned.length; batchStart += IDENTIFY_CONCURRENCY) {
+      const batch = unassigned.slice(batchStart, batchStart + IDENTIFY_CONCURRENCY);
       setCurrentIndex(batch[0].idx);
 
-      const results = await Promise.all(
-        batch.map(({ item }) => identifyStudent(item, studentRoster))
-      );
+      try {
+        // Use batch identify endpoint — sends all images in one request for parallel OCR
+        const { data, error } = await invokeWithRetry('analyze-student-work', {
+          batchIdentify: true,
+          images: batch.map(({ item }) => ({
+            id: item.id,
+            imageBase64: item.imageDataUrl,
+          })),
+          studentRoster: studentRoster.map(s => ({
+            id: s.id,
+            first_name: s.first_name,
+            last_name: s.last_name,
+            student_id: s.student_id,
+          })),
+        }, { maxRetries: 1, imageKeys: [], imageArrayKeys: [] });
 
-      // Update all items in this batch
-      setItems(prev => {
-        const updated = [...prev];
-        batch.forEach(({ idx }, i) => {
-          updated[idx] = results[i];
-        });
-        return updated;
-      });
+        if (error || !data?.success) {
+          console.error('[autoIdentifyAll] Batch identify failed, falling back to individual:', error?.message || data?.error);
+          // Fallback: identify individually
+          const results = await Promise.all(
+            batch.map(({ item }) => identifyStudent(item, studentRoster))
+          );
+          setItems(prev => {
+            const updated = [...prev];
+            batch.forEach(({ idx }, i) => { updated[idx] = results[i]; });
+            return updated;
+          });
+        } else {
+          // Apply batch results
+          const resultMap = new Map<string, any>();
+          for (const r of data.results) {
+            resultMap.set(r.id, r.identification);
+          }
+
+          setItems(prev => prev.map(item => {
+            const identification = resultMap.get(item.id) as IdentificationResult | undefined;
+            if (!identification) return item;
+            return {
+              ...item,
+              status: 'pending' as const,
+              identification,
+              studentId: identification.matchedStudentId || item.studentId,
+              studentName: identification.matchedStudentName || item.studentName,
+              questionId: identification.matchedQuestionId || item.questionId,
+              autoAssigned: !!identification.matchedStudentId,
+            };
+          }));
+
+          console.log(`[autoIdentifyAll] Batch ${batchStart / IDENTIFY_CONCURRENCY + 1}: ${data.results.filter((r: any) => r.identification.matchedStudentId).length}/${batch.length} matched in ${data.latencyMs}ms`);
+        }
+      } catch (err: any) {
+        console.error('[autoIdentifyAll] Batch error:', err);
+        // Mark remaining as pending
+        setItems(prev => prev.map(item => 
+          batch.some(b => b.item.id === item.id) && item.status === 'identifying'
+            ? { ...item, status: 'pending' as const }
+            : item
+        ));
+      }
     }
 
     setCurrentIndex(-1);
