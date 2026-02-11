@@ -7,23 +7,16 @@ const corsHeaders = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// AI MODEL CONFIGURATION — FIXED MODEL NAMES
+// AI MODEL CONFIGURATION — DIRECT OPENAI API
 // ═══════════════════════════════════════════════════════════════════════════════
 type AnalysisProvider = 'gemini' | 'gpt4o' | 'gpt4o-mini';
 
-function getAnalysisModel(provider: AnalysisProvider): string {
-  switch (provider) {
-    case 'gpt4o':
-      return 'openai/gpt-5';
-    case 'gpt4o-mini':
-      return 'openai/gpt-5-mini';
-    case 'gemini':
-    default:
-      return 'google/gemini-2.5-pro';
-  }
+function getAnalysisModel(_provider: AnalysisProvider): string {
+  // All providers now route to OpenAI directly
+  return 'gpt-4o';
 }
 
-const LITE_MODEL = 'google/gemini-2.5-flash-lite';
+const LITE_MODEL = 'gpt-4o-mini';
 type AIModelTier = 'lite' | 'standard';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -49,22 +42,27 @@ async function logAIUsage(supabase: any, userId: string, functionName: string, u
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// AI GATEWAY CALL — with retry logic (unchanged core)
+// OPENAI API CALL — direct, no gateway
 // ═══════════════════════════════════════════════════════════════════════════════
 async function callLovableAI(
-  messages: any[], apiKey: string, functionName = 'analyze-student-work',
+  messages: any[], _apiKey: string, functionName = 'analyze-student-work',
   supabase?: any, userId?: string, modelTier: AIModelTier = 'lite',
-  analysisProvider: AnalysisProvider = 'gemini'
+  analysisProvider: AnalysisProvider = 'gpt4o'
 ) {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) throw new Error('OPENAI_API_KEY is not configured');
+
   const model = modelTier === 'standard' ? getAnalysisModel(analysisProvider) : LITE_MODEL;
-  const isOpenAI = model.startsWith('openai/');
-  const maxTokens = modelTier === 'standard' ? 4000 : 2000; // ← REDUCED from 6000/4000
+  const maxTokens = modelTier === 'standard' ? 4000 : 2000;
   const startTime = Date.now();
 
   console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier}`);
 
-  const tokenParams = isOpenAI ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens };
-  const requestBody = JSON.stringify({ model, messages, ...tokenParams });
+  const requestBody = JSON.stringify({
+    model,
+    messages,
+    max_completion_tokens: maxTokens,
+  });
 
   const MAX_RETRIES = 1;
   let lastError: any = null;
@@ -79,9 +77,9 @@ async function callLovableAI(
       const controller = new AbortController();
       const tid = setTimeout(() => controller.abort(), timeoutMs);
 
-      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
         body: requestBody, signal: controller.signal,
       });
       clearTimeout(tid);
@@ -89,11 +87,11 @@ async function callLovableAI(
       if (!response.ok) {
         const errText = await response.text();
         console.error(`AI error (attempt ${attempt + 1}):`, response.status, errText);
-        if (response.status === 429) throw { status: 429, message: "Rate limit exceeded. Please try again shortly." };
-        if (response.status === 402) throw { status: 402, message: "AI credits exhausted." };
+        if (response.status === 429) throw { status: 429, message: "OpenAI rate limit exceeded. Please try again shortly." };
+        if (response.status === 402) throw { status: 402, message: "OpenAI billing issue." };
         if (response.status === 401 || response.status === 403) throw new Error(`Auth error: ${response.status}`);
         if (response.status >= 500) { lastError = new Error(`Server error: ${response.status}`); continue; }
-        throw new Error(`AI API error: ${response.status}`);
+        throw new Error(`OpenAI API error: ${response.status}`);
       }
 
       const data = await response.json();
@@ -530,8 +528,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     const authenticatedUserId = user.id;
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
 
     // ── Parse request ──
     let requestBody;
@@ -554,7 +552,7 @@ serve(async (req) => {
 
     // ── Page type detection ──
     if (detectPageType) {
-      const pageType = await detectPageTypeFromImage(imageBase64, LOVABLE_API_KEY);
+      const pageType = await detectPageTypeFromImage(imageBase64, OPENAI_API_KEY);
       return new Response(JSON.stringify({ success: true, pageType }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -571,13 +569,13 @@ serve(async (req) => {
 
     // ── Identify only ──
     if (identifyOnly) {
-      const identification = await identifyStudent(imageBase64, studentRoster, LOVABLE_API_KEY);
+      const identification = await identifyStudent(imageBase64, studentRoster, OPENAI_API_KEY);
       return new Response(JSON.stringify({ success: true, identification }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // ── Compare mode ──
     if (compareMode && solutionBase64) {
-      const comparison = await compareWithSolution(imageBase64, solutionBase64, rubricSteps, LOVABLE_API_KEY);
+      const comparison = await compareWithSolution(imageBase64, solutionBase64, rubricSteps, OPENAI_API_KEY);
       return new Response(JSON.stringify({ success: true, comparison }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -696,20 +694,20 @@ serve(async (req) => {
         { role: 'user', content: userContent },
       ];
 
-      // Use Gemini 2.5 Flash for OCR-assisted grading (image + text = multimodal)
-      const textModel = 'google/gemini-2.5-flash';
+      // Use gpt-4o for OCR-assisted grading (image + text = multimodal)
+      const textModel = 'gpt-4o';
       const startTime = Date.now();
       console.log(`[OCR_ASSISTED] Grading with model=${textModel}`);
 
-      const tokenParams = { max_tokens: 4000 };
+      const tokenParams = { max_completion_tokens: 4000 };
       const requestBody2 = JSON.stringify({ model: textModel, messages, ...tokenParams });
 
       const controller = new AbortController();
       const tid = setTimeout(() => controller.abort(), 65000); // 65s timeout
 
-      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
         body: requestBody2, signal: controller.signal,
       });
       clearTimeout(tid);
@@ -780,7 +778,7 @@ serve(async (req) => {
     console.log(`Grading with provider=${analysisProvider}, model=${getAnalysisModel(analysisProvider)}`);
     const analysisText = await callLovableAI(
       [{ role: 'system', content: systemPrompt }, { role: 'user', content: imageContent }],
-      LOVABLE_API_KEY, 'analyze-student-work', supabase, effectiveTeacherId,
+      OPENAI_API_KEY, 'analyze-student-work', supabase, effectiveTeacherId,
       'standard', analysisProvider
     );
 
