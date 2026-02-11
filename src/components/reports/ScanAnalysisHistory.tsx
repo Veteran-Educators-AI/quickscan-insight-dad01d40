@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { StudentWorkDetailDialog } from '@/components/scan/StudentWorkDetailDialog';
+import { StudentWorkDetailDialog } from '@/components/scan/lazy';
 import { GradeRecalculationDialog } from './GradeRecalculationDialog';
 import { MissingSubmissionsAlert } from '@/components/scan/MissingSubmissionsAlert';
 import { FileImage, User, Calendar, ChevronRight, Eye, Calculator } from 'lucide-react';
@@ -288,13 +288,15 @@ export function ScanAnalysisHistory({ classId }: ScanAnalysisHistoryProps) {
       />
 
       {selectedAttempt && (
-        <StudentWorkDetailDialog
-          open={!!selectedAttempt}
-          onOpenChange={(open) => !open && setSelectedAttempt(null)}
-          studentName={getDisplayName(selectedAttempt.student.id, selectedAttempt.student.first_name, selectedAttempt.student.last_name)}
-          imageUrl={selectedAttempt.images?.[0]?.image_url}
-          result={transformToAnalysisResult(selectedAttempt)}
-        />
+        <Suspense fallback={null}>
+          <StudentWorkDetailDialog
+            open={!!selectedAttempt}
+            onOpenChange={(open) => !open && setSelectedAttempt(null)}
+            studentName={getDisplayName(selectedAttempt.student.id, selectedAttempt.student.first_name, selectedAttempt.student.last_name)}
+            imageUrl={selectedAttempt.images?.[0]?.image_url}
+            result={transformToAnalysisResult(selectedAttempt)}
+          />
+        </Suspense>
       )}
     </>
   );

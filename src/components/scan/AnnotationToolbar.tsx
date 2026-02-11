@@ -150,3 +150,5 @@ export function AnnotationToolbar({
     </div>
   );
 }
+
+export default AnnotationToolbar;

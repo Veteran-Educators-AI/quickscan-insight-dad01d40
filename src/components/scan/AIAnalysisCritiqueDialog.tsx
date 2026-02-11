@@ -271,3 +271,5 @@ export function AIAnalysisCritiqueDialog({
     </Dialog>
   );
 }
+
+export default AIAnalysisCritiqueDialog;
