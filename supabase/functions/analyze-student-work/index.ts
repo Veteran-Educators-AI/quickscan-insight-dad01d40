@@ -78,11 +78,7 @@ async function callLovableAI(
   const maxTokens = modelTier === 'standard' ? 4000 : 2000;
   const startTime = Date.now();
 
-  // Default to temperature=0 for deterministic output (grading)
-  const temperature = options.temperature ?? 0;
-  const top_p = options.top_p ?? 1;
-
-  console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier} temp=${temperature}`);
+  console.log(`[AI_CALL] function=${functionName} model=${model} tier=${modelTier}`);
 
   const requestBody = JSON.stringify({
     model,
@@ -176,7 +172,7 @@ Respond in JSON only:
   const content = await callLovableAI([
     { role: 'system', content: 'You analyze scanned student worksheets. Respond in JSON only.' },
     { role: 'user', content: [{ type: 'text', text: prompt }, formatImageForAI(imageBase64)] }
-  ], apiKey, 'detect-page-type', undefined, undefined, 'lite', 'gemini', { temperature: 0.2 });
+  ], apiKey, 'detect-page-type', undefined, undefined, 'lite', 'gemini');
 
   try {
     const parsed = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] || '{}');
@@ -206,7 +202,7 @@ Respond in JSON only:
 
   const content = await callLovableAI([
     { role: 'user', content: [{ type: 'text', text: prompt }, formatImageForAI(imageBase64)] }
-  ], apiKey, 'identify-student', undefined, undefined, 'lite', 'gemini', { temperature: 0.2 });
+  ], apiKey, 'identify-student', undefined, undefined, 'lite', 'gemini');
 
   try {
     const parsed = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] || '{}');
@@ -311,7 +307,7 @@ async function compareWithSolution(studentImg: string, solutionImg: string, rubr
       { type: 'text', text: `Compare student work (image 1) to correct solution (image 2).${rubricPrompt}\nJSON format: {"suggested_scores":[{"criterion":"...","score":0,"max_score":0,"feedback":"..."}],"total_earned":0,"total_possible":0,"misconceptions":["..."],"feedback":"...","correctness_analysis":"..."}` },
       formatImageForAI(studentImg), formatImageForAI(solutionImg),
     ] }
-  ], apiKey, 'compare-with-solution', undefined, undefined, 'standard', 'gemini', { temperature: 0 });
+  ], apiKey, 'compare-with-solution', undefined, undefined, 'standard', 'gemini');
 
   try {
     const p = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] || '{}');
