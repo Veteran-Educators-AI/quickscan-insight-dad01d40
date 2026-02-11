@@ -10,6 +10,7 @@ import { parseAnyStudentQRCode } from '@/components/print/StudentOnlyQRCode';
 import { parseUnifiedStudentQRCode } from '@/components/print/StudentPageQRCode';
 import { toast } from 'sonner';
 import { compressImage } from '@/lib/imageUtils';
+import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 // Blank page detection is done inline via alphanumeric character count (<30 chars = blank)
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -369,6 +370,7 @@ interface UseBatchAnalysisReturn {
 export function useBatchAnalysis(): UseBatchAnalysisReturn {
   const { user } = useAuth();
   const { settings: qrScanSettings } = useQRScanSettings();
+  const { gradeFloor: teacherGradeFloor } = useGradeFloorSettings();
   const { checkForDuplicate, quickDuplicateCheck, clearDuplicateCache } = useDuplicateWorkDetection();
   const hasLoadedFromStorage = useRef(false);
   const lastSavedItems = useRef<string>('');
@@ -1440,7 +1442,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
             })),
             misconceptions: [],
             totalScore: { earned: 0, possible: rubricSteps?.reduce((s, r) => s + r.points, 0) || 6, percentage: 0 },
-            grade: 45,
+            grade: teacherGradeFloor,
             gradeJustification: 'No student work detected on this page.',
             feedback: 'No student work detected.',
             studentWorkPresent: false,
@@ -1971,7 +1973,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
               })),
               misconceptions: [],
               totalScore: { earned: 0, possible: rubricSteps?.reduce((s, r) => s + r.points, 0) || 6, percentage: 0 },
-              grade: 45,
+              grade: teacherGradeFloor,
               gradeJustification: 'No student work detected on this page.',
               feedback: 'No student work detected.',
               studentWorkPresent: false,
