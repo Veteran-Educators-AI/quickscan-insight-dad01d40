@@ -102,17 +102,8 @@ function parseMisconception(text: string, index: number): ParsedMisconception {
   return result;
 }
 
-/**
- * Extracts error regions from misconceptions for use with ImageErrorOverlay
- */
-export function extractErrorRegions(misconceptions: string[]): ErrorRegion[] {
-  return misconceptions
-    .map((m, i) => {
-      const parsed = parseMisconception(m, i);
-      return parsed.location;
-    })
-    .filter((loc): loc is ErrorRegion => loc !== null);
-}
+// Re-export from standalone utility for backward compatibility
+export { extractErrorRegions } from './extractErrorRegions';
 
 const locationLabels: Record<string, string> = {
   'top-left': 'Top Left',

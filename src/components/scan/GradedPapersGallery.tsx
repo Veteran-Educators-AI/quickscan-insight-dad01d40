@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,7 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { BatchItem, AnalysisResult } from '@/hooks/useBatchAnalysis';
 import { useGradeFloorSettings } from '@/hooks/useGradeFloorSettings';
 import { useMultipleGradeTrends, TrendDirection } from '@/hooks/useGradeTrend';
-import { MisconceptionComparison } from './MisconceptionComparison';
+const MisconceptionComparison = React.lazy(() => import('./MisconceptionComparison').then(m => ({ default: m.MisconceptionComparison })));
 
 // Extended result type that may include additional fields
 interface ExtendedAnalysisResult extends AnalysisResult {
@@ -465,7 +465,9 @@ export function GradedPapersGallery({
 
                   {/* Misconceptions - Side-by-side comparison */}
                   {(selectedItem.result?.misconceptions?.length ?? 0) > 0 && (
-                    <MisconceptionComparison misconceptions={selectedItem.result?.misconceptions ?? []} />
+                    <Suspense fallback={null}>
+                      <MisconceptionComparison misconceptions={selectedItem.result?.misconceptions ?? []} />
+                    </Suspense>
                   )}
 
                   {/* Feedback */}

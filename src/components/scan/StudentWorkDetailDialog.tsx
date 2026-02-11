@@ -36,8 +36,8 @@ import { ImageErrorOverlay } from './ImageErrorOverlay';
 const MisconceptionComparison = React.lazy(() => import('./MisconceptionComparison').then(m => ({ default: m.MisconceptionComparison })));
 const AIAnalysisCritiqueDialog = React.lazy(() => import('./AIAnalysisCritiqueDialog').then(m => ({ default: m.AIAnalysisCritiqueDialog })));
 
-// We still need extractErrorRegions at module level - import it separately
-import { extractErrorRegions } from './MisconceptionComparison';
+// Import from standalone utility to avoid TDZ circular dependency
+import { extractErrorRegions } from './extractErrorRegions';
 interface RubricScore {
   criterion: string;
   score: number;

@@ -16,7 +16,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ImageErrorOverlay, ErrorRegion } from './ImageErrorOverlay';
-import { extractErrorRegions } from './MisconceptionComparison';
+import { extractErrorRegions } from './extractErrorRegions';
 import { useMisconceptionFeedback, MisconceptionDecision } from '@/hooks/useMisconceptionFeedback';
 import { useAnnotations } from '@/hooks/useAnnotations';
 import { AnnotationToolbar } from './AnnotationToolbar';
