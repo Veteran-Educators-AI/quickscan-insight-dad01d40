@@ -827,10 +827,45 @@ serve(async (req: Request) => {
 
     // ── Rate limit removed — using direct OpenAI API which has its own limits ──
 
-    // ── Identify only ──
-    if (identifyOnly) {
+    // ── Identify only (single) ──
+    if (identifyOnly && !requestBody.batchIdentify) {
       const identification = await identifyStudentViaOCR(imageBase64, studentRoster);
       return new Response(JSON.stringify({ success: true, identification }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ── Batch identify (multiple images, parallel OCR) ──
+    if (requestBody.batchIdentify && Array.isArray(requestBody.images)) {
+      const images: { id: string; imageBase64: string }[] = requestBody.images;
+      console.log(`[BATCH_IDENTIFY] Processing ${images.length} images in parallel`);
+      const startTime = Date.now();
+
+      const results = await Promise.all(
+        images.map(async (img) => {
+          try {
+            const identification = await identifyStudentViaOCR(img.imageBase64, studentRoster);
+            return { id: img.id, success: true, identification };
+          } catch (err: any) {
+            console.error(`[BATCH_IDENTIFY] Failed for ${img.id}:`, err.message);
+            return {
+              id: img.id, success: false,
+              identification: {
+                qrCodeDetected: false, qrCodeContent: null, parsedQRCode: null,
+                handwrittenName: null, matchedStudentId: null, matchedStudentName: null,
+                matchedQuestionId: null, confidence: 'none' as const, rawExtraction: null,
+              },
+            };
+          }
+        })
+      );
+
+      const latencyMs = Date.now() - startTime;
+      const matched = results.filter(r => r.identification.matchedStudentId).length;
+      console.log(`[BATCH_IDENTIFY] Complete: ${matched}/${images.length} matched in ${latencyMs}ms`);
+
+      return new Response(
+        JSON.stringify({ success: true, results, latencyMs }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // ── Compare mode ──
