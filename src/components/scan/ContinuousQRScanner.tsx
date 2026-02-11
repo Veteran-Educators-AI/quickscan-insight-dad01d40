@@ -186,7 +186,9 @@ export function ContinuousQRScanner({
     for (const region of regions) {
       try {
         const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
-        const code = jsQR(imageData.data, region.w, region.h);
+        const code = jsQR(imageData.data, region.w, region.h, {
+          inversionAttempts: 'attemptBoth',
+        });
 
         if (code && code.data !== lastDetectedCode) {
           // Try unified parser first
