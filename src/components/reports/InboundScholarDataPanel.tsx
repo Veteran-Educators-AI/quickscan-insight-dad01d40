@@ -26,7 +26,8 @@ import {
   AlertCircle,
   Gamepad2,
   GraduationCap,
-  Award
+  Award,
+  ClipboardCheck
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -75,7 +76,7 @@ export function InboundScholarDataPanel({ classId }: InboundScholarDataPanelProp
         .from('sister_app_sync_log')
         .select('*')
         .eq('teacher_id', user!.id)
-        .in('action', ['grade_completed', 'activity_completed', 'reward_earned', 'level_up', 'achievement_unlocked', 'behavior_deduction'])
+        .in('action', ['grade_completed', 'activity_completed', 'reward_earned', 'level_up', 'achievement_unlocked', 'behavior_deduction', 'work_submitted'])
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -224,6 +225,8 @@ export function InboundScholarDataPanel({ classId }: InboundScholarDataPanelProp
         return <Award className="h-4 w-4 text-pink-500" />;
       case 'behavior_deduction':
         return <AlertCircle className="h-4 w-4 text-destructive" />;
+      case 'work_submitted':
+        return <ClipboardCheck className="h-4 w-4 text-teal-500" />;
       default:
         return <Star className="h-4 w-4 text-muted-foreground" />;
     }
@@ -237,6 +240,7 @@ export function InboundScholarDataPanel({ classId }: InboundScholarDataPanelProp
       case 'level_up': return 'Level Up';
       case 'achievement_unlocked': return 'Achievement Unlocked';
       case 'behavior_deduction': return 'Behavior Deduction';
+      case 'work_submitted': return 'Work Submitted';
       default: return action;
     }
   };
