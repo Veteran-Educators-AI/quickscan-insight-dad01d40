@@ -155,7 +155,31 @@ interface BehaviorDeductionPayload {
   };
 }
 
-type WebhookPayload = AssignmentPayload | StudentProfilePayload | StatusQueryPayload | RemediationPayload | PracticeSessionPayload | GradeCompletedPayload | StudentCreatedPayload | BehaviorDeductionPayload;
+interface WorkSubmittedPayload {
+  action: "work_submitted";
+  student_id: string;
+  data: {
+    student_name?: string;
+    class_id?: string;
+    assignment_title?: string;
+    topic_name?: string;
+    standard_code?: string;
+    score?: number;
+    questions_attempted?: number;
+    questions_correct?: number;
+    time_spent_minutes?: number;
+    answers?: Array<{
+      questionNumber: number;
+      studentAnswer: string;
+      isCorrect: boolean;
+      correctAnswer?: string;
+    }>;
+    completed_at?: string;
+    source_assignment_id?: string;
+  };
+}
+
+type WebhookPayload = AssignmentPayload | StudentProfilePayload | StatusQueryPayload | RemediationPayload | PracticeSessionPayload | GradeCompletedPayload | StudentCreatedPayload | BehaviorDeductionPayload | WorkSubmittedPayload;
 
 async function verifyApiKey(apiKey: string, supabaseUrl: string, supabaseKey: string): Promise<boolean> {
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -810,6 +834,121 @@ Deno.serve(async (req) => {
             status: "behavior_deduction_received",
             reason: behaviorData.reason,
             xp_deducted: behaviorData.xp_deducted,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "work_submitted": {
+        // Handle completed work pushed from Scholar App by student
+        const workData = (payload as WorkSubmittedPayload).data;
+        const studentId = payload.student_id;
+        console.log(`Processing work submission from student ${studentId}: ${workData.assignment_title || workData.topic_name}`);
+
+        // Find student record
+        const { data: studentRec } = await supabase
+          .from("students")
+          .select("id, first_name, last_name, class_id")
+          .eq("id", studentId)
+          .maybeSingle();
+
+        // Resolve teacher from class
+        let resolvedTeacherId: string | null = null;
+        const classId = workData.class_id || studentRec?.class_id;
+        if (classId) {
+          const { data: classInfo } = await supabase
+            .from("classes")
+            .select("teacher_id")
+            .eq("id", classId)
+            .single();
+          resolvedTeacherId = classInfo?.teacher_id || null;
+        }
+
+        // Save grade to grade_history if score is present
+        let gradeSaved = false;
+        if (workData.score !== undefined && resolvedTeacherId) {
+          const { error: gradeError } = await supabase
+            .from("grade_history")
+            .insert({
+              student_id: studentRec?.id || studentId,
+              teacher_id: resolvedTeacherId,
+              topic_name: workData.topic_name || workData.assignment_title || "Scholar App Submission",
+              grade: workData.score,
+              nys_standard: workData.standard_code || null,
+              raw_score_earned: workData.questions_correct || null,
+              raw_score_possible: workData.questions_attempted || null,
+              grade_justification: `Student submitted from Scholar App: ${workData.assignment_title || workData.topic_name || "Work"} (${workData.questions_correct || 0}/${workData.questions_attempted || 0} correct)`,
+            });
+          gradeSaved = !gradeError;
+          if (gradeError) console.error("Failed to save grade:", gradeError);
+        }
+
+        // Log to sister_app_sync_log for teacher review
+        if (resolvedTeacherId) {
+          try {
+            await supabase.from("sister_app_sync_log").insert({
+              teacher_id: resolvedTeacherId,
+              student_id: studentRec?.id || studentId,
+              action: "work_submitted",
+              data: {
+                student_name: workData.student_name || (studentRec ? `${studentRec.first_name} ${studentRec.last_name}` : "Unknown"),
+                assignment_title: workData.assignment_title,
+                topic_name: workData.topic_name,
+                standard_code: workData.standard_code,
+                score: workData.score,
+                questions_attempted: workData.questions_attempted,
+                questions_correct: workData.questions_correct,
+                time_spent_minutes: workData.time_spent_minutes,
+                answers: workData.answers,
+                completed_at: workData.completed_at,
+                source_assignment_id: workData.source_assignment_id,
+                grade_saved: gradeSaved,
+              },
+              source_app: "scholar_app",
+              processed: false,
+            });
+          } catch (logErr) {
+            console.error("Non-fatal: Failed to log work submission:", logErr);
+          }
+
+          // Send push notification to teacher
+          try {
+            const studentName = workData.student_name || (studentRec ? `${studentRec.first_name} ${studentRec.last_name}` : "A student");
+            const scoreText = workData.score !== undefined ? ` (${workData.score}%)` : "";
+            const topicText = workData.assignment_title || workData.topic_name || "their work";
+
+            const notifPayload = {
+              userId: resolvedTeacherId,
+              title: "📝 Student Work Submitted",
+              body: `${studentName} submitted ${topicText}${scoreText}`,
+              data: { url: "/reports" },
+            };
+
+            const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+            const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+            await fetch(`${SUPABASE_URL}/functions/v1/send-push-notification`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+              },
+              body: JSON.stringify(notifPayload),
+            });
+            console.log("Push notification sent to teacher:", resolvedTeacherId);
+          } catch (pushErr) {
+            console.error("Non-fatal: Failed to send push notification:", pushErr);
+          }
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            status: "work_received",
+            student_found: !!studentRec,
+            grade_saved: gradeSaved,
+            topic: workData.topic_name,
+            score: workData.score,
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );

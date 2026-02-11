@@ -20,7 +20,7 @@ export function PendingScholarDataBadge() {
         .select('*', { count: 'exact', head: true })
         .eq('teacher_id', user.id)
         .eq('processed', false)
-        .in('action', ['grade_completed', 'activity_completed', 'reward_earned', 'level_up', 'achievement_unlocked', 'behavior_deduction']);
+        .in('action', ['grade_completed', 'activity_completed', 'reward_earned', 'level_up', 'achievement_unlocked', 'behavior_deduction', 'work_submitted']);
 
       if (error) {
         console.error('Error fetching pending scholar data:', error);

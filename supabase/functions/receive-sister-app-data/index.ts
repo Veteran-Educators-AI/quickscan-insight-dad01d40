@@ -43,7 +43,7 @@ const corsHeaders = {
 // data: Flexible object containing event-specific information
 // -----------------------------------------------------------------------------
 interface IncomingData {
-  action: 'grade_completed' | 'activity_completed' | 'reward_earned' | 'level_up' | 'achievement_unlocked' | 'batch_sync' | 'behavior_deduction' | 'live_session_completed' | 'roster_sync' | 'student_created' | 'student_updated';
+  action: 'grade_completed' | 'activity_completed' | 'reward_earned' | 'level_up' | 'achievement_unlocked' | 'batch_sync' | 'behavior_deduction' | 'live_session_completed' | 'roster_sync' | 'student_created' | 'student_updated' | 'work_submitted';
   student_id?: string; // Optional for batch_sync and live_session_completed
   data?: {
     activity_type?: string;      // e.g., "quiz", "game", "practice", "live_presentation"
@@ -755,6 +755,122 @@ serve(async (req) => {
         misconceptions_skipped_missing_student: misconceptionsSkippedMissingStudent,
         remediations_queued: remediationsCreated,
         message: `Persisted ${gradesSaved} grades and ${misconceptionsSaved} misconceptions to database`,
+      };
+
+    } else if (body.action === 'work_submitted') {
+      // ---------------------------------------------------------------------
+      // WORK SUBMITTED PROCESSING
+      // ---------------------------------------------------------------------
+      // Handle completed student work pushed from Scholar App
+      // Records grade and notifies teacher via push notification
+      // ---------------------------------------------------------------------
+      console.log('Processing work_submitted from Scholar app:', body.student_id);
+
+      const workData: any = body.data || {};
+      const incomingStudentId = body.student_id || undefined;
+      const existingStudentIds2 = await fetchExistingStudentIds(
+        supabaseAdmin,
+        incomingStudentId ? [incomingStudentId] : []
+      );
+      const emailMap2 = await fetchStudentIdsByEmail(
+        supabaseAdmin,
+        workData.student_email ? [workData.student_email] : [],
+        teacherId
+      );
+      const resolvedStudent2 = resolveStudentId(
+        incomingStudentId,
+        workData.student_email,
+        existingStudentIds2,
+        emailMap2
+      );
+
+      // Save grade if score present
+      let workGradeSaved = false;
+      if (workData.score !== undefined && resolvedStudent2.resolvedId) {
+        const { error: gradeError } = await supabaseAdmin
+          .from('grade_history')
+          .insert({
+            student_id: resolvedStudent2.resolvedId,
+            teacher_id: teacherId,
+            topic_name: workData.topic_name || workData.assignment_title || 'Scholar App Submission',
+            grade: workData.score,
+            nys_standard: workData.standard_code || null,
+            raw_score_earned: workData.questions_correct || null,
+            raw_score_possible: workData.questions_attempted || null,
+            grade_justification: `Student submitted from Scholar App: ${workData.assignment_title || workData.topic_name || 'Work'} (${workData.questions_correct || 0}/${workData.questions_attempted || 0} correct)`,
+          });
+        workGradeSaved = !gradeError;
+        if (gradeError) console.error('Error saving work grade:', gradeError);
+      }
+
+      // Log to sister_app_sync_log
+      try {
+        const { data: workLog } = await supabaseAdmin
+          .from('sister_app_sync_log')
+          .insert({
+            teacher_id: teacherId,
+            student_id: resolvedStudent2.resolvedId || incomingStudentId,
+            action: 'work_submitted',
+            data: {
+              student_name: workData.student_name,
+              assignment_title: workData.assignment_title,
+              topic_name: workData.topic_name,
+              standard_code: workData.standard_code,
+              score: workData.score,
+              questions_attempted: workData.questions_attempted,
+              questions_correct: workData.questions_correct,
+              time_spent_minutes: workData.time_spent_minutes,
+              answers: workData.answers,
+              completed_at: workData.completed_at,
+              source_assignment_id: workData.source_assignment_id,
+              grade_saved: workGradeSaved,
+              external_student_id: resolvedStudent2.externalStudentId,
+              student_resolution: resolvedStudent2.resolution,
+            },
+            source_app: 'scholar_app',
+            processed: false,
+          })
+          .select()
+          .single();
+
+        logEntry = workLog;
+      } catch (logErr) {
+        console.error('Non-fatal: Failed to log work submission:', logErr);
+      }
+
+      // Send push notification to teacher
+      try {
+        const studentName = workData.student_name || 'A student';
+        const scoreText = workData.score !== undefined ? ` (${workData.score}%)` : '';
+        const topicText = workData.assignment_title || workData.topic_name || 'their work';
+
+        const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+        const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+        await fetch(`${SUPABASE_URL}/functions/v1/send-push-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({
+            userId: teacherId,
+            title: '📝 Student Work Submitted',
+            body: `${studentName} submitted ${topicText}${scoreText}`,
+            data: { url: '/reports' },
+          }),
+        });
+        console.log('Push notification sent to teacher:', teacherId);
+      } catch (pushErr) {
+        console.error('Non-fatal: Failed to send push notification:', pushErr);
+      }
+
+      processedResult = {
+        work_received: true,
+        student_resolved: resolvedStudent2.resolution,
+        grade_saved: workGradeSaved,
+        topic: workData.topic_name,
+        score: workData.score,
       };
 
     } else if (body.action === 'roster_sync' || body.action === 'student_created' || body.action === 'student_updated') {
