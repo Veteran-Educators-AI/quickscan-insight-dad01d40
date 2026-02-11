@@ -21,8 +21,9 @@ import { useMisconceptionFeedback, MisconceptionDecision } from '@/hooks/useMisc
 import { useAnnotations } from '@/hooks/useAnnotations';
 import { cn } from '@/lib/utils';
 
-// Lazy-load heavy components to break TDZ circular dependency chains
-import { AnnotationToolbar, AnnotationCanvas } from './lazy';
+// Lazy-load directly (NOT from ./lazy barrel — this file IS in the barrel, so importing from it is circular)
+const AnnotationToolbar = React.lazy(() => import('./AnnotationToolbar'));
+const AnnotationCanvas = React.lazy(() => import('./AnnotationCanvas'));
 const ImageErrorOverlay = React.lazy(() => import('./ImageErrorOverlay').then(m => ({ default: m.ImageErrorOverlay })));
 
 interface BatchImageZoomDialogProps {

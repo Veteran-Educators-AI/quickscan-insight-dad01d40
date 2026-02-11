@@ -12,9 +12,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-// Lazy-load all sub-components to prevent TDZ / circular-init crashes
-// when the Scan chunk initializes in production builds.
-import { MisconceptionComparison, AIAnalysisCritiqueDialog } from './lazy';
+// Lazy-load ALL sub-components directly (NOT from ./lazy barrel) to prevent
+// TDZ / circular-init crashes ("Cannot access 'Z' before initialization")
+// in production builds where Vite may bundle barrel re-exports eagerly.
+const MisconceptionComparison = React.lazy(() => import('./MisconceptionComparison'));
+const AIAnalysisCritiqueDialog = React.lazy(() => import('./AIAnalysisCritiqueDialog'));
 const AIWorkDetector = React.lazy(() => import('./AIWorkDetector').then(m => ({ default: m.AIWorkDetector })));
 const GradeOverrideDialog = React.lazy(() => import('./GradeOverrideDialog').then(m => ({ default: m.GradeOverrideDialog })));
 const RemediationActions = React.lazy(() => import('./RemediationActions').then(m => ({ default: m.RemediationActions })));
