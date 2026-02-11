@@ -835,160 +835,29 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         // Subsequent pages - check handwriting similarity with previous page
         const previousItem = newItems[i - 1];
         
+        // Handwriting similarity detection disabled — treat each page as a new paper
+        // Teachers can manually link front/back pages using the existing link button
+        onProgress?.(i + 1, pages.length, 'Identifying student...');
+        
         try {
-          const { data, error } = await invokeWithRetry('detect-handwriting-similarity', {
-            image1Base64: previousItem.imageDataUrl,
-            image2Base64: pageDataUrl,
-          }, { maxRetries: 2 });
-
-          if (!error && data?.success && data?.similarity) {
-            const similarity = data.similarity;
+          const identResult = await identifyStudent(baseItem, studentRoster);
+          
+          // Check ALL existing groups for this student (handles interleaved pages)
+          const existingGroupForStudent = identResult.studentId 
+            ? studentGroups.find(g => g.studentId === identResult.studentId)
+            : null;
+          
+          if (existingGroupForStudent) {
+            pagesLinked++;
+            existingGroupForStudent.pageIds.push(pageId);
             
-            const handwritingSimilarity: HandwritingSimilarity = {
-              isSameStudent: similarity.isSameStudent,
-              confidence: similarity.confidence,
-              similarityScore: similarity.similarityScore,
-              reasoning: similarity.reasoning,
-            };
-            
-            if (similarity.isSameStudent && (similarity.confidence === 'high' || similarity.confidence === 'medium')) {
-              // Same student - link as continuation
-              pagesLinked++;
-              currentGroup!.pageIds.push(pageId);
-              
-              newItems.push({
-                ...baseItem,
-                pageType: 'continuation',
-                continuationOf: currentGroup!.primaryId,
-                handwritingSimilarity,
-                studentId: currentGroup!.studentId,
-                studentName: currentGroup!.studentName,
-                autoAssigned: !!currentGroup!.studentId,
-              });
-            } else {
-              // Different student detected by handwriting - identify and check ALL groups
-              onProgress?.(i + 1, pages.length, 'New student detected, identifying...');
-              
-              try {
-                const identResult = await identifyStudent(baseItem, studentRoster);
-                
-                // Check ALL existing groups for this student (handles interleaved pages)
-                const existingGroupForStudent = identResult.studentId 
-                  ? studentGroups.find(g => g.studentId === identResult.studentId)
-                  : null;
-                
-                if (existingGroupForStudent) {
-                  // Student already seen earlier - link as continuation
-                  pagesLinked++;
-                  existingGroupForStudent.pageIds.push(pageId);
-                  
-                  newItems.push({
-                    ...identResult,
-                    pageType: 'continuation',
-                    continuationOf: existingGroupForStudent.primaryId,
-                    handwritingSimilarity,
-                  });
-                  currentGroup = existingGroupForStudent;
-                } else {
-                  // Truly new student
-                  currentGroup = {
-                    primaryId: pageId,
-                    studentId: identResult.studentId,
-                    studentName: identResult.studentName,
-                    pageIds: [pageId],
-                  };
-                  
-                  if (identResult.studentId) studentsIdentified++;
-                  
-                  newItems.push({
-                    ...identResult,
-                    pageType: 'new',
-                    handwritingSimilarity,
-                  });
-                  studentGroups.push(currentGroup);
-                }
-              } catch (err) {
-                console.error('Student identification failed:', err);
-                currentGroup = {
-                  primaryId: pageId,
-                  pageIds: [pageId],
-                };
-                newItems.push({
-                  ...baseItem,
-                  pageType: 'new',
-                  handwritingSimilarity,
-                });
-                studentGroups.push(currentGroup);
-              }
-            }
+            newItems.push({
+              ...identResult,
+              pageType: 'continuation',
+              continuationOf: existingGroupForStudent.primaryId,
+            });
+            currentGroup = existingGroupForStudent;
           } else {
-            // Handwriting comparison failed - try to identify as new student
-            onProgress?.(i + 1, pages.length, 'Identifying student...');
-            
-            try {
-              const identResult = await identifyStudent(baseItem, studentRoster);
-              
-              // Check ALL existing groups for this student (not just currentGroup)
-              const existingGroupForStudent = identResult.studentId 
-                ? studentGroups.find(g => g.studentId === identResult.studentId)
-                : null;
-              
-              if (existingGroupForStudent) {
-                // Same student already seen earlier - link as continuation
-                pagesLinked++;
-                existingGroupForStudent.pageIds.push(pageId);
-                
-                newItems.push({
-                  ...identResult,
-                  pageType: 'continuation',
-                  continuationOf: existingGroupForStudent.primaryId,
-                });
-                currentGroup = existingGroupForStudent;
-              } else if (identResult.studentId) {
-                // New student not seen before
-                studentsIdentified++;
-                currentGroup = {
-                  primaryId: pageId,
-                  studentId: identResult.studentId,
-                  studentName: identResult.studentName,
-                  pageIds: [pageId],
-                };
-                
-                newItems.push({
-                  ...identResult,
-                  pageType: 'new',
-                });
-                studentGroups.push(currentGroup);
-              } else {
-                // Could not identify - assume new paper
-                currentGroup = {
-                  primaryId: pageId,
-                  pageIds: [pageId],
-                };
-                newItems.push({
-                  ...identResult,
-                  pageType: 'new',
-                });
-                studentGroups.push(currentGroup);
-              }
-            } catch (err) {
-              // Fallback - add as new paper
-              currentGroup = {
-                primaryId: pageId,
-                pageIds: [pageId],
-              };
-              newItems.push({
-                ...baseItem,
-                pageType: 'new',
-              });
-              studentGroups.push(currentGroup);
-            }
-          }
-        } catch (err) {
-          console.error('Handwriting comparison failed:', err);
-          // Fallback - try identification
-          try {
-            const identResult = await identifyStudent(baseItem, studentRoster);
             if (identResult.studentId) studentsIdentified++;
             currentGroup = {
               primaryId: pageId,
@@ -1001,17 +870,18 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
               pageType: 'new',
             });
             studentGroups.push(currentGroup);
-          } catch (e) {
-            currentGroup = {
-              primaryId: pageId,
-              pageIds: [pageId],
-            };
-            newItems.push({
-              ...baseItem,
-              pageType: 'new',
-            });
-            studentGroups.push(currentGroup);
           }
+        } catch (err) {
+          console.error('Student identification failed:', err);
+          currentGroup = {
+            primaryId: pageId,
+            pageIds: [pageId],
+          };
+          newItems.push({
+            ...baseItem,
+            pageType: 'new',
+          });
+          studentGroups.push(currentGroup);
         }
       }
     }
@@ -1661,86 +1531,13 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
       // Get the previous item (the one we're comparing to)
       const previousItem = items[i - 1];
 
-      try {
-        // Compare handwriting between this page and the previous one
-        const { data, error } = await invokeWithRetry('detect-handwriting-similarity', {
-          image1Base64: previousItem.imageDataUrl,
-          image2Base64: currentItem.imageDataUrl,
-        }, { maxRetries: 2 });
-
-        if (!error && data?.success && data?.similarity) {
-          const similarity = data.similarity;
-          
-          // Store similarity info
-          const handwritingSimilarity: HandwritingSimilarity = {
-            isSameStudent: similarity.isSameStudent,
-            confidence: similarity.confidence,
-            similarityScore: similarity.similarityScore,
-            reasoning: similarity.reasoning,
-          };
-
-          if (similarity.isSameStudent && (similarity.confidence === 'high' || similarity.confidence === 'medium')) {
-            // Link as continuation to the previous paper's primary
-            const primaryId = previousItem.pageType === 'continuation' && previousItem.continuationOf 
-              ? previousItem.continuationOf 
-              : previousItem.id;
-            
-            pagesLinked++;
-            
-            setItems(prev => {
-              const updated: BatchItem[] = prev.map((item, idx) => {
-                if (idx === i) {
-                  return { 
-                    ...item, 
-                    status: 'pending' as const,
-                    pageType: 'continuation' as const,
-                    continuationOf: primaryId,
-                    handwritingSimilarity,
-                    // Inherit student from primary if available
-                    studentId: prev.find(p => p.id === primaryId)?.studentId,
-                    studentName: prev.find(p => p.id === primaryId)?.studentName,
-                  };
-                }
-                // Add this as a continuation page to the primary paper
-                if (item.id === primaryId) {
-                  return {
-                    ...item,
-                    continuationPages: [...(item.continuationPages || []), currentItem.id],
-                  };
-                }
-                return item;
-              });
-              return updated;
-            });
-          } else {
-            // Different student - mark as new paper
-            lastNewPaperId = currentItem.id;
-            groupsCreated++;
-            setItems(prev => prev.map((item, idx) => 
-              idx === i ? { 
-                ...item, 
-                status: 'pending' as const, 
-                pageType: 'new' as const,
-                handwritingSimilarity,
-              } : item
-            ));
-          }
-        } else {
-          // API error - default to new paper
-          lastNewPaperId = currentItem.id;
-          groupsCreated++;
-          setItems(prev => prev.map((item, idx) => 
-            idx === i ? { ...item, status: 'pending', pageType: 'new' } : item
-          ));
-        }
-      } catch (err) {
-        console.error('Handwriting similarity detection failed:', err);
-        lastNewPaperId = currentItem.id;
-        groupsCreated++;
-        setItems(prev => prev.map((item, idx) => 
-          idx === i ? { ...item, status: 'pending', pageType: 'new' } : item
-        ));
-      }
+      // Handwriting similarity detection disabled — treat each page as a new paper
+      // Teachers can manually link front/back pages using the existing link button
+      lastNewPaperId = currentItem.id;
+      groupsCreated++;
+      setItems(prev => prev.map((item, idx) => 
+        idx === i ? { ...item, status: 'pending' as const, pageType: 'new' as const } : item
+      ));
     }
 
     setCurrentIndex(-1);
