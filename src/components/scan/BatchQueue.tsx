@@ -262,12 +262,13 @@ export function BatchQueue({
   const hasLinkedPages = items.some(i => i.continuationPages && i.continuationPages.length > 0);
   
   // Check if all items are analyzed (completed or failed)
-  const allAnalyzed = items.length > 0 && items.every(item => item.status === 'completed' || item.status === 'failed');
+  const allAnalyzed = items.length > 0 && items.every(item => item.status === 'completed' || item.status === 'failed' || item.status === 'needs-reupload');
   const completedCount = items.filter(item => item.status === 'completed').length;
 
   const getStatusIcon = (status: BatchItem['status']) => {
     if (status === 'completed') return <CheckCircle2 className="h-4 w-4 text-green-600" />;
     if (status === 'failed') return <XCircle className="h-4 w-4 text-destructive" />;
+    if (status === 'needs-reupload') return <XCircle className="h-4 w-4 text-amber-500" />;
     if (status === 'analyzing') return <Loader2 className="h-4 w-4 text-primary animate-spin" />;
     if (status === 'identifying') return <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />;
     return <Clock className="h-4 w-4 text-muted-foreground" />;
@@ -314,6 +315,9 @@ export function BatchQueue({
           )}
         </div>
       );
+    }
+    if (item.status === 'needs-reupload') {
+      return <Badge variant="outline" className="text-amber-600 border-amber-400">Re-upload needed</Badge>;
     }
     if (item.status === 'failed') {
       return <Badge variant="destructive">Failed</Badge>;

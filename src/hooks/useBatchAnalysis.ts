@@ -289,7 +289,7 @@ export interface BatchItem {
   studentId?: string;
   studentName?: string;
   questionId?: string;
-  status: 'pending' | 'identifying' | 'analyzing' | 'completed' | 'failed';
+  status: 'pending' | 'identifying' | 'analyzing' | 'completed' | 'failed' | 'needs-reupload';
   identification?: IdentificationResult;
   autoAssigned?: boolean;
   result?: AnalysisResult;
@@ -379,7 +379,13 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
           console.log(`[BatchAnalysis] Restored ${parsed.length} items from session`);
           hasLoadedFromStorage.current = true;
           lastSavedItems.current = stored;
-          return parsed;
+          // Mark items with missing image data as needs-reupload instead of pending
+          return parsed.map((item: BatchItem) => ({
+            ...item,
+            status: (!item.imageDataUrl || item.imageDataUrl.length < 100)
+              ? 'needs-reupload' as const
+              : item.status,
+          }));
         }
       }
     } catch (e) {
@@ -1283,7 +1289,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         console.warn(`[analyzeItem] Skipping item ${item.id}: no image data`);
         return {
           ...item,
-          status: 'failed',
+          status: 'needs-reupload' as const,
           error: 'Image data missing — please re-upload this paper',
         };
       }
@@ -1801,7 +1807,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
         console.warn(`[analyzeItemWithContinuations] Skipping item ${item.id}: no image data (restored session?)`);
         return {
           ...item,
-          status: 'failed',
+          status: 'needs-reupload' as const,
           error: 'Image data missing — please re-upload this paper',
         };
       }
@@ -1901,11 +1907,15 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     let consecutiveFailures = 0;
     const MAX_CONSECUTIVE_FAILURES = 15;
 
-    // Separate items into analyzable (primary papers) and continuations
+    // Separate items into analyzable (primary papers), continuations, and needs-reupload
     const analyzableItems: { item: BatchItem; index: number }[] = [];
     for (let i = 0; i < currentItems.length; i++) {
       const item = currentItems[i];
-      if (item.pageType === 'continuation' && item.continuationOf) {
+      if (item.status === 'needs-reupload') {
+        // Skip items missing image data — don't attempt analysis
+        console.log(`[startBatchAnalysis] Skipping item ${item.id}: needs re-upload`);
+        continue;
+      } else if (item.pageType === 'continuation' && item.continuationOf) {
         // Mark continuation pages as completed immediately
         setItems(prev => prev.map((it, idx) => 
           idx === i ? { ...it, status: 'completed' } : it
@@ -2025,7 +2035,10 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     const analyzableItems: { item: BatchItem; index: number }[] = [];
     for (let i = 0; i < currentItems.length; i++) {
       const item = currentItems[i];
-      if (item.pageType === 'continuation' && item.continuationOf) {
+      if (item.status === 'needs-reupload') {
+        console.log(`[startConfidenceAnalysis] Skipping item ${item.id}: needs re-upload`);
+        continue;
+      } else if (item.pageType === 'continuation' && item.continuationOf) {
         setItems(prev => prev.map((it, idx) => 
           idx === i ? { ...it, status: 'completed' } : it
         ));
@@ -2164,7 +2177,10 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
     const analyzableItems: { item: BatchItem; index: number }[] = [];
     for (let i = 0; i < currentItems.length; i++) {
       const item = currentItems[i];
-      if (item.pageType === 'continuation' && item.continuationOf) {
+      if (item.status === 'needs-reupload') {
+        console.log(`[startTeacherGuidedBatchAnalysis] Skipping item ${item.id}: needs re-upload`);
+        continue;
+      } else if (item.pageType === 'continuation' && item.continuationOf) {
         setItems(prev => prev.map((it, idx) => 
           idx === i ? { ...it, status: 'completed' } : it
         ));
@@ -2193,7 +2209,7 @@ export function useBatchAnalysis(): UseBatchAnalysisReturn {
           // Guard: skip items with no image data
           if (!item.imageDataUrl || item.imageDataUrl.length < 100) {
             setItems(prev => prev.map((it, idx) => 
-              idx === i ? { ...it, status: 'failed', error: 'Image data missing — please re-upload this paper' } : it
+              idx === i ? { ...it, status: 'needs-reupload' as const, error: 'Image data missing — please re-upload this paper' } : it
             ));
             return;
           }
