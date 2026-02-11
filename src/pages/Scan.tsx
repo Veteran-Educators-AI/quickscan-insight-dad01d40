@@ -15,9 +15,13 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { CameraModal } from '@/components/scan/CameraModal';
 import { ContinuousQRScanner } from '@/components/scan/ContinuousQRScanner';
 import { ImagePreview } from '@/components/scan/ImagePreview';
-import { AnalysisResults } from '@/components/scan/AnalysisResults';
-import { BatchQueue } from '@/components/scan/BatchQueue';
-import { BatchReport } from '@/components/scan/BatchReport';
+import React, { Suspense } from 'react';
+import { ScanResultsErrorBoundary } from '@/components/scan/ScanResultsErrorBoundary';
+
+const AnalysisResults = React.lazy(() => import('@/components/scan/AnalysisResults').then(m => ({ default: m.AnalysisResults })));
+const BatchQueue = React.lazy(() => import('@/components/scan/BatchQueue').then(m => ({ default: m.BatchQueue })));
+const BatchReport = React.lazy(() => import('@/components/scan/BatchReport').then(m => ({ default: m.BatchReport })));
+const GradingComparisonView = React.lazy(() => import('@/components/scan/GradingComparisonView').then(m => ({ default: m.GradingComparisonView })));
 import { ClassStudentSelector, useClassStudents } from '@/components/scan/ClassStudentSelector';
 import { ScanClassStudentPicker, useStudentName } from '@/components/scan/ScanClassStudentPicker';
 import { ScanQuestionSelector } from '@/components/scan/ScanQuestionSelector';
@@ -40,7 +44,7 @@ import { MultiStudentScanner } from '@/components/scan/MultiStudentScanner';
 import { ScannerImportMode } from '@/components/scan/ScannerImportMode';
 import { GradingModeSelector, GradingMode } from '@/components/scan/GradingModeSelector';
 import { BatchGradingModeSelector, BatchGradingMode } from '@/components/scan/BatchGradingModeSelector';
-import { GradingComparisonView } from '@/components/scan/GradingComparisonView';
+// GradingComparisonView is lazy-loaded above
 import { GoogleClassroomImport, type ImportedSubmission } from '@/components/scan/GoogleClassroomImport';
 import { GoogleConnectionPanel } from '@/components/scan/GoogleConnectionPanel';
 import { GoogleDriveImport } from '@/components/scan/GoogleDriveImport';
@@ -1354,6 +1358,11 @@ export default function Scan() {
 
             {/* Scanner Mode - Combined Batch + Scanner Import */}
             <TabsContent value="scanner" className="space-y-4 mt-4">
+              <ScanResultsErrorBoundary
+                grade={batch.items.find(i => i.result?.grade)?.result?.grade}
+                onRetry={() => window.location.reload()}
+              >
+              <Suspense fallback={<div className="text-center py-8 text-muted-foreground">Loading...</div>}>
               {showBatchReport && batch.summary ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -1800,6 +1809,8 @@ export default function Scan() {
                   )}
                 </>
               )}
+              </Suspense>
+              </ScanResultsErrorBoundary>
             </TabsContent>
 
             {/* Save for Later Mode */}

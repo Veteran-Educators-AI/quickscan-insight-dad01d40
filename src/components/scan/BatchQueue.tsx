@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { X, CheckCircle2, XCircle, Loader2, Clock, UserCircle, Sparkles, QrCode, RefreshCw, FileStack, Link, Unlink, Fingerprint, Eye, Save, ShieldCheck, Pencil, BarChart3, LinkIcon, GripVertical, ZoomIn, UserPlus, FilePlus2, RotateCcw, Play, Cloud } from 'lucide-react';
+import { ScanResultsErrorBoundary } from './ScanResultsErrorBoundary';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,7 +34,7 @@ import { BatchItem } from '@/hooks/useBatchAnalysis';
 import { HandwritingComparisonDialog } from './HandwritingComparisonDialog';
 import { MultiAnalysisBreakdownDialog } from './MultiAnalysisBreakdownDialog';
 import { ManualLinkDialog } from './ManualLinkDialog';
-import { BatchImageZoomDialog } from './BatchImageZoomDialog';
+const BatchImageZoomDialog = React.lazy(() => import('./BatchImageZoomDialog').then(m => ({ default: m.BatchImageZoomDialog })));
 import { AddUnknownStudentDialog } from './AddUnknownStudentDialog';
 import { SaveToDriveDialog } from './SaveToDriveDialog';
 import { useStudentNames } from '@/lib/StudentNameContext';
@@ -1083,34 +1084,42 @@ export function BatchQueue({
 
     {/* Zoom Preview Dialog */}
     {zoomPreviewIndex !== null && items[zoomPreviewIndex] && (
-      <BatchImageZoomDialog
-        open={zoomPreviewIndex !== null}
-        onOpenChange={(open) => !open && setZoomPreviewIndex(null)}
-        imageUrl={items[zoomPreviewIndex].imageDataUrl}
-        studentName={getItemDisplayName(items[zoomPreviewIndex])}
-        paperIndex={zoomPreviewIndex}
-        totalPapers={items.length}
-        misconceptions={items[zoomPreviewIndex].result?.misconceptions}
+      <ScanResultsErrorBoundary
         grade={items[zoomPreviewIndex].result?.grade}
-        studentId={items[zoomPreviewIndex].studentId}
-        topicName={items[zoomPreviewIndex].worksheetTopic || items[zoomPreviewIndex].result?.problemIdentified || 'Unknown Topic'}
-        gradeJustification={items[zoomPreviewIndex].result?.gradeJustification}
-        feedback={items[zoomPreviewIndex].result?.feedback}
-        whatStudentDidCorrectly={items[zoomPreviewIndex].result?.whatStudentDidCorrectly}
-        whatStudentGotWrong={items[zoomPreviewIndex].result?.whatStudentGotWrong}
-        approachAnalysis={items[zoomPreviewIndex].result?.approachAnalysis}
-        strengthsAnalysis={items[zoomPreviewIndex].result?.strengthsAnalysis}
-        areasForImprovement={items[zoomPreviewIndex].result?.areasForImprovement}
-        regentsScore={items[zoomPreviewIndex].result?.regentsScore}
-        regentsScoreJustification={items[zoomPreviewIndex].result?.regentsScoreJustification}
-        onNavigate={(direction) => {
-          if (direction === 'prev' && zoomPreviewIndex > 0) {
-            setZoomPreviewIndex(zoomPreviewIndex - 1);
-          } else if (direction === 'next' && zoomPreviewIndex < items.length - 1) {
-            setZoomPreviewIndex(zoomPreviewIndex + 1);
-          }
-        }}
-      />
+        studentName={getItemDisplayName(items[zoomPreviewIndex])}
+        onRetry={() => setZoomPreviewIndex(null)}
+      >
+        <Suspense fallback={null}>
+          <BatchImageZoomDialog
+            open={zoomPreviewIndex !== null}
+            onOpenChange={(open) => !open && setZoomPreviewIndex(null)}
+            imageUrl={items[zoomPreviewIndex].imageDataUrl}
+            studentName={getItemDisplayName(items[zoomPreviewIndex])}
+            paperIndex={zoomPreviewIndex}
+            totalPapers={items.length}
+            misconceptions={items[zoomPreviewIndex].result?.misconceptions}
+            grade={items[zoomPreviewIndex].result?.grade}
+            studentId={items[zoomPreviewIndex].studentId}
+            topicName={items[zoomPreviewIndex].worksheetTopic || items[zoomPreviewIndex].result?.problemIdentified || 'Unknown Topic'}
+            gradeJustification={items[zoomPreviewIndex].result?.gradeJustification}
+            feedback={items[zoomPreviewIndex].result?.feedback}
+            whatStudentDidCorrectly={items[zoomPreviewIndex].result?.whatStudentDidCorrectly}
+            whatStudentGotWrong={items[zoomPreviewIndex].result?.whatStudentGotWrong}
+            approachAnalysis={items[zoomPreviewIndex].result?.approachAnalysis}
+            strengthsAnalysis={items[zoomPreviewIndex].result?.strengthsAnalysis}
+            areasForImprovement={items[zoomPreviewIndex].result?.areasForImprovement}
+            regentsScore={items[zoomPreviewIndex].result?.regentsScore}
+            regentsScoreJustification={items[zoomPreviewIndex].result?.regentsScoreJustification}
+            onNavigate={(direction) => {
+              if (direction === 'prev' && zoomPreviewIndex > 0) {
+                setZoomPreviewIndex(zoomPreviewIndex - 1);
+              } else if (direction === 'next' && zoomPreviewIndex < items.length - 1) {
+                setZoomPreviewIndex(zoomPreviewIndex + 1);
+              }
+            }}
+          />
+        </Suspense>
+      </ScanResultsErrorBoundary>
     )}
     </>
   );
