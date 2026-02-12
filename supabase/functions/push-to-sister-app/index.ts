@@ -320,27 +320,53 @@ serve(async (req) => {
       console.log('Processing live session completed request');
       sisterAppPayload = convertToLiveSessionFormat(requestData);
     } else {
-      // For grade/assignment pushes, auto-create student first if we have student info
+      // For grade/assignment pushes, auto-create student first and use the Scholar app's user ID
+      let scholarStudentId: string | null = null;
       if (requestData.student_id && (requestData.student_name || requestData.first_name)) {
         console.log('Auto-creating student on Scholar before pushing grade...');
         const studentPayload = convertToStudentCreatedFormat(requestData);
         const createResult = await sendToSisterApp(studentPayload);
         console.log('Student creation result:', createResult.status, createResult.body);
-        // Small delay to allow Scholar app to process student creation
+        
+        // Extract the Scholar app's linked_user_id from the response
+        if (createResult.ok) {
+          try {
+            const createData = JSON.parse(createResult.body);
+            scholarStudentId = createData.linked_user_id || createData.user_id || null;
+            if (scholarStudentId) {
+              console.log('Scholar app returned linked_user_id:', scholarStudentId);
+            }
+          } catch { /* ignore parse errors */ }
+        }
         await new Promise(resolve => setTimeout(resolve, 500));
       }
       sisterAppPayload = convertToSisterAppFormat(requestData);
+      // Use the Scholar app's user ID instead of our local student ID
+      if (scholarStudentId) {
+        sisterAppPayload.student_id = scholarStudentId;
+      }
     }
     
     console.log('Sending payload to sister app:', JSON.stringify(sisterAppPayload));
     
     let result = await sendToSisterApp(sisterAppPayload);
 
-    // If we get a 404 (Student not found) for grade pushes, retry once after creating student
+    // If we get a 404 (Student not found) for grade pushes, retry with Scholar's user ID
     if (!result.ok && result.status === 404 && requestData.student_id) {
       console.log('Got 404, retrying after student creation...');
       const studentPayload = convertToStudentCreatedFormat(requestData);
-      await sendToSisterApp(studentPayload);
+      const retryCreate = await sendToSisterApp(studentPayload);
+      // Try to extract linked_user_id from retry creation
+      if (retryCreate.ok) {
+        try {
+          const retryData = JSON.parse(retryCreate.body);
+          const retryScholarId = retryData.linked_user_id || retryData.user_id || null;
+          if (retryScholarId) {
+            console.log('Retry: using Scholar linked_user_id:', retryScholarId);
+            sisterAppPayload.student_id = retryScholarId;
+          }
+        } catch { /* ignore */ }
+      }
       await new Promise(resolve => setTimeout(resolve, 1000));
       result = await sendToSisterApp(sisterAppPayload);
       console.log('Retry result:', result.status, result.body);
