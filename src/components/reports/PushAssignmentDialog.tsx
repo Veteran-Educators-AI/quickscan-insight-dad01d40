@@ -214,13 +214,15 @@ export function PushAssignmentDialog({
 
         const { data: questionData, error: genError } = await supabase.functions.invoke('generate-worksheet-questions', {
           body: {
-            topic: primaryWeakness.topic,
-            standard: primaryWeakness.standard,
-            count: questionCount,
-            difficulty: primaryWeakness.avgGrade < 40 ? 'easy' : primaryWeakness.avgGrade < 60 ? 'medium' : 'mixed',
+            topics: [{
+              topicName: primaryWeakness.topic,
+              standard: primaryWeakness.standard || 'N/A',
+              subject: 'Math',
+              category: 'Remediation',
+            }],
+            questionCount,
+            difficultyLevels: [primaryWeakness.avgGrade < 40 ? 'medium' : primaryWeakness.avgGrade < 60 ? 'medium' : 'hard'],
             includeHints: true,
-            format: 'practice',
-            context: `Targeted remediation for a student who scored ${primaryWeakness.avgGrade}% on ${primaryWeakness.topic}. Focus on building foundational understanding and correcting common misconceptions.`,
           },
         });
         if (genError) { console.error(`Failed to generate questions for ${student.firstName}:`, genError); continue; }
@@ -291,13 +293,15 @@ export function PushAssignmentDialog({
 
         const { data: questionData, error: genError } = await supabase.functions.invoke('generate-worksheet-questions', {
           body: {
-            topic: manualTopic.trim(),
-            standard: manualStandard.trim() || undefined,
-            count: questionCount,
-            difficulty: 'medium',
+            topics: [{
+              topicName: manualTopic.trim(),
+              standard: manualStandard.trim() || 'N/A',
+              subject: 'Math',
+              category: 'Enrichment',
+            }],
+            questionCount,
+            difficultyLevels: ['medium', 'hard'],
             includeHints: false,
-            format: 'challenge',
-            context: `Enrichment assignment on "${manualTopic.trim()}" for ${student.first_name} ${student.last_name}. Provide thought-provoking questions that deepen understanding and encourage higher-order thinking.`,
           },
         });
         if (genError) { console.error(`Failed to generate for ${student.first_name}:`, genError); continue; }
