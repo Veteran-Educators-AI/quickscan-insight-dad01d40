@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Send, Loader2, Users, Target, TrendingDown, AlertCircle } from 'lucide-react';
+import { Send, Loader2, Users, Target, TrendingDown, AlertCircle, Sparkles, Check } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
@@ -39,6 +42,13 @@ interface StudentWeakness {
   }>;
 }
 
+interface StudentRecord {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+}
+
 export function PushAssignmentDialog({
   open,
   onOpenChange,
@@ -46,16 +56,26 @@ export function PushAssignmentDialog({
 }: PushAssignmentDialogProps) {
   const { user } = useAuth();
   const { pushToSisterApp } = usePushToSisterApp();
-  
+
+  const [activeTab, setActiveTab] = useState<'auto' | 'manual'>('auto');
   const [selectedClassId, setSelectedClassId] = useState<string>(defaultClassId || '');
   const [questionCount, setQuestionCount] = useState(5);
   const [isPushing, setIsPushing] = useState(false);
   const [pushProgress, setPushProgress] = useState({ current: 0, total: 0, studentName: '' });
 
-  // Update state when defaults change
+  // Manual enrichment state
+  const [manualTopic, setManualTopic] = useState('');
+  const [manualStandard, setManualStandard] = useState('');
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     if (defaultClassId) setSelectedClassId(defaultClassId);
   }, [defaultClassId]);
+
+  // Reset manual selections when class changes
+  useEffect(() => {
+    setSelectedStudentIds(new Set());
+  }, [selectedClassId]);
 
   // Fetch classes
   const { data: classes, isLoading: loadingClasses } = useQuery({
@@ -67,100 +87,81 @@ export function PushAssignmentDialog({
         .eq('teacher_id', user!.id)
         .is('archived_at', null)
         .order('name');
-
       if (error) throw error;
 
-      // Get student counts
       const classOptions: ClassOption[] = [];
       for (const cls of classesData || []) {
         const { count } = await supabase
           .from('students')
           .select('id', { count: 'exact', head: true })
           .eq('class_id', cls.id);
-        
-        classOptions.push({
-          id: cls.id,
-          name: cls.name,
-          studentCount: count || 0,
-        });
+        classOptions.push({ id: cls.id, name: cls.name, studentCount: count || 0 });
       }
-
       return classOptions;
     },
     enabled: !!user && open,
   });
 
-  // Analyze student performance to find individual weaknesses
+  // Fetch all students for manual selection
+  const { data: allStudents } = useQuery({
+    queryKey: ['class-students-for-push', selectedClassId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('students')
+        .select('id, first_name, last_name, email')
+        .eq('class_id', selectedClassId)
+        .order('last_name');
+      if (error) throw error;
+      return data as StudentRecord[];
+    },
+    enabled: !!selectedClassId && open,
+  });
+
+  // Analyze student performance (auto mode only)
   const { data: studentWeaknesses, isLoading: loadingWeaknesses } = useQuery({
     queryKey: ['student-weaknesses-for-push', selectedClassId, user?.id],
     queryFn: async () => {
-      // Get students in the class
       const { data: classStudents, error: studentsError } = await supabase
         .from('students')
         .select('id, first_name, last_name, email')
         .eq('class_id', selectedClassId);
-
       if (studentsError) throw studentsError;
       if (!classStudents || classStudents.length === 0) return [];
 
       const studentIds = classStudents.map(s => s.id);
-
-      // Get grade history for all students
       const { data: gradeHistory, error } = await supabase
         .from('grade_history')
         .select('student_id, topic_name, nys_standard, grade')
         .in('student_id', studentIds)
         .not('topic_name', 'is', null)
         .order('created_at', { ascending: false });
-
       if (error) throw error;
 
-      // Analyze each student's performance
       const studentAnalysis: StudentWeakness[] = [];
-
       for (const student of classStudents) {
         const studentGrades = (gradeHistory || []).filter(g => g.student_id === student.id);
-        
-        // Group by topic and calculate averages
         const topicMap = new Map<string, { grades: number[]; standard: string | null }>();
-        
         for (const entry of studentGrades) {
-          let cleanTopic = (entry.topic_name || '').trim();
-          cleanTopic = cleanTopic.replace(/^(Q\d+:|Question \d+:)\s*/i, '');
+          let cleanTopic = (entry.topic_name || '').trim().replace(/^(Q\d+:|Question \d+:)\s*/i, '');
           if (cleanTopic.length > 60) cleanTopic = cleanTopic.substring(0, 60) + '...';
           if (!cleanTopic) continue;
-
           let cleanStandard: string | null = null;
           if (entry.nys_standard) {
-            const match = entry.nys_standard.match(/^([A-Z0-9\.\-]+)/);
+            const match = entry.nys_standard.match(/^([A-Z0-9.\-]+)/);
             if (match) cleanStandard = match[1];
           }
-
           const existing = topicMap.get(cleanTopic);
-          if (existing) {
-            existing.grades.push(entry.grade);
-          } else {
-            topicMap.set(cleanTopic, { grades: [entry.grade], standard: cleanStandard });
-          }
+          if (existing) { existing.grades.push(entry.grade); }
+          else { topicMap.set(cleanTopic, { grades: [entry.grade], standard: cleanStandard }); }
         }
-
-        // Find weak topics (below 70% average)
         const weakTopics: StudentWeakness['weakTopics'] = [];
         topicMap.forEach((data, topic) => {
           const avg = data.grades.reduce((a, b) => a + b, 0) / data.grades.length;
           if (avg < 70) {
-            weakTopics.push({
-              topic,
-              standard: data.standard,
-              avgGrade: Math.round(avg),
-              attempts: data.grades.length,
-            });
+            weakTopics.push({ topic, standard: data.standard, avgGrade: Math.round(avg), attempts: data.grades.length });
           }
         });
-
-        // Sort by lowest grade first, take top 3
         weakTopics.sort((a, b) => a.avgGrade - b.avgGrade);
-        
         if (weakTopics.length > 0) {
           studentAnalysis.push({
             studentId: student.id,
@@ -171,26 +172,34 @@ export function PushAssignmentDialog({
           });
         }
       }
-
       return studentAnalysis;
     },
-    enabled: !!user && open && !!selectedClassId,
+    enabled: !!user && open && !!selectedClassId && activeTab === 'auto',
   });
 
-  const handlePushPersonalizedAssignments = async () => {
-    if (!selectedClassId) {
-      toast.error('Please select a class');
-      return;
-    }
+  const toggleStudent = (id: string) => {
+    setSelectedStudentIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
-    if (!studentWeaknesses || studentWeaknesses.length === 0) {
-      toast.error('No students need remediation based on their grades');
-      return;
+  const toggleAllStudents = () => {
+    if (!allStudents) return;
+    if (selectedStudentIds.size === allStudents.length) {
+      setSelectedStudentIds(new Set());
+    } else {
+      setSelectedStudentIds(new Set(allStudents.map(s => s.id)));
     }
+  };
+
+  // --- Auto remediation push (existing logic) ---
+  const handlePushAutoRemediation = async () => {
+    if (!selectedClassId || !studentWeaknesses || studentWeaknesses.length === 0) return;
 
     setIsPushing(true);
     setPushProgress({ current: 0, total: studentWeaknesses.length, studentName: '' });
-
     const selectedClass = classes?.find(c => c.id === selectedClassId);
     let successCount = 0;
 
@@ -198,14 +207,8 @@ export function PushAssignmentDialog({
       for (let i = 0; i < studentWeaknesses.length; i++) {
         const student = studentWeaknesses[i];
         const primaryWeakness = student.weakTopics[0];
-        
-        setPushProgress({
-          current: i + 1,
-          total: studentWeaknesses.length,
-          studentName: `${student.firstName} ${student.lastName}`,
-        });
+        setPushProgress({ current: i + 1, total: studentWeaknesses.length, studentName: `${student.firstName} ${student.lastName}` });
 
-        // Generate personalized questions for this student's weakest topic
         const { data: questionData, error: genError } = await supabase.functions.invoke('generate-worksheet-questions', {
           body: {
             topic: primaryWeakness.topic,
@@ -217,22 +220,12 @@ export function PushAssignmentDialog({
             context: `Targeted remediation for a student who scored ${primaryWeakness.avgGrade}% on ${primaryWeakness.topic}. Focus on building foundational understanding and correcting common misconceptions.`,
           },
         });
-
-        if (genError) {
-          console.error(`Failed to generate questions for ${student.firstName}:`, genError);
-          continue;
-        }
-
+        if (genError) { console.error(`Failed to generate questions for ${student.firstName}:`, genError); continue; }
         const questions = questionData?.questions || [];
         if (questions.length === 0) continue;
 
-        // Determine difficulty level based on performance
         const difficultyLevel = primaryWeakness.avgGrade < 40 ? 'A' : primaryWeakness.avgGrade < 60 ? 'B' : 'C';
-
-        // Build remediation recommendations from all weak topics
-        const remediationRecommendations = student.weakTopics.map(wt => 
-          `${wt.topic} (${wt.avgGrade}% avg)`
-        );
+        const remediationRecommendations = student.weakTopics.map(wt => `${wt.topic} (${wt.avgGrade}% avg)`);
 
         const result = await pushToSisterApp({
           type: 'assignment_push',
@@ -248,7 +241,7 @@ export function PushAssignmentDialog({
           student_email: student.email || undefined,
           first_name: student.firstName,
           last_name: student.lastName,
-          xp_reward: questions.length * 15, // Higher reward for remediation
+          xp_reward: questions.length * 15,
           coin_reward: questions.length * 10,
           difficulty_level: difficultyLevel,
           remediation_recommendations: remediationRecommendations,
@@ -261,22 +254,13 @@ export function PushAssignmentDialog({
             explanation: q.explanation,
           })),
         });
-
-        if (result.success) {
-          successCount++;
-        } else {
-          console.error(`Failed to push to ${student.firstName}:`, result.error);
-        }
+        if (result.success) successCount++;
+        else console.error(`Failed to push to ${student.firstName}:`, result.error);
       }
 
-      if (successCount === studentWeaknesses.length) {
-        toast.success(`Personalized assignments sent to all ${successCount} students!`);
-      } else if (successCount > 0) {
-        toast.warning(`Sent to ${successCount}/${studentWeaknesses.length} students`);
-      } else {
-        throw new Error('Failed to send to any students');
-      }
-
+      if (successCount === studentWeaknesses.length) toast.success(`Personalized assignments sent to all ${successCount} students!`);
+      else if (successCount > 0) toast.warning(`Sent to ${successCount}/${studentWeaknesses.length} students`);
+      else throw new Error('Failed to send to any students');
       onOpenChange(false);
     } catch (error) {
       console.error('Push assignment error:', error);
@@ -287,8 +271,83 @@ export function PushAssignmentDialog({
     }
   };
 
+  // --- Manual enrichment push ---
+  const handlePushManualEnrichment = async () => {
+    if (!selectedClassId || !manualTopic.trim() || selectedStudentIds.size === 0 || !allStudents) return;
+
+    setIsPushing(true);
+    const studentsToSend = allStudents.filter(s => selectedStudentIds.has(s.id));
+    setPushProgress({ current: 0, total: studentsToSend.length, studentName: '' });
+    const selectedClass = classes?.find(c => c.id === selectedClassId);
+    let successCount = 0;
+
+    try {
+      for (let i = 0; i < studentsToSend.length; i++) {
+        const student = studentsToSend[i];
+        setPushProgress({ current: i + 1, total: studentsToSend.length, studentName: `${student.first_name} ${student.last_name}` });
+
+        const { data: questionData, error: genError } = await supabase.functions.invoke('generate-worksheet-questions', {
+          body: {
+            topic: manualTopic.trim(),
+            standard: manualStandard.trim() || undefined,
+            count: questionCount,
+            difficulty: 'medium',
+            includeHints: false,
+            format: 'challenge',
+            context: `Enrichment assignment on "${manualTopic.trim()}" for ${student.first_name} ${student.last_name}. Provide thought-provoking questions that deepen understanding and encourage higher-order thinking.`,
+          },
+        });
+        if (genError) { console.error(`Failed to generate for ${student.first_name}:`, genError); continue; }
+        const questions = questionData?.questions || [];
+        if (questions.length === 0) continue;
+
+        const result = await pushToSisterApp({
+          type: 'assignment_push',
+          source: 'scan_genius',
+          class_id: selectedClassId,
+          class_name: selectedClass?.name,
+          title: `Enrichment: ${manualTopic.trim()}`,
+          description: `Teacher-assigned enrichment practice on ${manualTopic.trim()}`,
+          topic_name: manualTopic.trim(),
+          standard_code: manualStandard.trim() || undefined,
+          student_id: student.id,
+          student_name: `${student.first_name} ${student.last_name}`,
+          student_email: student.email || undefined,
+          first_name: student.first_name,
+          last_name: student.last_name,
+          xp_reward: questions.length * 20,
+          coin_reward: questions.length * 15,
+          difficulty_level: 'C',
+          remediation_recommendations: [],
+          questions: questions.map((q: any, idx: number) => ({
+            number: idx + 1,
+            text: q.text || q.question || q.prompt_text || q.title,
+            difficulty: q.difficulty || 'medium',
+            hints: q.hints || [],
+            answer: q.answer,
+            explanation: q.explanation,
+          })),
+        });
+        if (result.success) successCount++;
+        else console.error(`Failed to push to ${student.first_name}:`, result.error);
+      }
+
+      if (successCount === studentsToSend.length) toast.success(`Enrichment sent to all ${successCount} students!`);
+      else if (successCount > 0) toast.warning(`Sent to ${successCount}/${studentsToSend.length} students`);
+      else throw new Error('Failed to send to any students');
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Manual enrichment push error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send enrichment');
+    } finally {
+      setIsPushing(false);
+      setPushProgress({ current: 0, total: 0, studentName: '' });
+    }
+  };
+
   const selectedClass = classes?.find(c => c.id === selectedClassId);
   const studentsNeedingHelp = studentWeaknesses?.length || 0;
+  const manualReady = manualTopic.trim().length > 0 && selectedStudentIds.size > 0 && !!selectedClassId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -296,15 +355,15 @@ export function PushAssignmentDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Target className="h-5 w-5 text-primary" />
-            Push Personalized Remediation
+            Push Practice to Students
           </DialogTitle>
           <DialogDescription>
-            Each student receives unique practice questions based on their individual weaknesses from scanned work
+            Send personalized practice via auto-detected weaknesses or manually choose students for enrichment
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Class Selection */}
+        <div className="space-y-4 py-2">
+          {/* Class Selection (shared) */}
           <div className="space-y-2">
             <Label>Select Class</Label>
             <Select value={selectedClassId} onValueChange={setSelectedClassId}>
@@ -327,59 +386,128 @@ export function PushAssignmentDialog({
             </Select>
           </div>
 
-          {/* Student Weakness Analysis */}
-          {selectedClassId && (
-            <div className="space-y-3">
-              <Label className="flex items-center gap-2">
-                <TrendingDown className="h-4 w-4 text-destructive" />
-                Students Needing Remediation
-              </Label>
-              
-              {loadingWeaknesses ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Analyzing student performance from graded work...
-                </div>
-              ) : studentWeaknesses && studentWeaknesses.length > 0 ? (
-                <ScrollArea className="h-48 border rounded-md p-2">
-                  <div className="space-y-2">
-                    {studentWeaknesses.map(student => (
-                      <div key={student.studentId} className="p-2 bg-muted/50 rounded-md">
-                        <div className="font-medium text-sm">
-                          {student.firstName} {student.lastName}
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {student.weakTopics.map((wt, idx) => (
-                            <Badge 
-                              key={idx} 
-                              variant={wt.avgGrade < 50 ? "destructive" : "secondary"}
-                              className="text-xs"
-                            >
-                              {wt.topic.length > 25 ? wt.topic.substring(0, 25) + '...' : wt.topic}
-                              <span className="ml-1 opacity-75">({wt.avgGrade}%)</span>
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              ) : (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4 border rounded-md px-3">
-                  <AlertCircle className="h-4 w-4" />
-                  No students need remediation (all above 70%) or no graded work found
-                </div>
-              )}
-              
-              {studentWeaknesses && studentWeaknesses.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {studentsNeedingHelp} student{studentsNeedingHelp !== 1 ? 's' : ''} will receive personalized questions targeting their weakest topics
-                </p>
-              )}
-            </div>
-          )}
+          {/* Mode Tabs */}
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'auto' | 'manual')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="auto" className="flex items-center gap-1.5">
+                <TrendingDown className="h-3.5 w-3.5" />
+                Auto Remediation
+              </TabsTrigger>
+              <TabsTrigger value="manual" className="flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                Manual Enrichment
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Question Count */}
+            {/* Auto Remediation Tab */}
+            <TabsContent value="auto" className="mt-3 space-y-3">
+              {selectedClassId && (
+                <>
+                  <Label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <TrendingDown className="h-3.5 w-3.5" />
+                    Students with topics below 70% from scanned work
+                  </Label>
+                  {loadingWeaknesses ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Analyzing student performance...
+                    </div>
+                  ) : studentWeaknesses && studentWeaknesses.length > 0 ? (
+                    <ScrollArea className="h-48 border rounded-md p-2">
+                      <div className="space-y-2">
+                        {studentWeaknesses.map(student => (
+                          <div key={student.studentId} className="p-2 bg-muted/50 rounded-md">
+                            <div className="font-medium text-sm">
+                              {student.firstName} {student.lastName}
+                            </div>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {student.weakTopics.map((wt, idx) => (
+                                <Badge
+                                  key={idx}
+                                  variant={wt.avgGrade < 50 ? "destructive" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {wt.topic.length > 25 ? wt.topic.substring(0, 25) + '...' : wt.topic}
+                                  <span className="ml-1 opacity-75">({wt.avgGrade}%)</span>
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-4 border rounded-md px-3">
+                      <AlertCircle className="h-4 w-4" />
+                      No students need remediation (all above 70%) or no graded work found
+                    </div>
+                  )}
+                </>
+              )}
+            </TabsContent>
+
+            {/* Manual Enrichment Tab */}
+            <TabsContent value="manual" className="mt-3 space-y-3">
+              {/* Topic */}
+              <div className="space-y-2">
+                <Label>Topic</Label>
+                <Input
+                  placeholder="e.g. Solving Systems of Equations"
+                  value={manualTopic}
+                  onChange={(e) => setManualTopic(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Standard (optional)</Label>
+                <Input
+                  placeholder="e.g. A.REI.6"
+                  value={manualStandard}
+                  onChange={(e) => setManualStandard(e.target.value)}
+                />
+              </div>
+
+              {/* Student selection */}
+              {selectedClassId && allStudents && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2">
+                      <Users className="h-3.5 w-3.5" />
+                      Select Students
+                    </Label>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={toggleAllStudents}>
+                      {selectedStudentIds.size === allStudents.length ? 'Deselect All' : 'Select All'}
+                    </Button>
+                  </div>
+                  <ScrollArea className="h-40 border rounded-md p-2">
+                    <div className="space-y-1">
+                      {allStudents.map(student => (
+                        <label
+                          key={student.id}
+                          className="flex items-center gap-2 p-1.5 rounded-md hover:bg-muted/50 cursor-pointer text-sm"
+                        >
+                          <Checkbox
+                            checked={selectedStudentIds.has(student.id)}
+                            onCheckedChange={() => toggleStudent(student.id)}
+                          />
+                          <span>{student.last_name}, {student.first_name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  {selectedStudentIds.size > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedStudentIds.size} student{selectedStudentIds.size !== 1 ? 's' : ''} selected for enrichment
+                    </p>
+                  )}
+                </div>
+              )}
+              {!selectedClassId && (
+                <p className="text-sm text-muted-foreground">Select a class first to pick students</p>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          {/* Question Count (shared) */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Questions per Student</Label>
@@ -392,12 +520,9 @@ export function PushAssignmentDialog({
               max={10}
               step={1}
             />
-            <p className="text-xs text-muted-foreground">
-              Difficulty is automatically adjusted based on each student's performance
-            </p>
           </div>
 
-          {/* Progress indicator during push */}
+          {/* Progress */}
           {isPushing && pushProgress.total > 0 && (
             <div className="space-y-2 p-3 bg-muted/50 rounded-md">
               <div className="flex items-center justify-between text-sm">
@@ -413,22 +538,29 @@ export function PushAssignmentDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPushing}>
             Cancel
           </Button>
-          <Button
-            onClick={handlePushPersonalizedAssignments}
-            disabled={isPushing || !selectedClassId || studentsNeedingHelp === 0}
-          >
-            {isPushing ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              <>
-                <Send className="h-4 w-4 mr-2" />
-                Push to {studentsNeedingHelp} Student{studentsNeedingHelp !== 1 ? 's' : ''}
-              </>
-            )}
-          </Button>
+          {activeTab === 'auto' ? (
+            <Button
+              onClick={handlePushAutoRemediation}
+              disabled={isPushing || !selectedClassId || studentsNeedingHelp === 0}
+            >
+              {isPushing ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
+              ) : (
+                <><Send className="h-4 w-4 mr-2" /> Push to {studentsNeedingHelp} Student{studentsNeedingHelp !== 1 ? 's' : ''}</>
+              )}
+            </Button>
+          ) : (
+            <Button
+              onClick={handlePushManualEnrichment}
+              disabled={isPushing || !manualReady}
+            >
+              {isPushing ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
+              ) : (
+                <><Sparkles className="h-4 w-4 mr-2" /> Send Enrichment to {selectedStudentIds.size} Student{selectedStudentIds.size !== 1 ? 's' : ''}</>
+              )}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
