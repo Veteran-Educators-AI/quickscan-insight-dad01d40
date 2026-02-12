@@ -274,110 +274,112 @@ serve(async (req) => {
     }
 
     // ========================================================================
+    // HELPER: Send a payload to the sister app with timeout
+    // ========================================================================
+    async function sendToSisterApp(payload: any): Promise<{ ok: boolean; status: number; body: string }> {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 15000);
+      try {
+        const res = await fetch(sisterAppEndpoint!, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': sisterAppApiKey!,
+          },
+          body: JSON.stringify(payload),
+          signal: ctrl.signal,
+        });
+        clearTimeout(tid);
+        const text = await res.text();
+        return { ok: res.ok, status: res.status, body: text };
+      } catch (fetchError) {
+        clearTimeout(tid);
+        const isTimeout = fetchError instanceof DOMException && fetchError.name === 'AbortError';
+        const errorMsg = isTimeout 
+          ? 'Sister app request timed out after 15 seconds'
+          : `Network error: ${fetchError instanceof Error ? fetchError.message : 'Unknown'}`;
+        return { ok: false, status: 0, body: errorMsg };
+      }
+    }
+
+    // ========================================================================
     // SEND DATA TO SISTER APP
     // ========================================================================
-    // Convert to the format expected by receive-sister-app-data
-    // The receiving endpoint expects 'action' field (e.g., 'grade_completed' or 'behavior_deduction')
-    // NOT 'type' field which was causing "Unknown payload type" error
     let sisterAppPayload;
     
     if (requestData.type === 'behavior') {
-      // Handle behavior deduction - sends negative XP/coins
       console.log('Processing behavior deduction request');
       sisterAppPayload = convertToBehaviorFormat(requestData);
     } else if (requestData.type === 'student_created' || requestData.type === 'roster_sync') {
-      // Handle new student creation - sync roster
       console.log('Processing student creation/roster sync request');
       sisterAppPayload = convertToStudentCreatedFormat(requestData);
     } else if (requestData.type === 'student_updated') {
-      // Handle student update - sync roster changes
       console.log('Processing student update request');
       sisterAppPayload = convertToStudentUpdatedFormat(requestData);
     } else if (requestData.type === 'live_session_completed') {
-      // Handle live session results
       console.log('Processing live session completed request');
       sisterAppPayload = convertToLiveSessionFormat(requestData);
     } else {
-      // Handle grade completion (default)
+      // For grade/assignment pushes, auto-create student first if we have student info
+      if (requestData.student_id && (requestData.student_name || requestData.first_name)) {
+        console.log('Auto-creating student on Scholar before pushing grade...');
+        const studentPayload = convertToStudentCreatedFormat(requestData);
+        const createResult = await sendToSisterApp(studentPayload);
+        console.log('Student creation result:', createResult.status, createResult.body);
+        // Small delay to allow Scholar app to process student creation
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
       sisterAppPayload = convertToSisterAppFormat(requestData);
     }
     
     console.log('Sending payload to sister app:', JSON.stringify(sisterAppPayload));
     
-    // Make POST request to the sister app's endpoint with the grade data
-    // Use a timeout to prevent hanging if the sister app is slow
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-    
-    let response: Response;
-    try {
-      response = await fetch(sisterAppEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': sisterAppApiKey,  // Authenticate with the API key
-        },
-        body: JSON.stringify(sisterAppPayload),
-        signal: controller.signal,
-      });
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      const isTimeout = fetchError instanceof DOMException && fetchError.name === 'AbortError';
-      const errorMsg = isTimeout 
-        ? 'Sister app request timed out after 15 seconds'
-        : `Network error connecting to sister app: ${fetchError instanceof Error ? fetchError.message : 'Unknown'}`;
-      
-      console.error(errorMsg);
-      
-      // Return a soft failure - don't use 5xx status so the caller knows it was a network issue
-      // not a bug in our code
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: errorMsg,
-          retriable: true,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } finally {
-      clearTimeout(timeoutId);
+    let result = await sendToSisterApp(sisterAppPayload);
+
+    // If we get a 404 (Student not found) for grade pushes, retry once after creating student
+    if (!result.ok && result.status === 404 && requestData.student_id) {
+      console.log('Got 404, retrying after student creation...');
+      const studentPayload = convertToStudentCreatedFormat(requestData);
+      await sendToSisterApp(studentPayload);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      result = await sendToSisterApp(sisterAppPayload);
+      console.log('Retry result:', result.status, result.body);
     }
 
-    // Read the response
-    const responseText = await response.text();
-    
+    // Handle network errors
+    if (result.status === 0) {
+      return new Response(
+        JSON.stringify({ success: false, error: result.body, retriable: true }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // ========================================================================
     // HANDLE SISTER APP RESPONSE
     // ========================================================================
-    // Check if the request was successful
-    if (!response.ok) {
-      console.error('Sister app error:', response.status, responseText);
-      
-      // Return 200 with success:false instead of forwarding the error status
-      // This prevents the caller (grade save flow) from thinking the entire operation failed
+    if (!result.ok) {
+      console.error('Sister app error:', result.status, result.body);
       return new Response(
         JSON.stringify({ 
           success: false, 
           error: 'Sister app returned an error',
-          status: response.status,
-          details: responseText,
-          retriable: response.status >= 500,
+          status: result.status,
+          details: result.body,
+          retriable: result.status >= 500,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Try to parse response as JSON, fall back to raw text if not valid JSON
     let responseData;
     try {
-      responseData = JSON.parse(responseText);
+      responseData = JSON.parse(result.body);
     } catch {
-      responseData = { raw: responseText };
+      responseData = { raw: result.body };
     }
 
     console.log('Sister app response:', responseData);
 
-    // Return success with the sister app's response
     return new Response(
       JSON.stringify({ success: true, response: responseData }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
