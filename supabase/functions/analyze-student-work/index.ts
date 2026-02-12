@@ -587,7 +587,7 @@ const GRADING_SCHEMA = {
         detected_subject: { type: "string", description: "Subject area (Math, Science, ELA, etc)" },
         problem_identified: { type: "string", description: "What problem is being answered (under 20 words)" },
         nys_standard: { type: "string", description: "NYS standard code and description" },
-        // ─── THE 5 BOOLEAN GRADING QUESTIONS (code computes grade from these) ───
+        // ─── THE 7 BOOLEAN GRADING QUESTIONS (code computes grade from these) ───
         is_answer_correct: { type: "boolean", description: "Is the final answer mathematically/factually correct?" },
         is_work_shown: {
           type: "boolean",
@@ -601,6 +601,15 @@ const GRADING_SCHEMA = {
         has_computational_errors: {
           type: "boolean",
           description: "Are there computational/arithmetic errors (wrong calculation despite right method)?",
+        },
+        is_work_organized: {
+          type: "boolean",
+          description: "Is the work clearly organized, labeled, and easy to follow?",
+        },
+        has_conceptual_understanding: {
+          type: "boolean",
+          description:
+            "Does the student demonstrate understanding of the underlying concept even if the answer is wrong?",
         },
         // ─── FEEDBACK FIELDS ───
         strengths: {
@@ -637,6 +646,8 @@ const GRADING_SCHEMA = {
         "is_work_complete",
         "is_approach_valid",
         "has_computational_errors",
+        "is_work_organized",
+        "has_conceptual_understanding",
         "strengths",
         "areas_for_improvement",
         "misconceptions",
@@ -659,6 +670,8 @@ interface BooleanAnswers {
   is_work_complete: boolean;
   is_approach_valid: boolean;
   has_computational_errors: boolean;
+  is_work_organized: boolean;
+  has_conceptual_understanding: boolean;
 }
 
 function computeGradeFromBooleans(
@@ -673,34 +686,53 @@ function computeGradeFromBooleans(
     is_work_complete,
     is_approach_valid,
     has_computational_errors,
+    is_work_organized,
+    has_conceptual_understanding,
   } = answers;
 
-  // Decision tree — each path is deterministic
+  // Decision tree — 12 deterministic paths, 2-5pt gaps between adjacent tiers
   if (!student_work_present) {
-    return { grade: gradeFloor, regentsScore: 0, tier: "NO_RESPONSE" };
+    return { grade: gradeFloor, regentsScore: 0, tier: "NO_RESPONSE" }; // 0 (default)
   }
 
+  // ─── CORRECT ANSWER (5 tiers: 97, 95, 93, 91, 88) ───
   if (is_answer_correct) {
-    if (is_work_shown && is_work_complete) {
-      return { grade: 97, regentsScore: 4, tier: "PERFECT" }; // Correct + complete work
+    if (is_work_shown && is_work_complete && is_work_organized) {
+      return { grade: 97, regentsScore: 4, tier: "PERFECT" }; // 97
     }
-    if (is_work_shown && !is_work_complete) {
-      return { grade: 93, regentsScore: 4, tier: "EXCELLENT" }; // Correct + partial work
+    if (is_work_shown && is_work_complete && !is_work_organized) {
+      return { grade: 95, regentsScore: 4, tier: "NEAR_PERFECT" }; // 95
+    }
+    if (is_work_shown && !is_work_complete && is_work_organized) {
+      return { grade: 93, regentsScore: 4, tier: "EXCELLENT" }; // 93
+    }
+    if (is_work_shown && !is_work_complete && !is_work_organized) {
+      return { grade: 91, regentsScore: 3, tier: "VERY_GOOD" }; // 91
     }
     // Correct answer but no work shown
-    return { grade: 88, regentsScore: 3, tier: "GOOD" }; // Correct, no work
+    return { grade: 88, regentsScore: 3, tier: "GOOD" }; // 88
   }
 
-  // Answer is incorrect from here
+  // ─── INCORRECT ANSWER + VALID APPROACH (4 tiers: 83, 80, 78, 75) ───
   if (is_approach_valid) {
-    if (has_computational_errors) {
-      return { grade: 83, regentsScore: 3, tier: "ADEQUATE" }; // Right method, calc error
+    if (has_computational_errors && is_work_shown) {
+      return { grade: 83, regentsScore: 3, tier: "ADEQUATE" }; // 83
     }
-    return { grade: 75, regentsScore: 2, tier: "DEVELOPING" }; // Right method, wrong answer
+    if (has_computational_errors && !is_work_shown) {
+      return { grade: 80, regentsScore: 2, tier: "FAIR" }; // 80
+    }
+    if (!has_computational_errors && has_conceptual_understanding) {
+      return { grade: 78, regentsScore: 2, tier: "PARTIAL" }; // 78
+    }
+    return { grade: 75, regentsScore: 2, tier: "DEVELOPING" }; // 75
   }
 
-  // Wrong answer, wrong approach
-  return { grade: gradeFloorWithEffort, regentsScore: 1, tier: "MINIMAL" };
+  // ─── INCORRECT ANSWER + INVALID APPROACH (2 tiers: 70, 65) ───
+  if (has_conceptual_understanding) {
+    return { grade: 70, regentsScore: 1, tier: "STRUGGLING" }; // 70
+  }
+
+  return { grade: gradeFloorWithEffort, regentsScore: 1, tier: "MINIMAL" }; // 55 (default)
 }
 
 function buildGradingPrompt(opts: {
@@ -740,7 +772,7 @@ function buildGradingPrompt(opts: {
 
   const system = `You are a calibrated NYS Regents grading engine. You answer FACTUAL QUESTIONS about student work.
 
-Your job is NOT to decide a grade. Your job is to answer 5 specific YES/NO questions about the student's work.
+Your job is NOT to decide a grade. Your job is to answer 7 specific YES/NO questions about the student's work.
 The grade will be computed automatically from your answers. Focus on ACCURACY of each answer.
 
 PROCEDURE (follow these steps IN ORDER):
@@ -748,13 +780,15 @@ PROCEDURE (follow these steps IN ORDER):
 STEP 1 — EXTRACT: Read ALL student handwriting from the entire page including margins. Record exact text in "ocr_text".
 STEP 2 — DETECT: Is there student handwriting? (Printed questions alone = NO → student_work_present = false)
 STEP 3 — IDENTIFY: What problem/question is being answered? What subject area?
-STEP 4 — ANSWER these 5 questions with true/false (EACH IS INDEPENDENT):
+STEP 4 — ANSWER these 7 questions with true/false (EACH IS INDEPENDENT):
 
-  Q1. is_answer_correct:       Is the FINAL ANSWER mathematically/factually correct?
-  Q2. is_work_shown:           Did the student show ANY work/steps (not just the final answer)?
-  Q3. is_work_complete:        Is the work COMPLETE with ALL required steps shown?
-  Q4. is_approach_valid:       Is the mathematical/logical APPROACH valid (right method, even if wrong answer)?
-  Q5. has_computational_errors: Are there computational/arithmetic errors (e.g., 3×5=18)?
+  Q1. is_answer_correct:            Is the FINAL ANSWER mathematically/factually correct?
+  Q2. is_work_shown:                Did the student show ANY work/steps (not just the final answer)?
+  Q3. is_work_complete:             Is the work COMPLETE with ALL required steps shown?
+  Q4. is_approach_valid:            Is the mathematical/logical APPROACH valid (right method, even if wrong answer)?
+  Q5. has_computational_errors:     Are there computational/arithmetic errors (e.g., 3×5=18)?
+  Q6. is_work_organized:            Is the work clearly organized, labeled, and easy to follow?
+  Q7. has_conceptual_understanding: Does the student demonstrate understanding of the underlying concept?
 
 RULES FOR ANSWERING (MANDATORY):
 1. Answer ONLY true or false for each question. No hedging.
@@ -763,24 +797,27 @@ RULES FOR ANSWERING (MANDATORY):
 4. "is_work_complete" = true ONLY if ALL required steps are shown (nothing skipped).
 5. "is_approach_valid" = true if the METHOD is correct, even if a calculation error led to wrong answer.
 6. "has_computational_errors" = true ONLY for arithmetic/calculation mistakes (not conceptual errors).
-7. If student_work_present is false, set all 5 answers to false.
-8. Quote the student's actual written work as evidence in your justification.
-9. If handwriting is hard to read, give your best interpretation and set confidence to "low".
-10. Do NOT penalize for messy handwriting if the work is mathematically correct.
+7. "is_work_organized" = true if work is written neatly, labeled, and flows logically (not scattered/chaotic).
+8. "has_conceptual_understanding" = true if the student shows they UNDERSTAND the concept, even if the answer is wrong.
+9. If student_work_present is false, set all 7 answers to false.
+10. Quote the student's actual written work as evidence in your justification.
+11. If handwriting is hard to read, give your best interpretation and set confidence to "low".
+12. Do NOT penalize for messy handwriting if the work is mathematically correct.
 
 EXAMPLES:
-• "3x+5=20, 3x=15, x=5" (correct, all steps) → correct=true, shown=true, complete=true, valid=true, comp_errors=false
-• "3x=15, x=5" (correct, skipped subtraction step) → correct=true, shown=true, complete=false, valid=true, comp_errors=false
-• "x=5" alone (correct, no work) → correct=true, shown=false, complete=false, valid=false, comp_errors=false
-• "3x=25, x=8.3" (wrong subtraction) → correct=false, shown=true, complete=true, valid=true, comp_errors=true
-• "x=25" (wrong, confused) → correct=false, shown=false, complete=false, valid=false, comp_errors=false
+• "3x+5=20, 3x=15, x=5" (correct, all steps, neat) → correct=true, shown=true, complete=true, valid=true, comp_errors=false, organized=true, conceptual=true
+• "3x=15, x=5" (correct, skipped step, neat) → correct=true, shown=true, complete=false, valid=true, comp_errors=false, organized=true, conceptual=true
+• "x=5" alone (correct, no work) → correct=true, shown=false, complete=false, valid=false, comp_errors=false, organized=false, conceptual=false
+• "3x=25, x=8.3" (wrong subtraction, neat) → correct=false, shown=true, complete=true, valid=true, comp_errors=true, organized=true, conceptual=true
+• "x=25" (wrong, confused) → correct=false, shown=false, complete=false, valid=false, comp_errors=false, organized=false, conceptual=false
+• "I need to solve for x so 3x+5=20" then gives up → correct=false, shown=true, complete=false, valid=true, comp_errors=false, organized=true, conceptual=true
 ${opts.gradingStyleContext}${opts.teacherAnswerSampleContext}${opts.verificationContext}${teacherGuideNote}${standardSection}${customRubricSection}`;
 
-  const user = `Analyze this student's work and answer the 5 grading questions.${opts.promptText ? ` Problem: ${opts.promptText}` : ""}${rubricSection}
+  const user = `Analyze this student's work and answer the 7 grading questions.${opts.promptText ? ` Problem: ${opts.promptText}` : ""}${rubricSection}
 
 ${detailLevel}
 
-Respond with a JSON object matching the required schema. All boolean fields are REQUIRED.`;
+Respond with a JSON object matching the required schema. All 7 boolean fields are REQUIRED.`;
 
   return { system, user };
 }
@@ -876,7 +913,7 @@ function validateAndNormalizeGrade(
 // ═══════════════════════════════════════════════════════════════════════════════
 // PARSE AI RESPONSE — JSON-first with regex fallback
 // ═══════════════════════════════════════════════════════════════════════════════
-function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55, gradeFloorWithEffort = 65) {
+function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 0, gradeFloorWithEffort = 55) {
   // ─── Try JSON parse first (primary path) ───
   let parsed: any = null;
   try {
@@ -923,7 +960,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55,
     problemIdentified = parsed.problem_identified || "";
     nysStandard = parsed.nys_standard || "";
 
-    // ─── EXTRACT 5 BOOLEAN ANSWERS ───
+    // ─── EXTRACT 7 BOOLEAN ANSWERS ───
     const booleans: BooleanAnswers = {
       student_work_present: parsed.student_work_present === true,
       is_answer_correct: parsed.is_answer_correct === true || parsed.is_correct === true,
@@ -931,12 +968,14 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55,
       is_work_complete: parsed.is_work_complete === true,
       is_approach_valid: parsed.is_approach_valid === true,
       has_computational_errors: parsed.has_computational_errors === true,
+      is_work_organized: parsed.is_work_organized === true,
+      has_conceptual_understanding: parsed.has_conceptual_understanding === true,
     };
 
     isAnswerCorrect = booleans.is_answer_correct;
 
     console.log(
-      `[BOOL_GRADE] Booleans: work=${booleans.student_work_present} correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors}`,
+      `[BOOL_GRADE] Booleans: work=${booleans.student_work_present} correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors} organized=${booleans.is_work_organized} conceptual=${booleans.has_conceptual_understanding}`,
     );
 
     // ─── COMPUTE GRADE FROM BOOLEANS — 100% deterministic ───
@@ -1262,8 +1301,8 @@ serve(async (req: Request) => {
 
     // ── Fetch teacher settings ──
     let feedbackVerbosity = "concise";
-    let gradeFloor = customGradeFloor || 55;
-    let gradeFloorWithEffort = customGradeFloorWithEffort || 65;
+    let gradeFloor = customGradeFloor || 0;
+    let gradeFloorWithEffort = customGradeFloorWithEffort || 55;
     let aiTrainingMode = "learning";
     let analysisProvider: AnalysisProvider = "gemini";
 
@@ -1276,8 +1315,8 @@ serve(async (req: Request) => {
           .maybeSingle();
         if (settings) {
           if (!customGradeFloor) {
-            gradeFloor = settings.grade_floor ?? 55;
-            gradeFloorWithEffort = settings.grade_floor_with_effort ?? 65;
+            gradeFloor = settings.grade_floor ?? 0;
+            gradeFloorWithEffort = settings.grade_floor_with_effort ?? 55;
           }
           feedbackVerbosity = settings.ai_feedback_verbosity ?? "concise";
           aiTrainingMode = settings.ai_training_mode ?? "learning";
@@ -1522,10 +1561,12 @@ serve(async (req: Request) => {
         is_work_complete: parsed?.is_work_complete === true,
         is_approach_valid: parsed?.is_approach_valid === true,
         has_computational_errors: parsed?.has_computational_errors === true,
+        is_work_organized: parsed?.is_work_organized === true,
+        has_conceptual_understanding: parsed?.has_conceptual_understanding === true,
       };
 
       console.log(
-        `[CONSENSUS] seed=${seed} booleans: correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors}`,
+        `[CONSENSUS] seed=${seed} booleans: correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors} organized=${booleans.is_work_organized} conceptual=${booleans.has_conceptual_understanding}`,
       );
       consensusRounds.push({ booleans, result: roundResult, analysisText: roundText });
     }
@@ -1544,10 +1585,13 @@ serve(async (req: Request) => {
       is_approach_valid: consensusRounds.filter((r) => r.booleans.is_approach_valid).length > majorityThreshold,
       has_computational_errors:
         consensusRounds.filter((r) => r.booleans.has_computational_errors).length > majorityThreshold,
+      is_work_organized: consensusRounds.filter((r) => r.booleans.is_work_organized).length > majorityThreshold,
+      has_conceptual_understanding:
+        consensusRounds.filter((r) => r.booleans.has_conceptual_understanding).length > majorityThreshold,
     };
 
     console.log(
-      `[CONSENSUS] Voted booleans: work=${votedBooleans.student_work_present} correct=${votedBooleans.is_answer_correct} shown=${votedBooleans.is_work_shown} complete=${votedBooleans.is_work_complete} valid=${votedBooleans.is_approach_valid} comp_err=${votedBooleans.has_computational_errors}`,
+      `[CONSENSUS] Voted booleans: work=${votedBooleans.student_work_present} correct=${votedBooleans.is_answer_correct} shown=${votedBooleans.is_work_shown} complete=${votedBooleans.is_work_complete} valid=${votedBooleans.is_approach_valid} comp_err=${votedBooleans.has_computational_errors} organized=${votedBooleans.is_work_organized} conceptual=${votedBooleans.has_conceptual_understanding}`,
     );
 
     // ── COMPUTE FINAL GRADE from voted booleans — 100% deterministic ──
