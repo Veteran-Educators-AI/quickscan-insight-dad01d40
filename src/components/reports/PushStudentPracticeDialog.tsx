@@ -179,13 +179,15 @@ export function PushStudentPracticeDialog({
 
       const { data: questionData, error: genError } = await supabase.functions.invoke('generate-worksheet-questions', {
         body: {
-          topic: primaryTopic.topic,
-          standard: primaryTopic.standard,
-          count: questionCount,
-          difficulty,
+          topics: [{
+            topicName: primaryTopic.topic,
+            standard: primaryTopic.standard || 'N/A',
+            subject: 'Math',
+            category: isEnrichment ? 'Enrichment' : 'Remediation',
+          }],
+          questionCount,
+          difficultyLevels: [difficulty === 'easy' ? 'medium' : difficulty === 'hard' ? 'challenging' : 'hard'],
           includeHints: !isEnrichment,
-          format: isEnrichment ? 'challenge' : 'practice',
-          context: contextMsg,
         },
       });
 
