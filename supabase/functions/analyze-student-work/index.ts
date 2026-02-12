@@ -580,12 +580,23 @@ const GRADING_SCHEMA = {
       type: "object",
       properties: {
         ocr_text: { type: "string", description: "All handwritten text extracted from the page" },
+        is_academic_assignment: {
+          type: "boolean",
+          description:
+            "Is this document an academic assignment, test, quiz, homework, or classwork? FALSE for random documents, receipts, articles, non-academic content.",
+        },
         student_work_present: {
           type: "boolean",
           description: "Is there actual student handwriting (not just printed questions)?",
         },
-        detected_subject: { type: "string", description: "Subject area (Math, Science, ELA, etc)" },
-        problem_identified: { type: "string", description: "What problem is being answered (under 20 words)" },
+        detected_subject: {
+          type: "string",
+          description: "Subject area (Math, Science, ELA, etc). Use 'NOT_ACADEMIC' if not an assignment.",
+        },
+        problem_identified: {
+          type: "string",
+          description: "What problem is being answered (under 20 words). Use 'NOT_ACADEMIC' if not an assignment.",
+        },
         nys_standard: { type: "string", description: "NYS standard code and description" },
         // ─── THE 7 BOOLEAN GRADING QUESTIONS (code computes grade from these) ───
         is_answer_correct: { type: "boolean", description: "Is the final answer mathematically/factually correct?" },
@@ -637,6 +648,7 @@ const GRADING_SCHEMA = {
       },
       required: [
         "ocr_text",
+        "is_academic_assignment",
         "student_work_present",
         "detected_subject",
         "problem_identified",
@@ -664,6 +676,7 @@ const GRADING_SCHEMA = {
 // BOOLEAN → GRADE COMPUTATION — 100% deterministic, zero AI discretion
 // ═══════════════════════════════════════════════════════════════════════════════
 interface BooleanAnswers {
+  is_academic_assignment: boolean;
   student_work_present: boolean;
   is_answer_correct: boolean;
   is_work_shown: boolean;
@@ -680,6 +693,7 @@ function computeGradeFromBooleans(
   gradeFloorWithEffort: number,
 ): { grade: number; regentsScore: number; tier: string } {
   const {
+    is_academic_assignment,
     student_work_present,
     is_answer_correct,
     is_work_shown,
@@ -689,6 +703,11 @@ function computeGradeFromBooleans(
     is_work_organized,
     has_conceptual_understanding,
   } = answers;
+
+  // GATEKEEPER: Not an academic assignment → 0% immediately
+  if (!is_academic_assignment) {
+    return { grade: 0, regentsScore: 0, tier: "NOT_ACADEMIC" };
+  }
 
   // Decision tree — 12 deterministic paths, 2-5pt gaps between adjacent tiers
   if (!student_work_present) {
@@ -772,15 +791,19 @@ function buildGradingPrompt(opts: {
 
   const system = `You are a calibrated NYS Regents grading engine. You answer FACTUAL QUESTIONS about student work.
 
-Your job is NOT to decide a grade. Your job is to answer 7 specific YES/NO questions about the student's work.
+Your job is NOT to decide a grade. Your job is to answer 8 specific YES/NO questions about the student's work.
 The grade will be computed automatically from your answers. Focus on ACCURACY of each answer.
 
 PROCEDURE (follow these steps IN ORDER):
 
+STEP 0 — VALIDATE: Is this document an academic assignment (test, quiz, homework, classwork, exam)?
+  → If NO (random PDF, receipt, article, invoice, non-academic document) → set is_academic_assignment = false, set ALL other booleans to false, and STOP.
+  → If YES → continue to Step 1.
+
 STEP 1 — EXTRACT: Read ALL student handwriting from the entire page including margins. Record exact text in "ocr_text".
 STEP 2 — DETECT: Is there student handwriting? (Printed questions alone = NO → student_work_present = false)
 STEP 3 — IDENTIFY: What problem/question is being answered? What subject area?
-STEP 4 — ANSWER these 7 questions with true/false (EACH IS INDEPENDENT):
+STEP 4 — ANSWER these 7 grading questions with true/false (EACH IS INDEPENDENT):
 
   Q1. is_answer_correct:            Is the FINAL ANSWER mathematically/factually correct?
   Q2. is_work_shown:                Did the student show ANY work/steps (not just the final answer)?
@@ -792,32 +815,36 @@ STEP 4 — ANSWER these 7 questions with true/false (EACH IS INDEPENDENT):
 
 RULES FOR ANSWERING (MANDATORY):
 1. Answer ONLY true or false for each question. No hedging.
-2. "is_answer_correct" means the FINAL numerical/written answer matches the correct solution.
-3. "is_work_shown" = true even if only partial work is shown (any steps at all).
-4. "is_work_complete" = true ONLY if ALL required steps are shown (nothing skipped).
-5. "is_approach_valid" = true if the METHOD is correct, even if a calculation error led to wrong answer.
-6. "has_computational_errors" = true ONLY for arithmetic/calculation mistakes (not conceptual errors).
-7. "is_work_organized" = true if work is written neatly, labeled, and flows logically (not scattered/chaotic).
-8. "has_conceptual_understanding" = true if the student shows they UNDERSTAND the concept, even if the answer is wrong.
-9. If student_work_present is false, set all 7 answers to false.
-10. Quote the student's actual written work as evidence in your justification.
-11. If handwriting is hard to read, give your best interpretation and set confidence to "low".
-12. Do NOT penalize for messy handwriting if the work is mathematically correct.
+2. "is_academic_assignment" = false for ANY document that is NOT a student assignment. Examples of NON-academic: receipts, invoices, articles, news, random text, memes, personal notes, business documents.
+3. "is_answer_correct" means the FINAL numerical/written answer matches the correct solution.
+4. "is_work_shown" = true even if only partial work is shown (any steps at all).
+5. "is_work_complete" = true ONLY if ALL required steps are shown (nothing skipped).
+6. "is_approach_valid" = true if the METHOD is correct, even if a calculation error led to wrong answer.
+7. "has_computational_errors" = true ONLY for arithmetic/calculation mistakes (not conceptual errors).
+8. "is_work_organized" = true if work is written neatly, labeled, and flows logically (not scattered/chaotic).
+9. "has_conceptual_understanding" = true if the student shows they UNDERSTAND the concept, even if the answer is wrong.
+10. If is_academic_assignment is false, set ALL other booleans to false.
+11. If student_work_present is false, set all 7 grading answers to false.
+12. Quote the student's actual written work as evidence in your justification.
+13. If handwriting is hard to read, give your best interpretation and set confidence to "low".
+14. Do NOT penalize for messy handwriting if the work is mathematically correct.
 
 EXAMPLES:
-• "3x+5=20, 3x=15, x=5" (correct, all steps, neat) → correct=true, shown=true, complete=true, valid=true, comp_errors=false, organized=true, conceptual=true
-• "3x=15, x=5" (correct, skipped step, neat) → correct=true, shown=true, complete=false, valid=true, comp_errors=false, organized=true, conceptual=true
-• "x=5" alone (correct, no work) → correct=true, shown=false, complete=false, valid=false, comp_errors=false, organized=false, conceptual=false
-• "3x=25, x=8.3" (wrong subtraction, neat) → correct=false, shown=true, complete=true, valid=true, comp_errors=true, organized=true, conceptual=true
-• "x=25" (wrong, confused) → correct=false, shown=false, complete=false, valid=false, comp_errors=false, organized=false, conceptual=false
-• "I need to solve for x so 3x+5=20" then gives up → correct=false, shown=true, complete=false, valid=true, comp_errors=false, organized=true, conceptual=true
+• A restaurant receipt → is_academic_assignment=false, ALL others=false
+• A news article PDF → is_academic_assignment=false, ALL others=false
+• An empty math worksheet → is_academic_assignment=true, student_work_present=false, ALL grading=false
+• "3x+5=20, 3x=15, x=5" (correct, all steps, neat) → academic=true, correct=true, shown=true, complete=true, valid=true, comp_errors=false, organized=true, conceptual=true
+• "3x=15, x=5" (correct, skipped step, neat) → academic=true, correct=true, shown=true, complete=false, valid=true, comp_errors=false, organized=true, conceptual=true
+• "x=5" alone (correct, no work) → academic=true, correct=true, shown=false, complete=false, valid=false, comp_errors=false, organized=false, conceptual=false
+• "3x=25, x=8.3" (wrong subtraction) → academic=true, correct=false, shown=true, complete=true, valid=true, comp_errors=true, organized=true, conceptual=true
+• "x=25" (wrong, confused) → academic=true, correct=false, shown=false, complete=false, valid=false, comp_errors=false, organized=false, conceptual=false
 ${opts.gradingStyleContext}${opts.teacherAnswerSampleContext}${opts.verificationContext}${teacherGuideNote}${standardSection}${customRubricSection}`;
 
-  const user = `Analyze this student's work and answer the 7 grading questions.${opts.promptText ? ` Problem: ${opts.promptText}` : ""}${rubricSection}
+  const user = `Analyze this student's work and answer the 8 grading questions (including is_academic_assignment).${opts.promptText ? ` Problem: ${opts.promptText}` : ""}${rubricSection}
 
 ${detailLevel}
 
-Respond with a JSON object matching the required schema. All 7 boolean fields are REQUIRED.`;
+Respond with a JSON object matching the required schema. All 8 boolean fields are REQUIRED.`;
 
   return { system, user };
 }
@@ -960,8 +987,9 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 0, 
     problemIdentified = parsed.problem_identified || "";
     nysStandard = parsed.nys_standard || "";
 
-    // ─── EXTRACT 7 BOOLEAN ANSWERS ───
+    // ─── EXTRACT 8 BOOLEAN ANSWERS ───
     const booleans: BooleanAnswers = {
+      is_academic_assignment: parsed.is_academic_assignment === true,
       student_work_present: parsed.student_work_present === true,
       is_answer_correct: parsed.is_answer_correct === true || parsed.is_correct === true,
       is_work_shown: parsed.is_work_shown === true,
@@ -975,7 +1003,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 0, 
     isAnswerCorrect = booleans.is_answer_correct;
 
     console.log(
-      `[BOOL_GRADE] Booleans: work=${booleans.student_work_present} correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors} organized=${booleans.is_work_organized} conceptual=${booleans.has_conceptual_understanding}`,
+      `[BOOL_GRADE] Booleans: academic=${booleans.is_academic_assignment} work=${booleans.student_work_present} correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors} organized=${booleans.is_work_organized} conceptual=${booleans.has_conceptual_understanding}`,
     );
 
     // ─── COMPUTE GRADE FROM BOOLEANS — 100% deterministic ───
@@ -1554,6 +1582,7 @@ serve(async (req: Request) => {
       }
 
       const booleans: BooleanAnswers = {
+        is_academic_assignment: parsed?.is_academic_assignment === true,
         student_work_present: parsed?.student_work_present === true || roundResult.studentWorkPresent,
         is_answer_correct:
           parsed?.is_answer_correct === true || parsed?.is_correct === true || roundResult.isAnswerCorrect,
@@ -1566,7 +1595,7 @@ serve(async (req: Request) => {
       };
 
       console.log(
-        `[CONSENSUS] seed=${seed} booleans: correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors} organized=${booleans.is_work_organized} conceptual=${booleans.has_conceptual_understanding}`,
+        `[CONSENSUS] seed=${seed} booleans: academic=${booleans.is_academic_assignment} correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors} organized=${booleans.is_work_organized} conceptual=${booleans.has_conceptual_understanding}`,
       );
       consensusRounds.push({ booleans, result: roundResult, analysisText: roundText });
     }
@@ -1578,6 +1607,8 @@ serve(async (req: Request) => {
     const majorityThreshold = totalRounds / 2;
 
     const votedBooleans: BooleanAnswers = {
+      is_academic_assignment:
+        consensusRounds.filter((r) => r.booleans.is_academic_assignment).length > majorityThreshold,
       student_work_present: consensusRounds.filter((r) => r.booleans.student_work_present).length > majorityThreshold,
       is_answer_correct: consensusRounds.filter((r) => r.booleans.is_answer_correct).length > majorityThreshold,
       is_work_shown: consensusRounds.filter((r) => r.booleans.is_work_shown).length > majorityThreshold,
@@ -1591,7 +1622,7 @@ serve(async (req: Request) => {
     };
 
     console.log(
-      `[CONSENSUS] Voted booleans: work=${votedBooleans.student_work_present} correct=${votedBooleans.is_answer_correct} shown=${votedBooleans.is_work_shown} complete=${votedBooleans.is_work_complete} valid=${votedBooleans.is_approach_valid} comp_err=${votedBooleans.has_computational_errors} organized=${votedBooleans.is_work_organized} conceptual=${votedBooleans.has_conceptual_understanding}`,
+      `[CONSENSUS] Voted booleans: academic=${votedBooleans.is_academic_assignment} work=${votedBooleans.student_work_present} correct=${votedBooleans.is_answer_correct} shown=${votedBooleans.is_work_shown} complete=${votedBooleans.is_work_complete} valid=${votedBooleans.is_approach_valid} comp_err=${votedBooleans.has_computational_errors} organized=${votedBooleans.is_work_organized} conceptual=${votedBooleans.has_conceptual_understanding}`,
     );
 
     // ── COMPUTE FINAL GRADE from voted booleans — 100% deterministic ──
