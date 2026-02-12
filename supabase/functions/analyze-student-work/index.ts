@@ -67,6 +67,7 @@ interface AICallOptions {
   top_p?: number; // 1 = consider all tokens (default)
   seed?: number; // reproducibility seed (supported by some models)
   modelOverride?: string; // override model selection
+  responseFormat?: any; // Structured Outputs schema override
 }
 
 async function callLovableAI(
@@ -100,7 +101,7 @@ async function callLovableAI(
     temperature,
     top_p,
     seed,
-    response_format: { type: "json_object" },
+    response_format: options.responseFormat || { type: "json_object" },
   });
 
   const MAX_RETRIES = 1;
@@ -568,6 +569,140 @@ async function compareWithSolution(studentImg: string, solutionImg: string, rubr
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN GRADING PROMPT — CALIBRATION-ANCHORED, JSON OUTPUT
 // ═══════════════════════════════════════════════════════════════════════════════
+// STRUCTURED OUTPUT SCHEMA — strict mode, boolean types for grading questions
+// ═══════════════════════════════════════════════════════════════════════════════
+const GRADING_SCHEMA = {
+  type: "json_schema" as const,
+  json_schema: {
+    name: "grading_result",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        ocr_text: { type: "string", description: "All handwritten text extracted from the page" },
+        student_work_present: {
+          type: "boolean",
+          description: "Is there actual student handwriting (not just printed questions)?",
+        },
+        detected_subject: { type: "string", description: "Subject area (Math, Science, ELA, etc)" },
+        problem_identified: { type: "string", description: "What problem is being answered (under 20 words)" },
+        nys_standard: { type: "string", description: "NYS standard code and description" },
+        // ─── THE 5 BOOLEAN GRADING QUESTIONS (code computes grade from these) ───
+        is_answer_correct: { type: "boolean", description: "Is the final answer mathematically/factually correct?" },
+        is_work_shown: {
+          type: "boolean",
+          description: "Did the student show their work/steps (not just final answer)?",
+        },
+        is_work_complete: { type: "boolean", description: "Is the work complete with all required steps shown?" },
+        is_approach_valid: {
+          type: "boolean",
+          description: "Is the mathematical/logical approach valid (right method even if wrong answer)?",
+        },
+        has_computational_errors: {
+          type: "boolean",
+          description: "Are there computational/arithmetic errors (wrong calculation despite right method)?",
+        },
+        // ─── FEEDBACK FIELDS ───
+        strengths: {
+          type: "array",
+          items: { type: "string" },
+          description: "What the student did well, quoting their work",
+        },
+        areas_for_improvement: {
+          type: "array",
+          items: { type: "string" },
+          description: "Specific errors with how to fix",
+        },
+        misconceptions: {
+          type: "array",
+          items: { type: "string" },
+          description: "Verified conceptual errors only, quoting student writing. Empty array if none.",
+        },
+        grade_justification: { type: "string", description: "Evidence-based justification citing student writing" },
+        feedback: { type: "string", description: "Constructive feedback for the student" },
+        confidence: {
+          type: "string",
+          enum: ["high", "medium", "low"],
+          description: "Confidence in reading the handwriting",
+        },
+      },
+      required: [
+        "ocr_text",
+        "student_work_present",
+        "detected_subject",
+        "problem_identified",
+        "nys_standard",
+        "is_answer_correct",
+        "is_work_shown",
+        "is_work_complete",
+        "is_approach_valid",
+        "has_computational_errors",
+        "strengths",
+        "areas_for_improvement",
+        "misconceptions",
+        "grade_justification",
+        "feedback",
+        "confidence",
+      ],
+      additionalProperties: false,
+    },
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BOOLEAN → GRADE COMPUTATION — 100% deterministic, zero AI discretion
+// ═══════════════════════════════════════════════════════════════════════════════
+interface BooleanAnswers {
+  student_work_present: boolean;
+  is_answer_correct: boolean;
+  is_work_shown: boolean;
+  is_work_complete: boolean;
+  is_approach_valid: boolean;
+  has_computational_errors: boolean;
+}
+
+function computeGradeFromBooleans(
+  answers: BooleanAnswers,
+  gradeFloor: number,
+  gradeFloorWithEffort: number,
+): { grade: number; regentsScore: number; tier: string } {
+  const {
+    student_work_present,
+    is_answer_correct,
+    is_work_shown,
+    is_work_complete,
+    is_approach_valid,
+    has_computational_errors,
+  } = answers;
+
+  // Decision tree — each path is deterministic
+  if (!student_work_present) {
+    return { grade: gradeFloor, regentsScore: 0, tier: "NO_RESPONSE" };
+  }
+
+  if (is_answer_correct) {
+    if (is_work_shown && is_work_complete) {
+      return { grade: 97, regentsScore: 4, tier: "PERFECT" }; // Correct + complete work
+    }
+    if (is_work_shown && !is_work_complete) {
+      return { grade: 93, regentsScore: 4, tier: "EXCELLENT" }; // Correct + partial work
+    }
+    // Correct answer but no work shown
+    return { grade: 88, regentsScore: 3, tier: "GOOD" }; // Correct, no work
+  }
+
+  // Answer is incorrect from here
+  if (is_approach_valid) {
+    if (has_computational_errors) {
+      return { grade: 83, regentsScore: 3, tier: "ADEQUATE" }; // Right method, calc error
+    }
+    return { grade: 75, regentsScore: 2, tier: "DEVELOPING" }; // Right method, wrong answer
+  }
+
+  // Wrong answer, wrong approach
+  return { grade: gradeFloorWithEffort, regentsScore: 1, tier: "MINIMAL" };
+}
+
 function buildGradingPrompt(opts: {
   rubricSteps?: any[];
   standardCode?: string;
@@ -583,7 +718,7 @@ function buildGradingPrompt(opts: {
   gradeFloorWithEffort: number;
 }): { system: string; user: string } {
   const rubricSection = opts.rubricSteps?.length
-    ? `\nSCORING RUBRIC (score each criterion separately):\n${opts.rubricSteps.map((s: any, i: number) => `  ${i + 1}. "${s.description}" — ${s.points} points`).join("\n")}\nInclude rubric_scores array in your JSON with each criterion scored.`
+    ? `\nSCORING RUBRIC (score each criterion separately):\n${opts.rubricSteps.map((s: any, i: number) => `  ${i + 1}. "${s.description}" — ${s.points} points`).join("\n")}`
     : "";
 
   const standardSection = opts.standardCode
@@ -595,116 +730,59 @@ function buildGradingPrompt(opts: {
     : "";
 
   const teacherGuideNote = opts.answerGuideBase64
-    ? `\nIMPORTANT: A teacher answer guide image is attached. Use it as the PRIMARY grading reference. Compare the student's work directly against this guide.`
+    ? `\nIMPORTANT: A teacher answer guide image is attached. Use it as the PRIMARY grading reference.`
     : "";
 
   const detailLevel =
     opts.feedbackVerbosity === "detailed"
-      ? "Write 150-200 word justification with specific quotes from student work. Write 100-150 word feedback."
+      ? "Write 150-200 word justification with specific quotes. Write 100-150 word feedback."
       : "Write 75-120 word justification with specific quotes. Write 60-100 word feedback.";
 
-  const system = `You are a calibrated NYS Regents grading engine. You produce consistent, evidence-based grades.
+  const system = `You are a calibrated NYS Regents grading engine. You answer FACTUAL QUESTIONS about student work.
 
-GRADING PROCEDURE (follow these steps IN ORDER):
+Your job is NOT to decide a grade. Your job is to answer 5 specific YES/NO questions about the student's work.
+The grade will be computed automatically from your answers. Focus on ACCURACY of each answer.
 
-STEP 1 — EXTRACT: Read ALL student handwriting from the entire page including margins. Record exact text.
-STEP 2 — DETECT: Is there student handwriting? (Printed questions alone = NO student work)
+PROCEDURE (follow these steps IN ORDER):
+
+STEP 1 — EXTRACT: Read ALL student handwriting from the entire page including margins. Record exact text in "ocr_text".
+STEP 2 — DETECT: Is there student handwriting? (Printed questions alone = NO → student_work_present = false)
 STEP 3 — IDENTIFY: What problem/question is being answered? What subject area?
-STEP 4 — EVALUATE: Check the final answer and work shown against the standard/rubric.
-STEP 5 — CLASSIFY the work into EXACTLY ONE quality tier (output the tier NAME as a string):
+STEP 4 — ANSWER these 5 questions with true/false (EACH IS INDEPENDENT):
 
-  PERFECT    = Correct final answer + complete work shown (Regents 4)
-  EXCELLENT  = Correct answer + minor work omission (Regents 4)
-  GOOD       = Correct answer + significant work gaps (Regents 3)
-  ADEQUATE   = Right approach, minor computational error (Regents 3)
-  DEVELOPING = Some understanding, wrong final answer (Regents 2)
-  MINIMAL    = Confused attempt, little understanding (Regents 1)
-  NO_RESPONSE = Blank page / no student work (Regents 0)
+  Q1. is_answer_correct:       Is the FINAL ANSWER mathematically/factually correct?
+  Q2. is_work_shown:           Did the student show ANY work/steps (not just the final answer)?
+  Q3. is_work_complete:        Is the work COMPLETE with ALL required steps shown?
+  Q4. is_approach_valid:       Is the mathematical/logical APPROACH valid (right method, even if wrong answer)?
+  Q5. has_computational_errors: Are there computational/arithmetic errors (e.g., 3×5=18)?
 
-CRITICAL: The "quality_tier" field in your JSON response is the MOST IMPORTANT field.
-You MUST set it to EXACTLY one of: "PERFECT", "EXCELLENT", "GOOD", "ADEQUATE", "DEVELOPING", "MINIMAL", "NO_RESPONSE".
-The grade number will be computed automatically from your tier — focus on accurate CLASSIFICATION, not number selection.
+RULES FOR ANSWERING (MANDATORY):
+1. Answer ONLY true or false for each question. No hedging.
+2. "is_answer_correct" means the FINAL numerical/written answer matches the correct solution.
+3. "is_work_shown" = true even if only partial work is shown (any steps at all).
+4. "is_work_complete" = true ONLY if ALL required steps are shown (nothing skipped).
+5. "is_approach_valid" = true if the METHOD is correct, even if a calculation error led to wrong answer.
+6. "has_computational_errors" = true ONLY for arithmetic/calculation mistakes (not conceptual errors).
+7. If student_work_present is false, set all 5 answers to false.
+8. Quote the student's actual written work as evidence in your justification.
+9. If handwriting is hard to read, give your best interpretation and set confidence to "low".
+10. Do NOT penalize for messy handwriting if the work is mathematically correct.
 
-STEP 6 — VERIFY: Re-read your justification. Does the tier match your evidence? If not, adjust the tier.
-
-CLASSIFICATION EXAMPLES (use these to calibrate your tier selection):
-• Student correctly solves "3x + 5 = 20" showing all steps "3x+5=20, 3x=15, x=5" → quality_tier: "PERFECT"
-• Student writes "3x = 15, x = 5" but skips showing subtraction of 5 → quality_tier: "EXCELLENT"
-• Student writes "x = 5" correct answer but shows no algebra work → quality_tier: "GOOD"
-• Student writes "3x = 25, x = 8.3" (wrong subtraction but right method) → quality_tier: "ADEQUATE"
-• Student writes "x = 25" wrong answer with confused attempt → quality_tier: "DEVELOPING"
-• Student writes "x = 7" with no work, wrong answer, no understanding → quality_tier: "MINIMAL"
-• Blank page → quality_tier: "NO_RESPONSE"
-
-CONSISTENCY RULES (MANDATORY):
-1. CORRECT final answer = MINIMUM tier of "GOOD". Never classify a correct answer below GOOD.
-2. The "quality_tier" field MUST be one of the 7 exact strings listed above.
-3. Quote the student's actual written work as evidence for EVERY claim.
-4. If handwriting is hard to read, give your best interpretation and set confidence to "low".
-5. Do NOT penalize for messy handwriting if the work is mathematically correct.
-6. Be CONSISTENT: the same quality of work MUST receive the same tier every time.
-7. When in doubt between two adjacent tiers, choose the HIGHER one.
+EXAMPLES:
+• "3x+5=20, 3x=15, x=5" (correct, all steps) → correct=true, shown=true, complete=true, valid=true, comp_errors=false
+• "3x=15, x=5" (correct, skipped subtraction step) → correct=true, shown=true, complete=false, valid=true, comp_errors=false
+• "x=5" alone (correct, no work) → correct=true, shown=false, complete=false, valid=false, comp_errors=false
+• "3x=25, x=8.3" (wrong subtraction) → correct=false, shown=true, complete=true, valid=true, comp_errors=true
+• "x=25" (wrong, confused) → correct=false, shown=false, complete=false, valid=false, comp_errors=false
 ${opts.gradingStyleContext}${opts.teacherAnswerSampleContext}${opts.verificationContext}${teacherGuideNote}${standardSection}${customRubricSection}`;
 
-  const user = `Grade this student's work.${opts.promptText ? ` Problem: ${opts.promptText}` : ""}${rubricSection}
+  const user = `Analyze this student's work and answer the 5 grading questions.${opts.promptText ? ` Problem: ${opts.promptText}` : ""}${rubricSection}
 
 ${detailLevel}
 
-Respond with a SINGLE JSON object. No markdown, no code fences, no text outside the JSON:
-{
-  "ocr_text": "(all extracted handwritten text from the page)",
-  "student_work_present": true,
-  "detected_subject": "Math",
-  "problem_identified": "(brief, under 20 words)",
-  "nys_standard": "CODE - Description",
-  "is_correct": true,
-  "quality_tier": "GOOD",
-  "regents_score": 3,
-  "regents_justification": "(why this Regents score and quality tier)",
-  "strengths": ["(specific thing done right, quoting student work)"],
-  "areas_for_improvement": ["(specific error with why wrong and how to fix, quoting student work)"],
-  "misconceptions": ["(verified errors only — quote exact student writing. Empty array if none)"],
-  "grade_justification": "(cite student's actual writing using 'Student wrote: ...' format)",
-  "feedback": "(constructive: what was done well, what to practice, next steps)",
-  "confidence": "high"${rubricSection ? ',\n  "rubric_scores": [{"criterion": "...", "score": 0, "max_score": 0, "feedback": "..."}]' : ""}
-}`;
+Respond with a JSON object matching the required schema. All boolean fields are REQUIRED.`;
 
   return { system, user };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TIER → GRADE MAPPING — deterministic, zero AI discretion
-// ═══════════════════════════════════════════════════════════════════════════════
-const VALID_TIERS = ["PERFECT", "EXCELLENT", "GOOD", "ADEQUATE", "DEVELOPING", "MINIMAL", "NO_RESPONSE"] as const;
-type QualityTier = (typeof VALID_TIERS)[number];
-
-function tierToGrade(
-  tier: string,
-  gradeFloor: number,
-  gradeFloorWithEffort: number,
-): { grade: number; regentsScore: number } {
-  const normalized = tier.toUpperCase().replace(/[^A-Z_]/g, "");
-  const TIER_MAP: Record<string, { grade: number; regents: number }> = {
-    PERFECT: { grade: 97, regents: 4 },
-    EXCELLENT: { grade: 93, regents: 4 },
-    GOOD: { grade: 88, regents: 3 },
-    ADEQUATE: { grade: 83, regents: 3 },
-    DEVELOPING: { grade: 75, regents: 2 },
-    MINIMAL: { grade: gradeFloorWithEffort, regents: 1 },
-    NO_RESPONSE: { grade: gradeFloor, regents: 0 },
-    NORESPONSE: { grade: gradeFloor, regents: 0 },
-    "NO RESPONSE": { grade: gradeFloor, regents: 0 },
-  };
-  const match = TIER_MAP[normalized];
-  if (match) return { grade: match.grade, regentsScore: match.regents };
-  // Fuzzy fallback: find closest tier by prefix match
-  const key = Object.keys(TIER_MAP).find((k) => normalized.startsWith(k.slice(0, 4)));
-  if (key) {
-    console.warn(`[TIER_MAP] Fuzzy matched "${tier}" → "${key}"`);
-    return { grade: TIER_MAP[key].grade, regentsScore: TIER_MAP[key].regents };
-  }
-  console.error(`[TIER_MAP] UNKNOWN tier "${tier}", defaulting to DEVELOPING`);
-  return { grade: 75, regentsScore: 2 };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -834,18 +912,39 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55,
   if (
     parsed &&
     typeof parsed === "object" &&
-    ("quality_tier" in parsed || "grade" in parsed || "student_work_present" in parsed)
+    ("is_answer_correct" in parsed || "quality_tier" in parsed || "grade" in parsed || "student_work_present" in parsed)
   ) {
     // ─── PATH 1: JSON structured output ───
     console.log("[PARSE] Using JSON structured output");
 
     ocrText = parsed.ocr_text || "";
-    studentWorkPresent = parsed.student_work_present !== false && parsed.student_work_present !== "NO";
+    studentWorkPresent = parsed.student_work_present === true;
     detectedSubject = parsed.detected_subject || "";
     problemIdentified = parsed.problem_identified || "";
     nysStandard = parsed.nys_standard || "";
-    isAnswerCorrect = parsed.is_correct === true || parsed.is_correct === "YES";
-    regentsScore = Math.min(4, Math.max(0, parseInt(parsed.regents_score) || 0));
+
+    // ─── EXTRACT 5 BOOLEAN ANSWERS ───
+    const booleans: BooleanAnswers = {
+      student_work_present: parsed.student_work_present === true,
+      is_answer_correct: parsed.is_answer_correct === true || parsed.is_correct === true,
+      is_work_shown: parsed.is_work_shown === true,
+      is_work_complete: parsed.is_work_complete === true,
+      is_approach_valid: parsed.is_approach_valid === true,
+      has_computational_errors: parsed.has_computational_errors === true,
+    };
+
+    isAnswerCorrect = booleans.is_answer_correct;
+
+    console.log(
+      `[BOOL_GRADE] Booleans: work=${booleans.student_work_present} correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors}`,
+    );
+
+    // ─── COMPUTE GRADE FROM BOOLEANS — 100% deterministic ───
+    const gradeResult = computeGradeFromBooleans(booleans, gradeFloor, gradeFloorWithEffort);
+    rawGrade = gradeResult.grade;
+    regentsScore = gradeResult.regentsScore;
+    console.log(`[BOOL_GRADE] tier="${gradeResult.tier}" → grade=${rawGrade} regents=${regentsScore}`);
+
     strengthsAnalysis = Array.isArray(parsed.strengths)
       ? parsed.strengths.filter((s: string) => s && s.length >= 10)
       : [];
@@ -857,24 +956,6 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55,
           (m: string) => m && m.length >= 5 && !/no error|no misconception|none|N\/A/i.test(m),
         )
       : [];
-
-    // ─── TWO-PHASE GRADING: derive grade from quality_tier (AI never picks number) ───
-    const qualityTier = parsed.quality_tier || "";
-    if (qualityTier && typeof qualityTier === "string") {
-      const tierResult = tierToGrade(qualityTier, gradeFloor, gradeFloorWithEffort);
-      rawGrade = tierResult.grade;
-      regentsScore = tierResult.regentsScore;
-      console.log(`[TIER_GRADE] quality_tier="${qualityTier}" → grade=${rawGrade} regents=${regentsScore}`);
-    } else {
-      // Fallback: AI didn't provide quality_tier, use numeric grade with anchor snap
-      console.warn("[TIER_GRADE] No quality_tier in response, falling back to numeric grade");
-      rawGrade = parseInt(parsed.grade) || gradeFloorWithEffort;
-      const VALID_ANCHORS_PARSE = [97, 93, 88, 83, 75, gradeFloorWithEffort, gradeFloor];
-      rawGrade = VALID_ANCHORS_PARSE.reduce((prev, curr) =>
-        Math.abs(curr - rawGrade) < Math.abs(prev - rawGrade) ? curr : prev,
-      );
-      console.log(`[PARSE_ANCHOR] Fallback: grade ${parsed.grade} → snapped to ${rawGrade}`);
-    }
 
     gradeJustification = parsed.grade_justification || parsed.regents_justification || "";
     feedback = parsed.feedback || "";
@@ -1394,21 +1475,23 @@ serve(async (req: Request) => {
       for (const img of additionalImages) imageContent.push(formatImageForAI(img));
     }
 
-    // ── Call AI with consensus grading for maximum consistency ──
+    // ── Call AI with boolean consensus grading for maximum consistency ──
     console.log(`Grading with provider=${analysisProvider}, model=${getAnalysisModel(analysisProvider)}`);
     const messages = [
       { role: "system", content: systemPrompt },
       { role: "user", content: imageContent },
     ];
 
-    // CONSENSUS GRADING: Call AI with multiple seeds, enforce ≤2pt spread
-    const INITIAL_SEEDS = [42, 123, 256];
-    const EXTRA_SEEDS = [789, 1024]; // Used if initial spread > 2
-    const MAX_SPREAD = 2; // HARD BOUNDARY
-    let consensusResults: { grade: number; isCorrect: boolean; result: any; analysisText: string }[] = [];
+    // BOOLEAN CONSENSUS: Call AI 3x, majority-vote each boolean, compute grade from votes
+    const CONSENSUS_SEEDS = [42, 123, 256];
+    interface RoundResult {
+      booleans: BooleanAnswers;
+      result: any;
+      analysisText: string;
+    }
+    const consensusRounds: RoundResult[] = [];
 
-    // Phase 1: Initial 3 calls
-    for (const seed of INITIAL_SEEDS) {
+    for (const seed of CONSENSUS_SEEDS) {
       console.log(`[CONSENSUS] seed=${seed}`);
       const roundText = await callLovableAI(
         messages as any,
@@ -1418,114 +1501,83 @@ serve(async (req: Request) => {
         effectiveTeacherId,
         "standard",
         analysisProvider,
-        { temperature: 0, seed },
+        { temperature: 0, seed, responseFormat: GRADING_SCHEMA },
       );
       if (!roundText) continue;
       const roundResult = parseAnalysisResult(roundText, rubricSteps, gradeFloor, gradeFloorWithEffort);
-      consensusResults.push({
-        grade: roundResult.grade,
-        isCorrect: roundResult.isAnswerCorrect,
-        result: roundResult,
-        analysisText: roundText,
-      });
-    }
 
-    if (consensusResults.length === 0) throw new Error("No analysis returned from AI");
-
-    // Phase 2: Check spread — if >2, run extra calls to build stronger consensus
-    let grades = consensusResults.map((r) => r.grade);
-    let spread = Math.max(...grades) - Math.min(...grades);
-    console.log(`[CONSENSUS] Phase 1: grades=[${grades.join(",")}] spread=${spread}`);
-
-    if (spread > MAX_SPREAD && consensusResults.length < 5) {
-      console.log(`[CONSENSUS] Spread ${spread} > ${MAX_SPREAD}, running ${EXTRA_SEEDS.length} extra rounds`);
-      for (const seed of EXTRA_SEEDS) {
-        const roundText = await callLovableAI(
-          messages as any,
-          OPENAI_API_KEY,
-          "analyze-student-work",
-          supabase,
-          effectiveTeacherId,
-          "standard",
-          analysisProvider,
-          { temperature: 0, seed },
-        );
-        if (!roundText) continue;
-        const roundResult = parseAnalysisResult(roundText, rubricSteps, gradeFloor, gradeFloorWithEffort);
-        consensusResults.push({
-          grade: roundResult.grade,
-          isCorrect: roundResult.isAnswerCorrect,
-          result: roundResult,
-          analysisText: roundText,
-        });
+      // Extract booleans from parsed JSON
+      let parsed: any = null;
+      try {
+        parsed = JSON.parse(roundText);
+      } catch {
+        /* regex path won't have booleans */
       }
-      grades = consensusResults.map((r) => r.grade);
-      spread = Math.max(...grades) - Math.min(...grades);
-      console.log(`[CONSENSUS] Phase 2: grades=[${grades.join(",")}] spread=${spread}`);
+
+      const booleans: BooleanAnswers = {
+        student_work_present: parsed?.student_work_present === true || roundResult.studentWorkPresent,
+        is_answer_correct:
+          parsed?.is_answer_correct === true || parsed?.is_correct === true || roundResult.isAnswerCorrect,
+        is_work_shown: parsed?.is_work_shown === true,
+        is_work_complete: parsed?.is_work_complete === true,
+        is_approach_valid: parsed?.is_approach_valid === true,
+        has_computational_errors: parsed?.has_computational_errors === true,
+      };
+
+      console.log(
+        `[CONSENSUS] seed=${seed} booleans: correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors}`,
+      );
+      consensusRounds.push({ booleans, result: roundResult, analysisText: roundText });
     }
 
-    // Phase 3: Pick final grade — use MODE (most frequent), then median
-    const gradeFreq: Record<number, number> = {};
-    for (const g of grades) gradeFreq[g] = (gradeFreq[g] || 0) + 1;
-    const maxFreq = Math.max(...Object.values(gradeFreq));
-    const modeGrades = Object.entries(gradeFreq)
-      .filter(([, f]) => f === maxFreq)
-      .map(([g]) => parseInt(g));
+    if (consensusRounds.length === 0) throw new Error("No analysis returned from AI");
 
-    // If there's a clear mode, use it; otherwise use median
-    let finalGrade: number;
-    if (modeGrades.length === 1) {
-      finalGrade = modeGrades[0];
-      console.log(`[CONSENSUS] Using mode: ${finalGrade} (appeared ${maxFreq}x)`);
-    } else {
-      // Multiple modes — use median of all results
-      grades.sort((a, b) => a - b);
-      finalGrade = grades[Math.floor(grades.length / 2)];
-      console.log(`[CONSENSUS] No clear mode, using median: ${finalGrade}`);
-    }
+    // ── MAJORITY VOTE on each individual boolean ──
+    const totalRounds = consensusRounds.length;
+    const majorityThreshold = totalRounds / 2;
 
-    // Phase 4: Cross-validate is_correct — majority vote
-    const correctVotes = consensusResults.filter((r) => r.isCorrect).length;
-    const majorityCorrect = correctVotes > consensusResults.length / 2;
+    const votedBooleans: BooleanAnswers = {
+      student_work_present: consensusRounds.filter((r) => r.booleans.student_work_present).length > majorityThreshold,
+      is_answer_correct: consensusRounds.filter((r) => r.booleans.is_answer_correct).length > majorityThreshold,
+      is_work_shown: consensusRounds.filter((r) => r.booleans.is_work_shown).length > majorityThreshold,
+      is_work_complete: consensusRounds.filter((r) => r.booleans.is_work_complete).length > majorityThreshold,
+      is_approach_valid: consensusRounds.filter((r) => r.booleans.is_approach_valid).length > majorityThreshold,
+      has_computational_errors:
+        consensusRounds.filter((r) => r.booleans.has_computational_errors).length > majorityThreshold,
+    };
+
     console.log(
-      `[CONSENSUS] is_correct votes: ${correctVotes}/${consensusResults.length} → majority=${majorityCorrect}`,
+      `[CONSENSUS] Voted booleans: work=${votedBooleans.student_work_present} correct=${votedBooleans.is_answer_correct} shown=${votedBooleans.is_work_shown} complete=${votedBooleans.is_work_complete} valid=${votedBooleans.is_approach_valid} comp_err=${votedBooleans.has_computational_errors}`,
     );
 
-    // Pick the result that matches the final grade (or closest match)
+    // ── COMPUTE FINAL GRADE from voted booleans — 100% deterministic ──
+    const finalResult = computeGradeFromBooleans(votedBooleans, gradeFloor, gradeFloorWithEffort);
+    let finalGrade = finalResult.grade;
+    console.log(
+      `[CONSENSUS] Computed: tier="${finalResult.tier}" grade=${finalGrade} regents=${finalResult.regentsScore}`,
+    );
+
+    // ── Pick the best analysis text (prefer one that matches the voted correctness) ──
     const chosen =
-      consensusResults.find((r) => r.grade === finalGrade) ||
-      consensusResults.reduce((prev, curr) =>
-        Math.abs(curr.grade - finalGrade) < Math.abs(prev.grade - finalGrade) ? curr : prev,
-      );
+      consensusRounds.find((r) => r.booleans.is_answer_correct === votedBooleans.is_answer_correct) ||
+      consensusRounds[0];
     const analysisText = chosen.analysisText;
     const result = chosen.result;
 
-    // Override is_correct with majority vote if it disagrees
-    if (result.isAnswerCorrect !== majorityCorrect) {
-      console.log(`[CONSENSUS] Overriding is_correct: ${result.isAnswerCorrect} → ${majorityCorrect}`);
-      result.isAnswerCorrect = majorityCorrect;
-      // If majority says correct but grade is low, boost to minimum
-      if (majorityCorrect && finalGrade < 88) {
-        console.log(`[CONSENSUS] Majority says correct, boosting grade ${finalGrade} → 88`);
-        finalGrade = 88;
-      }
-    }
-
-    // Phase 5: HARD FINAL ANCHOR ASSERTION — no non-anchor grade leaves this pipeline
-    const FINAL_ANCHORS = [97, 93, 88, 83, 75, gradeFloorWithEffort, gradeFloor];
-    if (!FINAL_ANCHORS.includes(finalGrade)) {
-      const snapped = FINAL_ANCHORS.reduce((p, c) => (Math.abs(c - finalGrade) < Math.abs(p - finalGrade) ? c : p));
-      console.log(`[GRADE_ASSERT] VIOLATION: ${finalGrade} is not a valid anchor! Snapping to ${snapped}`);
-      finalGrade = snapped;
-    }
-
-    // Apply final grade to result
+    // Override result fields with voted values
     result.grade = finalGrade;
-    result.consensusGrades = grades;
-    result.consensusSpread = spread;
-    result.consensusMethod = modeGrades.length === 1 ? "mode" : "median";
-    result.consensusRounds = consensusResults.length;
-    console.log(`[CONSENSUS] FINAL grade=${finalGrade} spread=${spread} rounds=${consensusResults.length}`);
+    result.isAnswerCorrect = votedBooleans.is_answer_correct;
+    result.regentsScore = finalResult.regentsScore;
+    result.consensusGrades = consensusRounds.map(
+      (r) => computeGradeFromBooleans(r.booleans, gradeFloor, gradeFloorWithEffort).grade,
+    );
+    result.consensusSpread = Math.max(...result.consensusGrades) - Math.min(...result.consensusGrades);
+    result.consensusMethod = "boolean_majority_vote";
+    result.consensusRounds = totalRounds;
+    result.consensusTier = finalResult.tier;
+    console.log(
+      `[CONSENSUS] FINAL grade=${finalGrade} tier=${finalResult.tier} spread=${result.consensusSpread} rounds=${totalRounds}`,
+    );
 
     // ── Handle blank page from grading result ──
     if (!result.studentWorkPresent && blankPageSettings?.enabled) {
