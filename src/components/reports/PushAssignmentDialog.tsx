@@ -197,13 +197,41 @@ export function PushAssignmentDialog({
     }
   };
 
+  // Helper: sync a batch of students to Scholar before pushing
+  const syncStudentsToScholar = async (students: Array<{ id: string; first_name: string; last_name: string; email: string | null }>, classId: string, className: string) => {
+    for (const student of students) {
+      await pushToSisterApp({
+        class_id: classId,
+        title: 'Roster Sync',
+        student_id: student.id,
+        student_name: `${student.first_name} ${student.last_name}`,
+        type: 'student_created',
+        first_name: student.first_name,
+        last_name: student.last_name,
+        student_email: student.email || undefined,
+        class_name: className,
+      });
+    }
+  };
+
   // --- Auto remediation push (existing logic) ---
   const handlePushAutoRemediation = async () => {
     if (!selectedClassId || !studentWeaknesses || studentWeaknesses.length === 0) return;
 
     setIsPushing(true);
-    setPushProgress({ current: 0, total: studentWeaknesses.length, studentName: '' });
     const selectedClass = classes?.find(c => c.id === selectedClassId);
+
+    // Auto-sync roster to Scholar first
+    setPushProgress({ current: 0, total: studentWeaknesses.length, studentName: 'Syncing roster...' });
+    const studentsForSync = studentWeaknesses.map(sw => ({
+      id: sw.studentId,
+      first_name: sw.firstName,
+      last_name: sw.lastName,
+      email: sw.email,
+    }));
+    await syncStudentsToScholar(studentsForSync, selectedClassId, selectedClass?.name || '');
+
+    setPushProgress({ current: 0, total: studentWeaknesses.length, studentName: '' });
     let successCount = 0;
     const failedNames: string[] = [];
 
@@ -291,8 +319,13 @@ export function PushAssignmentDialog({
 
     setIsPushing(true);
     const studentsToSend = allStudents.filter(s => selectedStudentIds.has(s.id));
-    setPushProgress({ current: 0, total: studentsToSend.length, studentName: '' });
     const selectedClass = classes?.find(c => c.id === selectedClassId);
+
+    // Auto-sync roster to Scholar first
+    setPushProgress({ current: 0, total: studentsToSend.length, studentName: 'Syncing roster...' });
+    await syncStudentsToScholar(studentsToSend, selectedClassId, selectedClass?.name || '');
+
+    setPushProgress({ current: 0, total: studentsToSend.length, studentName: '' });
     let successCount = 0;
     const failedNames: string[] = [];
 
