@@ -491,39 +491,38 @@ STEP 1 — EXTRACT: Read ALL student handwriting from the entire page including 
 STEP 2 — DETECT: Is there student handwriting? (Printed questions alone = NO student work)
 STEP 3 — IDENTIFY: What problem/question is being answered? What subject area?
 STEP 4 — EVALUATE: Check the final answer and work shown against the standard/rubric.
-STEP 5 — CLASSIFY the work into EXACTLY ONE quality tier (output the tier NAME as a string):
+STEP 5 — SCORE using this STRICT decision tree (use the EXACT grade values shown):
 
-  PERFECT    = Correct final answer + complete work shown (Regents 4)
-  EXCELLENT  = Correct answer + minor work omission (Regents 4)
-  GOOD       = Correct answer + significant work gaps (Regents 3)
-  ADEQUATE   = Right approach, minor computational error (Regents 3)
-  DEVELOPING = Some understanding, wrong final answer (Regents 2)
-  MINIMAL    = Confused attempt, little understanding (Regents 1)
-  NO_RESPONSE = Blank page / no student work (Regents 0)
+  ┌─ PERFECT: Correct final answer + complete work shown ──► 97 (Regents 4)
+  ├─ EXCELLENT: Correct answer + minor work omission ──────► 93 (Regents 4)
+  ├─ GOOD: Correct answer + significant work gaps ─────────► 88 (Regents 3)
+  ├─ ADEQUATE: Right approach, minor computational error ──► 83 (Regents 3)
+  ├─ DEVELOPING: Some understanding, wrong final answer ───► 75 (Regents 2)
+  ├─ MINIMAL: Confused attempt, little understanding ──────► ${opts.gradeFloorWithEffort} (Regents 1)
+  └─ NO RESPONSE: Blank page / no student work ────────────► ${opts.gradeFloor} (Regents 0)
 
-CRITICAL: The "quality_tier" field in your JSON response is the MOST IMPORTANT field.
-You MUST set it to EXACTLY one of: "PERFECT", "EXCELLENT", "GOOD", "ADEQUATE", "DEVELOPING", "MINIMAL", "NO_RESPONSE".
-The grade number will be computed automatically from your tier — focus on accurate CLASSIFICATION, not number selection.
+IMPORTANT: You MUST output one of these EXACT grade values: 97, 93, 88, 83, 75, ${opts.gradeFloorWithEffort}, or ${opts.gradeFloor}.
+Do NOT interpolate or choose values between these anchors. Pick the anchor that best matches.
 
-STEP 6 — VERIFY: Re-read your justification. Does the tier match your evidence? If not, adjust the tier.
+STEP 6 — VERIFY: Re-read your justification. Does it support your grade? If not, adjust.
 
-CLASSIFICATION EXAMPLES (use these to calibrate your tier selection):
-• Student correctly solves "3x + 5 = 20" showing all steps "3x+5=20, 3x=15, x=5" → quality_tier: "PERFECT"
-• Student writes "3x = 15, x = 5" but skips showing subtraction of 5 → quality_tier: "EXCELLENT"
-• Student writes "x = 5" correct answer but shows no algebra work → quality_tier: "GOOD"
-• Student writes "3x = 25, x = 8.3" (wrong subtraction but right method) → quality_tier: "ADEQUATE"
-• Student writes "x = 25" wrong answer with confused attempt → quality_tier: "DEVELOPING"
-• Student writes "x = 7" with no work, wrong answer, no understanding → quality_tier: "MINIMAL"
-• Blank page → quality_tier: "NO_RESPONSE"
+CALIBRATION EXAMPLES (use these as scoring anchors):
+• Student correctly solves "3x + 5 = 20" showing all steps "3x+5=20, 3x=15, x=5" → Grade: 97 (PERFECT)
+• Student writes "3x = 15, x = 5" but skips showing subtraction of 5 → Grade: 93 (EXCELLENT)
+• Student writes "x = 5" correct answer but shows no algebra work → Grade: 88 (GOOD)
+• Student writes "3x = 25, x = 8.3" (wrong subtraction but right method) → Grade: 83 (ADEQUATE)
+• Student writes "x = 25" wrong answer with confused attempt → Grade: 75 (DEVELOPING)
+• Student writes "x = 7" with no work, wrong answer, no understanding → Grade: ${opts.gradeFloorWithEffort} (MINIMAL)
+• Blank page → Grade: ${opts.gradeFloor} (NO RESPONSE)
 
 CONSISTENCY RULES (MANDATORY):
-1. CORRECT final answer = MINIMUM tier of "GOOD". Never classify a correct answer below GOOD.
-2. The "quality_tier" field MUST be one of the 7 exact strings listed above.
+1. CORRECT final answer = MINIMUM grade of 88. Never grade a correct answer below 88.
+2. You MUST use one of the exact anchor values: 97, 93, 88, 83, 75, ${opts.gradeFloorWithEffort}, ${opts.gradeFloor}.
 3. Quote the student's actual written work as evidence for EVERY claim.
 4. If handwriting is hard to read, give your best interpretation and set confidence to "low".
 5. Do NOT penalize for messy handwriting if the work is mathematically correct.
-6. Be CONSISTENT: the same quality of work MUST receive the same tier every time.
-7. When in doubt between two adjacent tiers, choose the HIGHER one.
+6. Be CONSISTENT: the same quality of work MUST receive the same grade every time.
+7. When in doubt between two adjacent anchors, choose the HIGHER one.
 ${opts.gradingStyleContext}${opts.teacherAnswerSampleContext}${opts.verificationContext}${teacherGuideNote}${standardSection}${customRubricSection}`;
 
   const user = `Grade this student's work.${opts.promptText ? ` Problem: ${opts.promptText}` : ''}${rubricSection}
@@ -538,49 +537,18 @@ Respond with a SINGLE JSON object. No markdown, no code fences, no text outside 
   "problem_identified": "(brief, under 20 words)",
   "nys_standard": "CODE - Description",
   "is_correct": true,
-  "quality_tier": "GOOD",
   "regents_score": 3,
-  "regents_justification": "(why this Regents score and quality tier)",
+  "regents_justification": "(why this Regents score — must align with grade anchor)",
   "strengths": ["(specific thing done right, quoting student work)"],
   "areas_for_improvement": ["(specific error with why wrong and how to fix, quoting student work)"],
   "misconceptions": ["(verified errors only — quote exact student writing. Empty array if none)"],
+  "grade": 88,
   "grade_justification": "(cite student's actual writing using 'Student wrote: ...' format)",
   "feedback": "(constructive: what was done well, what to practice, next steps)",
   "confidence": "high"${rubricSection ? ',\n  "rubric_scores": [{"criterion": "...", "score": 0, "max_score": 0, "feedback": "..."}]' : ''}
 }`;
 
   return { system, user };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TIER → GRADE MAPPING — deterministic, zero AI discretion
-// ═══════════════════════════════════════════════════════════════════════════════
-const VALID_TIERS = ['PERFECT', 'EXCELLENT', 'GOOD', 'ADEQUATE', 'DEVELOPING', 'MINIMAL', 'NO_RESPONSE'] as const;
-type QualityTier = typeof VALID_TIERS[number];
-
-function tierToGrade(tier: string, gradeFloor: number, gradeFloorWithEffort: number): { grade: number; regentsScore: number } {
-  const normalized = tier.toUpperCase().replace(/[^A-Z_]/g, '');
-  const TIER_MAP: Record<string, { grade: number; regents: number }> = {
-    'PERFECT':      { grade: 97, regents: 4 },
-    'EXCELLENT':    { grade: 93, regents: 4 },
-    'GOOD':         { grade: 88, regents: 3 },
-    'ADEQUATE':     { grade: 83, regents: 3 },
-    'DEVELOPING':   { grade: 75, regents: 2 },
-    'MINIMAL':      { grade: gradeFloorWithEffort, regents: 1 },
-    'NO_RESPONSE':  { grade: gradeFloor, regents: 0 },
-    'NORESPONSE':   { grade: gradeFloor, regents: 0 },
-    'NO RESPONSE':  { grade: gradeFloor, regents: 0 },
-  };
-  const match = TIER_MAP[normalized];
-  if (match) return { grade: match.grade, regentsScore: match.regents };
-  // Fuzzy fallback: find closest tier by prefix match
-  const key = Object.keys(TIER_MAP).find(k => normalized.startsWith(k.slice(0, 4)));
-  if (key) {
-    console.warn(`[TIER_MAP] Fuzzy matched "${tier}" → "${key}"`);
-    return { grade: TIER_MAP[key].grade, regentsScore: TIER_MAP[key].regents };
-  }
-  console.error(`[TIER_MAP] UNKNOWN tier "${tier}", defaulting to DEVELOPING`);
-  return { grade: 75, regentsScore: 2 };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -698,7 +666,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55,
   let confidence: string;
   let rubricScores: { criterion: string; score: number; maxScore: number; feedback: string }[] = [];
 
-  if (parsed && typeof parsed === 'object' && ('quality_tier' in parsed || 'grade' in parsed || 'student_work_present' in parsed)) {
+  if (parsed && typeof parsed === 'object' && ('grade' in parsed || 'student_work_present' in parsed)) {
     // ─── PATH 1: JSON structured output ───
     console.log('[PARSE] Using JSON structured output');
 
@@ -712,24 +680,14 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 55,
     strengthsAnalysis = Array.isArray(parsed.strengths) ? parsed.strengths.filter((s: string) => s && s.length >= 10) : [];
     areasForImprovement = Array.isArray(parsed.areas_for_improvement) ? parsed.areas_for_improvement.filter((s: string) => s && s.length >= 10) : [];
     misconceptions = Array.isArray(parsed.misconceptions) ? parsed.misconceptions.filter((m: string) => m && m.length >= 5 && !/no error|no misconception|none|N\/A/i.test(m)) : [];
+    rawGrade = parseInt(parsed.grade) || gradeFloorWithEffort;
 
-    // ─── TWO-PHASE GRADING: derive grade from quality_tier (AI never picks number) ───
-    const qualityTier = parsed.quality_tier || '';
-    if (qualityTier && typeof qualityTier === 'string') {
-      const tierResult = tierToGrade(qualityTier, gradeFloor, gradeFloorWithEffort);
-      rawGrade = tierResult.grade;
-      regentsScore = tierResult.regentsScore;
-      console.log(`[TIER_GRADE] quality_tier="${qualityTier}" → grade=${rawGrade} regents=${regentsScore}`);
-    } else {
-      // Fallback: AI didn't provide quality_tier, use numeric grade with anchor snap
-      console.warn('[TIER_GRADE] No quality_tier in response, falling back to numeric grade');
-      rawGrade = parseInt(parsed.grade) || gradeFloorWithEffort;
-      const VALID_ANCHORS_PARSE = [97, 93, 88, 83, 75, gradeFloorWithEffort, gradeFloor];
-      rawGrade = VALID_ANCHORS_PARSE.reduce((prev, curr) =>
-        Math.abs(curr - rawGrade) < Math.abs(prev - rawGrade) ? curr : prev
-      );
-      console.log(`[PARSE_ANCHOR] Fallback: grade ${parsed.grade} → snapped to ${rawGrade}`);
-    }
+    // ─── HARD ANCHOR SNAP: force grade to nearest valid anchor at parse time ───
+    const VALID_ANCHORS_PARSE = [97, 93, 88, 83, 75, gradeFloorWithEffort, gradeFloor];
+    rawGrade = VALID_ANCHORS_PARSE.reduce((prev, curr) =>
+      Math.abs(curr - rawGrade) < Math.abs(prev - rawGrade) ? curr : prev
+    );
+    console.log(`[PARSE_ANCHOR] Parsed grade ${parsed.grade} → snapped to anchor ${rawGrade}`);
 
     gradeJustification = parsed.grade_justification || parsed.regents_justification || '';
     feedback = parsed.feedback || '';
