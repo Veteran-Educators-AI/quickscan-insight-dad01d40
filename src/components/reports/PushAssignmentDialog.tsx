@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Send, Loader2, Users, Target, TrendingDown, AlertCircle, Sparkles, Check } from 'lucide-react';
+import { Send, Loader2, Users, Target, TrendingDown, AlertCircle, Sparkles, Check, Search, BookOpen } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -12,10 +12,13 @@ import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { usePushToSisterApp } from '@/hooks/usePushToSisterApp';
 import { toast } from 'sonner';
+import { NYS_SUBJECTS } from '@/data/nysTopics';
 
 interface PushAssignmentDialogProps {
   open: boolean;
@@ -448,14 +451,26 @@ export function PushAssignmentDialog({
 
             {/* Manual Enrichment Tab */}
             <TabsContent value="manual" className="mt-3 space-y-3">
-              {/* Topic */}
+              {/* Topic Picker */}
               <div className="space-y-2">
-                <Label>Topic</Label>
-                <Input
-                  placeholder="e.g. Solving Systems of Equations"
+                <Label className="flex items-center gap-2">
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Topic
+                </Label>
+                <TopicSearchPicker
                   value={manualTopic}
-                  onChange={(e) => setManualTopic(e.target.value)}
+                  onSelect={(topic, standard) => {
+                    setManualTopic(topic);
+                    if (standard) setManualStandard(standard);
+                  }}
+                  onChange={(val) => setManualTopic(val)}
                 />
+                {manualTopic && (
+                  <Badge variant="outline" className="text-xs">
+                    {manualTopic}
+                    {manualStandard && <span className="ml-1 font-mono opacity-75">({manualStandard})</span>}
+                  </Badge>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Standard (optional)</Label>
@@ -564,5 +579,116 @@ export function PushAssignmentDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Searchable topic picker with NYS curriculum suggestions */
+function TopicSearchPicker({
+  value,
+  onSelect,
+  onChange,
+}: {
+  value: string;
+  onSelect: (topic: string, standard: string | null) => void;
+  onChange: (val: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const suggestions = useMemo(() => {
+    const results: { subject: string; category: string; name: string; standard: string }[] = [];
+    const q = search.toLowerCase();
+    for (const subject of NYS_SUBJECTS) {
+      for (const cat of subject.categories) {
+        for (const topic of cat.topics) {
+          if (
+            !q ||
+            topic.name.toLowerCase().includes(q) ||
+            topic.standard.toLowerCase().includes(q) ||
+            cat.category.toLowerCase().includes(q) ||
+            subject.name.toLowerCase().includes(q)
+          ) {
+            results.push({
+              subject: subject.shortName,
+              category: cat.category,
+              name: topic.name,
+              standard: topic.standard,
+            });
+          }
+        }
+      }
+      if (results.length > 50) break;
+    }
+    return results.slice(0, 50);
+  }, [search]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className="w-full justify-start text-left font-normal h-9"
+          onClick={() => setOpen(true)}
+        >
+          <Search className="h-3.5 w-3.5 mr-2 shrink-0 opacity-50" />
+          {value ? (
+            <span className="truncate">{value}</span>
+          ) : (
+            <span className="text-muted-foreground">Search topics or type your own...</span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[350px] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search NYS topics..."
+            value={search}
+            onValueChange={setSearch}
+          />
+          <CommandList>
+            {search.trim() && (
+              <CommandGroup heading="Custom topic">
+                <CommandItem
+                  onSelect={() => {
+                    onChange(search.trim());
+                    setOpen(false);
+                    setSearch('');
+                  }}
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-2 text-primary" />
+                  Use "{search.trim()}" as topic
+                </CommandItem>
+              </CommandGroup>
+            )}
+            <CommandGroup heading={`Curriculum topics${search ? ` matching "${search}"` : ''}`}>
+              {suggestions.length === 0 ? (
+                <CommandEmpty>No matching topics found</CommandEmpty>
+              ) : (
+                <ScrollArea className="h-[200px]">
+                  {suggestions.map((s, idx) => (
+                    <CommandItem
+                      key={`${s.name}-${s.standard}-${idx}`}
+                      onSelect={() => {
+                        onSelect(s.name, s.standard);
+                        setOpen(false);
+                        setSearch('');
+                      }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm truncate">{s.name}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 font-mono">{s.standard}</Badge>
+                          <span className="opacity-60">{s.subject}</span>
+                        </div>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </ScrollArea>
+              )}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
