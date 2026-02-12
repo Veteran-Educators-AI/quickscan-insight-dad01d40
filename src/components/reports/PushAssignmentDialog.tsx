@@ -205,6 +205,7 @@ export function PushAssignmentDialog({
     setPushProgress({ current: 0, total: studentWeaknesses.length, studentName: '' });
     const selectedClass = classes?.find(c => c.id === selectedClassId);
     let successCount = 0;
+    const failedNames: string[] = [];
 
     try {
       for (let i = 0; i < studentWeaknesses.length; i++) {
@@ -225,9 +226,9 @@ export function PushAssignmentDialog({
             includeHints: true,
           },
         });
-        if (genError) { console.error(`Failed to generate questions for ${student.firstName}:`, genError); continue; }
+        if (genError) { console.error(`Failed to generate questions for ${student.firstName}:`, genError); failedNames.push(`${student.firstName} ${student.lastName}`); continue; }
         const questions = questionData?.questions || [];
-        if (questions.length === 0) continue;
+        if (questions.length === 0) { failedNames.push(`${student.firstName} ${student.lastName}`); continue; }
 
         const difficultyLevel = primaryWeakness.avgGrade < 40 ? 'A' : primaryWeakness.avgGrade < 60 ? 'B' : 'C';
         const remediationRecommendations = student.weakTopics.map(wt => `${wt.topic} (${wt.avgGrade}% avg)`);
@@ -259,13 +260,21 @@ export function PushAssignmentDialog({
             explanation: q.explanation,
           })),
         });
-        if (result.success) successCount++;
-        else console.error(`Failed to push to ${student.firstName}:`, result.error);
+        if (result.success) {
+          successCount++;
+        } else {
+          failedNames.push(`${student.firstName} ${student.lastName}`);
+          console.error(`Failed to push to ${student.firstName}:`, result.error);
+        }
       }
 
-      if (successCount === studentWeaknesses.length) toast.success(`Personalized assignments sent to all ${successCount} students!`);
-      else if (successCount > 0) toast.warning(`Sent to ${successCount}/${studentWeaknesses.length} students`);
-      else throw new Error('Failed to send to any students');
+      if (successCount === studentWeaknesses.length) {
+        toast.success(`Personalized assignments sent to all ${successCount} students!`);
+      } else if (successCount > 0) {
+        toast.warning(`Sent to ${successCount}/${studentWeaknesses.length} students. Not found on Scholar: ${failedNames.join(', ')}`);
+      } else {
+        toast.error(`Could not send to any students. They may not exist in the Scholar app yet. Students: ${failedNames.join(', ')}`);
+      }
       onOpenChange(false);
     } catch (error) {
       console.error('Push assignment error:', error);
@@ -285,6 +294,7 @@ export function PushAssignmentDialog({
     setPushProgress({ current: 0, total: studentsToSend.length, studentName: '' });
     const selectedClass = classes?.find(c => c.id === selectedClassId);
     let successCount = 0;
+    const failedNames: string[] = [];
 
     try {
       for (let i = 0; i < studentsToSend.length; i++) {
@@ -335,13 +345,21 @@ export function PushAssignmentDialog({
             explanation: q.explanation,
           })),
         });
-        if (result.success) successCount++;
-        else console.error(`Failed to push to ${student.first_name}:`, result.error);
+        if (result.success) {
+          successCount++;
+        } else {
+          failedNames.push(`${student.first_name} ${student.last_name}`);
+          console.error(`Failed to push to ${student.first_name}:`, result.error);
+        }
       }
 
-      if (successCount === studentsToSend.length) toast.success(`Enrichment sent to all ${successCount} students!`);
-      else if (successCount > 0) toast.warning(`Sent to ${successCount}/${studentsToSend.length} students`);
-      else throw new Error('Failed to send to any students');
+      if (successCount === studentsToSend.length) {
+        toast.success(`Enrichment sent to all ${successCount} students!`);
+      } else if (successCount > 0) {
+        toast.warning(`Sent to ${successCount}/${studentsToSend.length} students. Not found on Scholar: ${failedNames.join(', ')}`);
+      } else {
+        toast.error(`Could not send to any students. They may not exist in the Scholar app yet. Students: ${failedNames.join(', ')}`);
+      }
       onOpenChange(false);
     } catch (error) {
       console.error('Manual enrichment push error:', error);
