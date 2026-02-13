@@ -598,7 +598,7 @@ const GRADING_SCHEMA = {
           description: "What problem is being answered (under 20 words). Use 'NOT_ACADEMIC' if not an assignment.",
         },
         nys_standard: { type: "string", description: "NYS standard code and description" },
-        // ─── THE 7 BOOLEAN GRADING QUESTIONS (code computes grade from these) ───
+        // ─── THE 9 BOOLEAN GRADING QUESTIONS (code computes grade from these) ───
         is_answer_correct: { type: "boolean", description: "Is the final answer mathematically/factually correct?" },
         is_work_shown: {
           type: "boolean",
@@ -621,6 +621,16 @@ const GRADING_SCHEMA = {
           type: "boolean",
           description:
             "Does the student demonstrate understanding of the underlying concept even if the answer is wrong?",
+        },
+        is_relevant_to_question: {
+          type: "boolean",
+          description:
+            "Is the student's work actually relevant to the question asked? FALSE for off-topic, gibberish, or completely unrelated content.",
+        },
+        has_meaningful_content: {
+          type: "boolean",
+          description:
+            "Did the student write a meaningful attempt? FALSE for trivial non-answers like 'idk', '?', a single random word, or joke answers.",
         },
         // ─── FEEDBACK FIELDS ───
         strengths: {
@@ -660,6 +670,8 @@ const GRADING_SCHEMA = {
         "has_computational_errors",
         "is_work_organized",
         "has_conceptual_understanding",
+        "is_relevant_to_question",
+        "has_meaningful_content",
         "strengths",
         "areas_for_improvement",
         "misconceptions",
@@ -685,12 +697,14 @@ interface BooleanAnswers {
   has_computational_errors: boolean;
   is_work_organized: boolean;
   has_conceptual_understanding: boolean;
+  is_relevant_to_question: boolean;
+  has_meaningful_content: boolean;
 }
 
 function computeGradeFromBooleans(
   answers: BooleanAnswers,
   gradeFloor: number,
-  gradeFloorWithEffort: number,
+  _gradeFloorWithEffort: number,
 ): { grade: number; regentsScore: number; tier: string } {
   const {
     is_academic_assignment,
@@ -702,16 +716,22 @@ function computeGradeFromBooleans(
     has_computational_errors,
     is_work_organized,
     has_conceptual_understanding,
+    is_relevant_to_question,
+    has_meaningful_content,
   } = answers;
 
-  // GATEKEEPER: Not an academic assignment → 0% immediately
+  // ─── GATEKEEPER CHECKS → 0% (must pass ALL to get any marks) ───
   if (!is_academic_assignment) {
-    return { grade: 0, regentsScore: 0, tier: "NOT_ACADEMIC" };
+    return { grade: 0, regentsScore: 0, tier: "NOT_ACADEMIC" }; // 0%
   }
-
-  // Decision tree — 12 deterministic paths, 2-5pt gaps between adjacent tiers
   if (!student_work_present) {
-    return { grade: gradeFloor, regentsScore: 0, tier: "NO_RESPONSE" }; // 0 (default)
+    return { grade: gradeFloor, regentsScore: 0, tier: "NO_RESPONSE" }; // 0%
+  }
+  if (!is_relevant_to_question) {
+    return { grade: 0, regentsScore: 0, tier: "OFF_TOPIC" }; // 0%
+  }
+  if (!has_meaningful_content) {
+    return { grade: 0, regentsScore: 0, tier: "NO_MEANINGFUL_CONTENT" }; // 0%
   }
 
   // ─── CORRECT ANSWER (5 tiers: 97, 95, 93, 91, 88) ───
@@ -746,12 +766,32 @@ function computeGradeFromBooleans(
     return { grade: 75, regentsScore: 2, tier: "DEVELOPING" }; // 75
   }
 
-  // ─── INCORRECT ANSWER + INVALID APPROACH (2 tiers: 70, 65) ───
+  // ─── INCORRECT ANSWER + INVALID APPROACH — grade based on effort + understanding ───
+  // Student must show CONCEPTUAL UNDERSTANDING to earn 50%+.
+  // Just attempting with everything wrong = minimal credit only.
+
   if (has_conceptual_understanding) {
-    return { grade: 70, regentsScore: 1, tier: "STRUGGLING" }; // 70
+    // Shows understanding of the concept, but wrong approach and wrong answer
+    if (is_work_shown && is_work_organized) {
+      return { grade: 70, regentsScore: 1, tier: "STRUGGLING" }; // 70 — concept + work + organized
+    }
+    if (is_work_shown && !is_work_organized) {
+      return { grade: 60, regentsScore: 1, tier: "DEVELOPING_CONCEPT" }; // 60 — concept + work shown
+    }
+    // Has concept but didn't show work
+    return { grade: 50, regentsScore: 1, tier: "EMERGING" }; // 50 — concept only
   }
 
-  return { grade: gradeFloorWithEffort, regentsScore: 1, tier: "MINIMAL" }; // 55 (default)
+  // No conceptual understanding — everything wrong, minimal credit for effort only
+  if (is_work_shown && is_work_organized) {
+    return { grade: 35, regentsScore: 0, tier: "BASIC_EFFORT" }; // 35 — organized work but all wrong
+  }
+  if (is_work_shown) {
+    return { grade: 25, regentsScore: 0, tier: "ATTEMPTED" }; // 25 — showed work but all wrong
+  }
+
+  // ─── EVERYTHING WRONG, NO WORK SHOWN → 0% ───
+  return { grade: 0, regentsScore: 0, tier: "MINIMAL" }; // 0%
 }
 
 function buildGradingPrompt(opts: {
@@ -791,8 +831,9 @@ function buildGradingPrompt(opts: {
 
   const system = `You are a calibrated NYS Regents grading engine. You answer FACTUAL QUESTIONS about student work.
 
-Your job is NOT to decide a grade. Your job is to answer 8 specific YES/NO questions about the student's work.
+Your job is NOT to decide a grade. Your job is to answer 10 specific YES/NO questions about the student's work.
 The grade will be computed automatically from your answers. Focus on ACCURACY of each answer.
+The student MUST get something right to earn ANY marks — do NOT give credit where none is deserved.
 
 PROCEDURE (follow these steps IN ORDER):
 
@@ -802,8 +843,11 @@ STEP 0 — VALIDATE: Is this document an academic assignment (test, quiz, homewo
 
 STEP 1 — EXTRACT: Read ALL student handwriting from the entire page including margins. Record exact text in "ocr_text".
 STEP 2 — DETECT: Is there student handwriting? (Printed questions alone = NO → student_work_present = false)
-STEP 3 — IDENTIFY: What problem/question is being answered? What subject area?
-STEP 4 — ANSWER these 7 grading questions with true/false (EACH IS INDEPENDENT):
+STEP 3 — RELEVANCE CHECK:
+  → Is the student's work relevant to the question? (Off-topic, gibberish, random text → is_relevant_to_question = false)
+  → Did the student write a meaningful attempt? ("idk", "?", joke answers, single random word → has_meaningful_content = false)
+STEP 4 — IDENTIFY: What problem/question is being answered? What subject area?
+STEP 5 — ANSWER these 7 grading questions with true/false (EACH IS INDEPENDENT):
 
   Q1. is_answer_correct:            Is the FINAL ANSWER mathematically/factually correct?
   Q2. is_work_shown:                Did the student show ANY work/steps (not just the final answer)?
@@ -815,36 +859,47 @@ STEP 4 — ANSWER these 7 grading questions with true/false (EACH IS INDEPENDENT
 
 RULES FOR ANSWERING (MANDATORY):
 1. Answer ONLY true or false for each question. No hedging.
-2. "is_academic_assignment" = false for ANY document that is NOT a student assignment. Examples of NON-academic: receipts, invoices, articles, news, random text, memes, personal notes, business documents.
-3. "is_answer_correct" means the FINAL numerical/written answer matches the correct solution.
-4. "is_work_shown" = true even if only partial work is shown (any steps at all).
-5. "is_work_complete" = true ONLY if ALL required steps are shown (nothing skipped).
-6. "is_approach_valid" = true if the METHOD is correct, even if a calculation error led to wrong answer.
-7. "has_computational_errors" = true ONLY for arithmetic/calculation mistakes (not conceptual errors).
-8. "is_work_organized" = true if work is written neatly, labeled, and flows logically (not scattered/chaotic).
-9. "has_conceptual_understanding" = true if the student shows they UNDERSTAND the concept, even if the answer is wrong.
-10. If is_academic_assignment is false, set ALL other booleans to false.
-11. If student_work_present is false, set all 7 grading answers to false.
-12. Quote the student's actual written work as evidence in your justification.
-13. If handwriting is hard to read, give your best interpretation and set confidence to "low".
-14. Do NOT penalize for messy handwriting if the work is mathematically correct.
+2. "is_academic_assignment" = false for ANY document that is NOT a student assignment. Examples: receipts, invoices, articles, news, random text, memes, personal notes, business documents, logos, images.
+3. "is_relevant_to_question" = false if the student's writing is completely unrelated to the question asked, is gibberish, or is random copied text that doesn't address the problem.
+4. "has_meaningful_content" = false if the student wrote something trivially short or meaningless: "idk", "I don't know", "?", a single random word, a joke answer, or doodles.
+5. "is_answer_correct" means the FINAL numerical/written answer matches the correct solution.
+6. "is_work_shown" = true even if only partial work is shown (any steps at all).
+7. "is_work_complete" = true ONLY if ALL required steps are shown (nothing skipped).
+8. "is_approach_valid" = true if the METHOD is correct, even if a calculation error led to wrong answer.
+9. "has_computational_errors" = true ONLY for arithmetic/calculation mistakes (not conceptual errors).
+10. "is_work_organized" = true if work is written neatly, labeled, and flows logically (not scattered/chaotic).
+11. "has_conceptual_understanding" = true if the student shows they UNDERSTAND the concept, even if the answer is wrong.
+12. If is_academic_assignment is false, set ALL other booleans to false.
+13. If student_work_present is false, set all other booleans to false.
+14. If is_relevant_to_question is false or has_meaningful_content is false, set all 7 grading booleans to false.
+
+FAIRNESS RULES:
+15. Do NOT reward longer answers over concise correct ones — judge quality, not quantity.
+16. Multiple valid approaches to the same problem are ALL equally acceptable.
+17. Judge KNOWLEDGE and UNDERSTANDING, not writing quality or grammar (unless it's an ELA assignment).
+18. A technically correct but poorly explained answer is STILL correct.
+19. Do NOT penalize for messy handwriting if the work is mathematically correct.
+20. Quote the student's actual written work as evidence in your justification.
+21. If handwriting is hard to read, give your best interpretation and set confidence to "low".
 
 EXAMPLES:
 • A restaurant receipt → is_academic_assignment=false, ALL others=false
-• A news article PDF → is_academic_assignment=false, ALL others=false
-• An empty math worksheet → is_academic_assignment=true, student_work_present=false, ALL grading=false
-• "3x+5=20, 3x=15, x=5" (correct, all steps, neat) → academic=true, correct=true, shown=true, complete=true, valid=true, comp_errors=false, organized=true, conceptual=true
-• "3x=15, x=5" (correct, skipped step, neat) → academic=true, correct=true, shown=true, complete=false, valid=true, comp_errors=false, organized=true, conceptual=true
-• "x=5" alone (correct, no work) → academic=true, correct=true, shown=false, complete=false, valid=false, comp_errors=false, organized=false, conceptual=false
-• "3x=25, x=8.3" (wrong subtraction) → academic=true, correct=false, shown=true, complete=true, valid=true, comp_errors=true, organized=true, conceptual=true
-• "x=25" (wrong, confused) → academic=true, correct=false, shown=false, complete=false, valid=false, comp_errors=false, organized=false, conceptual=false
+• A logo image → is_academic_assignment=false, ALL others=false
+• An empty math worksheet → academic=true, student_work_present=false, ALL others=false
+• Student writes "idk" → academic=true, present=true, relevant=true, meaningful=false, ALL grading=false
+• Student writes about dinosaurs on a math test → academic=true, present=true, relevant=false, meaningful=true, ALL grading=false
+• "3x+5=20, 3x=15, x=5" (correct, all steps, neat) → ALL gates=true, correct=true, shown=true, complete=true, valid=true, comp_errors=false, organized=true, conceptual=true
+• "3x=15, x=5" (correct, skipped step) → ALL gates=true, correct=true, shown=true, complete=false, valid=true, comp_errors=false, organized=true, conceptual=true
+• "x=5" alone (correct, no work) → ALL gates=true, correct=true, shown=false, complete=false, valid=false, comp_errors=false, organized=false, conceptual=false
+• "3x=25, x=8.3" (wrong subtraction) → ALL gates=true, correct=false, shown=true, complete=true, valid=true, comp_errors=true, organized=true, conceptual=true
+• Student writes random numbers everywhere → academic=true, present=true, relevant=false, meaningful=false, ALL grading=false
 ${opts.gradingStyleContext}${opts.teacherAnswerSampleContext}${opts.verificationContext}${teacherGuideNote}${standardSection}${customRubricSection}`;
 
-  const user = `Analyze this student's work and answer the 8 grading questions (including is_academic_assignment).${opts.promptText ? ` Problem: ${opts.promptText}` : ""}${rubricSection}
+  const user = `Analyze this student's work and answer the 10 grading questions.${opts.promptText ? ` Problem: ${opts.promptText}` : ""}${rubricSection}
 
 ${detailLevel}
 
-Respond with a JSON object matching the required schema. All 8 boolean fields are REQUIRED.`;
+Respond with a JSON object matching the required schema. All 11 boolean fields are REQUIRED (is_academic_assignment + student_work_present + is_relevant_to_question + has_meaningful_content + 7 grading booleans).`;
 
   return { system, user };
 }
@@ -864,7 +919,13 @@ function validateAndNormalizeGrade(
   let adjusted = false;
   let adjustReason = "";
 
-  // BLANK PAGE → floor
+  // ── NOT_ACADEMIC or BLANK PAGE → grade is already 0, pass through as-is ──
+  if (rawGrade <= 0) {
+    console.log(`[GRADE_GUARD] rawGrade=${rawGrade} (NOT_ACADEMIC or blank) → returning 0`);
+    return { grade: 0, regentsScore: 0, adjusted: false, adjustReason: "Not academic or blank → 0" };
+  }
+
+  // BLANK PAGE → floor (if gradeFloor > 0, teacher configured a custom floor)
   if (!studentWorkPresent) {
     return {
       grade: gradeFloor,
@@ -874,7 +935,7 @@ function validateAndNormalizeGrade(
     };
   }
 
-  let grade = Math.max(gradeFloorWithEffort, Math.min(100, rawGrade));
+  let grade = Math.max(25, Math.min(100, rawGrade));
 
   // Correct answer → minimum 88 (anchored at GOOD tier)
   if (isCorrect && !hasMisconceptions) {
@@ -887,13 +948,13 @@ function validateAndNormalizeGrade(
   }
 
   // Cross-check: snap grade to nearest valid anchor value
-  const GRADE_ANCHORS = [97, 93, 88, 83, 75, gradeFloorWithEffort, gradeFloor];
+  const GRADE_ANCHORS = [97, 95, 93, 91, 88, 83, 80, 78, 75, 70, 60, 50, 35, 25].filter((v) => v > 0);
   const regentsBands: Record<number, [number, number]> = {
-    4: [91, 100], // anchors: 93, 97
-    3: [81, 90], // anchors: 83, 88
-    2: [70, 80], // anchor: 75
-    1: [gradeFloorWithEffort, 69], // anchor: gradeFloorWithEffort
-    0: [gradeFloor, gradeFloor],
+    4: [91, 100], // anchors: 97, 95, 93, 91
+    3: [80, 90], // anchors: 88, 83, 80
+    2: [70, 79], // anchors: 78, 75, 70
+    1: [50, 69], // anchors: 60, 50
+    0: [0, 49], // anchors: 35, 25, 0
   };
 
   // Snap grade to nearest anchor value for consistency
@@ -928,7 +989,7 @@ function validateAndNormalizeGrade(
     regentsScore = derivedRegents;
   }
 
-  grade = Math.min(100, Math.max(gradeFloor, grade));
+  grade = Math.min(100, Math.max(0, grade));
 
   if (adjusted) {
     console.log(`[GRADE_GUARD] ${adjustReason}. Final: grade=${grade}, regents=${regentsScore}`);
@@ -987,7 +1048,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 0, 
     problemIdentified = parsed.problem_identified || "";
     nysStandard = parsed.nys_standard || "";
 
-    // ─── EXTRACT 8 BOOLEAN ANSWERS ───
+    // ─── EXTRACT 11 BOOLEAN ANSWERS ───
     const booleans: BooleanAnswers = {
       is_academic_assignment: parsed.is_academic_assignment === true,
       student_work_present: parsed.student_work_present === true,
@@ -998,12 +1059,14 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 0, 
       has_computational_errors: parsed.has_computational_errors === true,
       is_work_organized: parsed.is_work_organized === true,
       has_conceptual_understanding: parsed.has_conceptual_understanding === true,
+      is_relevant_to_question: parsed.is_relevant_to_question === true,
+      has_meaningful_content: parsed.has_meaningful_content === true,
     };
 
     isAnswerCorrect = booleans.is_answer_correct;
 
     console.log(
-      `[BOOL_GRADE] Booleans: academic=${booleans.is_academic_assignment} work=${booleans.student_work_present} correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors} organized=${booleans.is_work_organized} conceptual=${booleans.has_conceptual_understanding}`,
+      `[BOOL_GRADE] Booleans: academic=${booleans.is_academic_assignment} work=${booleans.student_work_present} relevant=${booleans.is_relevant_to_question} meaningful=${booleans.has_meaningful_content} correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors} organized=${booleans.is_work_organized} conceptual=${booleans.has_conceptual_understanding}`,
     );
 
     // ─── COMPUTE GRADE FROM BOOLEANS — 100% deterministic ───
@@ -1472,27 +1535,114 @@ serve(async (req: Request) => {
         userContent.push(formatImageForAI(answerGuideBase64));
       }
 
-      // Use callLovableAI for unified temp=0, seed=42, retry logic, and logging
-      const analysisText = await callLovableAI(
-        [
-          { role: "system", content: sysPrompt },
-          { role: "user", content: userContent },
-        ],
-        OPENAI_API_KEY,
-        "analyze-student-work-ocr",
-        supabase,
-        effectiveTeacherId,
-        "standard",
-        analysisProvider,
-        { temperature: 0, seed: 42 },
+      // ── OCR-ASSISTED CONSENSUS: Call AI 3x with strict schema, majority-vote each boolean ──
+      const OCR_CONSENSUS_SEEDS = [42, 123, 256];
+      interface OCRRoundResult {
+        booleans: BooleanAnswers;
+        result: any;
+        analysisText: string;
+      }
+      const ocrRounds: OCRRoundResult[] = [];
+
+      for (const seed of OCR_CONSENSUS_SEEDS) {
+        console.log(`[OCR_CONSENSUS] seed=${seed}`);
+        const roundText = await callLovableAI(
+          [
+            { role: "system", content: sysPrompt },
+            { role: "user", content: userContent },
+          ],
+          OPENAI_API_KEY,
+          "analyze-student-work-ocr",
+          supabase,
+          effectiveTeacherId,
+          "standard",
+          analysisProvider,
+          { temperature: 0, seed, responseFormat: GRADING_SCHEMA },
+        );
+        if (!roundText) continue;
+        const roundResult = parseAnalysisResult(roundText, rubricSteps, gradeFloor, gradeFloorWithEffort);
+
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(roundText);
+        } catch {
+          /* regex path won't have booleans */
+        }
+
+        const booleans: BooleanAnswers = {
+          is_academic_assignment: parsed?.is_academic_assignment === true,
+          student_work_present: parsed?.student_work_present === true || roundResult.studentWorkPresent,
+          is_answer_correct:
+            parsed?.is_answer_correct === true || parsed?.is_correct === true || roundResult.isAnswerCorrect,
+          is_work_shown: parsed?.is_work_shown === true,
+          is_work_complete: parsed?.is_work_complete === true,
+          is_approach_valid: parsed?.is_approach_valid === true,
+          has_computational_errors: parsed?.has_computational_errors === true,
+          is_work_organized: parsed?.is_work_organized === true,
+          has_conceptual_understanding: parsed?.has_conceptual_understanding === true,
+          is_relevant_to_question: parsed?.is_relevant_to_question === true,
+          has_meaningful_content: parsed?.has_meaningful_content === true,
+        };
+
+        console.log(
+          `[OCR_CONSENSUS] seed=${seed} booleans: academic=${booleans.is_academic_assignment} relevant=${booleans.is_relevant_to_question} meaningful=${booleans.has_meaningful_content} correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors} organized=${booleans.is_work_organized} conceptual=${booleans.has_conceptual_understanding}`,
+        );
+        ocrRounds.push({ booleans, result: roundResult, analysisText: roundText });
+      }
+
+      if (ocrRounds.length === 0) throw new Error("No analysis returned from AI");
+
+      // ── MAJORITY VOTE on each boolean ──
+      const ocrTotalRounds = ocrRounds.length;
+      const ocrMajority = ocrTotalRounds / 2;
+
+      const ocrVotedBooleans: BooleanAnswers = {
+        is_academic_assignment: ocrRounds.filter((r) => r.booleans.is_academic_assignment).length > ocrMajority,
+        student_work_present: ocrRounds.filter((r) => r.booleans.student_work_present).length > ocrMajority,
+        is_answer_correct: ocrRounds.filter((r) => r.booleans.is_answer_correct).length > ocrMajority,
+        is_work_shown: ocrRounds.filter((r) => r.booleans.is_work_shown).length > ocrMajority,
+        is_work_complete: ocrRounds.filter((r) => r.booleans.is_work_complete).length > ocrMajority,
+        is_approach_valid: ocrRounds.filter((r) => r.booleans.is_approach_valid).length > ocrMajority,
+        has_computational_errors: ocrRounds.filter((r) => r.booleans.has_computational_errors).length > ocrMajority,
+        is_work_organized: ocrRounds.filter((r) => r.booleans.is_work_organized).length > ocrMajority,
+        has_conceptual_understanding:
+          ocrRounds.filter((r) => r.booleans.has_conceptual_understanding).length > ocrMajority,
+        is_relevant_to_question: ocrRounds.filter((r) => r.booleans.is_relevant_to_question).length > ocrMajority,
+        has_meaningful_content: ocrRounds.filter((r) => r.booleans.has_meaningful_content).length > ocrMajority,
+      };
+
+      console.log(
+        `[OCR_CONSENSUS] Voted booleans: academic=${ocrVotedBooleans.is_academic_assignment} relevant=${ocrVotedBooleans.is_relevant_to_question} meaningful=${ocrVotedBooleans.has_meaningful_content} correct=${ocrVotedBooleans.is_answer_correct} shown=${ocrVotedBooleans.is_work_shown} complete=${ocrVotedBooleans.is_work_complete} valid=${ocrVotedBooleans.is_approach_valid} comp_err=${ocrVotedBooleans.has_computational_errors} organized=${ocrVotedBooleans.is_work_organized} conceptual=${ocrVotedBooleans.has_conceptual_understanding}`,
       );
 
-      if (!analysisText) throw new Error("No analysis returned from AI");
+      // ── COMPUTE FINAL GRADE from voted booleans ──
+      const ocrFinalResult = computeGradeFromBooleans(ocrVotedBooleans, gradeFloor, gradeFloorWithEffort);
+      const ocrFinalGrade = ocrFinalResult.grade;
+      console.log(
+        `[OCR_CONSENSUS] Computed: tier="${ocrFinalResult.tier}" grade=${ocrFinalGrade} regents=${ocrFinalResult.regentsScore}`,
+      );
 
-      const result = parseAnalysisResult(analysisText, rubricSteps, gradeFloor, gradeFloorWithEffort);
+      // Pick best analysis text
+      const ocrChosen =
+        ocrRounds.find((r) => r.booleans.is_answer_correct === ocrVotedBooleans.is_answer_correct) || ocrRounds[0];
+      const result = ocrChosen.result;
 
-      // Override OCR text with the pre-extracted version (more reliable)
+      // Override with consensus values
       result.ocrText = preExtractedOCR;
+      result.grade = ocrFinalGrade;
+      result.isAnswerCorrect = ocrVotedBooleans.is_answer_correct;
+      result.regentsScore = ocrFinalResult.regentsScore;
+      result.consensusGrades = ocrRounds.map(
+        (r) => computeGradeFromBooleans(r.booleans, gradeFloor, gradeFloorWithEffort).grade,
+      );
+      result.consensusSpread = Math.max(...result.consensusGrades) - Math.min(...result.consensusGrades);
+      result.consensusMethod = "boolean_majority_vote";
+      result.consensusRounds = ocrTotalRounds;
+      result.consensusTier = ocrFinalResult.tier;
+
+      console.log(
+        `[OCR_CONSENSUS] FINAL grade=${ocrFinalGrade} tier=${ocrFinalResult.tier} spread=${result.consensusSpread} rounds=${ocrTotalRounds}`,
+      );
 
       // Handle blank page
       if (!result.studentWorkPresent && blankPageSettings?.enabled) {
@@ -1507,9 +1657,10 @@ serve(async (req: Request) => {
         JSON.stringify({
           success: true,
           analysis: result,
-          rawAnalysis: analysisText,
+          rawAnalysis: ocrChosen.analysisText,
           blankPageDetected: !result.studentWorkPresent,
           ocrSource: "google-vision-assisted",
+          consensusSpread: result.consensusSpread,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -1592,10 +1743,12 @@ serve(async (req: Request) => {
         has_computational_errors: parsed?.has_computational_errors === true,
         is_work_organized: parsed?.is_work_organized === true,
         has_conceptual_understanding: parsed?.has_conceptual_understanding === true,
+        is_relevant_to_question: parsed?.is_relevant_to_question === true,
+        has_meaningful_content: parsed?.has_meaningful_content === true,
       };
 
       console.log(
-        `[CONSENSUS] seed=${seed} booleans: academic=${booleans.is_academic_assignment} correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors} organized=${booleans.is_work_organized} conceptual=${booleans.has_conceptual_understanding}`,
+        `[CONSENSUS] seed=${seed} booleans: academic=${booleans.is_academic_assignment} relevant=${booleans.is_relevant_to_question} meaningful=${booleans.has_meaningful_content} correct=${booleans.is_answer_correct} shown=${booleans.is_work_shown} complete=${booleans.is_work_complete} valid=${booleans.is_approach_valid} comp_err=${booleans.has_computational_errors} organized=${booleans.is_work_organized} conceptual=${booleans.has_conceptual_understanding}`,
       );
       consensusRounds.push({ booleans, result: roundResult, analysisText: roundText });
     }
@@ -1619,10 +1772,14 @@ serve(async (req: Request) => {
       is_work_organized: consensusRounds.filter((r) => r.booleans.is_work_organized).length > majorityThreshold,
       has_conceptual_understanding:
         consensusRounds.filter((r) => r.booleans.has_conceptual_understanding).length > majorityThreshold,
+      is_relevant_to_question:
+        consensusRounds.filter((r) => r.booleans.is_relevant_to_question).length > majorityThreshold,
+      has_meaningful_content:
+        consensusRounds.filter((r) => r.booleans.has_meaningful_content).length > majorityThreshold,
     };
 
     console.log(
-      `[CONSENSUS] Voted booleans: academic=${votedBooleans.is_academic_assignment} work=${votedBooleans.student_work_present} correct=${votedBooleans.is_answer_correct} shown=${votedBooleans.is_work_shown} complete=${votedBooleans.is_work_complete} valid=${votedBooleans.is_approach_valid} comp_err=${votedBooleans.has_computational_errors} organized=${votedBooleans.is_work_organized} conceptual=${votedBooleans.has_conceptual_understanding}`,
+      `[CONSENSUS] Voted booleans: academic=${votedBooleans.is_academic_assignment} relevant=${votedBooleans.is_relevant_to_question} meaningful=${votedBooleans.has_meaningful_content} correct=${votedBooleans.is_answer_correct} shown=${votedBooleans.is_work_shown} complete=${votedBooleans.is_work_complete} valid=${votedBooleans.is_approach_valid} comp_err=${votedBooleans.has_computational_errors} organized=${votedBooleans.is_work_organized} conceptual=${votedBooleans.has_conceptual_understanding}`,
     );
 
     // ── COMPUTE FINAL GRADE from voted booleans — 100% deterministic ──
