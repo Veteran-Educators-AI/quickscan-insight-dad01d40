@@ -2143,6 +2143,104 @@ export type Database = {
           },
         ]
       }
+      student_activity_feed: {
+        Row: {
+          activity_type: string
+          created_at: string
+          description: string | null
+          id: string
+          is_read: boolean
+          metadata: Json | null
+          student_id: string
+          title: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_read?: boolean
+          metadata?: Json | null
+          student_id: string
+          title: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_read?: boolean
+          metadata?: Json | null
+          student_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_activity_feed_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_assignment_submissions: {
+        Row: {
+          answers: Json
+          assignment_id: string
+          created_at: string
+          graded_at: string | null
+          id: string
+          score: number | null
+          started_at: string | null
+          status: string
+          student_id: string
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          answers?: Json
+          assignment_id: string
+          created_at?: string
+          graded_at?: string | null
+          id?: string
+          score?: number | null
+          started_at?: string | null
+          status?: string
+          student_id: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          answers?: Json
+          assignment_id?: string
+          created_at?: string
+          graded_at?: string | null
+          id?: string
+          score?: number | null
+          started_at?: string | null
+          status?: string
+          student_id?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_assignment_submissions_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "shared_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_assignment_submissions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_magic_links: {
         Row: {
           class_id: string
@@ -2177,6 +2275,117 @@ export type Database = {
             columns: ["class_id"]
             isOneToOne: false
             referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_rewards: {
+        Row: {
+          coin_cost: number | null
+          earned_at: string
+          id: string
+          reward_data: Json | null
+          reward_name: string
+          reward_type: string
+          student_id: string
+        }
+        Insert: {
+          coin_cost?: number | null
+          earned_at?: string
+          id?: string
+          reward_data?: Json | null
+          reward_name: string
+          reward_type: string
+          student_id: string
+        }
+        Update: {
+          coin_cost?: number | null
+          earned_at?: string
+          id?: string
+          reward_data?: Json | null
+          reward_name?: string
+          reward_type?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_rewards_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_xp_ledger: {
+        Row: {
+          coin_change: number
+          created_at: string
+          id: string
+          reason: string
+          reference_id: string | null
+          source: string
+          student_id: string
+          xp_change: number
+        }
+        Insert: {
+          coin_change?: number
+          created_at?: string
+          id?: string
+          reason: string
+          reference_id?: string | null
+          source?: string
+          student_id: string
+          xp_change?: number
+        }
+        Update: {
+          coin_change?: number
+          created_at?: string
+          id?: string
+          reason?: string
+          reference_id?: string | null
+          source?: string
+          student_id?: string
+          xp_change?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_xp_ledger_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_xp_summary: {
+        Row: {
+          current_level: number
+          student_id: string
+          total_coins: number
+          total_xp: number
+          updated_at: string
+        }
+        Insert: {
+          current_level?: number
+          student_id: string
+          total_coins?: number
+          total_xp?: number
+          updated_at?: string
+        }
+        Update: {
+          current_level?: number
+          student_id?: string
+          total_coins?: number
+          total_xp?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_xp_summary_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
