@@ -394,11 +394,65 @@ serve(async (req) => {
       }
       result.action = "live_session_notifications_sent";
 
+    } else if (requestData.type === "assignment_push") {
+      // Dedicated assignment push → insert into Scholar's assignments + questions tables
+      const { data: assignment, error: assignError } = await scholar
+        .from("assignments")
+        .insert({
+          class_id: requestData.class_id,
+          title: requestData.title,
+          description: requestData.description,
+          subject: requestData.topic_name || "General",
+          status: "active",
+          xp_reward: requestData.xp_reward || 100,
+          coin_reward: requestData.coin_reward || 50,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (assignError) {
+        console.error("assignments insert error:", assignError.message);
+        throw assignError;
+      }
+
+      // Insert questions linked to the assignment
+      if (requestData.questions?.length && assignment?.id) {
+        const questionRows = requestData.questions.map((q: any, i: number) => ({
+          assignment_id: assignment.id,
+          question_type: q.type || "multiple_choice",
+          prompt: q.question || q.prompt || q.text || JSON.stringify(q),
+          options: q.options || q.choices || [],
+          answer_key: q.answer || q.correct_answer || q.answer_key || null,
+          hint: q.hint || null,
+          difficulty: requestData.difficulty_level || q.difficulty || null,
+          order_index: i,
+          skill_tag: q.skill_tag || q.topic || requestData.topic_name || null,
+        }));
+
+        const { error: qErr } = await scholar
+          .from("questions")
+          .insert(questionRows);
+
+        if (qErr) console.error("questions insert error:", qErr.message);
+      }
+
+      result.assignment_id = assignment?.id;
+      result.action = "assignment_push";
+
+      if (scholarUserId) {
+        await sendScholarNotification(scholar, scholarUserId, requestData, "assignment");
+      }
+
+      // Email notification
+      await sendEmailNotification(requestData);
+
     } else {
-      // Grade / assignment push → create practice set + notification
+      // Grade push → create practice set + notification
       const practiceSetId = await createPracticeSet(scholar, scholarUserId, requestData);
       result.practice_set_id = practiceSetId;
-      result.action = requestData.type === "assignment_push" ? "assignment_push" : "grade_pushed";
+      result.action = "grade_pushed";
 
       if (scholarUserId) {
         await sendScholarNotification(scholar, scholarUserId, requestData, "assignment");
