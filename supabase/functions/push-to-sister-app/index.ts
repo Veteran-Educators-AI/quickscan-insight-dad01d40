@@ -186,7 +186,7 @@ async function createPracticeSet(
       description: req.description || null,
       source: req.source || "nycologic_ai",
       external_ref: req.student_id,
-      status: "assigned",
+      status: req.type === "assignment_push" ? "assigned" : "graded",
       score: req.grade ?? null,
       total_questions: req.questions?.length ?? 0,
       skill_tags: req.skill_tags || [],
@@ -398,7 +398,7 @@ serve(async (req) => {
       // Grade / assignment push → create practice set + notification
       const practiceSetId = await createPracticeSet(scholar, scholarUserId, requestData);
       result.practice_set_id = practiceSetId;
-      result.action = "grade_pushed";
+      result.action = requestData.type === "assignment_push" ? "assignment_push" : "grade_pushed";
 
       if (scholarUserId) {
         await sendScholarNotification(scholar, scholarUserId, requestData, "assignment");
