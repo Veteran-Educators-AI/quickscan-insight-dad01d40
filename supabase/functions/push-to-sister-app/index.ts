@@ -1,75 +1,88 @@
 /**
  * ============================================================================
- * PUSH TO SISTER APP EDGE FUNCTION
+ * PUSH TO SISTER APP — DIRECT DATABASE WRITE
  * ============================================================================
- * 
- * This function sends student grade data to the connected sister app (NYClogic Scholar Ai).
- * 
- * NOTE: For direct database sync, use the shared_assignments table instead.
- * This function is kept for backwards compatibility with external API integrations.
- * 
+ *
+ * Writes student data directly to the Scholar Ai database using a secondary
+ * Supabase client. Replaces the old webhook-based sync.
+ *
  * REQUIRED SECRETS:
- * - SISTER_APP_API_KEY: The API key for authenticating with the sister app
- * - NYCOLOGIC_API_URL: The endpoint URL of the sister app (e.g., https://app.nycologic.com/api/receive)
- * 
- * DATA FLOW:
- * 1. NYCLogic Ai analyzes student work and calculates a grade
- * 2. If sister app sync is enabled, this function is called
- * 3. Grade data is converted to XP/coins using configured multipliers
- * 4. Data is pushed to the sister app for gamification rewards
- * 
+ *   SCHOLAR_SUPABASE_URL          – Scholar project URL
+ *   SCHOLAR_SUPABASE_SERVICE_ROLE_KEY – Scholar service-role key
+ *   BREVO_API_KEY                 – (optional) for email notifications
+ *
+ * SCHOLAR TABLES WRITTEN:
+ *   external_students   – upserted on every push (student roster data)
+ *   practice_sets       – one row per assignment / graded scan
+ *   practice_questions  – one row per question inside a practice set
+ *   notifications       – student-facing notifications
+ *
  * ============================================================================
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CORS headers required for browser requests
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
-/**
- * Interface for the data being pushed to the sister app
- * Contains class info, assignment details, and student grade data
- */
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 interface PushRequest {
-  type?: 'ping' | 'grade' | 'behavior' | 'student_created' | 'student_updated' | 'roster_sync' | 'live_session_completed' | 'assignment_push';   // Request type
-  source?: 'scan_genius' | 'scan_analysis' | 'assignment_push' | 'tutorial_push';  // Source identifier for sister app
-  class_id?: string;         // The class this data belongs to
-  class_name?: string;       // The class name
-  title?: string;            // Assignment or activity title
-  description?: string;       // Optional description
-  due_at?: string;           // Optional due date
-  standard_code?: string;    // Optional learning standard code
-  xp_reward?: number;        // XP reward calculated from grade
-  coin_reward?: number;      // Coin reward calculated from grade
-  printable_url?: string;    // Optional link to printable worksheet
-  // Student-specific fields for individual grade pushes
-  student_id?: string;       // The student's ID
-  student_name?: string;     // The student's name
-  student_email?: string;    // The student's email
-  first_name?: string;       // Student first name
-  last_name?: string;        // Student last name
-  grade?: number;            // The grade (0-100)
-  topic_name?: string;       // The topic/subject of the work
-  questions?: any[];         // Generated remediation or mastery challenge questions
-  remediation_recommendations?: string[];  // Recommended topics for remediation
-  difficulty_level?: string;  // A, B, C, D, E, or F difficulty
-  // Behavior deduction fields
-  xp_deduction?: number;     // XP to remove for behavior
-  coin_deduction?: number;   // Coins to remove for behavior
-  reason?: string;           // Reason for deduction
-  notes?: string;            // Additional notes
-  // Live session fields
-  session_code?: string;           // Session join code
-  participation_mode?: string;     // 'individual' or 'pairs'
+  type?:
+    | "ping"
+    | "grade"
+    | "behavior"
+    | "student_created"
+    | "student_updated"
+    | "roster_sync"
+    | "live_session_completed"
+    | "assignment_push";
+  source?: "scan_genius" | "scan_analysis" | "assignment_push" | "tutorial_push";
+  class_id?: string;
+  class_name?: string;
+  title?: string;
+  description?: string;
+  due_at?: string;
+  standard_code?: string;
+  xp_reward?: number;
+  coin_reward?: number;
+  printable_url?: string;
+  student_id?: string;
+  student_name?: string;
+  student_email?: string;
+  first_name?: string;
+  last_name?: string;
+  grade?: number;
+  topic_name?: string;
+  questions?: any[];
+  remediation_recommendations?: string[];
+  difficulty_level?: string;
+  // Behavior
+  xp_deduction?: number;
+  coin_deduction?: number;
+  reason?: string;
+  notes?: string;
+  // Live session
+  session_code?: string;
+  participation_mode?: string;
   credit_for_participation?: number;
   deduction_for_non_participation?: number;
   total_participants?: number;
   active_participants?: number;
   participant_results?: ParticipantResult[];
+  // Extra student data for external_students
+  overall_average?: number;
+  grades?: Record<string, any>;
+  misconceptions?: Record<string, any>;
+  weak_topics?: Record<string, any>;
+  skill_tags?: string[];
+  teacher_name?: string;
 }
 
 interface ParticipantResult {
@@ -87,402 +100,327 @@ interface ParticipantResult {
   }[];
 }
 
-/**
- * Convert internal push request to sister app expected format for grades
- * The receiving endpoint expects 'action' field, not 'type'
- */
-function convertToSisterAppFormat(requestData: PushRequest) {
-  // Determine activity type/source - 'assignment_push' for pushed assignments, 'scan_analysis' for scanned work
-  const activityType = requestData.source || 
-    (requestData.type === 'assignment_push' ? 'scan_genius' : 'scan_analysis');
-  
-  return {
-    action: 'grade_completed' as const,
-    student_id: requestData.student_id,
-    data: {
-      source: activityType,  // Proper source identifier for sister app
-      activity_type: activityType,
-      activity_name: requestData.title,
-      score: requestData.grade,
-      xp_earned: requestData.xp_reward,
-      coins_earned: requestData.coin_reward,
-      topic_name: requestData.topic_name,
-      description: requestData.description,
-      standard_code: requestData.standard_code,
-      class_id: requestData.class_id,
-      class_name: requestData.class_name,
-      student_name: requestData.student_name,
-      student_email: requestData.student_email,
-      printable_url: requestData.printable_url,
-      due_at: requestData.due_at,
-      questions: requestData.questions || [], // Include generated questions
-      remediation_recommendations: requestData.remediation_recommendations || [], // Topics to practice
-      difficulty_level: requestData.difficulty_level,
-      timestamp: new Date().toISOString(),
-    }
-  };
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Build a Scholar Supabase client (service-role, bypasses RLS). */
+function getScholarClient() {
+  const url = Deno.env.get("SCHOLAR_SUPABASE_URL");
+  const key = Deno.env.get("SCHOLAR_SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) throw new Error("Scholar DB secrets not configured");
+  return createClient(url, key);
 }
 
-/**
- * Convert behavior deduction request to sister app format
- * Uses negative values for XP/coins to indicate deduction
- */
-function convertToBehaviorFormat(requestData: PushRequest) {
-  return {
-    action: 'behavior_deduction' as const,
-    student_id: requestData.student_id,
-    data: {
-      activity_type: 'behavior_consequence',
-      activity_name: `Behavior: ${requestData.reason}`,
-      xp_deducted: requestData.xp_deduction || 0,
-      coins_deducted: requestData.coin_deduction || 0,
-      // Also send as negative earned values for backward compatibility
-      xp_earned: -(requestData.xp_deduction || 0),
-      coins_earned: -(requestData.coin_deduction || 0),
-      reason: requestData.reason,
-      notes: requestData.notes,
-      class_id: requestData.class_id,
-      student_name: requestData.student_name,
-      timestamp: new Date().toISOString(),
-    }
+/** Upsert the student into Scholar's external_students table. Returns the row id. */
+async function upsertExternalStudent(
+  scholar: ReturnType<typeof createClient>,
+  req: PushRequest
+): Promise<string | null> {
+  if (!req.student_id) return null;
+
+  const row: Record<string, unknown> = {
+    external_id: req.student_id,
+    full_name: req.student_name || `${req.first_name || ""} ${req.last_name || ""}`.trim(),
+    first_name: req.first_name || req.student_name?.split(" ")[0] || null,
+    last_name: req.last_name || req.student_name?.split(" ").slice(1).join(" ") || null,
+    email: req.student_email || null,
+    class_id: req.class_id || null,
+    class_name: req.class_name || null,
+    source: "nycologic_ai",
+    sync_timestamp: new Date().toISOString(),
   };
+
+  // Optional enrichment fields
+  if (req.teacher_name) row.teacher_name = req.teacher_name;
+  if (req.overall_average !== undefined) row.overall_average = req.overall_average;
+  if (req.grades) row.grades = req.grades;
+  if (req.misconceptions) row.misconceptions = req.misconceptions;
+  if (req.weak_topics) row.weak_topics = req.weak_topics;
+  if (req.remediation_recommendations)
+    row.remediation_recommendations = req.remediation_recommendations;
+  if (req.skill_tags) row.skill_tags = req.skill_tags;
+  if (req.xp_reward !== undefined) row.xp_potential = req.xp_reward;
+  if (req.coin_reward !== undefined) row.coin_potential = req.coin_reward;
+
+  const { data, error } = await scholar
+    .from("external_students")
+    .upsert(row, { onConflict: "external_id" })
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("external_students upsert error:", error.message);
+    return null;
+  }
+  return data?.id ?? null;
 }
 
-/**
- * Convert student creation request to sister app format
- * Sends new student info to sync roster with sister app
- */
-function convertToStudentCreatedFormat(requestData: PushRequest) {
-  return {
-    action: 'student_created' as const,
-    student_id: requestData.student_id,
-    data: {
-      student_id: requestData.student_id, // Also include in data object for API compatibility
-      first_name: requestData.first_name,
-      last_name: requestData.last_name,
-      student_name: requestData.student_name,
-      email: requestData.student_email,
-      class_id: requestData.class_id,
-      class_name: requestData.class_name,
-      timestamp: new Date().toISOString(),
-    }
-  };
+/** Create a practice set + questions on Scholar. */
+async function createPracticeSet(
+  scholar: ReturnType<typeof createClient>,
+  scholarStudentId: string | null,
+  req: PushRequest
+) {
+  // If we don't have a linked Scholar user, look it up
+  let studentUserId = scholarStudentId;
+  if (!studentUserId && req.student_id) {
+    const { data } = await scholar
+      .from("external_students")
+      .select("linked_user_id")
+      .eq("external_id", req.student_id)
+      .maybeSingle();
+    studentUserId = data?.linked_user_id ?? null;
+  }
+
+  if (!studentUserId) {
+    console.log("No linked Scholar user found — skipping practice_set creation");
+    return null;
+  }
+
+  const { data: ps, error: psErr } = await scholar
+    .from("practice_sets")
+    .insert({
+      student_id: studentUserId,
+      title: req.title || req.topic_name || "Assignment",
+      description: req.description || null,
+      source: req.source || "nycologic_ai",
+      external_ref: req.student_id,
+      status: "assigned",
+      score: req.grade ?? null,
+      total_questions: req.questions?.length ?? 0,
+      skill_tags: req.skill_tags || [],
+      xp_reward: req.xp_reward ?? 0,
+      coin_reward: req.coin_reward ?? 0,
+    })
+    .select("id")
+    .single();
+
+  if (psErr) {
+    console.error("practice_sets insert error:", psErr.message);
+    return null;
+  }
+
+  // Insert practice questions
+  if (req.questions?.length && ps?.id) {
+    const questionRows = req.questions.map((q: any, i: number) => ({
+      practice_set_id: ps.id,
+      prompt: q.question || q.prompt || q.text || JSON.stringify(q),
+      question_type: q.type || "multiple_choice",
+      options: q.options || q.choices || [],
+      answer_key: q.answer || q.correct_answer || q.answer_key || null,
+      hint: q.hint || null,
+      difficulty: req.difficulty_level || q.difficulty || null,
+      order_index: i,
+      skill_tag: q.skill_tag || q.topic || req.topic_name || null,
+    }));
+
+    const { error: qErr } = await scholar
+      .from("practice_questions")
+      .insert(questionRows);
+
+    if (qErr) console.error("practice_questions insert error:", qErr.message);
+  }
+
+  return ps?.id ?? null;
 }
 
-/**
- * Convert student update request to sister app format
- * Sends updated student info to sync roster with sister app
- */
-function convertToStudentUpdatedFormat(requestData: PushRequest) {
-  return {
-    action: 'student_updated' as const,
-    student_id: requestData.student_id,
+/** Send a notification to the student inside Scholar. */
+async function sendScholarNotification(
+  scholar: ReturnType<typeof createClient>,
+  userId: string,
+  req: PushRequest,
+  type: string
+) {
+  const { error } = await scholar.from("notifications").insert({
+    user_id: userId,
+    type,
+    title: req.title || "Update from NYCLogic Ai",
+    message: req.description || `You have a new ${type} update.`,
+    icon: type === "assignment" ? "📚" : type === "behavior" ? "⚠️" : "🔔",
     data: {
-      student_id: requestData.student_id, // Also include in data object for API compatibility
-      first_name: requestData.first_name,
-      last_name: requestData.last_name,
-      student_name: requestData.student_name,
-      email: requestData.student_email,
-      class_id: requestData.class_id,
-      class_name: requestData.class_name,
-      timestamp: new Date().toISOString(),
-    }
-  };
+      source: "nycologic_ai",
+      class_name: req.class_name,
+      xp_reward: req.xp_reward,
+      coin_reward: req.coin_reward,
+      grade: req.grade,
+    },
+    read: false,
+  });
+  if (error) console.error("notifications insert error:", error.message);
 }
 
-/**
- * Convert live session completed request to sister app format
- * Sends full participation and answer data for all students
- */
-function convertToLiveSessionFormat(requestData: PushRequest) {
-  return {
-    action: 'live_session_completed' as const,
-    data: {
-      activity_type: 'live_presentation',
-      activity_name: requestData.title,
-      topic_name: requestData.topic_name,
-      description: requestData.description,
-      class_id: requestData.class_id,
-      session_code: requestData.session_code,
-      participation_mode: requestData.participation_mode,
-      credit_for_participation: requestData.credit_for_participation,
-      deduction_for_non_participation: requestData.deduction_for_non_participation,
-      total_participants: requestData.total_participants,
-      active_participants: requestData.active_participants,
-      participant_results: requestData.participant_results || [],
-      timestamp: new Date().toISOString(),
-    }
-  };
+/** Send email notification via Brevo (non-fatal). */
+async function sendEmailNotification(req: PushRequest) {
+  if (!req.student_email || !req.title || req.type === "ping") return;
+  const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+  if (!brevoApiKey) return;
+
+  try {
+    const studentFirstName =
+      req.first_name || req.student_name?.split(" ")[0] || "Student";
+    const questionsCount = req.questions?.length || 0;
+    const questionsSection =
+      questionsCount > 0
+        ? `<p style="color:#555;font-size:14px;">This assignment includes <strong>${questionsCount} question${questionsCount !== 1 ? "s" : ""}</strong> for you to complete.</p>`
+        : "";
+
+    const emailHtml = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+        <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:20px;border-radius:12px 12px 0 0;text-align:center;">
+          <h1 style="color:white;margin:0;font-size:22px;">📚 New Assignment</h1>
+        </div>
+        <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;">
+          <p style="color:#333;font-size:16px;">Hi ${studentFirstName},</p>
+          <p style="color:#555;font-size:14px;">You have a new assignment on <strong>NYCLogic Scholar AI</strong>:</p>
+          <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
+            <h2 style="color:#6366f1;margin:0 0 8px 0;font-size:18px;">${req.title}</h2>
+            <p style="color:#666;margin:0;font-size:14px;">Topic: ${req.topic_name || req.title}</p>
+            ${req.xp_reward ? `<p style="color:#059669;margin:8px 0 0 0;font-size:14px;">🎯 Earn up to <strong>${req.xp_reward} XP</strong> and <strong>${req.coin_reward || 0} Coins</strong></p>` : ""}
+          </div>
+          ${questionsSection}
+          <p style="color:#555;font-size:14px;">Open the <strong>Scholar App</strong> to get started. Good luck! 💪</p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
+          <p style="color:#999;font-size:12px;text-align:center;">NYCLogic Ai — Empowering Student Success</p>
+        </div>
+      </div>`;
+
+    await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "api-key": brevoApiKey,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: { name: "NYCLogic Ai", email: "notifications@nyclogic.ai" },
+        to: [{ email: req.student_email, name: req.student_name || studentFirstName }],
+        subject: `📚 New Assignment: ${req.title}`,
+        htmlContent: emailHtml,
+      }),
+    });
+    console.log("Email sent to", req.student_email);
+  } catch (e) {
+    console.error("Email error (non-fatal):", e);
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Main handler
+// ---------------------------------------------------------------------------
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // ========================================================================
-    // RETRIEVE REQUIRED SECRETS
-    // ========================================================================
-    // Get the API key for authenticating with the sister app
-    const sisterAppApiKey = Deno.env.get('SISTER_APP_API_KEY');
-    // Get the sister app endpoint URL from secrets (configurable per deployment)
-    const sisterAppEndpoint = Deno.env.get('NYCOLOGIC_API_URL');
-    
-    // Validate that the API key is configured
-    if (!sisterAppApiKey) {
-      console.error('SISTER_APP_API_KEY not configured');
-      return new Response(
-        JSON.stringify({ success: false, error: 'Sister app API key not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate that the endpoint URL is configured
-    if (!sisterAppEndpoint) {
-      console.error('NYCOLOGIC_API_URL not configured');
-      return new Response(
-        JSON.stringify({ success: false, error: 'Sister app endpoint URL not configured. Please add NYCOLOGIC_API_URL secret.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ========================================================================
-    // PARSE AND VALIDATE REQUEST DATA
-    // ========================================================================
     const requestData: PushRequest = await req.json();
-    
-    console.log('Received request:', JSON.stringify(requestData));
-    console.log('Endpoint:', sisterAppEndpoint);
+    console.log("push-to-sister-app received:", JSON.stringify(requestData));
 
-    // ========================================================================
-    // HANDLE PING/TEST REQUESTS LOCALLY
-    // ========================================================================
-    // For connection tests, we just verify that secrets are configured
-    // and return success without hitting the sister app
-    if (requestData.type === 'ping') {
-      console.log('Ping request - verifying configuration');
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'Connection configured correctly',
-          endpoint: sisterAppEndpoint 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ========================================================================
-    // HELPER: Send a payload to the sister app with timeout
-    // ========================================================================
-    async function sendToSisterApp(payload: any): Promise<{ ok: boolean; status: number; body: string }> {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 15000);
+    // --- Ping: verify secrets are configured ---
+    if (requestData.type === "ping") {
       try {
-        const res = await fetch(sisterAppEndpoint!, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': sisterAppApiKey!,
-          },
-          body: JSON.stringify(payload),
-          signal: ctrl.signal,
-        });
-        clearTimeout(tid);
-        const text = await res.text();
-        return { ok: res.ok, status: res.status, body: text };
-      } catch (fetchError) {
-        clearTimeout(tid);
-        const isTimeout = fetchError instanceof DOMException && fetchError.name === 'AbortError';
-        const errorMsg = isTimeout 
-          ? 'Sister app request timed out after 15 seconds'
-          : `Network error: ${fetchError instanceof Error ? fetchError.message : 'Unknown'}`;
-        return { ok: false, status: 0, body: errorMsg };
+        getScholarClient();
+        return new Response(
+          JSON.stringify({ success: true, message: "Scholar DB connection configured" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ success: false, error: (e as Error).message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
     }
 
-    // ========================================================================
-    // SEND DATA TO SISTER APP
-    // ========================================================================
-    let sisterAppPayload;
-    
-    if (requestData.type === 'behavior') {
-      console.log('Processing behavior deduction request');
-      sisterAppPayload = convertToBehaviorFormat(requestData);
-    } else if (requestData.type === 'student_created' || requestData.type === 'roster_sync') {
-      console.log('Processing student creation/roster sync request');
-      sisterAppPayload = convertToStudentCreatedFormat(requestData);
-    } else if (requestData.type === 'student_updated') {
-      console.log('Processing student update request');
-      sisterAppPayload = convertToStudentUpdatedFormat(requestData);
-    } else if (requestData.type === 'live_session_completed') {
-      console.log('Processing live session completed request');
-      sisterAppPayload = convertToLiveSessionFormat(requestData);
+    const scholar = getScholarClient();
+
+    // --- Always upsert external_students ---
+    const externalStudentId = await upsertExternalStudent(scholar, requestData);
+    console.log("Upserted external_student, id:", externalStudentId);
+
+    // Resolve the Scholar user_id for notifications / practice sets
+    let scholarUserId: string | null = null;
+    if (requestData.student_id) {
+      const { data } = await scholar
+        .from("external_students")
+        .select("linked_user_id")
+        .eq("external_id", requestData.student_id)
+        .maybeSingle();
+      scholarUserId = data?.linked_user_id ?? null;
+    }
+
+    // --- Route by type ---
+    let result: Record<string, unknown> = { external_student_id: externalStudentId };
+
+    if (requestData.type === "behavior") {
+      // Behavior deduction → notification only
+      if (scholarUserId) {
+        await sendScholarNotification(scholar, scholarUserId, {
+          ...requestData,
+          title: `Behavior: ${requestData.reason}`,
+          description: `XP −${requestData.xp_deduction || 0}, Coins −${requestData.coin_deduction || 0}. ${requestData.notes || ""}`,
+        }, "behavior");
+      }
+      result.action = "behavior_notification_sent";
+
+    } else if (
+      requestData.type === "student_created" ||
+      requestData.type === "roster_sync" ||
+      requestData.type === "student_updated"
+    ) {
+      // Student roster sync — already handled by upsertExternalStudent above
+      result.action = "student_synced";
+
+    } else if (requestData.type === "live_session_completed") {
+      // Live session → create notifications for each participant
+      if (requestData.participant_results?.length) {
+        for (const p of requestData.participant_results) {
+          const { data: ext } = await scholar
+            .from("external_students")
+            .select("linked_user_id")
+            .eq("external_id", p.student_id)
+            .maybeSingle();
+          if (ext?.linked_user_id) {
+            await sendScholarNotification(scholar, ext.linked_user_id, {
+              ...requestData,
+              title: `Live Session: ${requestData.title}`,
+              description: `You answered ${p.correct_answers}/${p.total_questions_answered} correctly. Credit: ${p.credit_awarded}`,
+              xp_reward: p.credit_awarded,
+            }, "live_session");
+          }
+        }
+      }
+      result.action = "live_session_notifications_sent";
+
     } else {
-      // For grade/assignment pushes, auto-create student first and use the Scholar app's user ID
-      let scholarStudentId: string | null = null;
-      if (requestData.student_id && (requestData.student_name || requestData.first_name)) {
-        console.log('Auto-creating student on Scholar before pushing grade...');
-        const studentPayload = convertToStudentCreatedFormat(requestData);
-        const createResult = await sendToSisterApp(studentPayload);
-        console.log('Student creation result:', createResult.status, createResult.body);
-        
-        // Extract the Scholar app's linked_user_id from the response
-        if (createResult.ok) {
-          try {
-            const createData = JSON.parse(createResult.body);
-            scholarStudentId = createData.linked_user_id || createData.user_id || null;
-            if (scholarStudentId) {
-              console.log('Scholar app returned linked_user_id:', scholarStudentId);
-            }
-          } catch { /* ignore parse errors */ }
-        }
-        await new Promise(resolve => setTimeout(resolve, 500));
+      // Grade / assignment push → create practice set + notification
+      const practiceSetId = await createPracticeSet(scholar, scholarUserId, requestData);
+      result.practice_set_id = practiceSetId;
+      result.action = "grade_pushed";
+
+      if (scholarUserId) {
+        await sendScholarNotification(scholar, scholarUserId, requestData, "assignment");
       }
-      sisterAppPayload = convertToSisterAppFormat(requestData);
-      // Use the Scholar app's user ID instead of our local student ID
-      if (scholarStudentId) {
-        sisterAppPayload.student_id = scholarStudentId;
-      }
-    }
-    
-    console.log('Sending payload to sister app:', JSON.stringify(sisterAppPayload));
-    
-    let result = await sendToSisterApp(sisterAppPayload);
 
-    // If we get a 404 (Student not found) for grade pushes, retry with Scholar's user ID
-    if (!result.ok && result.status === 404 && requestData.student_id) {
-      console.log('Got 404, retrying after student creation...');
-      const studentPayload = convertToStudentCreatedFormat(requestData);
-      const retryCreate = await sendToSisterApp(studentPayload);
-      // Try to extract linked_user_id from retry creation
-      if (retryCreate.ok) {
-        try {
-          const retryData = JSON.parse(retryCreate.body);
-          const retryScholarId = retryData.linked_user_id || retryData.user_id || null;
-          if (retryScholarId) {
-            console.log('Retry: using Scholar linked_user_id:', retryScholarId);
-            sisterAppPayload.student_id = retryScholarId;
-          }
-        } catch { /* ignore */ }
-      }
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      result = await sendToSisterApp(sisterAppPayload);
-      console.log('Retry result:', result.status, result.body);
+      // Email notification
+      await sendEmailNotification(requestData);
     }
 
-    // Handle network errors
-    if (result.status === 0) {
-      return new Response(
-        JSON.stringify({ success: false, error: result.body, retriable: true }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ========================================================================
-    // HANDLE SISTER APP RESPONSE
-    // ========================================================================
-    if (!result.ok) {
-      console.error('Sister app error:', result.status, result.body);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Sister app returned an error',
-          status: result.status,
-          details: result.body,
-          retriable: result.status >= 500,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    let responseData;
-    try {
-      responseData = JSON.parse(result.body);
-    } catch {
-      responseData = { raw: result.body };
-    }
-
-    console.log('Sister app response:', responseData);
-
-    // ========================================================================
-    // SEND EMAIL NOTIFICATION TO STUDENT (for assignment pushes)
-    // ========================================================================
-    if (requestData.student_email && requestData.title && requestData.type !== 'ping') {
-      try {
-        const brevoApiKey = Deno.env.get('BREVO_API_KEY');
-        if (brevoApiKey) {
-          const studentFirstName = requestData.first_name || requestData.student_name?.split(' ')[0] || 'Student';
-          const topicName = requestData.topic_name || requestData.title;
-          const questionsCount = requestData.questions?.length || 0;
-          const questionsSection = questionsCount > 0
-            ? `<p style="color:#555;font-size:14px;">This assignment includes <strong>${questionsCount} question${questionsCount !== 1 ? 's' : ''}</strong> for you to complete.</p>`
-            : '';
-
-          const emailHtml = `
-            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-              <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:20px;border-radius:12px 12px 0 0;text-align:center;">
-                <h1 style="color:white;margin:0;font-size:22px;">📚 New Assignment</h1>
-              </div>
-              <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;">
-                <p style="color:#333;font-size:16px;">Hi ${studentFirstName},</p>
-                <p style="color:#555;font-size:14px;">You have a new assignment waiting for you on <strong>NYCLogic Scholar AI</strong>:</p>
-                <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
-                  <h2 style="color:#6366f1;margin:0 0 8px 0;font-size:18px;">${requestData.title}</h2>
-                  <p style="color:#666;margin:0;font-size:14px;">Topic: ${topicName}</p>
-                  ${requestData.xp_reward ? `<p style="color:#059669;margin:8px 0 0 0;font-size:14px;">🎯 Earn up to <strong>${requestData.xp_reward} XP</strong> and <strong>${requestData.coin_reward || 0} Coins</strong></p>` : ''}
-                </div>
-                ${questionsSection}
-                <p style="color:#555;font-size:14px;">Open the <strong>Scholar App</strong> to get started. Good luck! 💪</p>
-                <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
-                <p style="color:#999;font-size:12px;text-align:center;">NYCLogic Ai — Empowering Student Success</p>
-              </div>
-            </div>
-          `;
-
-          const emailResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
-            method: "POST",
-            headers: {
-              "accept": "application/json",
-              "api-key": brevoApiKey,
-              "content-type": "application/json",
-            },
-            body: JSON.stringify({
-              sender: { name: "NYCLogic Ai", email: "notifications@nyclogic.ai" },
-              to: [{ email: requestData.student_email, name: requestData.student_name || studentFirstName }],
-              subject: `📚 New Assignment: ${requestData.title}`,
-              htmlContent: emailHtml,
-            }),
-          });
-
-          if (emailResponse.ok) {
-            console.log('Student email notification sent to:', requestData.student_email);
-          } else {
-            const errText = await emailResponse.text();
-            console.error('Email notification failed:', emailResponse.status, errText);
-          }
-        } else {
-          console.log('BREVO_API_KEY not configured, skipping email notification');
-        }
-      } catch (emailErr) {
-        console.error('Email notification error (non-fatal):', emailErr);
-      }
-    }
-
+    console.log("push-to-sister-app result:", JSON.stringify(result));
     return new Response(
-      JSON.stringify({ success: true, response: responseData }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true, response: result }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    // ========================================================================
-    // ERROR HANDLING
-    // ========================================================================
-    console.error('Error in push-to-sister-app:', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error("Error in push-to-sister-app:", error);
     return new Response(
-      JSON.stringify({ success: false, error: message, http_status: 500 }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
