@@ -406,6 +406,70 @@ serve(async (req) => {
 
     console.log('Sister app response:', responseData);
 
+    // ========================================================================
+    // SEND EMAIL NOTIFICATION TO STUDENT (for assignment pushes)
+    // ========================================================================
+    if (requestData.student_email && requestData.title && requestData.type !== 'ping') {
+      try {
+        const brevoApiKey = Deno.env.get('BREVO_API_KEY');
+        if (brevoApiKey) {
+          const studentFirstName = requestData.first_name || requestData.student_name?.split(' ')[0] || 'Student';
+          const topicName = requestData.topic_name || requestData.title;
+          const questionsCount = requestData.questions?.length || 0;
+          const questionsSection = questionsCount > 0
+            ? `<p style="color:#555;font-size:14px;">This assignment includes <strong>${questionsCount} question${questionsCount !== 1 ? 's' : ''}</strong> for you to complete.</p>`
+            : '';
+
+          const emailHtml = `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+              <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:20px;border-radius:12px 12px 0 0;text-align:center;">
+                <h1 style="color:white;margin:0;font-size:22px;">📚 New Assignment</h1>
+              </div>
+              <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;">
+                <p style="color:#333;font-size:16px;">Hi ${studentFirstName},</p>
+                <p style="color:#555;font-size:14px;">You have a new assignment waiting for you on <strong>NYCLogic Scholar AI</strong>:</p>
+                <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
+                  <h2 style="color:#6366f1;margin:0 0 8px 0;font-size:18px;">${requestData.title}</h2>
+                  <p style="color:#666;margin:0;font-size:14px;">Topic: ${topicName}</p>
+                  ${requestData.xp_reward ? `<p style="color:#059669;margin:8px 0 0 0;font-size:14px;">🎯 Earn up to <strong>${requestData.xp_reward} XP</strong> and <strong>${requestData.coin_reward || 0} Coins</strong></p>` : ''}
+                </div>
+                ${questionsSection}
+                <p style="color:#555;font-size:14px;">Open the <strong>Scholar App</strong> to get started. Good luck! 💪</p>
+                <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
+                <p style="color:#999;font-size:12px;text-align:center;">NYCLogic Ai — Empowering Student Success</p>
+              </div>
+            </div>
+          `;
+
+          const emailResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
+            method: "POST",
+            headers: {
+              "accept": "application/json",
+              "api-key": brevoApiKey,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              sender: { name: "NYCLogic Ai", email: "notifications@nyclogic.ai" },
+              to: [{ email: requestData.student_email, name: requestData.student_name || studentFirstName }],
+              subject: `📚 New Assignment: ${requestData.title}`,
+              htmlContent: emailHtml,
+            }),
+          });
+
+          if (emailResponse.ok) {
+            console.log('Student email notification sent to:', requestData.student_email);
+          } else {
+            const errText = await emailResponse.text();
+            console.error('Email notification failed:', emailResponse.status, errText);
+          }
+        } else {
+          console.log('BREVO_API_KEY not configured, skipping email notification');
+        }
+      } catch (emailErr) {
+        console.error('Email notification error (non-fatal):', emailErr);
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true, response: responseData }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
