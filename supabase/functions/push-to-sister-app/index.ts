@@ -395,9 +395,50 @@ serve(async (req) => {
       result.action = "live_session_notifications_sent";
 
     } else if (requestData.type === "assignment_push") {
-      // Assignment push → create practice_set (status: "assigned") + questions
-      const practiceSetId = await createPracticeSet(scholar, scholarUserId, requestData);
-      result.practice_set_id = practiceSetId;
+      // Assignment push → write to Scholar's assignments + questions tables
+      const { data: assignment, error: assignError } = await scholar
+        .from("assignments")
+        .insert({
+          class_id: requestData.class_id,
+          title: requestData.title,
+          description: requestData.description,
+          subject: requestData.topic_name || "General",
+          status: "active",
+          xp_reward: requestData.xp_reward || 100,
+          coin_reward: requestData.coin_reward || 50,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (assignError) {
+        console.error("assignments insert error:", assignError.message, assignError);
+      }
+
+      // Insert questions linked to the assignment
+      if (requestData.questions?.length && assignment?.id) {
+        const questionRows = requestData.questions.map((q: any, i: number) => ({
+          assignment_id: assignment.id,
+          question_type: q.type || "multiple_choice",
+          prompt: q.question || q.prompt || q.text || JSON.stringify(q),
+          options: q.options || q.choices || [],
+          answer_key: q.answer || q.correct_answer || q.answer_key || null,
+          hint: q.hint || null,
+          difficulty: requestData.difficulty_level || q.difficulty || null,
+          order_index: i,
+          skill_tag: q.skill_tag || q.topic || requestData.topic_name || null,
+        }));
+
+        const { error: qErr } = await scholar
+          .from("questions")
+          .insert(questionRows);
+
+        if (qErr) console.error("questions insert error:", qErr.message, qErr);
+      }
+
+      result.assignment_id = assignment?.id;
+      result.questions_inserted = requestData.questions?.length || 0;
       result.action = "assignment_push";
 
       if (scholarUserId) {
@@ -427,11 +468,12 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Error in push-to-sister-app:", error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("Push failed:", errMsg, error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errMsg,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
