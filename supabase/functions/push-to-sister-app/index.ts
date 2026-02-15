@@ -105,7 +105,8 @@ interface ParticipantResult {
 // ---------------------------------------------------------------------------
 
 /** Build a Scholar Supabase client (service-role, bypasses RLS). */
-function getScholarClient() {
+// deno-lint-ignore no-explicit-any
+function getScholarClient(): any {
   const url = Deno.env.get("SCHOLAR_SUPABASE_URL");
   const key = Deno.env.get("SCHOLAR_SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) throw new Error("Scholar DB secrets not configured");
@@ -114,7 +115,7 @@ function getScholarClient() {
 
 /** Upsert the student into Scholar's external_students table. Returns the row id. */
 async function upsertExternalStudent(
-  scholar: ReturnType<typeof createClient>,
+  scholar: any,
   req: PushRequest
 ): Promise<string | null> {
   if (!req.student_id) return null;
@@ -158,7 +159,7 @@ async function upsertExternalStudent(
 
 /** Create a practice set + questions on Scholar. */
 async function createPracticeSet(
-  scholar: ReturnType<typeof createClient>,
+  scholar: any,
   scholarStudentId: string | null,
   req: PushRequest
 ) {
@@ -227,7 +228,7 @@ async function createPracticeSet(
 
 /** Send a notification to the student inside Scholar. */
 async function sendScholarNotification(
-  scholar: ReturnType<typeof createClient>,
+  scholar: any,
   userId: string,
   req: PushRequest,
   type: string
