@@ -1,8 +1,8 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { CheckCircle2, XCircle, AlertTriangle, FileText, BookOpen, Target, MessageSquare } from 'lucide-react';
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { CheckCircle2, XCircle, AlertTriangle, FileText, BookOpen, Target, MessageSquare } from "lucide-react";
 
 /**
  * SimpleResultsView — a crash-proof fallback for displaying analysis results.
@@ -60,7 +60,7 @@ function toArray(val: string[] | string | undefined | null): string[] {
 
 export function SimpleResultsView({ result, studentName }: SimpleResultsViewProps) {
   const grade = result.overriddenGrade ?? result.grade ?? result.totalScore?.percentage ?? 0;
-  const gradeVariant = grade >= 80 ? 'default' : grade >= 60 ? 'secondary' : 'destructive';
+  const gradeVariant = grade >= 80 ? "default" : grade >= 60 ? "secondary" : "destructive";
 
   const strengths = toArray(result.strengthsAnalysis);
   const improvements = toArray(result.areasForImprovement);
@@ -76,9 +76,7 @@ export function SimpleResultsView({ result, studentName }: SimpleResultsViewProp
               <Badge variant={gradeVariant} className="text-2xl px-4 py-2 font-bold">
                 {grade}%
               </Badge>
-              {studentName && (
-                <span className="text-lg font-medium text-foreground">{studentName}</span>
-              )}
+              {studentName && <span className="text-lg font-medium text-foreground">{studentName}</span>}
             </div>
             {result.regentsScore !== undefined && result.regentsScore !== null && (
               <Badge variant="outline" className="text-sm px-3 py-1">
@@ -152,7 +150,9 @@ export function SimpleResultsView({ result, studentName }: SimpleResultsViewProp
           <CardContent className="pt-0">
             <ul className="list-disc list-inside space-y-1">
               {strengths.map((s, i) => (
-                <li key={i} className="text-sm">{s}</li>
+                <li key={i} className="text-sm">
+                  {s}
+                </li>
               ))}
             </ul>
           </CardContent>
@@ -165,13 +165,15 @@ export function SimpleResultsView({ result, studentName }: SimpleResultsViewProp
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
-              Areas for Improvement
+              Areas for Improvements
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
             <ul className="list-disc list-inside space-y-1">
               {improvements.map((s, i) => (
-                <li key={i} className="text-sm">{s}</li>
+                <li key={i} className="text-sm">
+                  {s}
+                </li>
               ))}
             </ul>
           </CardContent>
@@ -190,7 +192,9 @@ export function SimpleResultsView({ result, studentName }: SimpleResultsViewProp
           <CardContent className="pt-0">
             <ul className="list-disc list-inside space-y-1">
               {misconceptions.map((m, i) => (
-                <li key={i} className="text-sm">{m}</li>
+                <li key={i} className="text-sm">
+                  {m}
+                </li>
               ))}
             </ul>
           </CardContent>
@@ -213,7 +217,10 @@ export function SimpleResultsView({ result, studentName }: SimpleResultsViewProp
                   <p className="text-sm font-medium">{rs.criterion || `Step ${i + 1}`}</p>
                   {rs.feedback && <p className="text-xs text-muted-foreground">{rs.feedback}</p>}
                 </div>
-                <Badge variant={rs.score === rs.maxScore ? 'default' : rs.score === 0 ? 'destructive' : 'secondary'} className="shrink-0">
+                <Badge
+                  variant={rs.score === rs.maxScore ? "default" : rs.score === 0 ? "destructive" : "secondary"}
+                  className="shrink-0"
+                >
                   {rs.score ?? 0}/{rs.maxScore ?? 1}
                 </Badge>
               </div>
