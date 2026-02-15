@@ -205,11 +205,11 @@ async function invokeWithRetry(
   };
 }
 
-/** Delay between sequential batch items to avoid hitting the 50/hour rate limit */
-const BATCH_ITEM_DELAY_MS = 3000;
+/** Delay between batch chunks (reduced for faster flow; increase if hitting rate limits) */
+const BATCH_ITEM_DELAY_MS = 800;
 
-/** Number of papers to analyze concurrently in batch mode (sequential to preserve rate limit) */
-const BATCH_CONCURRENCY = 1;
+/** Number of papers to analyze concurrently in batch mode */
+const BATCH_CONCURRENCY = 2;
 
 /** Number of papers to identify concurrently via OCR (no rate limit concerns) */
 const IDENTIFY_CONCURRENCY = 5;

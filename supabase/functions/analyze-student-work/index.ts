@@ -1536,8 +1536,8 @@ serve(async (req: Request) => {
         userContent.push(formatImageForAI(answerGuideBase64));
       }
 
-      // ── OCR-ASSISTED CONSENSUS: Call AI 3x with strict schema, majority-vote each boolean ──
-      const OCR_CONSENSUS_SEEDS = [42, 123, 256];
+      // Single AI call for speed; use [42, 123, 256] for 3-round consensus if needed later
+      const OCR_CONSENSUS_SEEDS = [42];
       interface OCRRoundResult {
         booleans: BooleanAnswers;
         result: any;
@@ -1704,8 +1704,8 @@ serve(async (req: Request) => {
       { role: "user", content: imageContent },
     ];
 
-    // BOOLEAN CONSENSUS: Call AI 3x, majority-vote each boolean, compute grade from votes
-    const CONSENSUS_SEEDS = [42, 123, 256];
+    // Single AI call per paper for speed; use [42, 123, 256] for 3-round consensus if needed later
+    const CONSENSUS_SEEDS = [42];
     interface RoundResult {
       booleans: BooleanAnswers;
       result: any;
