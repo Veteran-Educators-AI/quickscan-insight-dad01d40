@@ -62,10 +62,9 @@ export function useGradeFloorSettings() {
   ): number => {
     const { gradeFloor, gradeFloorWithEffort } = settings;
     
-    // CRITICAL: No work shown = 0 - no exceptions
-    // This catches blank pages, only question text visible, no student writing
+    // CRITICAL: No work shown = 0% — do not use grade floor for blank submissions
     if (!hasWork) {
-      return gradeFloor;
+      return 0;
     }
 
     // Student showed work - grade is determined by the backend decision tree

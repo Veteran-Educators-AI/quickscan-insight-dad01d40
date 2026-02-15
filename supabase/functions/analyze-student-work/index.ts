@@ -1145,11 +1145,11 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 0, 
     rawGrade = gradeMatch
       ? parseInt(gradeMatch[1])
       : regentsScore >= 0
-        ? (({ 4: 97, 3: 88, 2: 75, 1: 60, 0: gradeFloor } as Record<number, number>)[regentsScore] ?? gradeFloor)
-        : gradeFloor;
+        ? (({ 4: 97, 3: 88, 2: 75, 1: 60, 0: 0 } as Record<number, number>)[regentsScore] ?? 0)
+        : 0;
 
     // ─── HARD ANCHOR SNAP for regex path too ───
-    const VALID_ANCHORS_REGEX = [97, 95, 93, 91, 88, 83, 80, 78, 75, 70, 60, 50, 35, 25, gradeFloor].filter(
+    const VALID_ANCHORS_REGEX = [97, 95, 93, 91, 88, 83, 80, 78, 75, 70, 60, 50, 35, 25, 0].filter(
       (v) => v >= 0,
     );
     rawGrade = VALID_ANCHORS_REGEX.reduce((prev, curr) =>
