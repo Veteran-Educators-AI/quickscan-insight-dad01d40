@@ -1001,7 +1001,7 @@ function validateAndNormalizeGrade(
 // ═══════════════════════════════════════════════════════════════════════════════
 // PARSE AI RESPONSE — JSON-first with regex fallback
 // ═══════════════════════════════════════════════════════════════════════════════
-function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 0, gradeFloorWithEffort = 55) {
+function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 0, gradeFloorWithEffort = 0) {
   // ─── Try JSON parse first (primary path) ───
   let parsed: any = null;
   try {
@@ -1144,12 +1144,13 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 0, 
     rawGrade = gradeMatch
       ? parseInt(gradeMatch[1])
       : regentsScore >= 0
-        ? (({ 4: 97, 3: 88, 2: 75, 1: gradeFloorWithEffort, 0: gradeFloor } as Record<number, number>)[regentsScore] ??
-          gradeFloorWithEffort)
-        : gradeFloorWithEffort;
+        ? (({ 4: 97, 3: 88, 2: 75, 1: 60, 0: gradeFloor } as Record<number, number>)[regentsScore] ?? gradeFloor)
+        : gradeFloor;
 
     // ─── HARD ANCHOR SNAP for regex path too ───
-    const VALID_ANCHORS_REGEX = [97, 93, 88, 83, 75, gradeFloorWithEffort, gradeFloor];
+    const VALID_ANCHORS_REGEX = [97, 95, 93, 91, 88, 83, 80, 78, 75, 70, 60, 50, 35, 25, gradeFloor].filter(
+      (v) => v >= 0,
+    );
     rawGrade = VALID_ANCHORS_REGEX.reduce((prev, curr) =>
       Math.abs(curr - rawGrade) < Math.abs(prev - rawGrade) ? curr : prev,
     );
@@ -1159,8 +1160,7 @@ function parseAnalysisResult(text: string, rubricSteps?: any[], gradeFloor = 0, 
 
     // Derive Regents if not parsed
     if (regentsScore < 0) {
-      regentsScore =
-        rawGrade >= 90 ? 4 : rawGrade >= 80 ? 3 : rawGrade >= 70 ? 2 : rawGrade >= gradeFloorWithEffort ? 1 : 0;
+      regentsScore = rawGrade >= 90 ? 4 : rawGrade >= 80 ? 3 : rawGrade >= 70 ? 2 : rawGrade >= 50 ? 1 : 0;
     }
 
     // Parse rubric scores from text
@@ -1393,7 +1393,7 @@ serve(async (req: Request) => {
     // ── Fetch teacher settings ──
     let feedbackVerbosity = "concise";
     let gradeFloor = customGradeFloor || 0;
-    let gradeFloorWithEffort = customGradeFloorWithEffort || 55;
+    let gradeFloorWithEffort = customGradeFloorWithEffort || 0;
     let aiTrainingMode = "learning";
     let analysisProvider: AnalysisProvider = "gemini";
 
@@ -1407,7 +1407,7 @@ serve(async (req: Request) => {
         if (settings) {
           if (!customGradeFloor) {
             gradeFloor = settings.grade_floor ?? 0;
-            gradeFloorWithEffort = settings.grade_floor_with_effort ?? 55;
+            gradeFloorWithEffort = settings.grade_floor_with_effort ?? 0;
           }
           feedbackVerbosity = settings.ai_feedback_verbosity ?? "concise";
           aiTrainingMode = settings.ai_training_mode ?? "learning";
