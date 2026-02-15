@@ -10,7 +10,7 @@ export interface BlankPageSettings {
 
 const DEFAULTS: BlankPageSettings = {
   autoScoreBlankPages: true,
-  blankPageScore: 55,
+  blankPageScore: 0,
   blankPageComment: 'No work shown on this page; score assigned per no-response policy.',
 };
 

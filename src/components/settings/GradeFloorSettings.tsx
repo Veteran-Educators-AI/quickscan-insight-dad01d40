@@ -26,12 +26,12 @@ const GRADE_FLOOR_EFFORT_OPTIONS = [
 
 export function GradeFloorSettings() {
   const { user } = useAuth();
-  const [gradeFloor, setGradeFloor] = useState<number>(55);
-  const [gradeFloorWithEffort, setGradeFloorWithEffort] = useState<number>(65);
+  const [gradeFloor, setGradeFloor] = useState<number>(0);
+  const [gradeFloorWithEffort, setGradeFloorWithEffort] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const [originalValues, setOriginalValues] = useState({ gradeFloor: 55, gradeFloorWithEffort: 65 });
+  const [originalValues, setOriginalValues] = useState({ gradeFloor: 0, gradeFloorWithEffort: 0 });
   const [showRecalcDialog, setShowRecalcDialog] = useState(false);
 
   useEffect(() => {
@@ -58,8 +58,8 @@ export function GradeFloorSettings() {
       }
 
       if (data) {
-        const floor = data.grade_floor ?? 55;
-        const effortFloor = data.grade_floor_with_effort ?? 65;
+        const floor = data.grade_floor ?? 0;
+        const effortFloor = data.grade_floor_with_effort ?? 0;
         setGradeFloor(floor);
         setGradeFloorWithEffort(effortFloor);
         setOriginalValues({ gradeFloor: floor, gradeFloorWithEffort: effortFloor });

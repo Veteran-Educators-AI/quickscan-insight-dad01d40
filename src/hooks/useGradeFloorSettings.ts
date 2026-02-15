@@ -8,8 +8,8 @@ interface GradeFloorSettings {
 }
 
 const DEFAULT_SETTINGS: GradeFloorSettings = {
-  gradeFloor: 55,
-  gradeFloorWithEffort: 65,
+  gradeFloor: 0,
+  gradeFloorWithEffort: 0,
 };
 
 export function useGradeFloorSettings() {
@@ -62,14 +62,15 @@ export function useGradeFloorSettings() {
   ): number => {
     const { gradeFloor, gradeFloorWithEffort } = settings;
     
-    // CRITICAL: No work shown = absolute floor (55) - no exceptions
+    // CRITICAL: No work shown = 0 - no exceptions
     // This catches blank pages, only question text visible, no student writing
     if (!hasWork) {
       return gradeFloor;
     }
 
-    // Student showed work - minimum is gradeFloorWithEffort (default 65)
-    const minGrade = gradeFloorWithEffort;
+    // Student showed work - grade is determined by the backend decision tree
+    // The backend already applies the correct tier (0-97) based on boolean analysis
+    // Frontend should NOT inflate grades beyond what the backend computed
     
     // Maximum grade from calculation is 95 (Regents 4 = Exceeding Standards)
     // 100 is reserved for teacher overrides / truly exceptional demonstrated mastery
@@ -81,23 +82,21 @@ export function useGradeFloorSettings() {
         4: 95,  // Exceeding Standards - max without override
         3: 90,  // Meeting Standards - no errors should be 90+
         2: 75,  // Approaching Standards
-        1: Math.max(gradeFloorWithEffort, 67),  // Limited understanding
-        0: gradeFloorWithEffort,  // Has work but completely wrong
+        1: 60,  // Limited understanding
+        0: 0,   // No understanding - let backend decide actual grade
       };
-      const convertedGrade = regentsToGrade[regentsScore] ?? minGrade;
-      return Math.max(minGrade, Math.min(maxCalculatedGrade, convertedGrade));
+      const convertedGrade = regentsToGrade[regentsScore] ?? 0;
+      return Math.min(maxCalculatedGrade, convertedGrade);
     }
 
-    // Calculate from percentage - scale between effort floor and max (95)
+    // Calculate from percentage - scale between 0 and max (95)
     if (percentage > 0) {
-      // Map percentage to grade range: 65-95 (not 100)
-      const gradeRange = maxCalculatedGrade - gradeFloorWithEffort; // 95 - 65 = 30
-      const scaledGrade = Math.round(gradeFloorWithEffort + (percentage / 100) * gradeRange);
-      return Math.max(minGrade, Math.min(maxCalculatedGrade, scaledGrade));
+      const scaledGrade = Math.round((percentage / 100) * maxCalculatedGrade);
+      return Math.min(maxCalculatedGrade, scaledGrade);
     }
 
-    // Has work but no percentage calculated = effort floor
-    return minGrade;
+    // Has work but no percentage calculated = 0 (let backend decide)
+    return 0;
   };
 
   const refreshSettings = () => {

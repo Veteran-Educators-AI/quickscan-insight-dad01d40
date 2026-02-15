@@ -228,17 +228,11 @@ export function useSaveAnalysisResults() {
       if (scoreError) throw scoreError;
 
       // 4. Save grade history if we have grade info
-      // Calculate grade: minimum 55, but only if no standards met
-      // If they earned any points, minimum should be 60
-      const hasAnyPoints = params.result.totalScore.earned > 0;
-      const baseGrade = hasAnyPoints ? 60 : 55;
-      const calculatedGrade = hasAnyPoints 
-        ? Math.round(baseGrade + (params.result.totalScore.percentage / 100) * (100 - baseGrade))
-        : 55;
-      const grade = params.result.grade ?? calculatedGrade;
+      // Grade is now computed by the backend decision tree — trust it directly
+      const grade = params.result.grade ?? 0;
       
-      // Ensure grade is never below 55
-      const finalGrade = Math.max(55, Math.min(100, grade));
+      // Trust the backend grade — do NOT inflate
+      const finalGrade = Math.max(0, Math.min(100, grade));
       
       let resolvedTopicName = params.topicName;
       let resolvedTopicId = params.topicId;

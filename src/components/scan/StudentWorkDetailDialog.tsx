@@ -218,16 +218,8 @@ export function StudentWorkDetailDialog({
   const whatStudentGotWrong = result?.whatStudentGotWrong ?? '';
   const feedbackText = result?.feedback ?? '';
 
-  // Calculate grade using teacher's grade floor settings
-  const hasAnyPoints = totalScore.earned > 0;
-  const hasAnyWork = ocrText.trim().length > 10 || hasAnyPoints;
-  const minGrade = hasAnyWork ? gradeFloorWithEffort : gradeFloor;
-  const calculatedGrade = calculateGrade(
-    totalScore.percentage, 
-    hasAnyWork, 
-    result?.regentsScore
-  );
-  const grade = result?.grade ? Math.max(minGrade, result.grade) : calculatedGrade;
+  // Trust the backend-computed grade directly — no frontend inflation
+  const grade = result?.grade ?? 0;
 
   return (
     <>

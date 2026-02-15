@@ -199,14 +199,8 @@ export function GradedPapersGallery({
   const calculateItemGrade = (item: BatchItem) => {
     if (!item.result) return 0;
     const result = item.result as ExtendedAnalysisResult;
-    const totalScore = result?.totalScore ?? { earned: 0, possible: 1, percentage: 0 };
-    const hasAnyPoints = totalScore.earned > 0;
-    const hasAnyWork = (result?.ocrText?.trim().length ?? 0) > 10 || hasAnyPoints;
-    return calculateGrade(
-      totalScore.percentage, 
-      hasAnyWork, 
-      result?.regentsScore
-    );
+    // Trust the backend-computed grade directly — no frontend inflation
+    return result?.grade ?? 0;
   };
 
   const handleSaveNotes = (itemId: string) => {
