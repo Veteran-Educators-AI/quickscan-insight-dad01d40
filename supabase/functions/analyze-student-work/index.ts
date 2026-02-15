@@ -725,7 +725,7 @@ function computeGradeFromBooleans(
     return { grade: 0, regentsScore: 0, tier: "NOT_ACADEMIC" }; // 0%
   }
   if (!student_work_present) {
-    return { grade: gradeFloor, regentsScore: 0, tier: "NO_RESPONSE" }; // 0%
+    return { grade: 0, regentsScore: 0, tier: "NO_RESPONSE" }; // no work → 0%
   }
   if (!is_relevant_to_question) {
     return { grade: 0, regentsScore: 0, tier: "OFF_TOPIC" }; // 0%
@@ -925,13 +925,14 @@ function validateAndNormalizeGrade(
     return { grade: 0, regentsScore: 0, adjusted: false, adjustReason: "Not academic or blank → 0" };
   }
 
-  // BLANK PAGE → floor (if gradeFloor > 0, teacher configured a custom floor)
+  // BLANK PAGE / NO WORK → 0%. Teacher "grade floor" applies only when there IS work (minimal effort).
+  // Do not use gradeFloor here — showing 55% for no submission is misleading.
   if (!studentWorkPresent) {
     return {
-      grade: gradeFloor,
+      grade: 0,
       regentsScore: 0,
-      adjusted: rawGrade !== gradeFloor,
-      adjustReason: "Blank page → floor",
+      adjusted: rawGrade !== 0,
+      adjustReason: "No student work present → 0",
     };
   }
 
@@ -1644,12 +1645,15 @@ serve(async (req: Request) => {
         `[OCR_CONSENSUS] FINAL grade=${ocrFinalGrade} tier=${ocrFinalResult.tier} spread=${result.consensusSpread} rounds=${ocrTotalRounds}`,
       );
 
-      // Handle blank page
-      if (!result.studentWorkPresent && blankPageSettings?.enabled) {
-        const blankScore = blankPageSettings.score ?? gradeFloor;
+      // Handle blank page: 0% unless teacher explicitly set a blank-page score
+      if (!result.studentWorkPresent) {
+        const blankScore =
+          blankPageSettings?.enabled && blankPageSettings?.score != null
+            ? blankPageSettings.score
+            : 0;
         result.grade = blankScore;
         result.gradeJustification =
-          blankPageSettings.comment ?? "No work shown; score assigned per no-response policy.";
+          blankPageSettings?.comment ?? "No student work present; no basis to evaluate.";
         result.feedback = "No student work detected. Re-scan with better lighting if incorrect.";
       }
 
@@ -1811,11 +1815,14 @@ serve(async (req: Request) => {
       `[CONSENSUS] FINAL grade=${finalGrade} tier=${finalResult.tier} spread=${result.consensusSpread} rounds=${totalRounds}`,
     );
 
-    // ── Handle blank page from grading result ──
-    if (!result.studentWorkPresent && blankPageSettings?.enabled) {
-      const blankScore = blankPageSettings.score ?? gradeFloor;
+    // ── Handle blank page: 0% unless teacher explicitly set a blank-page score ──
+    if (!result.studentWorkPresent) {
+      const blankScore =
+        blankPageSettings?.enabled && blankPageSettings?.score != null
+          ? blankPageSettings.score
+          : 0;
       const blankComment =
-        blankPageSettings.comment ?? "No work shown on this page; score assigned per no-response policy.";
+        blankPageSettings?.comment ?? "No student work present; no basis to evaluate.";
       result.grade = blankScore;
       result.gradeJustification = blankComment;
       result.feedback = "This page has no student work. If incorrect, re-scan with better lighting.";
