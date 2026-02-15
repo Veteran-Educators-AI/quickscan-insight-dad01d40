@@ -71,7 +71,7 @@ serve(async (req) => {
 
     // Filter students with valid emails
     const studentsWithEmail = enrollments.filter(e => 
-      e.profiles && e.profiles.email
+      e.profiles && (e.profiles as any).email
     )
 
     if (studentsWithEmail.length === 0) {
@@ -97,8 +97,8 @@ serve(async (req) => {
 
     // Prepare email recipients
     const recipients = studentsWithEmail.map(e => ({
-      email: e.profiles.email,
-      name: e.profiles.full_name || e.profiles.email
+      email: (e.profiles as any).email,
+      name: (e.profiles as any).full_name || (e.profiles as any).email
     }))
 
     // Send email via Brevo (batch send)
@@ -182,7 +182,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error sending student notifications:', error)
     return new Response(JSON.stringify({ 
-      error: error.message 
+      error: (error as Error).message 
     }), {
       headers: { 'Content-Type': 'application/json' },
       status: 500

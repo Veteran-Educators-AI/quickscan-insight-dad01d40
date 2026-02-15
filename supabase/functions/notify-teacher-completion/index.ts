@@ -145,7 +145,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error sending teacher notification:', error)
     return new Response(JSON.stringify({ 
-      error: error.message 
+      error: (error as Error).message 
     }), {
       headers: { 'Content-Type': 'application/json' },
       status: 500

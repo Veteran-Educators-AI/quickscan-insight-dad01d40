@@ -137,7 +137,7 @@ serve(async (req) => {
     } catch (error) {
       // If the balance endpoint doesn't exist yet, we can track manually
       // or integrate with OpenRouter/other monitoring tools
-      console.error('Unable to check Anthropic balance:', error.message)
+      console.error('Unable to check Anthropic balance:', (error as Error).message)
       
       return new Response(JSON.stringify({ 
         error: 'Balance check not available',
@@ -189,7 +189,7 @@ serve(async (req) => {
     console.error('❌ Error checking balance:', error)
     
     return new Response(JSON.stringify({ 
-      error: error.message,
+      error: (error as Error).message,
       timestamp: new Date().toISOString()
     }), {
       headers: { 'Content-Type': 'application/json' },
