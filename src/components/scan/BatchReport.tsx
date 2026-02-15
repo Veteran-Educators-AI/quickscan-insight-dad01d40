@@ -112,14 +112,15 @@ export function BatchReport({ items, summary, classId, questionId, className, as
   // Get the effective grade for a result - prefer grade field, fallback to totalScore percentage
   // (Defined early so it can be used by lowScoringStudents filter)
   const getEffectiveGrade = (result: BatchItem['result']) => {
-    if (!result) return 55;
-    if (result.grade && result.grade >= 55) {
+    if (!result) return 0;
+    // Trust the backend-computed grade directly — no inflation
+    if (result.grade !== undefined && result.grade !== null) {
       return result.grade;
     }
     if (result.totalScore.possible > 0) {
       return result.totalScore.percentage;
     }
-    return 65;
+    return 0;
   };
 
   // Students scoring below 60%
