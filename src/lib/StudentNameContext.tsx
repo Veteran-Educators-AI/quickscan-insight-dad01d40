@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from 'react';
 import { getStudentPseudonym, getPseudonymInitials } from './studentPseudonyms';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/lib/auth';
 
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const COUNTDOWN_INTERVAL_MS = 1000; // 1 second
@@ -15,34 +16,34 @@ interface StudentNameContextType {
 
 const StudentNameContext = createContext<StudentNameContextType | undefined>(undefined);
 
-// Log audit event to database
-async function logAuditEvent(action: string) {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    await supabase.from('ferpa_audit_log').insert({
-      teacher_id: user.id,
-      action,
-      user_agent: navigator.userAgent,
-    });
-  } catch (error) {
-    console.error('Failed to log audit event:', error);
-  }
-}
-
 export function StudentNameProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [revealRealNames, setRevealRealNames] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
 
+  // Log audit event to database
+  const logAuditEvent = useCallback(async (action: string) => {
+    try {
+      if (!user) return;
+
+      await supabase.from('ferpa_audit_log').insert({
+        teacher_id: user.id,
+        action,
+        user_agent: navigator.userAgent,
+      });
+    } catch (error) {
+      console.error('Failed to log audit event:', error);
+    }
+  }, [user]);
+
   const resetToPrivate = useCallback(() => {
     setRevealRealNames(false);
     setRemainingSeconds(null);
     logAuditEvent('auto_reverted_to_pseudonyms');
-  }, []);
+  }, [logAuditEvent]);
 
   const updateCountdown = useCallback(() => {
     const elapsed = Date.now() - lastActivityRef.current;
@@ -113,7 +114,7 @@ export function StudentNameProvider({ children }: { children: ReactNode }) {
       logAuditEvent(newValue ? 'revealed_real_names' : 'hidden_real_names');
       return newValue;
     });
-  }, []);
+  }, [logAuditEvent]);
 
   const getDisplayName = useCallback((studentId: string, firstName: string, lastName: string) => {
     if (revealRealNames) {
