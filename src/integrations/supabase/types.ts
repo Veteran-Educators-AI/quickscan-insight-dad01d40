@@ -534,6 +534,81 @@ export type Database = {
           },
         ]
       }
+      batch_queue: {
+        Row: {
+          batch_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          id: number
+          metadata: Json | null
+          payload: string
+          result: string | null
+          source_bot: string | null
+          status: string
+          task_type: string
+        }
+        Insert: {
+          batch_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: never
+          metadata?: Json | null
+          payload: string
+          result?: string | null
+          source_bot?: string | null
+          status?: string
+          task_type: string
+        }
+        Update: {
+          batch_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: never
+          metadata?: Json | null
+          payload?: string
+          result?: string | null
+          source_bot?: string | null
+          status?: string
+          task_type?: string
+        }
+        Relationships: []
+      }
+      batch_runs: {
+        Row: {
+          batch_id: string
+          completed_at: string | null
+          errors_count: number | null
+          id: number
+          results_count: number | null
+          status: string
+          submitted_at: string | null
+          task_count: number
+          task_type_filter: string | null
+        }
+        Insert: {
+          batch_id: string
+          completed_at?: string | null
+          errors_count?: number | null
+          id?: never
+          results_count?: number | null
+          status?: string
+          submitted_at?: string | null
+          task_count?: number
+          task_type_filter?: string | null
+        }
+        Update: {
+          batch_id?: string
+          completed_at?: string | null
+          errors_count?: number | null
+          id?: never
+          results_count?: number | null
+          status?: string
+          submitted_at?: string | null
+          task_count?: number
+          task_type_filter?: string | null
+        }
+        Relationships: []
+      }
       beta_feedback: {
         Row: {
           created_at: string
@@ -2718,7 +2793,18 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      batch_cost_summary: {
+        Row: {
+          completed_tasks: number | null
+          failed_tasks: number | null
+          first_task: string | null
+          last_completed: string | null
+          pending_tasks: number | null
+          task_type: string | null
+          total_tasks: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_ai_rate_limit: {
@@ -2729,46 +2815,28 @@ export type Database = {
         }
         Returns: Json
       }
-      get_ai_learning_stats: {
-        Args: {
-          teacher_uuid: string
-        }
-        Returns: Json
-      }
-      get_dashboard_stats: {
-        Args: {
-          teacher_uuid: string
-        }
-        Returns: Json
-      }
+      get_ai_learning_stats: { Args: { teacher_uuid: string }; Returns: Json }
       get_classes_with_student_counts: {
-        Args: {
-          teacher_uuid: string
-        }
-        Returns: Array<{
-          id: string
-          name: string
-          join_code: string
-          school_year: string | null
-          class_period: string | null
+        Args: { teacher_uuid: string }
+        Returns: {
+          archived_at: string
+          class_period: string
           created_at: string
-          archived_at: string | null
+          id: string
+          join_code: string
+          name: string
+          school_year: string
           student_count: number
-        }>
+        }[]
+      }
+      get_dashboard_stats: { Args: { teacher_uuid: string }; Returns: Json }
+      get_struggling_students: {
+        Args: { student_limit?: number; teacher_uuid: string }
+        Returns: Json
       }
       get_student_dashboard: { Args: { p_student_id: string }; Returns: Json }
-      get_struggling_students: {
-        Args: {
-          teacher_uuid: string
-          student_limit?: number
-        }
-        Returns: Json
-      }
       get_verification_stats: {
-        Args: {
-          teacher_uuid: string
-          days_back?: number
-        }
+        Args: { days_back?: number; teacher_uuid: string }
         Returns: Json
       }
       is_student_in_class: {

@@ -5,9 +5,9 @@ import { componentTagger } from "lovable-tagger";
 
 // Hardcoded fallback values for Cloud env vars
 // UPDATED: Now pointing to NYClogic AI (Scholar Quest) shared database
-const FALLBACK_SUPABASE_URL = 'https://rjlqmfthemfpetpcydog.supabase.co';
-const FALLBACK_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqbHFtZnRoZW1mcGV0cGN5ZG9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MzA4NTQsImV4cCI6MjA4MzMwNjg1NH0.qBSiyTKAWxP95UVpDS3nphi5vbVKV20ENNQiDw10IbA';
-const FALLBACK_SUPABASE_PROJECT_ID = 'rjlqmfthemfpetpcydog';
+const FALLBACK_SUPABASE_URL = 'https://pbqgmvshxkhkrhoxvyws.supabase.co';
+const FALLBACK_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBicWdtdnNoeGtoa3Job3h2eXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzNjU2MDksImV4cCI6MjA4Njk0MTYwOX0.JsySVF_HUpkzxxNokNITdujeoCfTeWut2SxuNhjWK_w';
+const FALLBACK_SUPABASE_PROJECT_ID = 'pbqgmvshxkhkrhoxvyws';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
