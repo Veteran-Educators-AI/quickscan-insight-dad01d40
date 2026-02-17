@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/lib/auth';
+import { useCallback } from 'react';
+import { useSettings } from './useSettings';
 
 interface GradeFloorSettings {
   gradeFloor: number;
@@ -12,50 +11,20 @@ const DEFAULT_SETTINGS: GradeFloorSettings = {
   gradeFloorWithEffort: 0,
 };
 
+/**
+ * Grade Floor settings hook - now uses unified settings to avoid duplicate API calls
+ * Previously made a separate API call to the settings table
+ * Now shares the unified settings query with other hooks
+ */
 export function useGradeFloorSettings() {
-  const { user } = useAuth();
-  const [settings, setSettings] = useState<GradeFloorSettings>(DEFAULT_SETTINGS);
-  const [isLoading, setIsLoading] = useState(true);
+  const { settings: unifiedSettings, isLoading } = useSettings();
 
-  useEffect(() => {
-    if (user) {
-      loadSettings();
-    } else {
-      setSettings(DEFAULT_SETTINGS);
-      setIsLoading(false);
-    }
-  }, [user]);
-
-  const loadSettings = async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('grade_floor, grade_floor_with_effort')
-        .eq('teacher_id', user.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading grade floor settings:', error);
-        return;
-      }
-
-      if (data) {
-        setSettings({
-          gradeFloor: data.grade_floor ?? DEFAULT_SETTINGS.gradeFloor,
-          gradeFloorWithEffort: data.grade_floor_with_effort ?? DEFAULT_SETTINGS.gradeFloorWithEffort,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    } finally {
-      setIsLoading(false);
-    }
+  const settings: GradeFloorSettings = {
+    gradeFloor: unifiedSettings.gradeFloor,
+    gradeFloorWithEffort: unifiedSettings.gradeFloorWithEffort,
   };
 
-  const calculateGrade = (
+  const calculateGrade = useCallback((
     percentage: number, 
     hasWork: boolean, 
     regentsScore?: number
@@ -96,13 +65,11 @@ export function useGradeFloorSettings() {
 
     // Has work but no percentage calculated = 0 (let backend decide)
     return 0;
-  };
+  }, [settings]);
 
-  const refreshSettings = () => {
-    if (user) {
-      loadSettings();
-    }
-  };
+  const refreshSettings = useCallback(() => {
+    // No longer needed - React Query handles refetching
+  }, []);
 
   return {
     ...settings,

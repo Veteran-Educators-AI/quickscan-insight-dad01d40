@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { GEOMETRY_TOPICS, ALGEBRA1_TOPICS, ALGEBRA2_TOPICS } from '@/data/nysTopics';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
+import { useProfile } from '@/hooks/useProfile';
 
 interface RecommendedNextStepsProps {
   misconceptions: string[];
@@ -187,6 +188,7 @@ export function RecommendedNextSteps({
   const { pushToSisterApp } = usePushToSisterApp();
   const { shouldAutoPush, autoPushEnabled, autoPushThreshold, autoPushRegentsThreshold, autoPushWorksheetCount, isLoading: autoPushLoading } = useAutoPushSettings();
   const { user } = useAuth();
+  const { fullName } = useProfile(); // Use unified profile hook
   const navigate = useNavigate();
 
   const topicRecommendations = findRelevantTopics(misconceptions, problemContext, nysStandard);
@@ -270,12 +272,8 @@ export function RecommendedNextSteps({
             .single();
 
           if (studentData?.parent_email) {
-            // Get teacher name
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', user?.id || '')
-              .single();
+            // Use cached teacher name from profile hook
+            const teacherName = fullName || '';
 
             const { error: notifyError } = await supabase.functions.invoke('send-auto-push-parent-notification', {
               body: {
@@ -286,7 +284,7 @@ export function RecommendedNextSteps({
                 regentsScore,
                 topicName: topicName || 'General Practice',
                 worksheetCount: successCount,
-                teacherName: profile?.full_name,
+                teacherName,
                 threshold: autoPushThreshold,
               },
             });
@@ -305,7 +303,7 @@ export function RecommendedNextSteps({
     };
 
     triggerAutoPush();
-  }, [grade, regentsScore, classId, studentId, shouldAutoPush, autoPushLoading, autoPushTriggered, worksheetRecommendations, autoPushWorksheetCount, pushToSisterApp, studentName, autoPushThreshold, user, topicName]);
+  }, [grade, regentsScore, classId, studentId, shouldAutoPush, autoPushLoading, autoPushTriggered, worksheetRecommendations, autoPushWorksheetCount, pushToSisterApp, studentName, autoPushThreshold, fullName, topicName]);
 
   const handlePushToApp = async (worksheet: WorksheetRecommendation) => {
     if (!classId) {

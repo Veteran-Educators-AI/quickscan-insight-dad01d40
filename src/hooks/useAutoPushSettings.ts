@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/lib/auth';
+import { useCallback } from 'react';
+import { useSettings } from './useSettings';
 
 interface AutoPushSettings {
   autoPushEnabled: boolean;
@@ -16,79 +15,30 @@ const DEFAULT_SETTINGS: AutoPushSettings = {
   autoPushWorksheetCount: 3,
 };
 
+/**
+ * Auto Push settings hook - now uses unified settings to avoid duplicate API calls
+ * Previously made a separate API call to the settings table
+ * Now shares the unified settings query with other hooks
+ */
 export function useAutoPushSettings() {
-  const { user } = useAuth();
-  const [settings, setSettings] = useState<AutoPushSettings>(DEFAULT_SETTINGS);
-  const [isLoading, setIsLoading] = useState(true);
+  const { settings: unifiedSettings, isLoading, updateSettings } = useSettings();
 
-  const fetchSettings = useCallback(async () => {
-    if (!user?.id) {
-      setIsLoading(false);
-      return;
-    }
+  const settings: AutoPushSettings = {
+    autoPushEnabled: unifiedSettings.autoPushEnabled,
+    autoPushThreshold: unifiedSettings.autoPushThreshold,
+    autoPushRegentsThreshold: unifiedSettings.autoPushRegentsThreshold,
+    autoPushWorksheetCount: unifiedSettings.autoPushWorksheetCount,
+  };
 
+  const updateAutoPushSettings = useCallback(async (newSettings: Partial<AutoPushSettings>) => {
     try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('auto_push_enabled, auto_push_threshold, auto_push_regents_threshold, auto_push_worksheet_count')
-        .eq('teacher_id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching auto-push settings:', error);
-        return;
-      }
-
-      if (data) {
-        setSettings({
-          autoPushEnabled: data.auto_push_enabled ?? false,
-          autoPushThreshold: data.auto_push_threshold ?? 70,
-          autoPushRegentsThreshold: data.auto_push_regents_threshold ?? 3,
-          autoPushWorksheetCount: data.auto_push_worksheet_count ?? 3,
-        });
-      }
-    } catch (err) {
-      console.error('Failed to fetch auto-push settings:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
-
-  const updateSettings = async (newSettings: Partial<AutoPushSettings>) => {
-    if (!user?.id) return false;
-
-    const updatedSettings = { ...settings, ...newSettings };
-
-    try {
-      const { error } = await supabase
-        .from('settings')
-        .upsert({
-          teacher_id: user.id,
-          auto_push_enabled: updatedSettings.autoPushEnabled,
-          auto_push_threshold: updatedSettings.autoPushThreshold,
-          auto_push_regents_threshold: updatedSettings.autoPushRegentsThreshold,
-          auto_push_worksheet_count: updatedSettings.autoPushWorksheetCount,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'teacher_id',
-        });
-
-      if (error) {
-        console.error('Error updating auto-push settings:', error);
-        return false;
-      }
-
-      setSettings(updatedSettings);
+      await updateSettings(newSettings);
       return true;
     } catch (err) {
-      console.error('Failed to update auto-push settings:', err);
+      console.error('Error updating auto-push settings:', err);
       return false;
     }
-  };
+  }, [updateSettings]);
 
   // Check if auto-push should trigger based on grade/regents score
   const shouldAutoPush = useCallback((grade?: number, regentsScore?: number): boolean => {
@@ -110,8 +60,8 @@ export function useAutoPushSettings() {
   return {
     ...settings,
     isLoading,
-    updateSettings,
+    updateSettings: updateAutoPushSettings,
     shouldAutoPush,
-    refetch: fetchSettings,
+    refetch: () => {}, // No longer needed - React Query handles refetching
   };
 }

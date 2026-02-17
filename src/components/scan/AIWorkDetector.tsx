@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useProfile } from '@/hooks/useProfile';
 import { cn } from '@/lib/utils';
 import { useAIDetectionSettings } from '@/hooks/useAIDetectionSettings';
 
@@ -28,6 +29,7 @@ interface AIWorkDetectorProps {
 export function AIWorkDetector({ text, studentName, studentId, questionContext, onResult, onRejection }: AIWorkDetectorProps) {
   const { toast } = useToast();
   const { settings, isLoading: isLoadingSettings } = useAIDetectionSettings();
+  const { fullName } = useProfile(); // Use unified profile hook
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AIDetectionResult | null>(null);
 
@@ -52,17 +54,8 @@ export function AIWorkDetector({ text, studentName, studentId, questionContext, 
         return;
       }
 
-      // Fetch teacher info
-      const { data: { user } } = await supabase.auth.getUser();
-      let teacherName = '';
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user.id)
-          .single();
-        teacherName = profile?.full_name || '';
-      }
+      // Use cached teacher name from profile hook
+      const teacherName = fullName || '';
 
       await supabase.functions.invoke('send-parent-ai-notification', {
         body: {

@@ -37,7 +37,7 @@ export default function SimpleMode() {
   const { toast } = useToast();
   
   const [classes, setClasses] = useState<ClassOption[]>([]);
-  const [selectedClass, setSelectedClass] = useState<string>("");
+  const [selectedClass, setSelectedClass] = useState<string>("all");
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [loading, setLoading] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -73,7 +73,7 @@ export default function SimpleMode() {
             Authorization: `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
-            classId: selectedClass || null,
+            classId: selectedClass === "all" ? null : selectedClass,
             excludeTopics,
           }),
         }
@@ -226,7 +226,7 @@ export default function SimpleMode() {
                   <SelectValue placeholder="All Classes" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Classes</SelectItem>
+                  <SelectItem value="all">All Classes</SelectItem>
                   {classes.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}

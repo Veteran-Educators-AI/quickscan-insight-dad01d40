@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/lib/auth';
+import { useSettings } from './useSettings';
 
 interface AIDetectionSettings {
   ai_detection_enabled: boolean;
@@ -16,40 +14,19 @@ const DEFAULT_SETTINGS: AIDetectionSettings = {
   parent_ai_notifications: true,
 };
 
+/**
+ * AI Detection settings hook - now uses unified settings to avoid duplicate API calls
+ * Previously made a separate API call to the settings table
+ * Now shares the unified settings query with other hooks
+ */
 export function useAIDetectionSettings() {
-  const { user } = useAuth();
-  const [settings, setSettings] = useState<AIDetectionSettings>(DEFAULT_SETTINGS);
-  const [isLoading, setIsLoading] = useState(true);
+  const { settings: unifiedSettings, isLoading } = useSettings();
 
-  useEffect(() => {
-    if (user) {
-      fetchSettings();
-    }
-  }, [user]);
-
-  const fetchSettings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('ai_detection_enabled, ai_detection_threshold, ai_auto_reject_enabled, parent_ai_notifications')
-        .eq('teacher_id', user!.id)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        setSettings({
-          ai_detection_enabled: data.ai_detection_enabled ?? true,
-          ai_detection_threshold: data.ai_detection_threshold ?? 80,
-          ai_auto_reject_enabled: data.ai_auto_reject_enabled ?? true,
-          parent_ai_notifications: data.parent_ai_notifications ?? true,
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching AI detection settings:', error);
-    } finally {
-      setIsLoading(false);
-    }
+  const settings: AIDetectionSettings = {
+    ai_detection_enabled: unifiedSettings.aiDetectionEnabled,
+    ai_detection_threshold: unifiedSettings.aiDetectionThreshold,
+    ai_auto_reject_enabled: unifiedSettings.aiAutoRejectEnabled,
+    parent_ai_notifications: unifiedSettings.parentAiNotifications,
   };
 
   return { settings, isLoading };

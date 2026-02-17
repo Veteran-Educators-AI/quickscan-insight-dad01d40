@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { useProfile } from '@/hooks/useProfile';
 import { toast } from 'sonner';
 import { resizeImage, blobToBase64 } from '@/lib/imageUtils';
 import jsPDF from 'jspdf';
@@ -34,6 +35,7 @@ interface AnswerKeyQuestion {
 
 export function TeacherAnswerKeyDialog({ open, onOpenChange, classId, className }: TeacherAnswerKeyDialogProps) {
   const { user } = useAuth();
+  const { fullName } = useProfile(); // Use unified profile hook
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [step, setStep] = useState<'upload' | 'answer' | 'review' | 'saved'>('upload');
@@ -42,25 +44,16 @@ export function TeacherAnswerKeyDialog({ open, onOpenChange, classId, className 
   const [extractedQuestions, setExtractedQuestions] = useState<AnswerKeyQuestion[]>([]);
   const [gradingNotes, setGradingNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [teacherName, setTeacherName] = useState('');
+  const [teacherName, setTeacherName] = useState(fullName || '');
   const [questionCount, setQuestionCount] = useState(5);
   const [manualQuestions, setManualQuestions] = useState<AnswerKeyQuestion[]>([]);
 
-  // Load teacher name from profile
+  // Update teacher name when profile loads
   useEffect(() => {
-    if (user?.id) {
-      supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .single()
-        .then(({ data }) => {
-          if (data?.full_name) {
-            setTeacherName(data.full_name);
-          }
-        });
+    if (fullName && !teacherName) {
+      setTeacherName(fullName);
     }
-  }, [user?.id]);
+  }, [fullName, teacherName]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

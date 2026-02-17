@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/lib/auth';
+import { useCallback } from 'react';
+import { useSettings } from './useSettings';
 
 export interface BlankPageSettings {
   autoScoreBlankPages: boolean;
@@ -14,62 +13,34 @@ const DEFAULTS: BlankPageSettings = {
   blankPageComment: 'No work shown on this page; score assigned per no-response policy.',
 };
 
+/**
+ * Blank Page settings hook - now uses unified settings to avoid duplicate API calls
+ * Previously made a separate API call to the settings table
+ * Now shares the unified settings query with other hooks
+ */
 export function useBlankPageSettings() {
-  const { user } = useAuth();
-  const [settings, setSettings] = useState<BlankPageSettings>(DEFAULTS);
-  const [isLoading, setIsLoading] = useState(true);
+  const { settings: unifiedSettings, isLoading, updateSettings, isUpdating } = useSettings();
 
-  const fetchSettings = useCallback(async () => {
-    if (!user) return;
+  const settings: BlankPageSettings = {
+    autoScoreBlankPages: unifiedSettings.autoScoreBlankPages,
+    blankPageScore: unifiedSettings.blankPageScore,
+    blankPageComment: unifiedSettings.blankPageComment,
+  };
+
+  const updateBlankPageSettings = useCallback(async (newSettings: Partial<BlankPageSettings>) => {
     try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('blank_page_auto_score, blank_page_score, blank_page_comment')
-        .eq('teacher_id', user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        setSettings({
-          autoScoreBlankPages: data.blank_page_auto_score ?? DEFAULTS.autoScoreBlankPages,
-          blankPageScore: data.blank_page_score ?? DEFAULTS.blankPageScore,
-          blankPageComment: data.blank_page_comment ?? DEFAULTS.blankPageComment,
-        });
-      }
-    } catch (err) {
-      console.error('Error fetching blank page settings:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
-
-  const updateSettings = useCallback(async (newSettings: Partial<BlankPageSettings>) => {
-    if (!user) return false;
-    try {
-      const merged = { ...settings, ...newSettings };
-      const { error } = await supabase
-        .from('settings')
-        .upsert({
-          teacher_id: user.id,
-          blank_page_auto_score: merged.autoScoreBlankPages,
-          blank_page_score: merged.blankPageScore,
-          blank_page_comment: merged.blankPageComment,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'teacher_id' });
-
-      if (error) throw error;
-      setSettings(merged);
+      await updateSettings(newSettings);
       return true;
     } catch (err) {
       console.error('Error updating blank page settings:', err);
       return false;
     }
-  }, [user, settings]);
+  }, [updateSettings]);
 
-  return { settings, isLoading, updateSettings, refetch: fetchSettings };
+  return {
+    settings,
+    isLoading,
+    updateSettings: updateBlankPageSettings,
+    refetch: () => {}, // No longer needed - React Query handles refetching
+  };
 }

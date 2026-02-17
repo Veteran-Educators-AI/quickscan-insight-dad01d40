@@ -1,102 +1,26 @@
-import { useEffect, useState } from 'react';
 import { Brain, TrendingUp, Target, Sparkles, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/lib/auth';
-
-interface LearningStats {
-  gradingCorrections: number;
-  interpretationVerifications: number;
-  nameCorrections: number;
-  dominantStyle: string | null;
-  avgAdjustment: number;
-  verificationAccuracy: number;
-}
+import { useAILearningStats } from '@/hooks/useAILearningStats';
 
 interface AILearningProgressProps {
   compact?: boolean;
 }
 
+/**
+ * AI Learning Progress Component
+ * 
+ * Now uses unified AI learning stats hook which consolidates 4-5 API calls into 1:
+ * - Previously: separate calls to grading_corrections, interpretation_verifications (2x), name_corrections
+ * - Now: single RPC call via useAILearningStats hook
+ */
 export function AILearningProgress({ compact = false }: AILearningProgressProps) {
-  const { user } = useAuth();
-  const [stats, setStats] = useState<LearningStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const fetchStats = async () => {
-      setIsLoading(true);
-      try {
-        // Fetch grading corrections
-        const { data: gradingData, count: gradingCount } = await supabase
-          .from('grading_corrections')
-          .select('ai_grade, corrected_grade, strictness_indicator', { count: 'exact' })
-          .eq('teacher_id', user.id);
-
-        // Fetch interpretation verifications
-        const { count: verificationCount } = await supabase
-          .from('interpretation_verifications')
-          .select('*', { count: 'exact', head: true })
-          .eq('teacher_id', user.id);
-
-        // Fetch approved verifications for accuracy
-        const { count: approvedCount } = await supabase
-          .from('interpretation_verifications')
-          .select('*', { count: 'exact', head: true })
-          .eq('teacher_id', user.id)
-          .eq('decision', 'approved');
-
-        // Fetch name corrections
-        const { count: nameCount } = await supabase
-          .from('name_corrections')
-          .select('*', { count: 'exact', head: true })
-          .eq('teacher_id', user.id);
-
-        // Calculate stats
-        let dominantStyle = null;
-        let avgAdjustment = 0;
-        
-        if (gradingData && gradingData.length > 0) {
-          avgAdjustment = gradingData.reduce((sum, c) => sum + (c.corrected_grade - c.ai_grade), 0) / gradingData.length;
-          
-          const strictnessCounts = gradingData.reduce((acc: Record<string, number>, c) => {
-            if (c.strictness_indicator) {
-              acc[c.strictness_indicator] = (acc[c.strictness_indicator] || 0) + 1;
-            }
-            return acc;
-          }, {});
-
-          dominantStyle = Object.entries(strictnessCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-        }
-
-        const verificationAccuracy = verificationCount && verificationCount > 0 
-          ? ((approvedCount || 0) / verificationCount) * 100 
-          : 0;
-
-        setStats({
-          gradingCorrections: gradingCount || 0,
-          interpretationVerifications: verificationCount || 0,
-          nameCorrections: nameCount || 0,
-          dominantStyle,
-          avgAdjustment,
-          verificationAccuracy,
-        });
-      } catch (error) {
-        console.error('Error fetching AI learning stats:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, [user?.id]);
+  const { stats, isLoading } = useAILearningStats();
 
   const totalLearnings = stats 
-    ? stats.gradingCorrections + stats.interpretationVerifications + stats.nameCorrections 
+    ? stats.gradingCorrections.count + stats.interpretationVerifications.totalCount + stats.nameCorrections.totalCount
     : 0;
   
   const trainingProgress = Math.min(100, (totalLearnings / 100) * 100);
@@ -164,20 +88,20 @@ export function AILearningProgress({ compact = false }: AILearningProgressProps)
               <ul className="space-y-1">
                 <li className="flex justify-between gap-4">
                   <span>Grade corrections:</span>
-                  <span className="font-medium">{stats?.gradingCorrections || 0}</span>
+                  <span className="font-medium">{stats?.gradingCorrections.count || 0}</span>
                 </li>
                 <li className="flex justify-between gap-4">
                   <span>Interpretation verifications:</span>
-                  <span className="font-medium">{stats?.interpretationVerifications || 0}</span>
+                  <span className="font-medium">{stats?.interpretationVerifications.totalCount || 0}</span>
                 </li>
                 <li className="flex justify-between gap-4">
                   <span>Name corrections:</span>
-                  <span className="font-medium">{stats?.nameCorrections || 0}</span>
+                  <span className="font-medium">{stats?.nameCorrections.totalCount || 0}</span>
                 </li>
               </ul>
-              {stats?.dominantStyle && (
+              {stats?.gradingCorrections.dominantStyle && (
                 <p className="text-muted-foreground">
-                  Your grading style: <span className="font-medium">{getStyleLabel(stats.dominantStyle)}</span>
+                  Your grading style: <span className="font-medium">{getStyleLabel(stats.gradingCorrections.dominantStyle)}</span>
                 </p>
               )}
             </div>
@@ -220,44 +144,44 @@ export function AILearningProgress({ compact = false }: AILearningProgressProps)
               <Target className="h-3.5 w-3.5" />
               <span className="text-xs">Grades</span>
             </div>
-            <span className="text-xl font-bold">{stats?.gradingCorrections || 0}</span>
+            <span className="text-xl font-bold">{stats?.gradingCorrections.count || 0}</span>
           </div>
           <div className="text-center p-3 rounded-lg bg-muted/50">
             <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
               <CheckCircle className="h-3.5 w-3.5" />
               <span className="text-xs">Verified</span>
             </div>
-            <span className="text-xl font-bold">{stats?.interpretationVerifications || 0}</span>
+            <span className="text-xl font-bold">{stats?.interpretationVerifications.totalCount || 0}</span>
           </div>
           <div className="text-center p-3 rounded-lg bg-muted/50">
             <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
               <Sparkles className="h-3.5 w-3.5" />
               <span className="text-xs">Names</span>
             </div>
-            <span className="text-xl font-bold">{stats?.nameCorrections || 0}</span>
+            <span className="text-xl font-bold">{stats?.nameCorrections.totalCount || 0}</span>
           </div>
         </div>
 
         {/* Grading style */}
-        {stats?.dominantStyle && (
+        {stats?.gradingCorrections.dominantStyle && (
           <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">Your grading style</span>
             </div>
-            <Badge variant="secondary">{getStyleLabel(stats.dominantStyle)}</Badge>
+            <Badge variant="secondary">{getStyleLabel(stats.gradingCorrections.dominantStyle)}</Badge>
           </div>
         )}
 
         {/* Verification accuracy */}
-        {stats && stats.interpretationVerifications > 0 && (
+        {stats && stats.interpretationVerifications.totalCount > 0 && (
           <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
             <div className="flex items-center gap-2">
               <Info className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">AI interpretation accuracy</span>
             </div>
-            <span className={`font-medium ${stats.verificationAccuracy >= 80 ? 'text-green-500' : stats.verificationAccuracy >= 60 ? 'text-yellow-500' : 'text-red-500'}`}>
-              {stats.verificationAccuracy.toFixed(0)}%
+            <span className={`font-medium ${stats.interpretationVerifications.accuracyRate >= 80 ? 'text-green-500' : stats.interpretationVerifications.accuracyRate >= 60 ? 'text-yellow-500' : 'text-red-500'}`}>
+              {stats.interpretationVerifications.accuracyRate.toFixed(0)}%
             </span>
           </div>
         )}

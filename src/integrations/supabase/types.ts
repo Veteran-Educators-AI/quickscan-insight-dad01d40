@@ -2729,6 +2729,12 @@ export type Database = {
         }
         Returns: Json
       }
+      get_ai_learning_stats: {
+        Args: {
+          teacher_uuid: string
+        }
+        Returns: Json
+      }
       get_dashboard_stats: {
         Args: {
           teacher_uuid: string
@@ -2755,6 +2761,13 @@ export type Database = {
         Args: {
           teacher_uuid: string
           student_limit?: number
+        }
+        Returns: Json
+      }
+      get_verification_stats: {
+        Args: {
+          teacher_uuid: string
+          days_back?: number
         }
         Returns: Json
       }
