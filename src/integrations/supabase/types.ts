@@ -2729,7 +2729,20 @@ export type Database = {
         }
         Returns: Json
       }
+      get_dashboard_stats: {
+        Args: {
+          teacher_uuid: string
+        }
+        Returns: Json
+      }
       get_student_dashboard: { Args: { p_student_id: string }; Returns: Json }
+      get_struggling_students: {
+        Args: {
+          teacher_uuid: string
+          student_limit?: number
+        }
+        Returns: Json
+      }
       is_student_in_class: {
         Args: { p_class_id: string; p_user_id: string }
         Returns: boolean

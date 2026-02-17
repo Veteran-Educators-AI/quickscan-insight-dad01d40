@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   Users, 
   ClipboardList, 
@@ -40,18 +41,11 @@ import {
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { supabase } from '@/integrations/supabase/client';
+import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useAuth } from '@/lib/auth';
 import { LessonPlanGenerator } from '@/components/questions/LessonPlanGenerator';
 import { LessonTopicSelector, type PresentationTheme } from '@/components/questions/LessonTopicSelector';
 import { format } from 'date-fns';
-
-interface DashboardStats {
-  classCount: number;
-  studentCount: number;
-  questionCount: number;
-  recentAttempts: number;
-  unreadComments: number;
-}
 
 interface RecentLessonPlan {
   id: string;
@@ -84,119 +78,31 @@ const gettingStartedSteps = [
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<DashboardStats>({
-    classCount: 0,
-    studentCount: 0,
-    questionCount: 0,
-    recentAttempts: 0,
-    unreadComments: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  
+  // Use unified dashboard stats hook - replaces 9+ individual API calls with 1
+  const { data: dashboardData, isLoading: loading } = useDashboardStats();
+  
   const [showTopicSelector, setShowTopicSelector] = useState(false);
   const [showLessonGenerator, setShowLessonGenerator] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<{ topicName: string; standard: string; subject: string } | null>(null);
   const [selectedTheme, setSelectedTheme] = useState<PresentationTheme | null>(null);
-  const [recentLessons, setRecentLessons] = useState<RecentLessonPlan[]>([]);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [lessonToDelete, setLessonToDelete] = useState<RecentLessonPlan | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [userName, setUserName] = useState<string>('');
 
-  useEffect(() => {
-    async function fetchStats() {
-      if (!user) return;
+  // Extract data from unified hook with defaults
+  const stats = {
+    classCount: dashboardData?.class_count || 0,
+    studentCount: dashboardData?.student_count || 0,
+    questionCount: dashboardData?.question_count || 0,
+    recentAttempts: 0, // This can be added to RPC later if needed
+    unreadComments: dashboardData?.unread_comments_count || 0,
+  };
+  
+  const recentLessons = dashboardData?.recent_lessons || [];
+  const userName = dashboardData?.profile?.full_name?.split(' ')[0] || '';
 
-      try {
-        // Fetch user's full name
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user.id)
-          .single();
-        
-        if (profile?.full_name) {
-          setUserName(profile.full_name.split(' ')[0]); // Use first name only
-        }
-
-        // Fetch class count (active classes only)
-        const { count: classCount } = await supabase
-          .from('classes')
-          .select('*', { count: 'exact', head: true })
-          .is('archived_at', null);
-
-        // Fetch question count
-        const { count: questionCount } = await supabase
-          .from('questions')
-          .select('*', { count: 'exact', head: true });
-
-        // Fetch student count across active classes only
-        const { data: classes } = await supabase
-          .from('classes')
-          .select('id')
-          .is('archived_at', null);
-
-        let studentCount = 0;
-        if (classes && classes.length > 0) {
-          const { count } = await supabase
-            .from('students')
-            .select('*', { count: 'exact', head: true })
-            .in('class_id', classes.map(c => c.id));
-          studentCount = count || 0;
-        }
-
-        // Fetch unread student comments count
-        let unreadComments = 0;
-        if (classes && classes.length > 0) {
-          const { data: students } = await supabase
-            .from('students')
-            .select('id')
-            .in('class_id', classes.map(c => c.id));
-          
-          if (students && students.length > 0) {
-            const { data: attempts } = await supabase
-              .from('attempts')
-              .select('id')
-              .in('student_id', students.map(s => s.id));
-            
-            if (attempts && attempts.length > 0) {
-              const { count: commentsCount } = await supabase
-                .from('result_comments')
-                .select('*', { count: 'exact', head: true })
-                .in('attempt_id', attempts.map(a => a.id))
-                .eq('author_type', 'student')
-                .eq('is_read', false);
-              
-              unreadComments = commentsCount || 0;
-            }
-          }
-        }
-
-        // Fetch recent lesson plans for this teacher
-        const { data: lessons } = await supabase
-          .from('lesson_plans')
-          .select('id, title, topic_name, standard, subject, created_at')
-          .eq('teacher_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        setRecentLessons(lessons || []);
-
-        setStats({
-          classCount: classCount || 0,
-          studentCount,
-          questionCount: questionCount || 0,
-          recentAttempts: 0,
-          unreadComments,
-        });
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchStats();
-  }, [user]);
 
   const handleTopicSelected = (topic: { topicName: string; standard: string; subject: string }, theme: PresentationTheme) => {
     setSelectedTopic(topic);
@@ -217,7 +123,7 @@ export default function Dashboard() {
   };
 
   const handleDeleteLesson = async () => {
-    if (!lessonToDelete) return;
+    if (!lessonToDelete || !user) return;
     
     setIsDeleting(true);
     try {
@@ -228,7 +134,8 @@ export default function Dashboard() {
 
       if (error) throw error;
 
-      setRecentLessons(prev => prev.filter(l => l.id !== lessonToDelete.id));
+      // Invalidate the dashboard stats query to refresh the lesson list
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats', user.id] });
       toast.success('Lesson plan deleted');
     } catch (error) {
       console.error('Error deleting lesson plan:', error);

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   TrendingDown,
@@ -17,24 +16,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StudentReportDialog } from '@/components/reports/StudentReportDialog';
 import { BatchRemediationEmailDialog } from '@/components/reports/BatchRemediationEmailDialog';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/lib/auth';
+import { useStrugglingStudents } from '@/hooks/useStrugglingStudents';
 import { cn } from '@/lib/utils';
-
-interface StrugglingStudent {
-  id: string;
-  firstName: string;
-  lastName: string;
-  classId: string;
-  className: string;
-  averageGrade: number;
-  weakTopicCount: number;
-  trend: 'improving' | 'stable' | 'declining';
-  lastAssessmentDate: string | null;
-  email?: string;
-  parentEmail?: string;
-  weakTopics?: string[];
-}
 
 interface StudentsNeedingHelpWidgetProps {
   className?: string;
@@ -52,120 +35,12 @@ function scoreToLevel(score: number): string {
   return 'F';
 }
 
-function calculateTrend(scores: number[]): 'improving' | 'stable' | 'declining' {
-  if (scores.length < 2) return 'stable';
-  const midpoint = Math.floor(scores.length / 2);
-  const firstHalf = scores.slice(0, midpoint);
-  const secondHalf = scores.slice(midpoint);
-  const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
-  const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
-  const diff = secondAvg - firstAvg;
-  if (diff > 5) return 'improving';
-  if (diff < -5) return 'declining';
-  return 'stable';
-}
-
 export function StudentsNeedingHelpWidget({ className, limit = 5 }: StudentsNeedingHelpWidgetProps) {
-  const { user } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string } | null>(null);
   const [showBatchEmailDialog, setShowBatchEmailDialog] = useState(false);
 
-  const { data: strugglingStudents, isLoading } = useQuery({
-    queryKey: ['struggling-students', user?.id, limit],
-    queryFn: async () => {
-      if (!user) return [];
-
-      // 1. Fetch all classes for this teacher
-      const { data: classes, error: classError } = await supabase
-        .from('classes')
-        .select('id, name')
-        .eq('teacher_id', user.id)
-        .is('archived_at', null);
-
-      if (classError) throw classError;
-      if (!classes?.length) return [];
-
-      const classMap = new Map(classes.map(c => [c.id, c.name]));
-      const classIds = classes.map(c => c.id);
-
-      // 2. Fetch all students in these classes with email info
-      const { data: students, error: studentsError } = await supabase
-        .from('students')
-        .select('id, first_name, last_name, class_id, email, parent_email')
-        .in('class_id', classIds);
-
-      if (studentsError) throw studentsError;
-      if (!students?.length) return [];
-
-      const studentIds = students.map(s => s.id);
-
-      // 3. Fetch grade history for these students
-      const { data: grades, error: gradesError } = await supabase
-        .from('grade_history')
-        .select('student_id, topic_name, grade, raw_score_earned, raw_score_possible, created_at')
-        .in('student_id', studentIds)
-        .order('created_at', { ascending: true });
-
-      if (gradesError) throw gradesError;
-
-      // 4. Process each student
-      const studentProfiles: StrugglingStudent[] = students.map(student => {
-        const studentGrades = (grades || []).filter(g => g.student_id === student.id);
-        
-        // Calculate scores
-        const scores = studentGrades.map(g => 
-          g.raw_score_possible && g.raw_score_possible > 0
-            ? (Number(g.raw_score_earned) / Number(g.raw_score_possible)) * 100
-            : g.grade
-        );
-
-        const averageGrade = scores.length > 0
-          ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-          : 70;
-
-        // Count weak topics (< 70%)
-        const topicScores: Record<string, number[]> = {};
-        studentGrades.forEach(g => {
-          const score = g.raw_score_possible && g.raw_score_possible > 0
-            ? (Number(g.raw_score_earned) / Number(g.raw_score_possible)) * 100
-            : g.grade;
-          if (!topicScores[g.topic_name]) topicScores[g.topic_name] = [];
-          topicScores[g.topic_name].push(score);
-        });
-
-        const weakTopicsEntries = Object.entries(topicScores).filter(([_, topicScoreList]) => {
-          const avg = topicScoreList.reduce((a, b) => a + b, 0) / topicScoreList.length;
-          return avg < 70;
-        });
-        const weakTopicCount = weakTopicsEntries.length;
-        const weakTopics = weakTopicsEntries.map(([name]) => name);
-
-        return {
-          id: student.id,
-          firstName: student.first_name,
-          lastName: student.last_name,
-          classId: student.class_id,
-          className: classMap.get(student.class_id) || 'Unknown Class',
-          averageGrade,
-          weakTopicCount,
-          weakTopics,
-          trend: calculateTrend(scores),
-          lastAssessmentDate: studentGrades.length > 0
-            ? studentGrades[studentGrades.length - 1].created_at
-            : null,
-          email: student.email || undefined,
-          parentEmail: student.parent_email || undefined,
-        };
-      });
-
-      // 5. Filter to struggling students and sort by lowest grade
-      return studentProfiles
-        .filter(s => s.averageGrade < 70 || s.weakTopicCount > 0)
-        .sort((a, b) => a.averageGrade - b.averageGrade)
-        .slice(0, limit);
-    },
-    enabled: !!user,
-  });
+  // Use optimized hook - replaces multiple sequential queries with single RPC call
+  const { data: strugglingStudents, isLoading } = useStrugglingStudents(limit);
 
   const getTrendIcon = (trend: 'improving' | 'stable' | 'declining') => {
     switch (trend) {
