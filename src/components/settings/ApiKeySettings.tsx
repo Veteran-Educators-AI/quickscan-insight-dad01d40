@@ -288,7 +288,7 @@ export function ApiKeySettings() {
   // The full URL that the sister app should POST to.
   // Uses the Supabase project ID to construct the edge function URL.
   // ---------------------------------------------------------------------------
-  const endpointUrl = `https://wihddyjdfihvnxvvynek.supabase.co/functions/v1/receive-sister-app-data`;
+  const endpointUrl = `https://rjlqmfthemfpetpcydog.supabase.co/functions/v1/receive-sister-app-data`;
 
   // ---------------------------------------------------------------------------
   // LOADING STATE
