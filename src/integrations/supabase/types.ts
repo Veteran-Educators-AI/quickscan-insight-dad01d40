@@ -2735,6 +2735,21 @@ export type Database = {
         }
         Returns: Json
       }
+      get_classes_with_student_counts: {
+        Args: {
+          teacher_uuid: string
+        }
+        Returns: Array<{
+          id: string
+          name: string
+          join_code: string
+          school_year: string | null
+          class_period: string | null
+          created_at: string
+          archived_at: string | null
+          student_count: number
+        }>
+      }
       get_student_dashboard: { Args: { p_student_id: string }; Returns: Json }
       get_struggling_students: {
         Args: {

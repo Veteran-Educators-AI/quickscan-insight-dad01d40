@@ -10,6 +10,7 @@ import { EditClassDialog } from '@/components/classes/EditClassDialog';
 import { ArchiveClassDialog } from '@/components/classes/ArchiveClassDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/lib/auth';
 
 interface ClassWithStudentCount {
   id: string;
@@ -23,36 +24,31 @@ interface ClassWithStudentCount {
 }
 
 export default function Classes() {
+  const { user } = useAuth();
   const [classes, setClasses] = useState<ClassWithStudentCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchClasses();
-  }, []);
+    if (user) {
+      fetchClasses();
+    }
+  }, [user]);
 
   async function fetchClasses() {
+    if (!user) return;
+
     try {
-      const { data: classesData, error } = await supabase
-        .from('classes')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Use RPC function to fetch classes with student counts in a single query
+      // This replaces the N+1 query pattern (1 for classes + 1 per class for counts)
+      const { data, error } = await supabase.rpc('get_classes_with_student_counts', {
+        teacher_uuid: user.id,
+      });
 
       if (error) throw error;
 
-      // Fetch student counts for each class
-      const classesWithCounts = await Promise.all(
-        (classesData || []).map(async (cls) => {
-          const { count } = await supabase
-            .from('students')
-            .select('*', { count: 'exact', head: true })
-            .eq('class_id', cls.id);
-          return { ...cls, student_count: count || 0 };
-        })
-      );
-
-      setClasses(classesWithCounts);
+      setClasses(data || []);
     } catch (error) {
       console.error('Error fetching classes:', error);
       toast({
